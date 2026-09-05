@@ -6,6 +6,7 @@ import { env } from "./env.js";
 import { prisma } from "./db.js";
 import { registerRoomRoutes } from "./http/rooms.js";
 import { registerUploadRoutes } from "./http/upload.js";
+import { registerSocketHandlers } from "./socket/index.js";
 
 const app = Fastify({ logger: true });
 
@@ -40,12 +41,7 @@ const io = new SocketServer<ClientToServerEvents, ServerToClientEvents, Record<s
   { cors: { origin: env.CORS_ORIGIN } },
 );
 
-io.on("connection", (socket) => {
-  app.log.info({ socketId: socket.id }, "socket conectado");
-  socket.on("disconnect", (reason) => {
-    app.log.info({ socketId: socket.id, reason }, "socket desconectado");
-  });
-});
+registerSocketHandlers(io, app.log);
 
 // --- Start --------------------------------------------------------------
 
