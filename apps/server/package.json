@@ -13,9 +13,12 @@
   },
   "dependencies": {
     "@fastify/cors": "^10.0.0",
+    "@fastify/multipart": "^10.1.1",
+    "@fastify/static": "^10.1.3",
     "@prisma/client": "^6.16.0",
     "@tormenta-vtt/shared": "workspace:*",
     "fastify": "^5.1.0",
+    "image-size": "^2.0.2",
     "socket.io": "^4.8.0",
     "zod": "^3.23.8"
   },

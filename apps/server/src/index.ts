@@ -4,6 +4,8 @@ import { Server as SocketServer } from "socket.io";
 import type { ClientToServerEvents, ServerToClientEvents, SocketData } from "@tormenta-vtt/shared";
 import { env } from "./env.js";
 import { prisma } from "./db.js";
+import { registerRoomRoutes } from "./http/rooms.js";
+import { registerUploadRoutes } from "./http/upload.js";
 
 const app = Fastify({ logger: true });
 
@@ -23,6 +25,9 @@ app.get("/health", async () => {
 });
 
 app.get("/", async () => ({ name: "tormenta-vtt server", version: "0.1.0" }));
+
+await registerRoomRoutes(app);
+await registerUploadRoutes(app);
 
 // --- Socket.io ----------------------------------------------------------
 // O Socket.io é "plugado" no servidor HTTP do Fastify. Os generics garantem
