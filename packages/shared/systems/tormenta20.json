@@ -1,0 +1,72 @@
+{
+  "$comment": "Definição do sistema Tormenta20 (edição 2020). Este arquivo segue o SystemDefinitionSchema em src/schemas/system.ts. Toda regra de sistema mora aqui, nunca no código.",
+  "schemaVersion": 1,
+  "id": "tormenta20",
+  "name": "Tormenta20",
+  "version": "1.0.0",
+  "baseDie": "1d20",
+
+  "attributes": [
+    { "key": "for", "abbr": "FOR", "label": "Força",        "default": 0, "min": -5, "max": 20 },
+    { "key": "des", "abbr": "DES", "label": "Destreza",     "default": 0, "min": -5, "max": 20 },
+    { "key": "con", "abbr": "CON", "label": "Constituição", "default": 0, "min": -5, "max": 20 },
+    { "key": "int", "abbr": "INT", "label": "Inteligência", "default": 0, "min": -5, "max": 20 },
+    { "key": "sab", "abbr": "SAB", "label": "Sabedoria",    "default": 0, "min": -5, "max": 20 },
+    { "key": "car", "abbr": "CAR", "label": "Carisma",      "default": 0, "min": -5, "max": 20 }
+  ],
+
+  "skills": [
+    { "key": "acrobacia",     "label": "Acrobacia",     "attribute": "des", "trainedOnly": false, "armorPenalty": true  },
+    { "key": "adestramento",  "label": "Adestramento",  "attribute": "car", "trainedOnly": true,  "armorPenalty": false },
+    { "key": "atletismo",     "label": "Atletismo",     "attribute": "for", "trainedOnly": false, "armorPenalty": false },
+    { "key": "atuacao",       "label": "Atuação",       "attribute": "car", "trainedOnly": false, "armorPenalty": false },
+    { "key": "cavalgar",      "label": "Cavalgar",      "attribute": "des", "trainedOnly": false, "armorPenalty": false },
+    { "key": "conhecimento",  "label": "Conhecimento",  "attribute": "int", "trainedOnly": true,  "armorPenalty": false },
+    { "key": "cura",          "label": "Cura",          "attribute": "sab", "trainedOnly": false, "armorPenalty": false },
+    { "key": "diplomacia",    "label": "Diplomacia",    "attribute": "car", "trainedOnly": false, "armorPenalty": false },
+    { "key": "enganacao",     "label": "Enganação",     "attribute": "car", "trainedOnly": false, "armorPenalty": false },
+    { "key": "fortitude",     "label": "Fortitude",     "attribute": "con", "trainedOnly": false, "armorPenalty": false },
+    { "key": "furtividade",   "label": "Furtividade",   "attribute": "des", "trainedOnly": false, "armorPenalty": true  },
+    { "key": "guerra",        "label": "Guerra",        "attribute": "int", "trainedOnly": true,  "armorPenalty": false },
+    { "key": "iniciativa",    "label": "Iniciativa",    "attribute": "des", "trainedOnly": false, "armorPenalty": false },
+    { "key": "intimidacao",   "label": "Intimidação",   "attribute": "car", "trainedOnly": false, "armorPenalty": false },
+    { "key": "intuicao",      "label": "Intuição",      "attribute": "sab", "trainedOnly": false, "armorPenalty": false },
+    { "key": "investigacao",  "label": "Investigação",  "attribute": "int", "trainedOnly": false, "armorPenalty": false },
+    { "key": "jogatina",      "label": "Jogatina",      "attribute": "car", "trainedOnly": true,  "armorPenalty": false },
+    { "key": "ladinagem",     "label": "Ladinagem",     "attribute": "des", "trainedOnly": true,  "armorPenalty": true  },
+    { "key": "luta",          "label": "Luta",          "attribute": "for", "trainedOnly": false, "armorPenalty": false },
+    { "key": "misticismo",    "label": "Misticismo",    "attribute": "int", "trainedOnly": true,  "armorPenalty": false },
+    { "key": "nobreza",       "label": "Nobreza",       "attribute": "int", "trainedOnly": true,  "armorPenalty": false },
+    { "key": "oficio",        "label": "Ofício",        "attribute": "int", "trainedOnly": true,  "armorPenalty": false },
+    { "key": "percepcao",     "label": "Percepção",     "attribute": "sab", "trainedOnly": false, "armorPenalty": false },
+    { "key": "pilotagem",     "label": "Pilotagem",     "attribute": "des", "trainedOnly": true,  "armorPenalty": false },
+    { "key": "pontaria",      "label": "Pontaria",      "attribute": "des", "trainedOnly": false, "armorPenalty": false },
+    { "key": "reflexos",      "label": "Reflexos",      "attribute": "des", "trainedOnly": false, "armorPenalty": false },
+    { "key": "religiao",      "label": "Religião",      "attribute": "sab", "trainedOnly": true,  "armorPenalty": false },
+    { "key": "sobrevivencia", "label": "Sobrevivência", "attribute": "sab", "trainedOnly": false, "armorPenalty": false },
+    { "key": "vontade",       "label": "Vontade",       "attribute": "sab", "trainedOnly": false, "armorPenalty": false }
+  ],
+
+  "resources": [
+    { "key": "pv", "label": "Pontos de Vida", "abbr": "PV" },
+    { "key": "pm", "label": "Pontos de Mana", "abbr": "PM" }
+  ],
+
+  "rolls": {
+    "$comment": "Em Tormenta20 o valor do atributo já é o modificador. Perícia = 1d20 + metade do nível + atributo + bônus de treino.",
+    "attributeCheck": "1d20 + {attr}",
+    "skillCheck": "1d20 + {halfLevel} + {attr} + {trained}",
+    "initiative": "1d20 + {skill.iniciativa}"
+  },
+
+  "extraRolls": [
+    { "key": "atk_melee",  "label": "Ataque corpo a corpo (Luta)",       "formula": "1d20 + {skill.luta}" },
+    { "key": "atk_ranged", "label": "Ataque à distância (Pontaria)",     "formula": "1d20 + {skill.pontaria}" }
+  ],
+
+  "trainedBonus": [
+    { "minLevel": 1,  "bonus": 2 },
+    { "minLevel": 7,  "bonus": 4 },
+    { "minLevel": 15, "bonus": 6 }
+  ]
+}

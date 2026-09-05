@@ -1,0 +1,29 @@
+{
+  "name": "@tormenta-vtt/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node --env-file=../../.env dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "prisma:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.0",
+    "@prisma/client": "^6.16.0",
+    "@tormenta-vtt/shared": "workspace:*",
+    "fastify": "^5.1.0",
+    "socket.io": "^4.8.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "prisma": "^6.16.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

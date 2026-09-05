@@ -1,0 +1,115 @@
+// Modelo de dados do MVP. Espelha os schemas Zod em packages/shared/src/schemas.
+// Regra: o Prisma guarda ESTADO (posição de token, mapa, chat). Regras de
+// sistema (atributos, perícias) NÃO ficam aqui — ficam no JSON do sistema.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  gm
+  player
+}
+
+model Room {
+  id            String   @id @default(cuid())
+  name          String
+  inviteCode    String   @unique
+  gmSecret      String
+  systemId      String   @default("tormenta20")
+  activeSceneId String?
+  createdAt     DateTime @default(now())
+
+  scenes       Scene[]
+  participants Participant[]
+  messages     ChatMessage[]
+  initiative   InitiativeEntry[]
+}
+
+model Participant {
+  id        String   @id @default(cuid())
+  roomId    String
+  nickname  String
+  role      Role     @default(player)
+  /// Token secreto guardado no localStorage do navegador para reconectar como o mesmo participante.
+  sessionToken String @unique @default(cuid())
+  createdAt DateTime @default(now())
+
+  room   Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tokens Token[]
+
+  @@index([roomId])
+}
+
+model Scene {
+  id        String  @id @default(cuid())
+  roomId    String
+  name      String
+  mapUrl    String?
+  mapWidth  Int?
+  mapHeight Int?
+  /// GridConfig serializado (ver GridConfigSchema). JSON para não migrar a cada campo novo.
+  grid      Json    @default("{\"type\":\"square\",\"cellSize\":70,\"offsetX\":0,\"offsetY\":0,\"color\":\"#00000055\",\"snap\":true}")
+  createdAt DateTime @default(now())
+
+  room   Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tokens Token[]
+
+  @@index([roomId])
+}
+
+model Token {
+  id       String  @id @default(cuid())
+  sceneId  String
+  name     String
+  imageUrl String?
+  x        Float
+  y        Float
+  width    Float
+  height   Float
+  rotation Float   @default(0)
+  zIndex   Int     @default(0)
+  visible  Boolean @default(true)
+  ownerId  String?
+  color    String  @default("#e11d48")
+
+  scene Scene        @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  owner Participant? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([sceneId])
+}
+
+model ChatMessage {
+  id            String   @id @default(cuid())
+  roomId        String
+  participantId String
+  nickname      String
+  kind          String   // "text" | "roll" | "system"
+  text          String?
+  /// DiceRoll serializado (ver DiceRollSchema) quando kind == "roll".
+  roll          Json?
+  createdAt     DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+}
+
+model InitiativeEntry {
+  id       String  @id @default(cuid())
+  roomId   String
+  tokenId  String?
+  name     String
+  value    Float
+  tiebreak Float   @default(0)
+  visible  Boolean @default(true)
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+}

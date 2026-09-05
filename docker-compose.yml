@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: tormenta-vtt-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vtt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vtt}
+      POSTGRES_DB: ${POSTGRES_DB:-tormenta_vtt}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vtt} -d ${POSTGRES_DB:-tormenta_vtt}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
