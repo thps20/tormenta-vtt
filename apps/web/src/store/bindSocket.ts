@@ -1,0 +1,37 @@
+import type { Socket } from "socket.io-client";
+import type { ClientToServerEvents, ServerToClientEvents } from "@tormenta-vtt/shared";
+import { useRoom } from "./room";
+import { useTokens } from "./tokens";
+import { useChat } from "./chat";
+import { useInitiative } from "./initiative";
+import { toast } from "./ui";
+
+/**
+ * Liga cada broadcast do servidor à store certa. Chamado uma única vez ao
+ * criar o socket. Componentes nunca fazem socket.on: só leem as stores.
+ */
+export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEvents>): void {
+  // Reconexão automática: se a conexão caiu e voltou, entra de novo na sala
+  // com o sessionToken salvo (o servidor devolve um snapshot fresco).
+  socket.on("connect", () => {
+    const { lastJoin, status } = useRoom.getState();
+    if (lastJoin && (status.kind === "joined" || status.kind === "joining")) void useRoom.getState().join(lastJoin);
+  });
+
+  socket.on("room:participantJoined", (p) => useRoom.getState().upsertParticipant(p));
+  socket.on("room:participantLeft", ({ id }) => useRoom.getState().markDisconnected(id));
+  socket.on("room:activeSceneChanged", ({ sceneId }) => useRoom.getState().setActiveScene(sceneId));
+
+  socket.on("scene:created", (scene) => useRoom.getState().upsertScene(scene));
+  socket.on("scene:updated", (scene) => useRoom.getState().upsertScene(scene));
+
+  socket.on("token:created", (token) => useTokens.getState().upsert(token));
+  socket.on("token:updated", (token) => useTokens.getState().upsert(token));
+  socket.on("token:deleted", ({ tokenId }) => useTokens.getState().remove(tokenId));
+
+  socket.on("chat:message", (msg) => useChat.getState().append(msg));
+
+  socket.on("initiative:updated", (state) => useInitiative.getState().setState(state));
+
+  socket.on("server:error", ({ message }) => toast(message));
+}
