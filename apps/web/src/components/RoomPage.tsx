@@ -1,0 +1,132 @@
+import { useEffect } from "react";
+import { navigate } from "../lib/router";
+import { selectActiveScene, useRoom } from "../store/room";
+import { selectSceneTokens, useTokens } from "../store/tokens";
+import { useChat } from "../store/chat";
+import { currentEntry, useInitiative } from "../store/initiative";
+import { TopBar } from "./TopBar";
+import { VttCanvas } from "./VttCanvas";
+import { SidePanel } from "./SidePanel";
+import { NicknamePrompt } from "./NicknamePrompt";
+
+/**
+ * Página da mesa: entra na sala pela URL e liga as stores aos componentes.
+ * Os componentes visuais recebem props; só esta página conhece as stores.
+ */
+export function RoomPage({ inviteCode, gmSecret }: { inviteCode: string; gmSecret: string | null }) {
+  const status = useRoom((s) => s.status);
+  const lastJoin = useRoom((s) => s.lastJoin);
+  const join = useRoom((s) => s.join);
+
+  // Entra na sala ao abrir a URL (a menos que o Lobby já tenha iniciado o join deste código).
+  useEffect(() => {
+    if (lastJoin?.inviteCode !== inviteCode) void join({ inviteCode, gmSecret });
+  }, [inviteCode, gmSecret, lastJoin?.inviteCode, join]);
+
+  if (status.kind === "needsNickname") {
+    return (
+      <NicknamePrompt inviteCode={inviteCode} error={status.error} onSubmit={(nickname) => void join({ inviteCode, gmSecret, nickname })} />
+    );
+  }
+
+  if (status.kind === "error") {
+    return (
+      <Centered>
+        <p className="text-red-400 text-sm">{status.message}</p>
+        <button onClick={() => navigate("/")} className="text-xs text-[#d4af37] underline cursor-pointer">
+          Voltar ao lobby
+        </button>
+      </Centered>
+    );
+  }
+
+  if (status.kind !== "joined") {
+    return (
+      <Centered>
+        <p className="text-zinc-400 text-sm font-serif">Entrando na sala…</p>
+      </Centered>
+    );
+  }
+
+  return <Table />;
+}
+
+function Table() {
+  const room = useRoom((s) => s.room);
+  const me = useRoom((s) => s.me);
+  const participants = useRoom((s) => s.participants);
+  const scene = useRoom(selectActiveScene);
+  const leave = useRoom((s) => s.leave);
+
+  const tokens = useTokens(selectSceneTokens(scene?.id));
+  const selectedTokenId = useTokens((s) => s.selectedId);
+  const selectToken = useTokens((s) => s.select);
+  const moveLive = useTokens((s) => s.moveLive);
+  const patchToken = useTokens((s) => s.patch);
+
+  const messages = useChat((s) => s.messages);
+  const sendMessage = useChat((s) => s.send);
+
+  const initiative = useInitiative((s) => s.state);
+  const nextTurn = useInitiative((s) => s.next);
+  const resetInitiative = useInitiative((s) => s.reset);
+
+  if (!room || !me) return null;
+  const isGm = me.role === "gm";
+  const activeTurnTokenId = currentEntry(initiative)?.tokenId ?? null;
+
+  return (
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0c0c0c] text-zinc-100 antialiased">
+      <TopBar
+        room={room}
+        scene={scene}
+        participants={participants}
+        me={me}
+        onLeaveToLobby={() => {
+          leave();
+          navigate("/");
+        }}
+      />
+
+      <div className="flex-1 flex overflow-hidden relative">
+        <main className="flex-1 h-full relative overflow-hidden">
+          {scene ? (
+            <VttCanvas
+              scene={scene}
+              tokens={tokens}
+              participants={participants}
+              me={me}
+              activeTurnTokenId={activeTurnTokenId}
+              selectedTokenId={selectedTokenId}
+              onSelectToken={selectToken}
+              onTokenMoveLive={moveLive}
+              onTokenMoveEnd={(id, x, y) => void patchToken({ id, x, y })}
+            />
+          ) : (
+            <Centered>
+              <p className="text-zinc-500 text-sm">Nenhuma cena ativa.</p>
+            </Centered>
+          )}
+        </main>
+
+        <SidePanel
+          messages={messages}
+          participants={participants}
+          currentUserId={me.id}
+          initiative={initiative}
+          tokens={tokens}
+          isGm={isGm}
+          onSendMessage={(text) => void sendMessage(text)}
+          onNextTurn={() => void nextTurn()}
+          onResetInitiative={() => void resetInitiative()}
+          onSelectToken={selectToken}
+          selectedTokenId={selectedTokenId}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Centered({ children }: { children: React.ReactNode }) {
+  return <div className="h-full w-full min-h-screen flex flex-col items-center justify-center gap-3 bg-[#0c0c0c]">{children}</div>;
+}
