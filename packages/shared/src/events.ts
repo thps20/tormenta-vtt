@@ -6,28 +6,38 @@
  * Convenção de nomes: "<recurso>:<ação>" em kebab/camel.
  * Todo evento C->S recebe um callback `ack` com { ok: true, data } ou { ok: false, error }.
  * Isso deixa o cliente saber se o servidor aceitou (ex.: validação Zod falhou).
+ *
+ * Os payloads são tipados a partir dos schemas Zod em schemas/payloads.ts,
+ * então tipo e validação nunca divergem.
  */
 import type {
   ChatMessage,
-  InitiativeEntry,
+  InitiativeAddPayload,
   InitiativeState,
+  InitiativeUpdatePayload,
   Participant,
+  RoomJoinPayload,
   RoomPublic,
   Scene,
-  GridConfig,
+  SceneSetMapPayload,
+  SceneUpdateGridPayload,
   Token,
   TokenCreate,
   TokenPatch,
 } from "./schemas/index.js";
 
-export type Ack<T = void> = (res: { ok: true; data: T } | { ok: false; error: string }) => void;
+export type AckResult<T> = { ok: true; data: T } | { ok: false; error: string };
+export type Ack<T = void> = (res: AckResult<T>) => void;
 
 /** Estado completo enviado ao entrar na sala. */
 export interface RoomSnapshot {
   room: RoomPublic;
   me: Participant;
+  /** Guardar no localStorage para reconectar como o mesmo participante. */
+  sessionToken: string;
   participants: Participant[];
   scenes: Scene[];
+  /** Tokens da cena ativa (jogadores não recebem os invisíveis). */
   tokens: Token[];
   initiative: InitiativeState;
   chat: ChatMessage[];
@@ -35,20 +45,14 @@ export interface RoomSnapshot {
 
 export interface ClientToServerEvents {
   // Sala
-  "room:join": (
-    payload: { inviteCode: string; nickname: string; gmSecret?: string },
-    ack: Ack<RoomSnapshot>,
-  ) => void;
+  "room:join": (payload: RoomJoinPayload, ack: Ack<RoomSnapshot>) => void;
 
   // Cena (GM)
   "scene:create": (payload: { name: string }, ack: Ack<Scene>) => void;
   "scene:activate": (payload: { sceneId: string }, ack: Ack) => void;
-  "scene:updateGrid": (payload: { sceneId: string; grid: Partial<GridConfig> }, ack: Ack<Scene>) => void;
-  /** mapUrl vem do upload HTTP (POST /api/upload) feito antes. */
-  "scene:setMap": (
-    payload: { sceneId: string; mapUrl: string; mapWidth: number; mapHeight: number },
-    ack: Ack<Scene>,
-  ) => void;
+  "scene:updateGrid": (payload: SceneUpdateGridPayload, ack: Ack<Scene>) => void;
+  /** mapUrl vem do upload HTTP (POST /api/upload) feito antes. null remove o mapa. */
+  "scene:setMap": (payload: SceneSetMapPayload, ack: Ack<Scene>) => void;
 
   // Tokens
   "token:create": (payload: TokenCreate, ack: Ack<Token>) => void;
@@ -57,12 +61,12 @@ export interface ClientToServerEvents {
   "token:delete": (payload: { tokenId: string }, ack: Ack) => void;
 
   // Chat + dados
-  /** Se text começar com "/r " o servidor interpreta como rolagem. */
+  /** "/r <fórmula> [# rótulo]" rola; "/gr" rola em segredo (só GM + autor veem). */
   "chat:send": (payload: { text: string }, ack: Ack<ChatMessage>) => void;
 
-  // Iniciativa (GM, exceto "initiative:roll" que jogadores podem usar no próprio token)
-  "initiative:add": (payload: Omit<InitiativeEntry, "id">, ack: Ack<InitiativeState>) => void;
-  "initiative:update": (payload: Partial<InitiativeEntry> & { id: string }, ack: Ack<InitiativeState>) => void;
+  // Iniciativa (GM)
+  "initiative:add": (payload: InitiativeAddPayload, ack: Ack<InitiativeState>) => void;
+  "initiative:update": (payload: InitiativeUpdatePayload, ack: Ack<InitiativeState>) => void;
   "initiative:remove": (payload: { entryId: string }, ack: Ack<InitiativeState>) => void;
   "initiative:next": (payload: Record<string, never>, ack: Ack<InitiativeState>) => void;
   "initiative:prev": (payload: Record<string, never>, ack: Ack<InitiativeState>) => void;
@@ -70,7 +74,9 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
+  /** Participante entrou (ou reconectou). Se já existir na lista, atualizar. */
   "room:participantJoined": (p: Participant) => void;
+  /** Participante desconectou. Ele continua na sala com connected = false. */
   "room:participantLeft": (p: { id: string }) => void;
   "room:activeSceneChanged": (p: { sceneId: string }) => void;
 

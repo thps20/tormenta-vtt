@@ -17,7 +17,7 @@ Arquitetura **agnóstica de sistema**: tudo que é regra (atributos, perícias, 
 | **GM** | Cria a sala (recebe `gmSecret` na URL) | Tudo: mapa, grid, criar/mover/apagar qualquer token, controlar iniciativa, ver tokens invisíveis |
 | **Jogador** | Entra pelo link de convite com um nickname | Mover/redimensionar tokens que possui (`ownerId`), chat, rolar dados, ver iniciativa |
 
-Sem login: um `sessionToken` (cuid) é gravado no `localStorage` para reconectar como o mesmo participante.
+Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inviteCode`) para reconectar como o mesmo participante. Ele é devolvido no `RoomSnapshot` e enviado de volta em `room:join` nas próximas conexões.
 
 ## 3. Funcionalidades do MVP
 
@@ -25,14 +25,18 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` para reconectar
 - `POST /api/rooms { name, nickname }` → cria sala, cria participante GM, devolve `{ room, gmSecret, sessionToken }`.
 - URL do GM: `/room/<inviteCode>?gm=<gmSecret>` — URL do jogador: `/room/<inviteCode>`.
 - Ao abrir a URL, o cliente pede nickname (se não houver `sessionToken` salvo) e emite `room:join`.
-- Servidor responde com `RoomSnapshot` (estado completo) e faz broadcast de `room:participantJoined`.
+- Servidor responde com `RoomSnapshot` (estado completo, inclui `sessionToken`) e faz broadcast de `room:participantJoined`.
+- Ao desconectar, o servidor faz broadcast de `room:participantLeft { id }`; o participante **continua** na lista com `connected = false` (jogadores online = `connected = true`).
+- O Lobby (`/`) tem só dois cards: criar sala e entrar com código. Não há lista de salas recentes no MVP.
 - Ao criar a sala, o servidor cria automaticamente uma cena "Cena 1" vazia e a define como ativa.
 
 ### 3.2 Mapa e grid (GM)
 - `POST /api/upload` (multipart, PNG/JPG/WebP, máx. 20 MB) → salva em `apps/server/uploads/` e devolve `{ url, width, height }`.
 - GM emite `scene:setMap` com a URL e dimensões. Servidor persiste e faz broadcast de `scene:updated`.
 - Painel de grid: tipo (`square`/`none`), `cellSize` (px), `offsetX/Y`, cor, snap. Emite `scene:updateGrid`.
-- O canvas (react-konva) desenha: imagem do mapa → linhas do grid → tokens. Pan com botão do meio/espaço+arrastar; zoom com scroll.
+- O canvas (react-konva) desenha: imagem do mapa → linhas do grid → tokens. Pan arrastando o fundo do mapa (botão esquerdo); zoom com scroll e botões +/−/ajustar.
+- Sem mapa (`mapUrl = null`) o canvas desenha um retângulo escuro de `mapWidth × mapHeight` (padrão 1600×1100) só para o grid e os tokens terem onde ficar.
+- Renomear cena está fora do MVP (o nome é definido em `scene:create`).
 
 ### 3.3 Tokens
 - Criar: GM clica "Novo token" → aparece no centro da viewport com `width = height = cellSize`. Opcional: imagem via `/api/upload`.
@@ -47,7 +51,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` para reconectar
 - Comandos:
   - `/r <fórmula> [# rótulo]` — rola, ex.: `/r 2d6+3`, `/r 1d20+5 # Ataque`.
   - `/gr <fórmula>` — rolagem secreta (só GM e autor veem).
-- **Gramática da fórmula** (parser genérico em `packages/shared/src/dice`, a implementar):
+- **Gramática da fórmula** (parser genérico em `packages/shared/src/dice`):
   ```
   formula := term (("+"|"-") term)*
   term    := dice | integer
@@ -91,7 +95,7 @@ Decisão: coordenadas em pixels (não células) para o token poder ficar "fora d
 
 ## 5. Eventos Socket.io
 
-Definidos com tipos em `packages/shared/src/events.ts`. Todo evento cliente→servidor recebe um **ack**:
+Definidos com tipos em `packages/shared/src/events.ts`; os payloads têm schemas Zod em `packages/shared/src/schemas/payloads.ts` (os tipos dos eventos derivam deles). Todo evento cliente→servidor recebe um **ack**:
 `{ ok: true, data }` ou `{ ok: false, error }`. Payloads são validados com Zod no servidor; inválido → `ok: false`.
 
 Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para essa sala. O GM entra também em `room:<roomId>:gm` para receber dados que jogadores não veem.
@@ -100,10 +104,10 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 
 | Evento | Payload | Quem | Efeito / broadcast |
 |---|---|---|---|
-| `room:join` | `{ inviteCode, nickname, gmSecret? }` | todos | ack `RoomSnapshot`; `room:participantJoined` |
+| `room:join` | `{ inviteCode, nickname?, gmSecret?, sessionToken? }` | todos | ack `RoomSnapshot`; `room:participantJoined`. `sessionToken` válido → reconecta o mesmo participante; senão exige `nickname` e cria um novo |
 | `scene:create` | `{ name }` | GM | `scene:created` |
 | `scene:activate` | `{ sceneId }` | GM | `room:activeSceneChanged` |
-| `scene:setMap` | `{ sceneId, mapUrl, mapWidth, mapHeight }` | GM | `scene:updated` |
+| `scene:setMap` | `{ sceneId, mapUrl, mapWidth, mapHeight }` (`null` remove o mapa) | GM | `scene:updated` |
 | `scene:updateGrid` | `{ sceneId, grid: Partial<GridConfig> }` | GM | `scene:updated` |
 | `token:create` | `TokenCreate` | GM | `token:created` |
 | `token:update` | `TokenPatch` (`id` + campos) | GM ou owner | `token:updated` |
@@ -118,7 +122,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 
 | Evento | Payload |
 |---|---|
-| `room:participantJoined` / `room:participantLeft` | `Participant` / `{ id }` |
+| `room:participantJoined` / `room:participantLeft` | `Participant` (novo ou reconectado; cliente faz upsert) / `{ id }` (marca `connected = false`) |
 | `room:activeSceneChanged` | `{ sceneId }` |
 | `scene:created` / `scene:updated` | `Scene` |
 | `token:created` / `token:updated` | `Token` |
