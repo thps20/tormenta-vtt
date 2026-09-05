@@ -6,6 +6,7 @@ import { useChat } from "../store/chat";
 import { currentEntry, useInitiative } from "../store/initiative";
 import { TopBar } from "./TopBar";
 import { VttCanvas } from "./VttCanvas";
+import { TOKEN_COLORS } from "./TokenInspector";
 import { SidePanel } from "./SidePanel";
 import { NicknamePrompt } from "./NicknamePrompt";
 
@@ -60,9 +61,13 @@ function Table() {
 
   const tokens = useTokens(selectSceneTokens(scene?.id));
   const selectedTokenId = useTokens((s) => s.selectedId);
+  const focusRequest = useTokens((s) => s.focusRequest);
   const selectToken = useTokens((s) => s.select);
+  const focusToken = useTokens((s) => s.focus);
   const moveLive = useTokens((s) => s.moveLive);
   const patchToken = useTokens((s) => s.patch);
+  const createToken = useTokens((s) => s.create);
+  const deleteToken = useTokens((s) => s.delete);
 
   const messages = useChat((s) => s.messages);
   const sendMessage = useChat((s) => s.send);
@@ -98,9 +103,28 @@ function Table() {
               me={me}
               activeTurnTokenId={activeTurnTokenId}
               selectedTokenId={selectedTokenId}
+              focusRequest={focusRequest}
               onSelectToken={selectToken}
               onTokenMoveLive={moveLive}
-              onTokenMoveEnd={(id, x, y) => void patchToken({ id, x, y })}
+              onTokenPatch={(patch) => void patchToken(patch)}
+              onTokenCreate={(pos, size) => {
+                const n = tokens.length + 1;
+                void createToken({
+                  sceneId: scene.id,
+                  name: `Token ${n}`,
+                  imageUrl: null,
+                  x: pos.x,
+                  y: pos.y,
+                  width: size,
+                  height: size,
+                  rotation: 0,
+                  zIndex: n,
+                  visible: true,
+                  ownerId: null,
+                  color: TOKEN_COLORS[(n - 1) % TOKEN_COLORS.length] ?? "#e11d48",
+                }).then((created) => created && selectToken(created.id));
+              }}
+              onTokenDelete={(id) => void deleteToken(id)}
             />
           ) : (
             <Centered>
@@ -119,7 +143,7 @@ function Table() {
           onSendMessage={(text) => void sendMessage(text)}
           onNextTurn={() => void nextTurn()}
           onResetInitiative={() => void resetInitiative()}
-          onSelectToken={selectToken}
+          onSelectToken={focusToken}
           selectedTokenId={selectedTokenId}
         />
       </div>

@@ -7,11 +7,14 @@ import { toast } from "./ui";
 interface TokensState {
   byId: Record<string, Token>;
   selectedId: string | null;
+  /** Pedido de "centralizar no token" (ex.: clique na iniciativa). nonce muda a cada pedido. */
+  focusRequest: { tokenId: string; nonce: number } | null;
 
   setAll: (tokens: Token[]) => void;
   upsert: (token: Token) => void;
   remove: (tokenId: string) => void;
   select: (tokenId: string | null) => void;
+  focus: (tokenId: string) => void;
 
   /** Durante o arraste: aplica local e emite com throttle (sem reverter). */
   moveLive: (tokenId: string, x: number, y: number) => void;
@@ -29,6 +32,7 @@ const emitMoveThrottled = throttle((tokenId: string, x: number, y: number) => {
 export const useTokens = create<TokensState>((set, get) => ({
   byId: {},
   selectedId: null,
+  focusRequest: null,
 
   setAll: (tokens) => set({ byId: Object.fromEntries(tokens.map((t) => [t.id, t])) }),
   upsert: (token) => set((s) => ({ byId: { ...s.byId, [token.id]: token } })),
@@ -38,6 +42,7 @@ export const useTokens = create<TokensState>((set, get) => ({
       return { byId: rest, selectedId: s.selectedId === tokenId ? null : s.selectedId };
     }),
   select: (tokenId) => set({ selectedId: tokenId }),
+  focus: (tokenId) => set((s) => ({ selectedId: tokenId, focusRequest: { tokenId, nonce: (s.focusRequest?.nonce ?? 0) + 1 } })),
 
   moveLive: (tokenId, x, y) => {
     const t = get().byId[tokenId];

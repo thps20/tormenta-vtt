@@ -1,11 +1,12 @@
 import React, { useRef, useState, useEffect, useMemo } from "react";
-import { Stage, Layer, Rect, Circle, Text, Group, Line, Image as KonvaImage } from "react-konva";
+import { Stage, Layer, Rect, Circle, Text, Group, Line, Image as KonvaImage, Transformer } from "react-konva";
 import type Konva from "konva";
-import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Shield, User } from "lucide-react";
-import type { Participant, Scene, Token } from "@tormenta-vtt/shared";
+import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
+import type { Participant, Scene, Token, TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
 import { clampToMap, gridLines, snapToGrid } from "../lib/grid";
 import { useImage } from "../lib/useImage";
+import { TokenInspector } from "./TokenInspector";
 
 /** Tamanho padrão quando a cena ainda não tem mapa. */
 export const DEFAULT_MAP = { width: 1600, height: 1100 };
@@ -17,11 +18,16 @@ interface VttCanvasProps {
   me: Participant;
   activeTurnTokenId: string | null;
   selectedTokenId: string | null;
+  /** Pedido externo de centralizar num token (clique na iniciativa). */
+  focusRequest: { tokenId: string; nonce: number } | null;
   onSelectToken: (tokenId: string | null) => void;
   /** Durante o arraste (throttled na store). */
   onTokenMoveLive: (tokenId: string, x: number, y: number) => void;
-  /** Ao soltar: posição final (com snap). */
-  onTokenMoveEnd: (tokenId: string, x: number, y: number) => void;
+  /** Ao soltar / redimensionar / editar: patch com ack e reversão. */
+  onTokenPatch: (patch: TokenPatch) => void;
+  /** GM: criar token no ponto (pixels do mapa) com o tamanho de uma célula. */
+  onTokenCreate: (pos: { x: number; y: number }, size: number) => void;
+  onTokenDelete: (tokenId: string) => void;
 }
 
 /** GM move tudo; jogador só o que possui (mesma regra do servidor). */
@@ -36,12 +42,16 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   me,
   activeTurnTokenId,
   selectedTokenId,
+  focusRequest,
   onSelectToken,
   onTokenMoveLive,
-  onTokenMoveEnd,
+  onTokenPatch,
+  onTokenCreate,
+  onTokenDelete,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
+  const transformerRef = useRef<Konva.Transformer>(null);
 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [stageScale, setStageScale] = useState(1);
@@ -87,10 +97,10 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dimensions.width, dimensions.height, mapWidth, mapHeight]);
 
-  // Centraliza no token selecionado (ex.: clique na iniciativa).
+  // Centraliza no token quando pedido de fora (clique na iniciativa).
   useEffect(() => {
-    if (!selectedTokenId) return;
-    const t = tokens.find((tk) => tk.id === selectedTokenId);
+    if (!focusRequest) return;
+    const t = tokens.find((tk) => tk.id === focusRequest.tokenId);
     if (t && dimensions.width > 0) {
       setStagePos({
         x: dimensions.width / 2 - (t.x + t.width / 2) * stageScale,
@@ -98,7 +108,34 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTokenId]);
+  }, [focusRequest?.nonce]);
+
+  // Liga o Transformer (alças de redimensionar) ao token selecionado, se pudermos controlá-lo.
+  const selectedToken = tokens.find((t) => t.id === selectedTokenId) ?? null;
+  const canResize = selectedToken !== null && canControl(me, selectedToken);
+  useEffect(() => {
+    const tr = transformerRef.current;
+    const stage = stageRef.current;
+    if (!tr || !stage) return;
+    const node = canResize && selectedToken ? stage.findOne<Konva.Group>(`#token-group-${selectedToken.id}`) : null;
+    tr.nodes(node ? [node] : []);
+    tr.getLayer()?.batchDraw();
+  }, [canResize, selectedToken, tokens]);
+
+  /** Ponto do mapa no centro da viewport (para criar tokens onde o GM está olhando). */
+  const viewportCenter = () => ({
+    x: (dimensions.width / 2 - stagePos.x) / stageScale,
+    y: (dimensions.height / 2 - stagePos.y) / stageScale,
+  });
+
+  const handleCreateToken = () => {
+    const size = scene.grid.type === "square" ? scene.grid.cellSize : 70;
+    const c = viewportCenter();
+    let pos = { x: c.x - size / 2, y: c.y - size / 2 };
+    if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
+    pos = clampToMap(pos.x, pos.y, { width: size, height: size }, map);
+    onTokenCreate(pos, size);
+  };
 
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
@@ -124,7 +161,6 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
 
   const lines = useMemo(() => (gridVisible ? gridLines(scene.grid, map) : []), [gridVisible, scene.grid, map]);
 
-  const selectedToken = tokens.find((t) => t.id === selectedTokenId) ?? null;
   const setCursor = (cursor: string) => {
     if (stageRef.current) stageRef.current.container().style.cursor = cursor;
   };
@@ -182,10 +218,41 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
                 if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
                 pos = clampToMap(pos.x, pos.y, token, map);
                 node.position(pos);
-                onTokenMoveEnd(token.id, pos.x, pos.y);
+                onTokenPatch({ id: token.id, x: pos.x, y: pos.y });
+              }}
+              onTransformEnd={(node) => {
+                // O Transformer altera scaleX/scaleY do Group; convertemos em width/height reais
+                // e zeramos a escala, porque o token é desenhado a partir de width/height.
+                const scaleX = node.scaleX();
+                const scaleY = node.scaleY();
+                node.scale({ x: 1, y: 1 });
+                const min = 8;
+                let width = Math.max(min, token.width * scaleX);
+                let height = Math.max(min, token.height * scaleY);
+                if (snapEnabled && scene.grid.type === "square") {
+                  const cells = Math.max(1, Math.round(width / scene.grid.cellSize));
+                  width = height = cells * scene.grid.cellSize;
+                }
+                let pos = { x: node.x(), y: node.y() };
+                if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
+                pos = clampToMap(pos.x, pos.y, { width, height }, map);
+                node.position(pos);
+                onTokenPatch({ id: token.id, x: pos.x, y: pos.y, width, height });
               }}
             />
           ))}
+          <Transformer
+            ref={transformerRef}
+            rotateEnabled={false}
+            keepRatio
+            enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+            anchorStroke="#d4af37"
+            anchorFill="#1a1a1a"
+            anchorSize={8}
+            borderStroke="#d4af37"
+            borderDash={[4, 4]}
+            ignoreStroke
+          />
         </Layer>
       </Stage>
 
@@ -210,43 +277,31 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
           <span className="hidden sm:inline text-[10px] font-serif font-bold uppercase tracking-wider">Grid</span>
         </HudToggle>
         <span className="text-[10px] font-mono text-zinc-400 px-1.5 border-l border-[#2d2417]">{Math.round(stageScale * 100)}%</span>
+        {me.role === "gm" && (
+          <>
+            <div className="w-[1px] h-4 bg-[#2d2417] mx-0.5" />
+            <button
+              id="btn-new-token"
+              onClick={handleCreateToken}
+              title="Novo token no centro da tela"
+              className="flex items-center gap-1 px-2 py-1 rounded bg-[#2d2417] border border-[#d4af37]/60 text-[#d4af37] hover:bg-[#3d311f] text-[10px] font-serif font-bold uppercase tracking-wider cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Token
+            </button>
+          </>
+        )}
       </div>
 
-      {/* Inspetor do token selecionado */}
       {selectedToken && (
-        <div id="token-inspector-overlay" className="absolute top-4 left-4 z-10 w-64 p-3 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl text-zinc-200">
-          <div className="flex items-center justify-between border-b border-[#2d2417] pb-2 mb-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-4 h-4 rounded-full border border-[#d4af37] shrink-0" style={{ backgroundColor: selectedToken.color }} />
-              <span className="text-xs font-serif font-bold text-[#d4af37] tracking-wide truncate">{selectedToken.name}</span>
-            </div>
-            <button onClick={() => onSelectToken(null)} className="text-zinc-500 hover:text-zinc-200 text-xs px-1 cursor-pointer">
-              ✕
-            </button>
-          </div>
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-400 flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-blue-400" />
-                Posição:
-              </span>
-              <span className="font-mono text-zinc-300 text-[11px]">
-                {Math.round(selectedToken.x)}, {Math.round(selectedToken.y)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-400 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-[#d4af37]" />
-                Dono:
-              </span>
-              <span className="text-zinc-300 text-[11px] font-medium">
-                {selectedToken.ownerId
-                  ? (participants.find((p) => p.id === selectedToken.ownerId)?.nickname ?? "Jogador")
-                  : "Apenas GM"}
-              </span>
-            </div>
-          </div>
-        </div>
+        <TokenInspector
+          token={selectedToken}
+          participants={participants}
+          me={me}
+          onPatch={onTokenPatch}
+          onDelete={() => onTokenDelete(selectedToken.id)}
+          onClose={() => onSelectToken(null)}
+        />
       )}
 
       <div className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a1a]/95 border border-[#2d2417] text-[11px] text-zinc-400 shadow-xl pointer-events-none">
@@ -268,9 +323,10 @@ interface TokenNodeProps {
   onCursor: (cursor: string) => void;
   onDragMove: (x: number, y: number) => void;
   onDragEnd: (node: Konva.Node) => void;
+  onTransformEnd: (node: Konva.Node) => void;
 }
 
-const TokenNode: React.FC<TokenNodeProps> = ({ token, draggable, isSelected, isActiveTurn, onSelect, onCursor, onDragMove, onDragEnd }) => {
+const TokenNode: React.FC<TokenNodeProps> = ({ token, draggable, isSelected, isActiveTurn, onSelect, onCursor, onDragMove, onDragEnd, onTransformEnd }) => {
   const image = useImage(assetUrl(token.imageUrl));
   const radius = Math.min(token.width, token.height) / 2;
   const cx = token.width / 2;
@@ -304,6 +360,7 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, draggable, isSelected, isA
         onCursor("grab");
         onDragEnd(e.target);
       }}
+      onTransformEnd={(e) => onTransformEnd(e.target)}
     >
       {isActiveTurn && (
         <Circle x={cx} y={cy} radius={radius + 8} stroke="#d4af37" strokeWidth={2.5} dash={[6, 4]} shadowColor="#d4af37" shadowBlur={14} shadowOpacity={0.9} />
