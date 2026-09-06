@@ -197,6 +197,27 @@ export const ActivationDefSchema = z.object({
 });
 export type ActivationDef = z.infer<typeof ActivationDefSchema>;
 
+/** Regra para contar células na diagonal (medição da régua). */
+export const DiagonalRuleSchema = z.enum(["euclidean", "manhattan", "alternating", "chebyshev"]);
+export type DiagonalRule = z.infer<typeof DiagonalRuleSchema>;
+
+/**
+ * Escala do grid no mundo do jogo. Quanto vale uma célula e como contar diagonais:
+ *   euclidean   distância em linha reta (√(dx² + dy²))
+ *   manhattan   só movimento ortogonal (dx + dy)
+ *   alternating diagonais alternam 1 e 2 células (regra 1-2-1 do d20)
+ *   chebyshev   diagonal custa o mesmo que reto (max(dx, dy))
+ * Ausente = a régua mostra só a contagem de células.
+ */
+export const SystemGridDefSchema = z.object({
+  /** Tamanho de uma célula na unidade do jogo (ex.: 1.5 para 1,5 m). */
+  cellSize: z.number().positive(),
+  /** Unidade exibida depois do número (ex.: "m"). */
+  unit: z.string().min(1).max(8),
+  diagonals: DiagonalRuleSchema.default("alternating"),
+});
+export type SystemGridDef = z.infer<typeof SystemGridDefSchema>;
+
 export const SystemDefinitionSchema = z.object({
   /** Versão deste formato de arquivo (para migrar JSONs antigos no futuro). */
   schemaVersion: z.literal(2),
@@ -248,6 +269,8 @@ export const SystemDefinitionSchema = z.object({
    * Ausente = tokens sem barra. A UI lê o atual/máximo da ficha vinculada.
    */
   tokenBar: KeySchema.optional(),
+  /** Escala do grid (valor de uma célula e regra de diagonais) para a régua. */
+  grid: SystemGridDefSchema.optional(),
   /** Regras de treinamento por faixa de nível (T20: +2/+4/+6). */
   trainedBonus: z
     .array(

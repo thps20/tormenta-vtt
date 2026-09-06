@@ -88,6 +88,12 @@ describe("tormenta20.json", () => {
     expect(def.resources.some((r) => r.key === def.tokenBar)).toBe(true);
   });
 
+  it("declara a escala do grid (célula em metros e regra de diagonais)", () => {
+    expect(def.grid).toBeDefined();
+    expect(def.grid?.cellSize).toBeGreaterThan(0);
+    expect(def.grid?.unit).toBeTruthy();
+  });
+
   it("declara Defesa como stat derivado e armadura como tipo de item com bônus de Defesa", () => {
     expect(def.derived.some((d) => d.key === "defense")).toBe(true);
     const armor = def.itemKinds.find((k) => k.key === "armor");

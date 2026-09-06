@@ -233,6 +233,13 @@
 
   "tokenBar": "pv",
 
+  "grid": {
+    "$comment": "Uma célula = 1,5 m. Diagonais na regra 1-2-1 (1,5 m / 3 m / 1,5 m); se a mesa preferir diagonal igual a reto, troque para \"chebyshev\".",
+    "cellSize": 1.5,
+    "unit": "m",
+    "diagonals": "alternating"
+  },
+
   "trainedBonus": [
     { "minLevel": 1,  "bonus": 2 },
     { "minLevel": 7,  "bonus": 4 },
