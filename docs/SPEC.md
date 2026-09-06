@@ -41,7 +41,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - **Selecionar (V)**: clicar/arrastar tokens; arrastar no mapa vazio desenha uma caixa que seleciona os tokens com o centro dentro dela; shift+clique entra/sai da seleção; arrastar um token selecionado move todos os selecionados que o usuário controla. O Stage não faz pan.
   - **Mover mapa (H)**: arrastar em qualquer lugar faz pan; tokens não respondem. Barra de espaço segurada ativa este modo temporariamente.
   - **Régua (R)**: clicar e arrastar mede do ponto inicial ao ponteiro (pontos grudam no centro da célula quando há grid e snap). A distância usa `grid` do `SystemDefinition` (`cellSize` na unidade do jogo, `unit`, regra de diagonais `euclidean | manhattan | alternating | chebyshev`; `rules/measure.ts` faz a conta) e o `cellSize` em px da cena. A régua é enviada por `ruler:update` (efêmero) e os outros a veem com o nickname do autor; some ao soltar.
-  - Névoa e Desenho: botões reservados (desabilitados), fora do MVP.
+  - **Névoa (F, só GM)**: fog of war manual, descrita em §9.3. Desenho: botão reservado (desabilitado), fora do MVP.
   - Esc cancela o gesto em andamento e volta para Selecionar. Scroll = zoom em todos os modos.
 - Sem mapa (`mapUrl = null`) o canvas desenha um retângulo escuro de `mapWidth × mapHeight` (padrão 1600×1100) só para o grid e os tokens terem onde ficar.
 - Renomear cena está fora do MVP (o nome é definido em `scene:create`).
@@ -239,6 +239,7 @@ Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a fi
 - Só existe UI para uma cena por sala (`scene:create`/`scene:activate` funcionam no servidor, sem botão no web).
 - `currentIndex`/`round` da iniciativa e a presença (`connected`) se perdem ao reiniciar o servidor.
 - Uploads ficam em disco (`apps/server/uploads/`), sem limpeza de arquivos órfãos.
+- Névoa (§9.3): só "desfazer último" (sem histórico completo nem refazer); sem luz dinâmica, paredes ou visão por token; a visibilidade de um token olha só o centro dele; `fog:updated` sempre manda a lista completa de shapes (limitada a 500).
 
 ## 9. Fase 2 (pós-MVP)
 
