@@ -117,6 +117,9 @@ export const SkillsSection: React.FC<SkillsSectionProps> = ({ def, character, co
           const attrAbbr = def.attributes.find((a) => a.key === c.attribute)?.abbr ?? c.attribute;
           const rollable = canRoll && c.usable;
           const isVariant = key.includes(":");
+          // Treino concedido por item (classe, raça): o checkbox fica travado e diz quem concedeu.
+          const grantedBy = c.grantedBy ? (character.items.find((i) => i.id === c.grantedBy)?.name ?? "item") : null;
+          const trainedTitle = grantedBy ? `Treinada por ${grantedBy}` : c.trained ? "Treinada" : "Não treinada";
 
           return (
             <div
@@ -132,13 +135,20 @@ export const SkillsSection: React.FC<SkillsSectionProps> = ({ def, character, co
             >
               <div className="flex items-center gap-2 min-w-0">
                 {isEditMode ? (
-                  <input type="checkbox" checked={cs.trained} onChange={(e) => setSkill(key, { trained: e.target.checked })} className="accent-[#d4af37] cursor-pointer" title="Treinada" />
+                  <input
+                    type="checkbox"
+                    checked={c.trained}
+                    disabled={grantedBy !== null}
+                    onChange={(e) => setSkill(key, { trained: e.target.checked })}
+                    className="accent-[#d4af37] cursor-pointer disabled:cursor-default"
+                    title={trainedTitle}
+                  />
                 ) : (
                   <div
                     className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 ${
                       c.trained ? "bg-[#d4af37]/20 border border-[#d4af37] text-[#d4af37]" : "bg-zinc-800/40 border border-zinc-700 text-zinc-600"
                     }`}
-                    title={c.trained ? "Treinada" : "Não treinada"}
+                    title={trainedTitle}
                   >
                     {c.trained ? <Star className="w-2.5 h-2.5 fill-[#d4af37]" /> : "·"}
                   </div>

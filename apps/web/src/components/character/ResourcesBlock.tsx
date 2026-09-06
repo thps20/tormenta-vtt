@@ -1,5 +1,5 @@
 import React from "react";
-import { Heart, Minus, Plus, Sparkles, Zap } from "lucide-react";
+import { Heart, Lock, Minus, Plus, Sparkles, Zap } from "lucide-react";
 import type { Character, CharacterPatch, CharacterResource, ComputedCharacter, SystemDefinition } from "@tormenta-vtt/shared";
 import { NumInput } from "./fields";
 
@@ -40,7 +40,10 @@ export const ResourcesBlock: React.FC<ResourcesBlockProps> = ({ def, character, 
           const style = STYLES[Math.min(index, STYLES.length - 1)] ?? STYLES[0]!;
           const Icon = style.Icon;
           const res = character.resources[rDef.key] ?? EMPTY;
-          const { max, min } = computed.resources[rDef.key] ?? { max: 0, min: 0 };
+          const { max, min, detail } = computed.resources[rDef.key] ?? { max: 0, min: 0, detail: null };
+          // Máximo vindo das classes: somente leitura, com a conta no tooltip ("Modo manual" no cabeçalho libera).
+          const byClasses = computed.levelSource === "classes" && rDef.perLevel !== undefined;
+          const maxTitle = byClasses && detail ? `${rDef.abbr} pelas classes: ${detail}` : undefined;
           const percent = max > 0 ? Math.min(100, Math.max(0, (res.current / max) * 100)) : 0;
           const tempPercent = max > 0 ? Math.min(30, (res.temp / max) * 100) : 0;
 
@@ -79,20 +82,28 @@ export const ResourcesBlock: React.FC<ResourcesBlockProps> = ({ def, character, 
                     <div className="flex items-center gap-1">
                       <NumInput value={res.current} onCommit={(v) => set({ current: Math.floor(v ?? 0) })} className="font-bold text-zinc-100" title="Valor atual" />
                       <span className="text-zinc-500">/</span>
-                      <NumInput
-                        value={res.maxOverride}
-                        allowEmpty
-                        placeholder={String(max)}
-                        onCommit={(v) => set({ maxOverride: v === null ? null : Math.floor(v) })}
-                        className="text-zinc-300"
-                        title={rDef.maxFormula ? `Máximo (vazio = fórmula: ${rDef.maxFormula})` : "Máximo (vazio = 0)"}
-                      />
+                      {byClasses ? (
+                        <span className="inline-flex items-center gap-1 w-12 justify-center bg-[#141414] border border-zinc-800 rounded px-1.5 py-0.5 text-zinc-300 cursor-help" title={maxTitle ?? "Máximo calculado pelas classes"}>
+                          <Lock className="w-3 h-3 text-zinc-500" /> {max}
+                        </span>
+                      ) : (
+                        <NumInput
+                          value={res.maxOverride}
+                          allowEmpty
+                          placeholder={String(max)}
+                          onCommit={(v) => set({ maxOverride: v === null ? null : Math.floor(v) })}
+                          className="text-zinc-300"
+                          title={rDef.maxFormula ? `Máximo (vazio = fórmula: ${rDef.maxFormula})` : "Máximo (vazio = 0)"}
+                        />
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-baseline gap-1">
                       <span className="text-base font-bold text-zinc-100">{res.current}</span>
                       <span className="text-zinc-500">/</span>
-                      <span className="text-zinc-400">{max}</span>
+                      <span className={`text-zinc-400 ${maxTitle ? "cursor-help underline decoration-dotted decoration-zinc-600" : ""}`} title={maxTitle}>
+                        {max}
+                      </span>
                       {res.temp > 0 && (
                         <span className="text-amber-400 font-bold ml-1" title="Pontos temporários">
                           (+{res.temp} temp)

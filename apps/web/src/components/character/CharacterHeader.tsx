@@ -1,7 +1,7 @@
 import React from "react";
-import { Award, Edit3, Eye, Shield, User, X } from "lucide-react";
-import type { Character, CharacterPatch, ComputedCharacter, Participant, SystemDefinition } from "@tormenta-vtt/shared";
-import { NumInput, Select, TextInput } from "./fields";
+import { Award, Edit3, Eye, Lock, Shield, Unlock, User, X } from "lucide-react";
+import { describeClasses, type Character, type CharacterPatch, type ComputedCharacter, type Participant, type SystemDefinition } from "@tormenta-vtt/shared";
+import { NumInput, Select, TextInput, ghostBtn } from "./fields";
 
 interface CharacterHeaderProps {
   def: SystemDefinition;
@@ -41,6 +41,29 @@ export const CharacterHeader: React.FC<CharacterHeaderProps> = ({
   const spellcastingAttr = def.attributes.find((a) => a.key === character.spellcastingAttribute);
 
   const setTrait = (key: string, value: string) => onPatch({ traits: { ...character.traits, [key]: value } });
+
+  // Classes: o sistema soma o nível dos itens de classe? Só mostra o controle quando a ficha tem alguma.
+  const classesText = describeClasses(computed.classes);
+  const hasClasses = computed.classes.length > 0;
+  const byClasses = computed.levelSource === "classes";
+  const levelTitle = byClasses ? `${computed.classes.map((c) => `${c.name} ${c.levels}`).join(" + ")} = nível ${computed.level}` : undefined;
+  /**
+   * Modo manual: ao ligar, copia o nível e os máximos calculados para os campos
+   * digitados, para nada mudar de valor na hora; ao desligar, as classes voltam a mandar.
+   */
+  const toggleManual = () => {
+    if (character.manualProgression) {
+      onPatch({ manualProgression: false });
+      return;
+    }
+    const resources = { ...character.resources };
+    for (const r of def.resources) {
+      if (!r.perLevel) continue;
+      const current = resources[r.key] ?? { current: 0, temp: 0, maxOverride: null };
+      resources[r.key] = { ...current, maxOverride: computed.resources[r.key]?.max ?? current.maxOverride };
+    }
+    onPatch({ manualProgression: true, level: computed.level, resources });
+  };
 
   return (
     <div className="bg-[#141414] border-b border-[#2d2417] p-4 text-zinc-100 relative">
@@ -115,11 +138,25 @@ export const CharacterHeader: React.FC<CharacterHeaderProps> = ({
             <div className="flex items-center gap-2 shrink-0">
               {character.kind === "npc" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 uppercase tracking-wider font-serif font-bold">NPC</span>}
               <div
+                id="sheet-level-badge"
                 className="flex items-center gap-1.5 bg-[#1e1912] border border-[#d4af37]/40 px-2.5 py-1 rounded shadow-sm"
-                title={nextLevelXp !== undefined ? `Próximo nível: ${nextLevelXp.toLocaleString()} XP` : undefined}
+                title={[levelTitle, nextLevelXp !== undefined ? `Próximo nível: ${nextLevelXp.toLocaleString()} XP` : undefined].filter(Boolean).join(" • ") || undefined}
               >
                 <Award className="w-3.5 h-3.5 text-[#d4af37]" />
                 <span className="text-xs font-serif font-bold text-amber-200">Nível {computed.level}</span>
+                {classesText && (
+                  <>
+                    <span className="text-zinc-500 text-xs">|</span>
+                    <span id="sheet-classes" className="text-xs font-serif text-zinc-200 truncate max-w-[14rem]">
+                      {classesText}
+                    </span>
+                  </>
+                )}
+                {hasClasses && character.manualProgression && (
+                  <span className="text-[9px] px-1 rounded bg-zinc-800 text-zinc-400 uppercase tracking-wider font-serif font-bold" title="Nível e PV/PM digitados; as classes não somam">
+                    manual
+                  </span>
+                )}
                 {def.level.xpTable && (
                   <>
                     <span className="text-zinc-500 text-xs">|</span>
@@ -133,10 +170,28 @@ export const CharacterHeader: React.FC<CharacterHeaderProps> = ({
           {/* Edição: nível, XP e (GM) tipo/dono */}
           {isEditMode && (
             <div className="flex flex-wrap items-center gap-3 mt-2 text-xs">
-              <label className="flex items-center gap-1 text-zinc-400">
+              <label className="flex items-center gap-1 text-zinc-400" title={levelTitle}>
                 Nível
-                <NumInput id="sheet-level" value={character.level} onCommit={(v) => onPatch({ level: Math.max(0, Math.min(def.level.max, Math.floor(v ?? 0))) })} />
+                {byClasses ? (
+                  <span id="sheet-level" className="inline-flex items-center gap-1 w-12 justify-center bg-[#141414] border border-zinc-800 rounded px-1.5 py-0.5 text-xs font-mono text-zinc-300" title={levelTitle}>
+                    <Lock className="w-3 h-3 text-zinc-500" /> {computed.level}
+                  </span>
+                ) : (
+                  <NumInput id="sheet-level" value={character.level} onCommit={(v) => onPatch({ level: Math.max(0, Math.min(def.level.max, Math.floor(v ?? 0))) })} />
+                )}
               </label>
+              {hasClasses && def.level.source === "classes" && (
+                <button
+                  type="button"
+                  id="btn-toggle-manual-progression"
+                  onClick={toggleManual}
+                  className={ghostBtn}
+                  title={character.manualProgression ? "Voltar a somar nível e PV/PM pelas classes" : "Digitar nível e PV/PM à mão, ignorando as classes"}
+                >
+                  {character.manualProgression ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                  {character.manualProgression ? "Usar classes" : "Modo manual"}
+                </button>
+              )}
               {def.level.xpTable && (
                 <label className="flex items-center gap-1 text-zinc-400">
                   XP
