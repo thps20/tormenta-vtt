@@ -9,6 +9,8 @@ interface TokensState {
   selectedId: string | null;
   /** Pedido de "centralizar no token" (ex.: clique na iniciativa). nonce muda a cada pedido. */
   focusRequest: { tokenId: string; nonce: number } | null;
+  /** Token que este cliente está arrastando agora (ecos de posição dele são ignorados). */
+  draggingId: string | null;
 
   setAll: (tokens: Token[]) => void;
   upsert: (token: Token) => void;
@@ -33,9 +35,17 @@ export const useTokens = create<TokensState>((set, get) => ({
   byId: {},
   selectedId: null,
   focusRequest: null,
+  draggingId: null,
 
   setAll: (tokens) => set({ byId: Object.fromEntries(tokens.map((t) => [t.id, t])) }),
-  upsert: (token) => set((s) => ({ byId: { ...s.byId, [token.id]: token } })),
+  upsert: (token) =>
+    set((s) => {
+      // Enquanto arrastamos, o servidor devolve (eco) posições já antigas; se aplicássemos,
+      // o token pularia para trás a cada eco. Mantemos a posição local até soltar.
+      const local = s.byId[token.id];
+      const merged = s.draggingId === token.id && local ? { ...token, x: local.x, y: local.y } : token;
+      return { byId: { ...s.byId, [token.id]: merged } };
+    }),
   remove: (tokenId) =>
     set((s) => {
       const { [tokenId]: _removed, ...rest } = s.byId;
@@ -47,13 +57,18 @@ export const useTokens = create<TokensState>((set, get) => ({
   moveLive: (tokenId, x, y) => {
     const t = get().byId[tokenId];
     if (!t) return;
-    set((s) => ({ byId: { ...s.byId, [tokenId]: { ...t, x, y } } }));
+    set((s) => ({ byId: { ...s.byId, [tokenId]: { ...t, x, y } }, draggingId: tokenId }));
     emitMoveThrottled(tokenId, x, y);
   },
 
   patch: async (patch) => {
     const previous = get().byId[patch.id];
     if (!previous) return false;
+    if (get().draggingId === patch.id) {
+      // Soltou: descarta um envio "ao vivo" pendente, que chegaria depois da posição final.
+      emitMoveThrottled.cancel();
+      set({ draggingId: null });
+    }
     // 1. otimista
     set((s) => ({ byId: { ...s.byId, [patch.id]: { ...previous, ...patch } } }));
     // 2. ack
@@ -81,6 +96,10 @@ export const useTokens = create<TokensState>((set, get) => ({
   delete: async (tokenId) => {
     const previous = get().byId[tokenId];
     if (!previous) return false;
+    if (get().draggingId === tokenId) {
+      emitMoveThrottled.cancel();
+      set({ draggingId: null });
+    }
     get().remove(tokenId);
     const res = await emitAck("token:delete", { tokenId });
     if (!res.ok) {

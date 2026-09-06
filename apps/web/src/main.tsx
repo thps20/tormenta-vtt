@@ -8,3 +8,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>,
 );
+
+// Em desenvolvimento, expõe as stores no console para depuração (window.__vtt).
+if (import.meta.env.DEV) {
+  void Promise.all([
+    import("./store/connection"),
+    import("./store/room"),
+    import("./store/tokens"),
+    import("./store/chat"),
+    import("./store/initiative"),
+  ]).then(([c, r, t, ch, i]) => {
+    Object.assign(window, { __vtt: { useConnection: c.useConnection, useRoom: r.useRoom, useTokens: t.useTokens, useChat: ch.useChat, useInitiative: i.useInitiative } });
+  });
+}
