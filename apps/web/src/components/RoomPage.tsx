@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { navigate } from "../lib/router";
 import { selectActiveScene, useRoom } from "../store/room";
 import { selectSceneTokens, useTokens } from "../store/tokens";
@@ -7,6 +7,7 @@ import { currentEntry, useInitiative } from "../store/initiative";
 import { TopBar } from "./TopBar";
 import { VttCanvas } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
+import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
 import { SidePanel } from "./SidePanel";
 import { NicknamePrompt } from "./NicknamePrompt";
 
@@ -58,6 +59,9 @@ function Table() {
   const participants = useRoom((s) => s.participants);
   const scene = useRoom(selectActiveScene);
   const leave = useRoom((s) => s.leave);
+  const setMap = useRoom((s) => s.setMap);
+  const updateGrid = useRoom((s) => s.updateGrid);
+  const [isMapConfigOpen, setMapConfigOpen] = useState(false);
 
   const tokens = useTokens(selectSceneTokens(scene?.id));
   const selectedTokenId = useTokens((s) => s.selectedId);
@@ -74,11 +78,23 @@ function Table() {
 
   const initiative = useInitiative((s) => s.state);
   const nextTurn = useInitiative((s) => s.next);
+  const prevTurn = useInitiative((s) => s.prev);
   const resetInitiative = useInitiative((s) => s.reset);
+  const addEntry = useInitiative((s) => s.add);
+  const updateEntry = useInitiative((s) => s.update);
+  const removeEntry = useInitiative((s) => s.remove);
 
   if (!room || !me) return null;
   const isGm = me.role === "gm";
   const activeTurnTokenId = currentEntry(initiative)?.tokenId ?? null;
+
+  // Salvar do modal: só emite o que mudou (mapa e/ou grid).
+  const handleSaveMapConfig = async ({ map, grid }: MapConfigResult) => {
+    if (!scene) return;
+    const mapChanged = map.mapUrl !== scene.mapUrl || map.mapWidth !== scene.mapWidth || map.mapHeight !== scene.mapHeight;
+    if (mapChanged) await setMap(map);
+    await updateGrid(grid);
+  };
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0c0c0c] text-zinc-100 antialiased">
@@ -91,6 +107,7 @@ function Table() {
           leave();
           navigate("/");
         }}
+        onOpenMapConfig={isGm ? () => setMapConfigOpen(true) : undefined}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -142,11 +159,19 @@ function Table() {
           isGm={isGm}
           onSendMessage={(text) => void sendMessage(text)}
           onNextTurn={() => void nextTurn()}
+          onPrevTurn={() => void prevTurn()}
           onResetInitiative={() => void resetInitiative()}
+          onAddEntry={(entry) => void addEntry(entry)}
+          onUpdateEntry={(patch) => void updateEntry(patch)}
+          onRemoveEntry={(id) => void removeEntry(id)}
           onSelectToken={focusToken}
           selectedTokenId={selectedTokenId}
         />
       </div>
+
+      {isGm && scene && (
+        <MapConfigModal isOpen={isMapConfigOpen} scene={scene} onSave={(r) => void handleSaveMapConfig(r)} onClose={() => setMapConfigOpen(false)} />
+      )}
     </div>
   );
 }

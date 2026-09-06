@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MessageSquare, Swords } from 'lucide-react';
 import { ChatTab } from './ChatTab';
 import { InitiativeTab } from './InitiativeTab';
-import type { ChatMessage, InitiativeState, Participant, Token } from '@tormenta-vtt/shared';
+import type { ChatMessage, InitiativeAddPayload, InitiativeState, InitiativeUpdatePayload, Participant, Token } from '@tormenta-vtt/shared';
 
 interface SidePanelProps {
   messages: ChatMessage[];
@@ -13,7 +13,11 @@ interface SidePanelProps {
   isGm: boolean;
   onSendMessage: (text: string) => void;
   onNextTurn: () => void;
+  onPrevTurn: () => void;
   onResetInitiative: () => void;
+  onAddEntry: (entry: InitiativeAddPayload) => void;
+  onUpdateEntry: (patch: InitiativeUpdatePayload) => void;
+  onRemoveEntry: (entryId: string) => void;
   onSelectToken: (tokenId: string) => void;
   selectedTokenId: string | null;
 }
@@ -27,7 +31,11 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   isGm,
   onSendMessage,
   onNextTurn,
+  onPrevTurn,
   onResetInitiative,
+  onAddEntry,
+  onUpdateEntry,
+  onRemoveEntry,
   onSelectToken,
   selectedTokenId,
 }) => {
@@ -100,7 +108,11 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             tokens={tokens}
             isGm={isGm}
             onNextTurn={onNextTurn}
+            onPrevTurn={onPrevTurn}
             onResetInitiative={onResetInitiative}
+            onAddEntry={onAddEntry}
+            onUpdateEntry={onUpdateEntry}
+            onRemoveEntry={onRemoveEntry}
             onSelectToken={onSelectToken}
             selectedTokenId={selectedTokenId}
           />
