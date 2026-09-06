@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { MessageSquare, Swords, Users } from 'lucide-react';
 import { ChatTab } from './ChatTab';
 import { InitiativeTab } from './InitiativeTab';
@@ -14,7 +14,12 @@ import type {
   Token,
 } from '@tormenta-vtt/shared';
 
+export type SidePanelTab = 'chat' | 'initiative' | 'characters';
+
 interface SidePanelProps {
+  /** Aba ativa (controlada pela página, para outros botões poderem abrir uma aba). */
+  activeTab: SidePanelTab;
+  onTabChange: (tab: SidePanelTab) => void;
   messages: ChatMessage[];
   participants: Participant[];
   currentUserId: string;
@@ -39,6 +44,8 @@ interface SidePanelProps {
 }
 
 export const SidePanel: React.FC<SidePanelProps> = ({
+  activeTab,
+  onTabChange,
   messages,
   participants,
   currentUserId,
@@ -60,7 +67,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   onCreateCharacter,
   onDeleteCharacter,
 }) => {
-  const [activeTab, setActiveTab] = useState<'chat' | 'initiative' | 'characters'>('chat');
+  const setActiveTab = onTabChange;
 
   return (
     <aside

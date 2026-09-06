@@ -11,9 +11,11 @@ interface TopBarProps {
   onLeaveToLobby: () => void;
   /** Só o GM recebe este handler (botão "Configurar Mapa"). */
   onOpenMapConfig?: () => void;
+  /** Botão de ficha ("Meu personagem" / "Fichas"), montado pela página. */
+  characterMenu?: React.ReactNode;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, onLeaveToLobby, onOpenMapConfig }) => {
+export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, onLeaveToLobby, onOpenMapConfig, characterMenu }) => {
   const [copied, setCopied] = useState(false);
   const isGM = me.role === "gm";
 
@@ -140,6 +142,7 @@ export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, o
         </div>
 
         <div className="flex items-center gap-2 ml-2">
+          {characterMenu}
           {isGM && onOpenMapConfig && (
             <button
               id="btn-topbar-map-config"

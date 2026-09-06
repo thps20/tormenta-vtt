@@ -11,7 +11,8 @@ import { TopBar } from "./TopBar";
 import { VttCanvas } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
 import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
-import { SidePanel } from "./SidePanel";
+import { SidePanel, type SidePanelTab } from "./SidePanel";
+import { CharacterMenu } from "./CharacterMenu";
 import { NicknamePrompt } from "./NicknamePrompt";
 
 /**
@@ -65,6 +66,7 @@ function Table() {
   const setMap = useRoom((s) => s.setMap);
   const updateGrid = useRoom((s) => s.updateGrid);
   const [isMapConfigOpen, setMapConfigOpen] = useState(false);
+  const [sidePanelTab, setSidePanelTab] = useState<SidePanelTab>("chat");
 
   // Seleciona o objeto estável (byId) e deriva a lista com useMemo: um seletor que
   // devolvesse um array novo a cada chamada faria o Zustand re-renderizar sem parar.
@@ -95,6 +97,7 @@ function Table() {
   const openCharacterId = useCharacters((s) => s.openId);
   const emptySheetOpen = useCharacters((s) => s.emptyOpen);
   const openCharacter = useCharacters((s) => s.open);
+  const openEmptySheet = useCharacters((s) => s.openEmpty);
   const createCharacter = useCharacters((s) => s.create);
   const updateCharacter = useCharacters((s) => s.update);
   const deleteCharacter = useCharacters((s) => s.delete);
@@ -129,6 +132,16 @@ function Table() {
           navigate("/");
         }}
         onOpenMapConfig={isGm ? () => setMapConfigOpen(true) : undefined}
+        characterMenu={
+          <CharacterMenu
+            me={me}
+            participants={participants}
+            characters={characters}
+            onOpenCharacter={openCharacter}
+            onOpenEmpty={openEmptySheet}
+            onNewCharacter={() => setSidePanelTab("characters")}
+          />
+        }
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -175,6 +188,8 @@ function Table() {
         </main>
 
         <SidePanel
+          activeTab={sidePanelTab}
+          onTabChange={setSidePanelTab}
           messages={messages}
           participants={participants}
           currentUserId={me.id}
