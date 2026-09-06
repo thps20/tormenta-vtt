@@ -17,6 +17,7 @@ import type {
   CharacterUpdatePayload,
   CharacterUseItemPayload,
   ChatMessage,
+  CompendiumEntry,
   FogConfig,
   FogUpdatePayload,
   InitiativeAddPayload,
@@ -90,6 +91,14 @@ export interface ClientToServerEvents {
    * insuficiente = ack { ok:false } e nada é publicado.
    */
   "character:use-item": (payload: CharacterUseItemPayload, ack: Ack<ChatMessage>) => void;
+
+  // Compêndio
+  /**
+   * Entradas do compêndio do sistema da sala (e, no futuro, as da própria sala,
+   * que têm prioridade quando o id coincide). Sem broadcast: o cliente pede ao
+   * abrir a paleta e guarda em memória.
+   */
+  "compendium:list": (payload: Record<string, never>, ack: Ack<CompendiumEntry[]>) => void;
 
   // Régua (efêmera: só broadcast, nada vai ao banco)
   /** Enviado com throttle enquanto o participante arrasta a régua; `ruler: null` ao soltar. */
