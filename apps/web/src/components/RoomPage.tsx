@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { navigate } from "../lib/router";
 import { selectActiveScene, useRoom } from "../store/room";
-import { selectSceneTokens, useTokens } from "../store/tokens";
+import { sceneTokens, useTokens } from "../store/tokens";
 import { useChat } from "../store/chat";
 import { currentEntry, useInitiative } from "../store/initiative";
 import { TopBar } from "./TopBar";
@@ -63,7 +63,10 @@ function Table() {
   const updateGrid = useRoom((s) => s.updateGrid);
   const [isMapConfigOpen, setMapConfigOpen] = useState(false);
 
-  const tokens = useTokens(selectSceneTokens(scene?.id));
+  // Seleciona o objeto estável (byId) e deriva a lista com useMemo: um seletor que
+  // devolvesse um array novo a cada chamada faria o Zustand re-renderizar sem parar.
+  const byId = useTokens((s) => s.byId);
+  const tokens = useMemo(() => sceneTokens(byId, scene?.id), [byId, scene?.id]);
   const selectedTokenId = useTokens((s) => s.selectedId);
   const focusRequest = useTokens((s) => s.focusRequest);
   const selectToken = useTokens((s) => s.select);

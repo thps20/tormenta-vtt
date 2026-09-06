@@ -14,8 +14,10 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   // Reconexão automática: se a conexão caiu e voltou, entra de novo na sala
   // com o sessionToken salvo (o servidor devolve um snapshot fresco).
   socket.on("connect", () => {
+    // Na primeira conexão o join inicial já está na fila do socket; só reentramos se a
+    // conexão caiu depois de já termos entrado.
     const { lastJoin, status } = useRoom.getState();
-    if (lastJoin && (status.kind === "joined" || status.kind === "joining")) void useRoom.getState().join(lastJoin);
+    if (lastJoin && status.kind === "joined") void useRoom.getState().join(lastJoin);
   });
 
   socket.on("room:participantJoined", (p) => useRoom.getState().upsertParticipant(p));

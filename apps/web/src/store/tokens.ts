@@ -92,10 +92,12 @@ export const useTokens = create<TokensState>((set, get) => ({
   },
 }));
 
-/** Lista ordenada por zIndex, filtrada pela cena. */
-export function selectSceneTokens(sceneId: string | null | undefined) {
-  return (s: TokensState): Token[] =>
-    Object.values(s.byId)
-      .filter((t) => t.sceneId === sceneId)
-      .sort((a, b) => a.zIndex - b.zIndex);
+/**
+ * Lista ordenada por zIndex, filtrada pela cena. Função pura para usar com useMemo;
+ * NÃO use como seletor do hook (devolve array novo a cada chamada => loop de render).
+ */
+export function sceneTokens(byId: Record<string, Token>, sceneId: string | null | undefined): Token[] {
+  return Object.values(byId)
+    .filter((t) => t.sceneId === sceneId)
+    .sort((a, b) => a.zIndex - b.zIndex);
 }
