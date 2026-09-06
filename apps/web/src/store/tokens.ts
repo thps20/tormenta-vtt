@@ -6,16 +6,22 @@ import { toast } from "./ui";
 
 interface TokensState {
   byId: Record<string, Token>;
+  /** Todos os tokens selecionados (caixa de seleção / shift+clique). */
+  selectedIds: string[];
+  /** O selecionado quando há exatamente UM (inspector, redimensionar, iniciativa). null com 0 ou vários. */
   selectedId: string | null;
   /** Pedido de "centralizar no token" (ex.: clique na iniciativa). nonce muda a cada pedido. */
   focusRequest: { tokenId: string; nonce: number } | null;
-  /** Token que este cliente está arrastando agora (ecos de posição dele são ignorados). */
-  draggingId: string | null;
+  /** Tokens que este cliente está arrastando agora (ecos de posição deles são ignorados). */
+  draggingIds: Record<string, true>;
 
   setAll: (tokens: Token[]) => void;
   upsert: (token: Token) => void;
   remove: (tokenId: string) => void;
   select: (tokenId: string | null) => void;
+  selectMany: (tokenIds: string[]) => void;
+  /** Shift+clique: entra ou sai da seleção. */
+  toggleSelect: (tokenId: string) => void;
   focus: (tokenId: string) => void;
 
   /** Durante o arraste: aplica local e emite com throttle (sem reverter). */
@@ -28,16 +34,33 @@ interface TokensState {
   linkCharacter: (tokenId: string, characterId: string | null) => Promise<boolean>;
 }
 
-/** Máx. ~30 emissões por segundo enquanto arrasta (SPEC §3.3). */
-const emitMoveThrottled = throttle((tokenId: string, x: number, y: number) => {
-  void emitAck("token:update", { id: tokenId, x, y });
+/**
+ * Posições ainda não enviadas dos tokens em arraste. Um único throttle envia
+ * TODAS a cada ~33 ms (SPEC §3.3): com um throttle por chamada, ao mover um
+ * grupo só o último token de cada rajada seria enviado.
+ */
+const pendingMoves = new Map<string, { x: number; y: number }>();
+const flushMoves = throttle(() => {
+  for (const [id, { x, y }] of pendingMoves) void emitAck("token:update", { id, x, y });
+  pendingMoves.clear();
 }, 33);
+
+/** Seleção derivada: selectedId só vale com exatamente um token. */
+const selection = (ids: string[]) => ({ selectedIds: ids, selectedId: ids.length === 1 ? (ids[0] ?? null) : null });
+
+function stopDragging(tokenId: string): void {
+  useTokens.setState((s) => {
+    const { [tokenId]: _done, ...rest } = s.draggingIds;
+    return { draggingIds: rest };
+  });
+}
 
 export const useTokens = create<TokensState>((set, get) => ({
   byId: {},
+  selectedIds: [],
   selectedId: null,
   focusRequest: null,
-  draggingId: null,
+  draggingIds: {},
 
   setAll: (tokens) => set({ byId: Object.fromEntries(tokens.map((t) => [t.id, t])) }),
   upsert: (token) =>
@@ -45,31 +68,36 @@ export const useTokens = create<TokensState>((set, get) => ({
       // Enquanto arrastamos, o servidor devolve (eco) posições já antigas; se aplicássemos,
       // o token pularia para trás a cada eco. Mantemos a posição local até soltar.
       const local = s.byId[token.id];
-      const merged = s.draggingId === token.id && local ? { ...token, x: local.x, y: local.y } : token;
+      const merged = s.draggingIds[token.id] && local ? { ...token, x: local.x, y: local.y } : token;
       return { byId: { ...s.byId, [token.id]: merged } };
     }),
   remove: (tokenId) =>
     set((s) => {
       const { [tokenId]: _removed, ...rest } = s.byId;
-      return { byId: rest, selectedId: s.selectedId === tokenId ? null : s.selectedId };
+      return { byId: rest, ...selection(s.selectedIds.filter((id) => id !== tokenId)) };
     }),
-  select: (tokenId) => set({ selectedId: tokenId }),
-  focus: (tokenId) => set((s) => ({ selectedId: tokenId, focusRequest: { tokenId, nonce: (s.focusRequest?.nonce ?? 0) + 1 } })),
+  select: (tokenId) => set(selection(tokenId ? [tokenId] : [])),
+  selectMany: (tokenIds) => set(selection(tokenIds)),
+  toggleSelect: (tokenId) =>
+    set((s) => selection(s.selectedIds.includes(tokenId) ? s.selectedIds.filter((id) => id !== tokenId) : [...s.selectedIds, tokenId])),
+  focus: (tokenId) => set((s) => ({ ...selection([tokenId]), focusRequest: { tokenId, nonce: (s.focusRequest?.nonce ?? 0) + 1 } })),
 
   moveLive: (tokenId, x, y) => {
     const t = get().byId[tokenId];
     if (!t) return;
-    set((s) => ({ byId: { ...s.byId, [tokenId]: { ...t, x, y } }, draggingId: tokenId }));
-    emitMoveThrottled(tokenId, x, y);
+    set((s) => ({ byId: { ...s.byId, [tokenId]: { ...t, x, y } }, draggingIds: { ...s.draggingIds, [tokenId]: true } }));
+    pendingMoves.set(tokenId, { x, y });
+    flushMoves();
   },
 
   patch: async (patch) => {
     const previous = get().byId[patch.id];
     if (!previous) return false;
-    if (get().draggingId === patch.id) {
-      // Soltou: descarta um envio "ao vivo" pendente, que chegaria depois da posição final.
-      emitMoveThrottled.cancel();
-      set({ draggingId: null });
+    if (get().draggingIds[patch.id]) {
+      // Soltou: descarta o envio "ao vivo" pendente deste token, que chegaria depois da posição final.
+      pendingMoves.delete(patch.id);
+      if (pendingMoves.size === 0) flushMoves.cancel();
+      stopDragging(patch.id);
     }
     // 1. otimista
     set((s) => ({ byId: { ...s.byId, [patch.id]: { ...previous, ...patch } } }));
@@ -111,9 +139,10 @@ export const useTokens = create<TokensState>((set, get) => ({
   delete: async (tokenId) => {
     const previous = get().byId[tokenId];
     if (!previous) return false;
-    if (get().draggingId === tokenId) {
-      emitMoveThrottled.cancel();
-      set({ draggingId: null });
+    if (get().draggingIds[tokenId]) {
+      pendingMoves.delete(tokenId);
+      if (pendingMoves.size === 0) flushMoves.cancel();
+      stopDragging(tokenId);
     }
     get().remove(tokenId);
     const res = await emitAck("token:delete", { tokenId });

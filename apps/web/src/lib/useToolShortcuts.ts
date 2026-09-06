@@ -11,13 +11,13 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 /**
- * Atalhos globais da barra de ferramentas: V/H/R trocam o modo, Esc volta para
- * Selecionar, espaço segurado ativa "mover mapa" enquanto durar.
+ * Atalhos globais da barra de ferramentas: V/H/R trocam o modo, Esc cancela o
+ * gesto em andamento e volta para Selecionar, espaço segurado ativa "mover mapa".
  * Um único listener na janela (montado pela página da mesa).
  */
 export function useToolShortcuts(): void {
   useEffect(() => {
-    const { setMode, setSpaceHeld } = useTools.getState();
+    const { setMode, setSpaceHeld, cancel } = useTools.getState();
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -28,6 +28,7 @@ export function useToolShortcuts(): void {
         return;
       }
       if (e.key === "Escape") {
+        cancel();
         setMode("select");
         return;
       }

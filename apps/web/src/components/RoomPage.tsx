@@ -76,6 +76,7 @@ function Table() {
   const toolMode = useTools((s) => s.mode);
   const effectiveMode = useTools(selectEffectiveMode);
   const setToolMode = useTools((s) => s.setMode);
+  const cancelNonce = useTools((s) => s.cancelNonce);
   useToolShortcuts();
 
   // Seleciona o objeto estável (byId) e deriva a lista com useMemo: um seletor que
@@ -83,8 +84,11 @@ function Table() {
   const byId = useTokens((s) => s.byId);
   const tokens = useMemo(() => sceneTokens(byId, scene?.id), [byId, scene?.id]);
   const selectedTokenId = useTokens((s) => s.selectedId);
+  const selectedIds = useTokens((s) => s.selectedIds);
   const focusRequest = useTokens((s) => s.focusRequest);
   const selectToken = useTokens((s) => s.select);
+  const selectMany = useTokens((s) => s.selectMany);
+  const toggleSelect = useTokens((s) => s.toggleSelect);
   const focusToken = useTokens((s) => s.focus);
   const moveLive = useTokens((s) => s.moveLive);
   const patchToken = useTokens((s) => s.patch);
@@ -189,7 +193,11 @@ function Table() {
                 me={me}
                 activeTurnTokenId={activeTurnTokenId}
                 selectedTokenId={selectedTokenId}
+                selectedIds={selectedIds}
                 focusRequest={focusRequest}
+                cancelNonce={cancelNonce}
+                onSelectMany={selectMany}
+                onToggleSelect={toggleSelect}
                 onSelectToken={(tokenId) => {
                   selectToken(tokenId);
                   // Clique num token vinculado a uma ficha que eu vejo abre a ficha.

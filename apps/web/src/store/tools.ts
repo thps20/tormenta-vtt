@@ -11,15 +11,20 @@ interface ToolsState {
   mode: ToolMode;
   /** Barra de espaço pressionada: vira "pan" temporariamente sem perder o modo escolhido. */
   spaceHeld: boolean;
+  /** Esc: muda a cada pedido de cancelar o gesto em andamento (caixa de seleção, régua). */
+  cancelNonce: number;
   setMode: (mode: ToolMode) => void;
   setSpaceHeld: (held: boolean) => void;
+  cancel: () => void;
 }
 
 export const useTools = create<ToolsState>((set) => ({
   mode: "select",
   spaceHeld: false,
+  cancelNonce: 0,
   setMode: (mode) => set({ mode }),
   setSpaceHeld: (spaceHeld) => set({ spaceHeld }),
+  cancel: () => set((s) => ({ cancelNonce: s.cancelNonce + 1 })),
 }));
 
 /** Modo que o canvas deve obedecer agora (espaço segurado sobrepõe o modo escolhido). */

@@ -4,7 +4,7 @@ import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
 import type { Character, Participant, Scene, Token, TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
-import { clampToMap, gridLines, snapToGrid } from "../lib/grid";
+import { clampToMap, gridLines, snapToGrid, tokensInBox, type Box } from "../lib/grid";
 import { useImage } from "../lib/useImage";
 import type { ToolMode } from "../store/tools";
 import { TokenInspector } from "./TokenInspector";
@@ -20,10 +20,19 @@ interface VttCanvasProps {
   participants: Participant[];
   me: Participant;
   activeTurnTokenId: string | null;
+  /** Único selecionado (inspector, redimensionar); null com 0 ou vários. */
   selectedTokenId: string | null;
+  /** Todos os selecionados (anel dourado, movimento em grupo). */
+  selectedIds: string[];
   /** Pedido externo de centralizar num token (clique na iniciativa). */
   focusRequest: { tokenId: string; nonce: number } | null;
+  /** Esc: muda a cada pedido de cancelar o gesto em andamento (caixa de seleção). */
+  cancelNonce: number;
   onSelectToken: (tokenId: string | null) => void;
+  /** Caixa de seleção: substitui a seleção pelos tokens dentro dela. */
+  onSelectMany: (tokenIds: string[]) => void;
+  /** Shift+clique: entra/sai da seleção. */
+  onToggleSelect: (tokenId: string) => void;
   /** Durante o arraste (throttled na store). */
   onTokenMoveLive: (tokenId: string, x: number, y: number) => void;
   /** Ao soltar / redimensionar / editar: patch com ack e reversão. */
@@ -76,8 +85,12 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   me,
   activeTurnTokenId,
   selectedTokenId,
+  selectedIds,
   focusRequest,
+  cancelNonce,
   onSelectToken,
+  onSelectMany,
+  onToggleSelect,
   onTokenMoveLive,
   onTokenPatch,
   onTokenCreate,
@@ -97,6 +110,29 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   // Preferências locais de visualização (não vão ao servidor).
   const [snapEnabled, setSnapEnabled] = useState(scene.grid.snap);
   const [gridVisible, setGridVisible] = useState(true);
+
+  // Caixa de seleção (modo Selecionar, arraste no mapa vazio), em pixels do mapa.
+  const [selectionBox, setSelectionBox] = useState<Box | null>(null);
+  /** Ponto onde o mousedown caiu no mapa vazio; a caixa só aparece depois de mover alguns pixels. */
+  const boxStartRef = useRef<{ x: number; y: number } | null>(null);
+  /** Um arraste de caixa acabou de terminar: o `click` que o Konva dispara em seguida não deve limpar a seleção. */
+  const boxJustEndedRef = useRef(false);
+  /** Arraste em grupo: posição inicial do líder e dos outros selecionados que eu controlo. */
+  const groupDragRef = useRef<{ leader: { x: number; y: number }; others: Array<{ token: Token; x: number; y: number }> } | null>(null);
+
+  // Esc cancela a caixa em andamento.
+  useEffect(() => {
+    boxStartRef.current = null;
+    setSelectionBox(null);
+  }, [cancelNonce]);
+
+  // Trocar de ferramenta no meio de uma caixa também a descarta.
+  useEffect(() => {
+    if (mode !== "select") {
+      boxStartRef.current = null;
+      setSelectionBox(null);
+    }
+  }, [mode]);
 
   const mapImage = useImage(assetUrl(scene.mapUrl));
   const mapWidth = scene.mapWidth ?? DEFAULT_MAP.width;
@@ -211,20 +247,25 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
    * O último da lista é desenhado por cima, então tem prioridade.
    */
   const tokenAtPointer = (): Token | null => {
-    const stage = stageRef.current;
-    const p = stage?.getPointerPosition();
-    if (!stage || !p) return null;
-    const mx = (p.x - stage.x()) / stage.scaleX();
-    const my = (p.y - stage.y()) / stage.scaleY();
+    const p = pointerMapPos();
+    if (!p) return null;
     for (let i = tokens.length - 1; i >= 0; i--) {
       const t = tokens[i];
       if (!t) continue;
       const r = tokenRadius(t) + BODY_STROKE;
-      const dx = mx - (t.x + t.width / 2);
-      const dy = my - (t.y + t.height / 2);
+      const dx = p.x - (t.x + t.width / 2);
+      const dy = p.y - (t.y + t.height / 2);
       if (dx * dx + dy * dy <= r * r) return t;
     }
     return null;
+  };
+
+  /** Ponteiro em pixels do mapa (desfaz pan e zoom do Stage). */
+  const pointerMapPos = (): { x: number; y: number } | null => {
+    const stage = stageRef.current;
+    const p = stage?.getPointerPosition();
+    if (!stage || !p) return null;
+    return { x: (p.x - stage.x()) / stage.scaleX(), y: (p.y - stage.y()) / stage.scaleY() };
   };
 
   const tokenGroup = (tokenId: string) => stageRef.current?.findOne<Konva.Group>(`#token-group-${tokenId}`) ?? null;
@@ -235,32 +276,116 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     return g !== null && (target === g || g.isAncestorOf(target));
   };
 
-  /** Cursor conforme o modo; no modo Selecionar, "grab" sobre um token que posso mover. */
+  /** Cursor conforme o modo; no modo Selecionar, "grab" sobre um token que posso mover. Também estica a caixa de seleção. */
   const handleStageMouseMove = () => {
     if (Konva.isDragging()) return; // no meio de um arraste não mexemos em nada
     if (mode === "pan") return setCursor("grab");
     if (mode !== "select") return setCursor("crosshair");
+    const start = boxStartRef.current;
+    if (start) {
+      const p = pointerMapPos();
+      // Só vira caixa depois de andar alguns pixels de tela; antes disso é um clique.
+      if (p && (selectionBox || Math.hypot(p.x - start.x, p.y - start.y) * stageScale > 4)) {
+        setSelectionBox({ x1: start.x, y1: start.y, x2: p.x, y2: p.y });
+      }
+      return;
+    }
     const over = tokenAtPointer();
     setCursor(over && canControl(me, over) ? "grab" : "default");
   };
 
-  /** Se o canvas de hit não reconheceu o token sob o ponteiro, repassa o mousedown ao Group para o Konva iniciar o drag dele. */
+  /**
+   * Modo Selecionar: sobre um token, repassa o mousedown ao Group se o canvas de hit não o
+   * reconheceu (para o Konva iniciar o drag); no mapa vazio, começa a caixa de seleção.
+   */
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (mode !== "select") return;
+    if (mode !== "select" || e.evt.button !== 0) return;
     const t = tokenAtPointer();
-    if (!t || hitLandedOnToken(e.target, t.id)) return;
-    tokenGroup(t.id)?.fire("mousedown", { evt: e.evt, pointerId: e.pointerId }, false);
+    if (t) {
+      if (!hitLandedOnToken(e.target, t.id)) tokenGroup(t.id)?.fire("mousedown", { evt: e.evt, pointerId: e.pointerId }, false);
+      return;
+    }
+    boxStartRef.current = pointerMapPos();
+  };
+
+  /** Fim da caixa de seleção: seleciona os tokens dentro dela. Sem caixa (clique parado), o `click` cuida. */
+  const finishSelectionBox = () => {
+    const start = boxStartRef.current;
+    boxStartRef.current = null;
+    if (!start || !selectionBox) return;
+    onSelectMany(tokensInBox(tokens, selectionBox).map((t) => t.id));
+    setSelectionBox(null);
+    boxJustEndedRef.current = true;
   };
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (mode !== "select") return;
+    if (boxJustEndedRef.current) {
+      boxJustEndedRef.current = false;
+      return;
+    }
     const t = tokenAtPointer();
     if (t) {
       // Se o hit tivesse acertado, o Group já teria tratado o clique (e cancelado o bubble).
-      if (!hitLandedOnToken(e.target, t.id)) onSelectToken(t.id);
+      if (!hitLandedOnToken(e.target, t.id)) selectByClick(t.id, e.evt.shiftKey);
       return;
     }
     if (e.target === stageRef.current || e.target.name() === "map-background") onSelectToken(null);
+  };
+
+  /** Clique num token: seleciona só ele; com Shift, entra/sai da seleção atual. */
+  const selectByClick = (tokenId: string, additive: boolean) => {
+    if (additive) onToggleSelect(tokenId);
+    else onSelectToken(tokenId);
+  };
+
+  /** Snap (se ligado) + limites do mapa para uma posição final de token. */
+  const settle = (x: number, y: number, size: { width: number; height: number }) => {
+    let pos = { x, y };
+    if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
+    return clampToMap(pos.x, pos.y, size, map);
+  };
+
+  // --- Arraste em grupo: o token arrastado (líder) puxa os outros selecionados que eu controlo.
+  const handleTokenDragStart = (token: Token, node: Konva.Node) => {
+    if (!selectedIds.includes(token.id) || selectedIds.length < 2) {
+      groupDragRef.current = null;
+      return;
+    }
+    const others = selectedIds
+      .filter((id) => id !== token.id)
+      .map((id) => tokens.find((t) => t.id === id))
+      .filter((t): t is Token => t !== undefined && canControl(me, t))
+      .map((t) => ({ token: t, x: t.x, y: t.y }));
+    groupDragRef.current = { leader: { x: node.x(), y: node.y() }, others };
+  };
+
+  const handleTokenDragMove = (token: Token, node: Konva.Node) => {
+    onTokenMoveLive(token.id, node.x(), node.y());
+    const g = groupDragRef.current;
+    if (!g) return;
+    const dx = node.x() - g.leader.x;
+    const dy = node.y() - g.leader.y;
+    for (const o of g.others) {
+      const pos = { x: o.x + dx, y: o.y + dy };
+      tokenGroup(o.token.id)?.position(pos);
+      onTokenMoveLive(o.token.id, pos.x, pos.y);
+    }
+  };
+
+  const handleTokenDragEnd = (token: Token, node: Konva.Node) => {
+    const g = groupDragRef.current;
+    groupDragRef.current = null;
+    const dx = node.x() - (g?.leader.x ?? node.x());
+    const dy = node.y() - (g?.leader.y ?? node.y());
+    const pos = settle(node.x(), node.y(), token);
+    node.position(pos);
+    onTokenPatch({ id: token.id, x: pos.x, y: pos.y });
+    for (const o of g?.others ?? []) {
+      const p = settle(o.x + dx, o.y + dy, o.token);
+      tokenGroup(o.token.id)?.position(p);
+      onTokenPatch({ id: o.token.id, x: p.x, y: p.y });
+    }
   };
 
   return (
@@ -290,6 +415,8 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         }}
         onMouseMove={handleStageMouseMove}
         onMouseDown={handleStageMouseDown}
+        onMouseUp={finishSelectionBox}
+        onMouseLeave={finishSelectionBox}
         onClick={handleStageClick}
       >
         {/* Camada 1: mapa + grid */}
@@ -313,18 +440,13 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
               token={token}
               bar={tokenBars[token.id] ?? null}
               draggable={mode === "select" && canControl(me, token)}
-              isSelected={token.id === selectedTokenId}
+              isSelected={selectedIds.includes(token.id)}
               isActiveTurn={token.id === activeTurnTokenId}
-              onSelect={() => mode === "select" && onSelectToken(token.id)}
+              onSelect={(additive) => mode === "select" && selectByClick(token.id, additive)}
               onCursor={setCursor}
-              onDragMove={(x, y) => onTokenMoveLive(token.id, x, y)}
-              onDragEnd={(node) => {
-                let pos = { x: node.x(), y: node.y() };
-                if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
-                pos = clampToMap(pos.x, pos.y, token, map);
-                node.position(pos);
-                onTokenPatch({ id: token.id, x: pos.x, y: pos.y });
-              }}
+              onDragStart={(node) => handleTokenDragStart(token, node)}
+              onDragMove={(node) => handleTokenDragMove(token, node)}
+              onDragEnd={(node) => handleTokenDragEnd(token, node)}
               onTransformEnd={(node) => {
                 // O Transformer altera scaleX/scaleY do Group; convertemos em width/height reais
                 // e zeramos a escala, porque o token é desenhado a partir de width/height.
@@ -358,6 +480,22 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
             borderDash={[4, 4]}
             ignoreStroke
           />
+        </Layer>
+
+        {/* Camada 3: caixa de seleção (só desenho) */}
+        <Layer listening={false}>
+          {selectionBox && (
+            <Rect
+              x={Math.min(selectionBox.x1, selectionBox.x2)}
+              y={Math.min(selectionBox.y1, selectionBox.y2)}
+              width={Math.abs(selectionBox.x2 - selectionBox.x1)}
+              height={Math.abs(selectionBox.y2 - selectionBox.y1)}
+              fill="rgba(212, 175, 55, 0.12)"
+              stroke="#d4af37"
+              strokeWidth={1 / stageScale}
+              dash={[6 / stageScale, 4 / stageScale]}
+            />
+          )}
         </Layer>
       </Stage>
 
@@ -453,15 +591,17 @@ interface TokenNodeProps {
   draggable: boolean;
   isSelected: boolean;
   isActiveTurn: boolean;
-  onSelect: () => void;
+  /** additive = Shift pressionado (entra/sai da seleção em vez de substituí-la). */
+  onSelect: (additive: boolean) => void;
   /** Cursor durante o arraste (fora dele o Stage decide por geometria). */
   onCursor: (cursor: string) => void;
-  onDragMove: (x: number, y: number) => void;
+  onDragStart: (node: Konva.Node) => void;
+  onDragMove: (node: Konva.Node) => void;
   onDragEnd: (node: Konva.Node) => void;
   onTransformEnd: (node: Konva.Node) => void;
 }
 
-const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected, isActiveTurn, onSelect, onCursor, onDragMove, onDragEnd, onTransformEnd }) => {
+const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd }) => {
   const image = useImage(assetUrl(token.imageUrl));
   const radius = tokenRadius(token);
   const cx = token.width / 2;
@@ -483,17 +623,18 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected
       opacity={token.visible ? 1 : 0.45}
       onClick={(e) => {
         e.cancelBubble = true;
-        onSelect();
+        onSelect(e.evt.shiftKey);
       }}
       onTap={(e) => {
         e.cancelBubble = true;
-        onSelect();
+        onSelect(false);
       }}
       onDragStart={(e) => {
         e.cancelBubble = true;
         onCursor("grabbing");
+        onDragStart(e.target);
       }}
-      onDragMove={(e) => onDragMove(e.target.x(), e.target.y())}
+      onDragMove={(e) => onDragMove(e.target)}
       onDragEnd={(e) => {
         e.cancelBubble = true;
         onCursor("grab");

@@ -45,3 +45,24 @@ export function gridLines(grid: GridConfig, map: { width: number; height: number
   for (let y = oy; y <= map.height; y += grid.cellSize) lines.push([0, y, map.width, y]);
   return lines;
 }
+
+/** Retângulo em pixels do mapa, cantos em qualquer ordem (o arraste pode ir para cima/esquerda). */
+export interface Box {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/** Tokens cujo CENTRO cai dentro da caixa (seleção em caixa). */
+export function tokensInBox<T extends { x: number; y: number; width: number; height: number }>(tokens: T[], box: Box): T[] {
+  const minX = Math.min(box.x1, box.x2);
+  const maxX = Math.max(box.x1, box.x2);
+  const minY = Math.min(box.y1, box.y2);
+  const maxY = Math.max(box.y1, box.y2);
+  return tokens.filter((t) => {
+    const cx = t.x + t.width / 2;
+    const cy = t.y + t.height / 2;
+    return cx >= minX && cx <= maxX && cy >= minY && cy <= maxY;
+  });
+}
