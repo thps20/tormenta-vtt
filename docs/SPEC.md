@@ -54,12 +54,18 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - `/gr <fórmula>` — rolagem secreta (só GM e autor veem).
 - **Gramática da fórmula** (parser genérico em `packages/shared/src/dice`):
   ```
-  formula := term (("+"|"-") term)*
-  term    := dice | integer
+  expr    := term (("+"|"-") term)*
+  term    := factor (("*"|"/") factor)*
+  factor  := ("+"|"-") factor | atom
+  atom    := integer | dice | func "(" expr ("," expr)* ")" | "(" expr ")"
   dice    := [count]"d"sides [modifier]
   modifier:= "kh"n | "kl"n        ; keep highest / keep lowest (ex.: 2d20kh1 = vantagem)
+  func    := "floor" | "ceil" | "abs" | "min" | "max"
   ```
+  - Dados só entram em soma/subtração; `*`, `/` e funções aceitam apenas constantes (`2*1d6` é inválido). Assim o resultado é sempre "grupos de dados + modificador fixo".
+  - `/` é divisão inteira arredondada para baixo (`7/2 = 3`).
   - Limites: `count ≤ 100`, `sides ≤ 1000`, fórmula ≤ 200 chars.
+  - `evaluateConstant()` avalia a mesma gramática sem dados (usada para stats derivados da ficha).
   - Rolagem acontece **no servidor** (jogadores não podem forjar resultados).
 - Resultado exibido como: `Thiago rolou 1d20+5: [14] + 5 = 19`. Dados naturais máximo/mínimo destacados (crítico/falha), regra visual apenas.
 - Placeholders de sistema (`{attr.for}`, `{skill.percepcao}`) são resolvidos **antes** do parser a partir da ficha; no MVP, como não há ficha, só a fórmula crua é suportada. O JSON do sistema já define as fórmulas para a fase seguinte.
