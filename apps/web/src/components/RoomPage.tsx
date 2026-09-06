@@ -256,6 +256,12 @@ function Table() {
                 onLinkCharacter={(tokenId, characterId) => void linkCharacter(tokenId, characterId)}
                 onOpenCharacter={openCharacter}
                 tokenBars={tokenBars}
+                fogTool={isGm ? { mode: fogMode, shape: fogShape, brushSize: fogBrushSize } : null}
+                onFogShape={(shape) => {
+                  // Pintar com a névoa desligada não mostraria nada: liga antes de adicionar.
+                  if (!scene.fog.enabled) void fogOp({ type: "setEnabled", enabled: true });
+                  void fogOp({ type: "add", shape });
+                }}
               />
               <Toolbar isGm={isGm} mode={toolMode} effectiveMode={effectiveMode} onChange={setToolMode} />
               {isGm && toolMode === "fog" && (

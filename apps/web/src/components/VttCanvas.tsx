@@ -2,11 +2,12 @@ import React, { useRef, useState, useEffect, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
-import { measureDistance, type Character, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenPatch } from "@tormenta-vtt/shared";
+import { measureDistance, type Character, type FogShape, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
 import { clampToMap, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
 import { useImage } from "../lib/useImage";
-import type { RemoteRuler, ToolMode } from "../store/tools";
+import { newId } from "../lib/ids";
+import type { FogToolMode, FogToolShape, RemoteRuler, ToolMode } from "../store/tools";
 import { TokenInspector } from "./TokenInspector";
 import { FogLayer } from "./FogLayer";
 
@@ -53,6 +54,17 @@ interface VttCanvasProps {
   onOpenCharacter: (characterId: string) => void;
   /** Barra de vida por token (tokenBar do sistema, lida da ficha vinculada). */
   tokenBars: Record<string, TokenBar>;
+  /** Modo Névoa (GM): o que desenhar e com qual forma. null para jogadores. */
+  fogTool: FogTool | null;
+  /** Forma pronta (pincel solto, retângulo solto, polígono fechado), em pixels do mapa. */
+  onFogShape: (shape: FogShape) => void;
+}
+
+export interface FogTool {
+  mode: FogToolMode;
+  shape: FogToolShape;
+  /** Diâmetro do pincel em pixels do mapa. */
+  brushSize: number;
 }
 
 /** Atual/máximo do recurso que o sistema aponta como barra do token. */
@@ -69,6 +81,13 @@ const MODE_HINTS: Record<ToolMode, string> = {
   ruler: "Clique e arraste para medir • Scroll = zoom",
   fog: "Névoa: escolha Revelar/Ocultar e uma forma no painel • Scroll = zoom",
   draw: "Desenho: em breve",
+};
+
+/** Ajuda específica de cada forma da névoa. */
+const FOG_HINTS: Record<FogToolShape, string> = {
+  brush: "Arraste para pintar • Tamanho do pincel no painel • Ctrl+Z desfaz",
+  rect: "Arraste para desenhar um retângulo • Ctrl+Z desfaz",
+  polygon: "Clique para adicionar vértices • Duplo clique fecha • Esc cancela",
 };
 
 /** Largura da borda do círculo do token (pixels do mapa). */
@@ -111,6 +130,8 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   onLinkCharacter,
   onOpenCharacter,
   tokenBars,
+  fogTool,
+  onFogShape,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -134,6 +155,18 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   /** Ponto inicial da régua em andamento (pixels do mapa). */
   const rulerStartRef = useRef<{ x: number; y: number } | null>(null);
 
+  // --- Névoa (GM): gesto em andamento. Nada vai ao servidor antes de soltar/fechar.
+  /** Pincel: pontos [x1,y1,x2,y2,...] acumulados no arrasto (já decimados). null = não está pintando. */
+  const brushPointsRef = useRef<number[] | null>(null);
+  /** Retângulo: canto onde o mousedown caiu. */
+  const rectStartRef = useRef<{ x: number; y: number } | null>(null);
+  /** Polígono: vértices confirmados por clique. */
+  const [polygonPoints, setPolygonPoints] = useState<number[]>([]);
+  /** Forma sendo desenhada, para preview na camada de névoa (mesma composição da forma final). */
+  const [fogDraft, setFogDraft] = useState<FogShape | null>(null);
+  /** Ponteiro em pixels do mapa (círculo do pincel e linha elástica do polígono). */
+  const [fogPointer, setFogPointer] = useState<{ x: number; y: number } | null>(null);
+
   const cancelGestures = () => {
     boxStartRef.current = null;
     setSelectionBox(null);
@@ -141,6 +174,10 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
       rulerStartRef.current = null;
       onRulerClear();
     }
+    brushPointsRef.current = null;
+    rectStartRef.current = null;
+    setPolygonPoints([]);
+    setFogDraft(null);
   };
 
   // Esc cancela a caixa/régua em andamento.
@@ -300,10 +337,114 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   /** Ponto da régua: centro da célula quando há grid e o snap está ligado; senão, livre. */
   const rulerPoint = (p: { x: number; y: number }) => (snapEnabled ? snapToCellCenter(p.x, p.y, scene.grid) : p);
 
+  // --- Névoa ------------------------------------------------------------------
+  const fogActive = mode === "fog" && fogTool !== null;
+  const round = (v: number) => Math.round(v);
+  const fogMode = fogTool?.mode ?? "reveal";
+
+  /** Pincel: círculo no clique único, traço (polilinha com largura) no arrasto. Coordenadas inteiras: JSON menor. */
+  const brushShape = (points: number[]): FogShape | null => {
+    const width = fogTool?.brushSize ?? 0;
+    if (points.length < 2) return null;
+    if (points.length === 2) return { id: newId(), mode: fogMode, kind: "circle", cx: round(points[0] ?? 0), cy: round(points[1] ?? 0), r: width / 2 };
+    return { id: newId(), mode: fogMode, kind: "stroke", points: points.map(round), width };
+  };
+
+  const rectShape = (a: { x: number; y: number }, b: { x: number; y: number }): FogShape | null => {
+    const x = Math.min(a.x, b.x);
+    const y = Math.min(a.y, b.y);
+    const width = Math.abs(b.x - a.x);
+    const height = Math.abs(b.y - a.y);
+    if (width < 1 || height < 1) return null;
+    return { id: newId(), mode: fogMode, kind: "rect", x: round(x), y: round(y), width: round(width) || 1, height: round(height) || 1 };
+  };
+
+  const polygonShape = (points: number[]): FogShape | null =>
+    points.length >= 6 ? { id: newId(), mode: fogMode, kind: "polygon", points: points.map(round) } : null;
+
+  const fogMouseDown = (p: { x: number; y: number }) => {
+    if (!fogTool) return;
+    if (fogTool.shape === "brush") {
+      brushPointsRef.current = [p.x, p.y];
+      setFogDraft(brushShape(brushPointsRef.current));
+    } else if (fogTool.shape === "rect") {
+      rectStartRef.current = p;
+      setFogDraft(null);
+    }
+    // Polígono: vértices entram no click (o duplo clique fecha; ver fogDblClick).
+  };
+
+  const fogMouseMove = (p: { x: number; y: number }) => {
+    if (!fogTool) return;
+    setFogPointer(p);
+    const pts = brushPointsRef.current;
+    if (fogTool.shape === "brush" && pts) {
+      // Decimação: só guarda o ponto se andou o bastante (fração do pincel, mínimo 2 px de tela).
+      const lx = pts[pts.length - 2] ?? p.x;
+      const ly = pts[pts.length - 1] ?? p.y;
+      const minStep = Math.max(2 / stageScale, fogTool.brushSize / 8);
+      if (Math.hypot(p.x - lx, p.y - ly) < minStep) return;
+      pts.push(p.x, p.y);
+      setFogDraft(brushShape(pts));
+      return;
+    }
+    if (fogTool.shape === "rect" && rectStartRef.current) {
+      setFogDraft(rectShape(rectStartRef.current, p));
+      return;
+    }
+    if (fogTool.shape === "polygon" && polygonPoints.length >= 4) {
+      // Com 2+ vértices, o preview mostra o polígono fechado até o ponteiro.
+      setFogDraft(polygonShape([...polygonPoints, p.x, p.y]));
+    }
+  };
+
+  /** Soltou: pincel e retângulo viram uma shape e vão ao servidor (uma emissão por gesto). */
+  const fogMouseUp = () => {
+    if (!fogTool) return;
+    const pts = brushPointsRef.current;
+    if (pts) {
+      brushPointsRef.current = null;
+      const shape = brushShape(pts);
+      if (shape) onFogShape(shape);
+    }
+    const start = rectStartRef.current;
+    if (start) {
+      rectStartRef.current = null;
+      const p = pointerMapPos();
+      const shape = p ? rectShape(start, p) : null;
+      if (shape) onFogShape(shape);
+    }
+    setFogDraft(null);
+  };
+
+  /** Polígono: cada clique adiciona um vértice (ignorando cliques em cima do último, como os do duplo clique). */
+  const fogClick = (p: { x: number; y: number }) => {
+    if (!fogTool || fogTool.shape !== "polygon") return;
+    const lx = polygonPoints[polygonPoints.length - 2];
+    const ly = polygonPoints[polygonPoints.length - 1];
+    if (lx !== undefined && ly !== undefined && Math.hypot(p.x - lx, p.y - ly) * stageScale < 4) return;
+    setPolygonPoints([...polygonPoints, p.x, p.y]);
+  };
+
+  /** Duplo clique fecha o polígono (mínimo 3 vértices); com menos, descarta. */
+  const fogDblClick = () => {
+    if (!fogTool || fogTool.shape !== "polygon") return;
+    const shape = polygonShape(polygonPoints);
+    setPolygonPoints([]);
+    setFogDraft(null);
+    if (shape) onFogShape(shape);
+  };
+
   /** Cursor conforme o modo; no modo Selecionar, "grab" sobre um token que posso mover. Também estica a caixa de seleção e a régua. */
   const handleStageMouseMove = () => {
     if (Konva.isDragging()) return; // no meio de um arraste não mexemos em nada
     if (mode === "pan") return setCursor("grab");
+    if (fogActive) {
+      setCursor("crosshair");
+      const p = pointerMapPos();
+      if (p) fogMouseMove(p);
+      return;
+    }
     if (mode === "ruler") {
       setCursor("crosshair");
       const start = rulerStartRef.current;
@@ -331,6 +472,11 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
    */
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (e.evt.button !== 0) return;
+    if (fogActive) {
+      const p = pointerMapPos();
+      if (p) fogMouseDown(p);
+      return;
+    }
     if (mode === "ruler") {
       const p = pointerMapPos();
       if (!p) return;
@@ -350,6 +496,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
 
   /** Soltou o mouse: fecha a régua (some) ou a caixa de seleção (seleciona o que está dentro). */
   const handleStageMouseUp = () => {
+    if (fogActive) return fogMouseUp();
     if (rulerStartRef.current) {
       rulerStartRef.current = null;
       onRulerClear();
@@ -369,6 +516,11 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   };
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (fogActive) {
+      const p = pointerMapPos();
+      if (p && e.evt.button === 0) fogClick(p);
+      return;
+    }
     if (mode !== "select") return;
     if (boxJustEndedRef.current) {
       boxJustEndedRef.current = false;
@@ -448,9 +600,10 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
       token={token}
       bar={tokenBars[token.id] ?? null}
       draggable={mode === "select" && canControl(me, token)}
+      selectable={mode === "select"}
       isSelected={selectedIds.includes(token.id)}
       isActiveTurn={token.id === activeTurnTokenId}
-      onSelect={(additive) => mode === "select" && selectByClick(token.id, additive)}
+      onSelect={(additive) => selectByClick(token.id, additive)}
       onCursor={setCursor}
       onDragStart={(node) => handleTokenDragStart(token, node)}
       onDragMove={(node) => handleTokenDragMove(token, node)}
@@ -505,8 +658,12 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         onMouseMove={handleStageMouseMove}
         onMouseDown={handleStageMouseDown}
         onMouseUp={handleStageMouseUp}
-        onMouseLeave={handleStageMouseUp}
+        onMouseLeave={() => {
+          handleStageMouseUp();
+          setFogPointer(null);
+        }}
         onClick={handleStageClick}
+        onDblClick={() => fogActive && fogDblClick()}
       >
         {/* Camada 1: mapa + grid */}
         <Layer id="map-layer">
@@ -528,7 +685,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         */}
         <Layer id="tokens-layer-below-fog">{tokensBelowFog.map(renderToken)}</Layer>
 
-        <FogLayer fog={scene.fog} map={map} isGm={me.role === "gm"} />
+        <FogLayer fog={scene.fog} map={map} isGm={me.role === "gm"} draft={fogActive ? fogDraft : null} />
 
         <Layer id="tokens-layer">
           {tokensAboveFog.map(renderToken)}
@@ -552,6 +709,9 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
             <RulerShape key={r.participantId} ruler={r.ruler} grid={scene.grid} systemDef={systemDef} stageScale={stageScale} color="#60a5fa" author={r.nickname} />
           ))}
           {ruler && <RulerShape ruler={ruler} grid={scene.grid} systemDef={systemDef} stageScale={stageScale} color="#d4af37" author={null} />}
+          {fogActive && fogTool && (
+            <FogGestureOverlay tool={fogTool} pointer={fogPointer} polygonPoints={polygonPoints} draft={fogDraft} stageScale={stageScale} />
+          )}
           {selectionBox && (
             <Rect
               x={Math.min(selectionBox.x1, selectionBox.x2)}
@@ -621,7 +781,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
       {!selectedToken && (
       <div className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a1a]/95 border border-[#2d2417] text-[11px] text-zinc-400 shadow-xl pointer-events-none">
         <Info className="w-3.5 h-3.5 text-[#d4af37]" />
-        <span>{MODE_HINTS[mode]}</span>
+        <span>{fogActive && fogTool ? FOG_HINTS[fogTool.shape] : MODE_HINTS[mode]}</span>
       </div>
       )}
     </div>
@@ -657,6 +817,8 @@ interface TokenNodeProps {
   token: Token;
   bar: TokenBar | null;
   draggable: boolean;
+  /** Modo Selecionar: clique seleciona. Nos outros modos o clique sobe para o Stage (ex.: vértice do polígono da névoa). */
+  selectable: boolean;
   isSelected: boolean;
   isActiveTurn: boolean;
   /** additive = Shift pressionado (entra/sai da seleção em vez de substituí-la). */
@@ -669,7 +831,7 @@ interface TokenNodeProps {
   onTransformEnd: (node: Konva.Node) => void;
 }
 
-const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd }) => {
+const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd }) => {
   const image = useImage(assetUrl(token.imageUrl));
   const radius = tokenRadius(token);
   const cx = token.width / 2;
@@ -690,10 +852,12 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected
       draggable={draggable}
       opacity={token.visible ? 1 : 0.45}
       onClick={(e) => {
+        if (!selectable) return;
         e.cancelBubble = true;
         onSelect(e.evt.shiftKey);
       }}
       onTap={(e) => {
+        if (!selectable) return;
         e.cancelBubble = true;
         onSelect(false);
       }}
@@ -768,6 +932,50 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected
         `fill="transparent"` não desenha nada, mas deixa explícito que a área conta como preenchida.
       */}
       <Circle name="token-hit" x={cx} y={cy} radius={radius + BODY_STROKE} fill="transparent" />
+    </Group>
+  );
+};
+
+// --- Névoa: contorno do gesto em andamento -----------------------------------
+
+interface FogGestureOverlayProps {
+  tool: FogTool;
+  pointer: { x: number; y: number } | null;
+  polygonPoints: number[];
+  draft: FogShape | null;
+  stageScale: number;
+}
+
+/**
+ * Guias douradas por cima da névoa: círculo do pincel no ponteiro, contorno do
+ * retângulo em andamento e vértices + linha elástica do polígono. Só desenho; a
+ * "tinta" de verdade é o draft na FogLayer.
+ */
+const FogGestureOverlay: React.FC<FogGestureOverlayProps> = ({ tool, pointer, polygonPoints, draft, stageScale }) => {
+  const k = 1 / stageScale;
+  const color = tool.mode === "reveal" ? "#d4af37" : "#f87171";
+  return (
+    <Group>
+      {tool.shape === "brush" && pointer && (
+        <Circle x={pointer.x} y={pointer.y} radius={tool.brushSize / 2} stroke={color} strokeWidth={1.5 * k} dash={[6 * k, 4 * k]} />
+      )}
+      {tool.shape === "rect" && draft?.kind === "rect" && (
+        <Rect x={draft.x} y={draft.y} width={draft.width} height={draft.height} stroke={color} strokeWidth={1.5 * k} dash={[6 * k, 4 * k]} />
+      )}
+      {tool.shape === "polygon" && polygonPoints.length >= 2 && (
+        <>
+          <Line
+            points={pointer ? [...polygonPoints, pointer.x, pointer.y] : polygonPoints}
+            stroke={color}
+            strokeWidth={1.5 * k}
+            dash={[6 * k, 4 * k]}
+            closed={polygonPoints.length >= 6}
+          />
+          {Array.from({ length: polygonPoints.length / 2 }, (_, i) => (
+            <Circle key={i} x={polygonPoints[i * 2] ?? 0} y={polygonPoints[i * 2 + 1] ?? 0} radius={(i === 0 ? 5 : 3.5) * k} fill={i === 0 ? color : "#1a1a1a"} stroke={color} strokeWidth={k} />
+          ))}
+        </>
+      )}
     </Group>
   );
 };
