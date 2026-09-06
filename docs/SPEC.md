@@ -44,7 +44,8 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Redimensionar: handles nos cantos (Konva Transformer). Emite `token:update {id, width, height}`.
 - Permissão: servidor rejeita `token:update`/`token:delete` de jogador que não é `ownerId` do token (ack `{ ok: false }`).
 - Todo `token:*` aceito é persistido e reenviado a todos na sala (inclusive quem enviou, para manter uma única fonte de verdade).
-- Tokens com `visible = false` não são enviados a jogadores.
+- Tokens com `visible = false` não são enviados a jogadores. Se o GM oculta um token visível, jogadores recebem `token:deleted`; se torna visível de novo, recebem `token:updated` (o cliente trata `token:updated` como upsert).
+- Jogador (dono) só pode alterar `x, y, width, height, rotation`; o servidor ignora os demais campos do patch. Nome, cor, dono, visibilidade e imagem são só do GM (painel do token).
 
 ### 3.4 Chat e dados
 - Input único. Texto normal vira `ChatMessage{kind:"text"}`.
@@ -65,8 +66,10 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 
 ### 3.5 Iniciativa
 - Painel lateral com lista ordenada por `value` desc, depois `tiebreak` desc.
-- GM: adicionar entrada (a partir de um token ou manual), editar valor, remover, `next`/`prev`, `reset` (limpa e volta `round = 0`).
-- `next` no último da lista incrementa `round` e volta ao índice 0.
+- GM: adicionar entrada (a partir de um token ou manual), editar valor, ocultar/mostrar, remover, `next`/`prev`, `reset` (limpa e volta `round = 0`).
+- `next` com `currentIndex = null` inicia o combate (índice 0, `round = 1`). `next` no último da lista incrementa `round` e volta ao índice 0. `prev` no primeiro volta ao último e decrementa `round` (mínimo 1).
+- Ao alterar a lista (add/update/remove), o cursor continua apontando para a mesma entrada; se ela for removida, quem vinha depois passa a agir.
+- Para jogadores, `currentIndex` é recalculado sobre a lista filtrada; se quem age está oculto, `currentIndex = null`.
 - Jogadores veem a lista (entradas `visible = true`) e o destaque de quem está agindo. Token do turno atual ganha um contorno no mapa.
 - A fórmula de iniciativa vem do JSON do sistema (`rolls.initiative`), mas no MVP o valor é digitado ou rolado com `/r`.
 
@@ -106,7 +109,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 |---|---|---|---|
 | `room:join` | `{ inviteCode, nickname?, gmSecret?, sessionToken? }` | todos | ack `RoomSnapshot`; `room:participantJoined`. `sessionToken` válido → reconecta o mesmo participante; senão exige `nickname` e cria um novo |
 | `scene:create` | `{ name }` | GM | `scene:created` |
-| `scene:activate` | `{ sceneId }` | GM | `room:activeSceneChanged` |
+| `scene:activate` | `{ sceneId }` | GM | `room:activeSceneChanged` (clientes reemitem `room:join` para receber os tokens da nova cena) |
 | `scene:setMap` | `{ sceneId, mapUrl, mapWidth, mapHeight }` (`null` remove o mapa) | GM | `scene:updated` |
 | `scene:updateGrid` | `{ sceneId, grid: Partial<GridConfig> }` | GM | `scene:updated` |
 | `token:create` | `TokenCreate` | GM | `token:created` |
@@ -152,25 +155,30 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 
 ```
 apps/web/src/
-  components/   canvas/ (Konva), chat/, initiative/, scene/, room/
-  store/        connection.ts, room.ts, tokens.ts, chat.ts, initiative.ts
-  lib/          grid.ts (célula↔pixel), socket helpers
+  App.tsx       escolhe a tela pela URL
+  components/   Lobby, RoomPage (liga stores aos componentes), TopBar, VttCanvas,
+                TokenInspector, SidePanel, ChatTab, InitiativeTab, MapConfigModal,
+                NicknamePrompt, Toasts
+  store/        connection.ts (socket + emitAck), bindSocket.ts (broadcast → store),
+                room.ts, tokens.ts, chat.ts, initiative.ts, ui.ts (toasts)
+  lib/          router.ts (2 rotas, sem lib), api.ts (HTTP), grid.ts (célula↔pixel, puro),
+                session.ts (localStorage), throttle.ts, useImage.ts
 apps/server/src/
   index.ts, env.ts, db.ts
   http/         rooms.ts, upload.ts
-  socket/       index.ts, room.ts, scene.ts, token.ts, chat.ts, initiative.ts
-  services/     dice.ts (usa o parser do shared), permissions.ts
+  socket/       index.ts, types.ts, ack.ts (validação Zod + ack), room.ts, scene.ts,
+                token.ts, chat.ts, initiative.ts
+  services/     serialize.ts (Prisma → shared), snapshot.ts, presence.ts,
+                initiativeState.ts, permissions.ts, chatCommands.ts, ids.ts
 packages/shared/src/
-  schemas/      (Zod)  events.ts  dice/ (parser + roller, puro, sem I/O)
+  schemas/      (Zod, inclui payloads.ts)  events.ts  dice/ (parser + roller, puro, sem I/O)
 packages/shared/systems/
   tormenta20.json
 ```
 
-## 8. Ordem de implementação sugerida
+## 8. Estado da implementação
 
-1. Parser de dados em `shared` (puro, com testes) — desbloqueia chat.
-2. `POST /api/rooms` + `room:join` + `RoomSnapshot` — desbloqueia tudo que depende de sala.
-3. Canvas com mapa + grid (upload + `scene:*`).
-4. Tokens (`token:*`) com drag/resize e sync.
-5. Chat + `/r`.
-6. Iniciativa.
+Todos os itens do MVP acima estão implementados (setembro/2026). Limitações conhecidas:
+- Só existe UI para uma cena por sala (`scene:create`/`scene:activate` funcionam no servidor, sem botão no web).
+- `currentIndex`/`round` da iniciativa e a presença (`connected`) se perdem ao reiniciar o servidor.
+- Uploads ficam em disco (`apps/server/uploads/`), sem limpeza de arquivos órfãos.
