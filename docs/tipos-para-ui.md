@@ -132,7 +132,14 @@ type Save = {
   text: string;                  // max 500, default ""
 };
 
-type ItemFieldValue = string | number | boolean;
+/** attributeBonuses: { con: 2, sab: 1, des: -1 }. */
+type AttributeBonusesValue = Record<Key, number>;
+/** attributeChoice: +amount em `count` atributos diferentes, escolhidos em `chosen` (fora de `exclude`). */
+type AttributeChoiceValue = { amount: number; count: number; exclude: Key[]; chosen: Key[] };
+/** skillGrants: perícias treinadas fixas + grupos "escolha `count` de `from`" (`from` vazio = qualquer). */
+type SkillGrantsValue = { fixed: SkillInstanceKey[]; choices: { count: number; from: Key[]; chosen: SkillInstanceKey[] }[] };
+
+type ItemFieldValue = string | number | boolean | AttributeChoiceValue | SkillGrantsValue | AttributeBonusesValue;
 
 type CharacterItem = {
   id: Id;
@@ -176,8 +183,11 @@ type CharacterKind = "pc" | "npc";
 /** Conteúdo da coluna `data` + campos editáveis. */
 type CharacterData = {
   imageUrl: string | null;       // default null
+  /** Nível digitado. Ignorado quando as classes mandam (level.source = "classes", há classe e manualProgression = false). */
   level: number;                 // int >= 0, default 1
   xp: number;                    // int >= 0, default 0
+  /** true = ignora as classes: nível e máximos dos recursos voltam a ser digitados (level, maxOverride). */
+  manualProgression: boolean;    // default false
   attributes: Record<Key, { base: number }>;          // default {}
   skills: Record<SkillInstanceKey, CharacterSkill>;   // default {}
   resources: Record<Key, CharacterResource>;          // default {}
@@ -266,13 +276,19 @@ type ResourceDef = {
   minFormula?: Formula;
   /** Se true, a ficha tem um campo de pontos temporários. */
   hasTemp: boolean;              // default false
-  /** Máximo acumulado por nível de classe (fase 4). Declarado no schema; computeCharacter ainda ignora. */
+  /**
+   * Máximo acumulado por nível de classe (itens do tipo level.classes.kind): 1º nível da
+   * classe inicial soma firstLevelField (ou classField), os demais classField; cada nível
+   * soma o attribute e respeita minPerLevel. Só vale com classes e sem manualProgression.
+   */
   perLevel?: {
-    /** Campo do item de classe com o valor por nível (ex.: "hpPerLevel"). */
+    /** Campo numérico do item de classe com o valor por nível (ex.: "hpPerLevel"). */
     classField: Key;
+    /** Campo numérico com o valor do 1º nível da classe inicial (ex.: "hpInitial"). */
+    firstLevelField?: Key;
     /** Atributo somado por nível (ex.: CON para PV). */
     attribute?: Key;
-    firstLevelMultiplier: number;  // int >= 1, default 1
+    /** Ganho mínimo por nível depois de somar o atributo (T20: 1 PV). */
     minPerLevel?: number;
   };
 };
@@ -289,8 +305,10 @@ type DerivedDef = {
 
 type LevelDef = {
   max: number;                   // int >= 1
-  /** "manual" = digitado na ficha; "classes" = soma dos itens de classe (fase 4). */
+  /** "manual" = digitado; "classes" = soma dos itens de classe (ficha sem classe ou em manualProgression usa o digitado). */
   source: "manual" | "classes";  // default "manual"
+  /** Onde estão as classes quando source = "classes" (obrigatório nesse caso). */
+  classes?: { kind: Key; levelsField: Key; initialField: Key };
   /** XP acumulado necessário para cada nível (índice 0 = nível 1). */
   xpTable?: number[];
 };
@@ -333,11 +351,19 @@ type EquipStatDef = {
   default: number;               // default 0
 };
 
+/**
+ * Tipos estruturados têm EFEITO na ficha enquanto o item está ativo (não físico, ou equipado):
+ * attributeBonuses → modificadores attr.<key>; attributeChoice → +amount nos escolhidos;
+ * skillGrants → perícias treinadas; size → a UI aplica ao tamanho da ficha.
+ */
+type ItemFieldType = "enum" | "number" | "boolean" | "text" | "attributeBonuses" | "attributeChoice" | "skillGrants" | "size";
+
 type ItemFieldDef = {
   key: Key;
   label: string;
-  type: "enum" | "number" | "boolean" | "text";
+  type: ItemFieldType;
   options?: OptionDef[];
+  /** Só para enum/number/boolean/text; os estruturados nascem vazios. */
   default?: string | number | boolean;
 };
 
@@ -354,6 +380,8 @@ type ItemKindDef = {
   fields: ItemFieldDef[];        // default []
   /** Stats de equipStats que itens deste tipo podem fornecer quando equipados. */
   statBonuses: Key[];            // default []
+  /** Quantos itens deste tipo a ficha aceita (ex.: 1 raça). Ausente = sem limite. */
+  maxCount?: number;
 };
 
 /** Enumerações do bloco de ativação (poderes, magias, consumíveis). */
@@ -470,8 +498,15 @@ As chaves `$comment` e `$rules` são só documentação; o schema as ignora.
   ],
 
   "resources": [
-    { "key": "pv", "label": "Pontos de Vida", "abbr": "PV", "hasTemp": true, "minFormula": "-floor({max}/2)" },
-    { "key": "pm", "label": "Pontos de Mana", "abbr": "PM" }
+    {
+      "$comment": "PV = PV inicial da classe inicial + CON no 1º nível; + PV por nível + CON nos demais (mínimo 1 por nível). Multiclasse soma por classe.",
+      "key": "pv", "label": "Pontos de Vida", "abbr": "PV", "hasTemp": true, "minFormula": "-floor({max}/2)",
+      "perLevel": { "classField": "hpPerLevel", "firstLevelField": "hpInitial", "attribute": "con", "minPerLevel": 1 }
+    },
+    {
+      "key": "pm", "label": "Pontos de Mana", "abbr": "PM",
+      "perLevel": { "classField": "mpPerLevel" }
+    }
   ],
 
   "derived": [
@@ -483,9 +518,10 @@ As chaves `$comment` e `$rules` são só documentação; o schema as ignora.
   ],
 
   "level": {
-    "$comment": "source vira \"classes\" na fase 4, quando classes forem itens.",
+    "$comment": "Nível = soma dos níveis dos itens de classe. Ficha sem classe (ou em progressão manual) usa o nível digitado.",
     "max": 20,
-    "source": "manual",
+    "source": "classes",
+    "classes": { "kind": "class", "levelsField": "levels", "initialField": "initial" },
     "xpTable": [0, 1000, 3000, 6000, 10000, 15000, 21000, 28000, 36000, 45000, 55000, 66000, 78000, 91000, 105000, 120000, 136000, 153000, 171000, 190000]
   },
 
@@ -522,7 +558,6 @@ As chaves `$comment` e `$rules` são só documentação; o schema as ignora.
   ],
 
   "traitFields": [
-    { "key": "raca",      "label": "Raça" },
     { "key": "origem",    "label": "Origem" },
     { "key": "divindade", "label": "Divindade" },
     { "key": "tipo", "label": "Tipo de criatura", "type": "enum", "options": [
@@ -544,6 +579,31 @@ As chaves `$comment` e `$rules` são só documentação; o schema as ignora.
   ],
 
   "itemKinds": [
+    {
+      "$comment": "Classe: alimenta nível (levels), PV/PM (resources[].perLevel) e perícias treinadas. Sem compêndio: os valores vêm do livro, digitados.",
+      "key": "class", "label": "Classe", "physical": false,
+      "fields": [
+        { "key": "levels",        "label": "Níveis",          "type": "number",  "default": 1 },
+        { "key": "initial",       "label": "Classe inicial",  "type": "boolean", "default": false },
+        { "key": "hpInitial",     "label": "PV no 1º nível",  "type": "number",  "default": 0 },
+        { "key": "hpPerLevel",    "label": "PV por nível",    "type": "number",  "default": 0 },
+        { "key": "mpPerLevel",    "label": "PM por nível",    "type": "number",  "default": 0 },
+        { "key": "skillsGranted", "label": "Perícias treinadas", "type": "skillGrants" },
+        { "key": "proficiencies", "label": "Proficiências",   "type": "text" }
+      ]
+    },
+    {
+      "$comment": "Raça (no máximo 1): bônus fixos e à escolha em atributos, tamanho, perícias. Deslocamento e sentidos são só informativos por enquanto.",
+      "key": "race", "label": "Raça", "physical": false, "maxCount": 1,
+      "fields": [
+        { "key": "attributeBonuses", "label": "Atributos",        "type": "attributeBonuses" },
+        { "key": "flexibleBonuses",  "label": "Bônus à escolha",  "type": "attributeChoice" },
+        { "key": "size",             "label": "Tamanho",          "type": "size" },
+        { "key": "movement",         "label": "Deslocamento (m)", "type": "number", "default": 9 },
+        { "key": "senses",           "label": "Sentidos",         "type": "text" },
+        { "key": "skillsGranted",    "label": "Perícias treinadas", "type": "skillGrants" }
+      ]
+    },
     {
       "key": "weapon", "label": "Arma",
       "fields": [
@@ -591,7 +651,7 @@ As chaves `$comment` e `$rules` são só documentação; o schema as ignora.
       ]
     },
     {
-      "key": "spell", "label": "Magia", "physical": false, "hasActivation": true, "hasSave": true,
+      "key": "spell", "label": "Magia", "physical": false, "hasActivation": true, "hasSave": true, "useLabel": "Conjurar",
       "fields": [
         { "key": "circle", "label": "Círculo", "type": "number", "default": 1 },
         { "key": "school", "label": "Escola", "type": "enum", "default": "evocacao", "options": [

@@ -3,7 +3,7 @@
 > Documento de referência. Analisa o sistema não oficial de Tormenta20 para Foundry VTT
 > (`~/projetos/foundry-tormenta20`, versão 1.5.015) **apenas como referência de modelagem de dados**
 > e propõe como estender `packages/shared` para cobrir ficha de personagem e itens.
-> As fases 1, 2 e 3 da proposta estão implementadas (ver §3.6); o comportamento atual está em `SPEC.md` §3.6.
+> As fases 1 a 4 da proposta estão implementadas (ver §3.6); o comportamento atual está em `SPEC.md` §3.6.
 > As seções 2 e 3 permanecem como registro da análise e da proposta original.
 
 Escopo da leitura no repositório do Foundry:
@@ -201,7 +201,7 @@ Fica de fora de propósito, por ser automação pesada ou Product Identity: Acti
 | 1. Schema v2 + JSON + `computeCharacter` + modificadores | **feito** | `packages/shared/src/schemas/system.ts`, `systems/tormenta20.json`, `src/rules/` |
 | 2. Itens físicos com `statBonuses` e ações de ataque/dano ligadas ao chat | **feito** | `rules/rolls.ts`, `apps/server/src/socket/character.ts`, `apps/web/src/components/sheet/` |
 | 3. Poderes e magias com ativação, custo de PM e CD de resistência | **feito** | `rules/activation.ts`, `activation.*` no JSON, `character:use-item`, `ItemCardMessage` no chat; plano em `plano-passo3.md` |
-| 4. Classes e raças como itens alimentando nível e PV/PM | pendente | `ResourceDef.perLevel` e `level.source = "classes"` já existem no schema, ignorados por enquanto |
+| 4. Classes e raças como itens alimentando nível e PV/PM | **feito** | `rules/progression.ts`, `level.classes` + `resources[].perLevel` no JSON, tipos de campo estruturados em `ItemFieldDef`, `StructuredFields.tsx` na ficha; plano em `plano-passo4.md` |
 
 Diferenças em relação à proposta original, todas para manter o código sem chave de Tormenta:
 - `equipStats[]` ganhou `aggregate` (`sum`/`min`/`max`) e `default`, para o limite de atributo da armadura pesada ser "sem limite" quando não há armadura.
@@ -210,3 +210,4 @@ Diferenças em relação à proposta original, todas para manter o código sem c
 - Sem `systemId` na ficha: a sala já tem o sistema.
 - Moedas: os valores de `ratio` em `currencies[]` foram preenchidos de memória e **precisam ser conferidos no livro**; hoje são só informativos.
 - Fase 3: em vez de `derived.dc` servir de CD para itens, o JSON tem `activation.saveDc` com `{saveAttr}`/`{saveBonus}`, porque o item pode trocar o atributo. O custo usa modificadores `resource.<key>.cost` (equivalente ao `custoPM` do Foundry) com piso `activation.minCost`. Execuções passivas são marcadas no JSON (`executions[].passive`), não por chave no código.
+- Fase 4: `perLevel.firstLevelMultiplier` (o "×4" do Foundry) virou `firstLevelField` (PV inicial da classe, como no livro). Bônus de raça e perícias concedidas **não** são gravados como `Modifier`/`trained` na ficha: `computeCharacter` os deriva dos itens ativos (mesmo padrão dos `statBonuses`), então remover o item remove o efeito sem gancho nenhum. As escolhas (atributos flexíveis, "escolha N de [lista]") ficam dentro do próprio campo (`chosen`). A flag `lvlconfig.manual` do Foundry virou `manualProgression`. O traço livre "Raça" saiu de `traitFields`, porque a raça é item.

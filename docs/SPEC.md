@@ -8,9 +8,9 @@
 VTT (Virtual Tabletop) web para jogar RPG de mesa online com amigos. Primeiro sistema: **Tormenta20**.
 Arquitetura **agnóstica de sistema**: tudo que é regra (atributos, perícias, fórmulas) vive em `packages/shared/systems/<id>.json`, validado pelo `SystemDefinitionSchema`. O código nunca conhece "FOR" ou "Percepção".
 
-**Fora do MVP** (explicitamente): login/contas, fog of war, medição de distância, áudio/vídeo, múltiplos mapas simultâneos, compêndio de magias/itens, automação avançada da ficha (classes e raças como itens, efeitos ativos, progressão por nível). O que já foi feito além do MVP está em **§9 Fase 2**.
+**Fora do MVP** (explicitamente): login/contas, fog of war, medição de distância, áudio/vídeo, múltiplos mapas simultâneos, compêndio de magias/itens/classes, automação avançada da ficha (efeitos ativos, poderes por nível com escolhas). O que já foi feito além do MVP está em **§9 Fase 2**.
 
-A **ficha básica** (§3.6) entrou no escopo em setembro/2026: atributos, perícias, recursos, stats derivados, modificadores e itens físicos com ataque/dano ligados ao chat. Poderes e magias com ativação (custo de PM, CD de resistência, card no chat) entraram em seguida (fase 3). Raciocínio e mapeamento em `docs/modelo-personagem.md`; plano da fase 3 em `docs/plano-passo3.md`.
+A **ficha básica** (§3.6) entrou no escopo em setembro/2026: atributos, perícias, recursos, stats derivados, modificadores e itens físicos com ataque/dano ligados ao chat. Poderes e magias com ativação (custo de PM, CD de resistência, card no chat) entraram em seguida (fase 3), e classes e raças como itens que alimentam nível, PV/PM e atributos (fase 4). Raciocínio e mapeamento em `docs/modelo-personagem.md`; planos em `docs/plano-passo3.md` e `docs/plano-passo4.md`.
 
 ## 2. Papéis
 
@@ -100,7 +100,9 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Permissões: GM vê e edita todas; jogador vê as fichas `kind = "pc"`, cria só para si e edita/rola só as que possui (`ownerId`). Fichas `npc` não vão para jogadores (`character:deleted` se uma PC virar NPC).
 - Vínculo com token: `token:link-character` (GM, ou dono do token que também é dono da ficha). Apagar a ficha desvincula os tokens (`token:updated` com `characterId = null`). Na mesa, clicar num token vinculado a uma ficha visível abre a ficha; o token mostra uma barra com o recurso apontado por `tokenBar` no JSON do sistema (atual/máximo da ficha, via `computeCharacter`).
 - UI: a ficha abre numa gaveta lateral (`CharacterSheetDrawer`) com modo visualização (clique rola) e modo edição. Jogador tem o botão "Meu personagem" na barra superior (estado vazio + "Criar personagem" se não tiver ficha); o GM tem "Fichas", com todas as fichas da sala.
-- Nível é digitado (`level.source = "manual"`); PV/PM máximos são digitados (`maxOverride`) até classes virarem itens (fase 4).
+- **Classes e raças** (fase 4) são itens: `level.classes` no JSON aponta o tipo de item de classe e seus campos de níveis e "classe inicial"; `resources[].perLevel` diz como PV/PM acumulam por nível (`firstLevelField` no 1º nível da classe inicial, `classField` nos demais, `+ attribute`, piso `minPerLevel`; multiclasse soma). Quando a ficha tem ao menos uma classe e `manualProgression = false`, `computeCharacter` devolve `levelSource = "classes"`: nível = soma dos níveis (até `level.max`) e PV/PM ignoram `maxOverride` (a conta vai em `resources[].detail` para o tooltip). Sem classe, ou com "Modo manual" ligado, tudo continua digitado; fichas antigas não mudam.
+  - Campos de item estruturados (`ItemFieldDef.type`): `attributeBonuses` (raça: CON +2), `attributeChoice` (Humano: +1 em 3 à escolha, guardada em `chosen`), `skillGrants` (perícias fixas + grupos "escolha N de [lista]", com `chosen`) e `size`. Valem para qualquer item ativo (não físico, ou físico equipado) e **não são gravados na ficha**: viram `computed.itemModifiers` (origem = id do item) e `skills[].grantedBy`; remover o item remove o efeito. `itemKinds[].maxCount` limita a quantidade (1 raça), conferido em `character:update` por `validateCharacterItems`.
+  - UI: abas Classe e Raça em "Equipamentos e habilidades"; cabeçalho mostra "Guerreiro 3 / Arcanista 2" e o nível total com a soma no tooltip; nível e máximos de PV/PM ficam somente leitura (cadeado) com a conta no tooltip; botão "Modo manual" liga `manualProgression` copiando os valores calculados para os campos digitados. Escolhas (atributos flexíveis, perícias da classe) são chips que o dono marca fora do modo edição, com aviso "faltam N escolhas". Perícia concedida aparece com o checkbox travado e "Treinada por <item>". Modificadores vindos de itens aparecem travados na seção Modificadores. `movement` e `senses` da raça são só informativos.
 
 ## 4. Modelo de dados
 
@@ -234,7 +236,7 @@ packages/shared/systems/
 ## 8. Estado da implementação
 
 Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a ficha básica (§3.6). Limitações conhecidas:
-- Ficha: classes e raças como itens, nível e PV/PM automáticos são a fase 4. Consumíveis usam a mesma ativação de poderes/magias, mas a quantidade não é descontada ao usar.
+- Ficha: sem compêndio de classes/raças (os valores do livro são digitados no item); deslocamento e sentidos da raça não alimentam `derived[]`; poderes de classe por nível ficam de fora. Consumíveis usam a mesma ativação de poderes/magias, mas a quantidade não é descontada ao usar.
 - `character:update` é um patch raso: editar um item reenvia a lista `items` inteira (fichas são pequenas; ok por ora).
 - Só existe UI para uma cena por sala (`scene:create`/`scene:activate` funcionam no servidor, sem botão no web).
 - `currentIndex`/`round` da iniciativa e a presença (`connected`) se perdem ao reiniciar o servidor.
@@ -246,7 +248,7 @@ Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a fi
 Funcionalidades entregues depois do MVP, na ordem em que entraram. O §1 continua descrevendo só o MVP.
 
 ### 9.1 Ficha de personagem
-Descrita em §3.6 (entrou em setembro/2026). Poderes e magias com ativação são a "fase 3" da ficha (`docs/plano-passo3.md`).
+Descrita em §3.6 (entrou em setembro/2026). Poderes e magias com ativação são a "fase 3" da ficha (`docs/plano-passo3.md`); classes e raças como itens, a "fase 4" (`docs/plano-passo4.md`).
 
 ### 9.2 Barra de ferramentas e régua
 Descritas em §3.2: modos Selecionar / Mover mapa / Régua com atalhos, caixa de seleção, movimento em grupo e a régua efêmera (`ruler:update`).
