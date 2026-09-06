@@ -6,6 +6,7 @@ import { registerChatHandlers } from "./chat.js";
 import { registerInitiativeHandlers } from "./initiative.js";
 import { registerCharacterHandlers } from "./character.js";
 import { registerRulerHandlers } from "./ruler.js";
+import { registerFogHandlers } from "./fog.js";
 import type { TypedServer } from "./types.js";
 
 /** Ponto único que liga todos os handlers de socket. */
@@ -25,6 +26,7 @@ export function registerSocketHandlers(io: TypedServer, log: FastifyBaseLogger):
     registerInitiativeHandlers(io, socket);
     registerCharacterHandlers(io, socket);
     registerRulerHandlers(io, socket);
+    registerFogHandlers(io, socket);
 
     socket.on("disconnect", (reason) => {
       log.info({ socketId: socket.id, reason }, "socket desconectado");

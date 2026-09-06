@@ -57,6 +57,8 @@ model Scene {
   mapHeight Int?
   /// GridConfig serializado (ver GridConfigSchema). JSON para não migrar a cada campo novo.
   grid      Json    @default("{\"type\":\"square\",\"cellSize\":70,\"offsetX\":0,\"offsetY\":0,\"color\":\"#00000055\",\"snap\":true}")
+  /// FogConfig serializado (ver FogConfigSchema): névoa manual da fase 2.
+  fog       Json    @default("{\"enabled\":false,\"base\":\"hidden\",\"shapes\":[]}")
   createdAt DateTime @default(now())
 
   room   Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)

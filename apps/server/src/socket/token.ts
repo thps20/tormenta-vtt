@@ -1,8 +1,9 @@
-import { TokenCreateSchema, TokenDeleteSchema, TokenLinkCharacterSchema, TokenPatchSchema, type Token } from "@tormenta-vtt/shared";
+import { TokenCreateSchema, TokenDeleteSchema, TokenLinkCharacterSchema, TokenPatchSchema, type FogConfig, type Token } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { canEditCharacter, requireCharacter, toCharacter } from "../services/characters.js";
 import { canEditToken, restrictPatchForRole } from "../services/permissions.js";
-import { toToken } from "../services/serialize.js";
+import { toScene, toToken } from "../services/serialize.js";
+import { emitTokenToPlayers } from "../services/visibility.js";
 import { guarded, HandlerError } from "./ack.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
@@ -14,13 +15,13 @@ async function requireToken(tokenId: string, roomId: string) {
 }
 
 /**
- * Broadcast respeitando visibilidade: GM recebe sempre; jogadores recebem
- * o token só se visível, senão recebem token:deleted (caso tenham ele em cache).
+ * Broadcast respeitando visibilidade: GM recebe sempre; jogadores só recebem o
+ * token se puderem vê-lo (`visible` + névoa da cena), senão recebem token:deleted
+ * (caso tenham ele em cache). Ver services/visibility.ts.
  */
-export function broadcastToken(io: TypedServer, roomId: string, token: Token, event: "token:created" | "token:updated") {
+export function broadcastToken(io: TypedServer, roomId: string, token: Token, event: "token:created" | "token:updated", fog: FogConfig) {
   io.to(rooms.gm(roomId)).emit(event, token);
-  if (token.visible) io.to(rooms.players(roomId)).emit(event, token);
-  else if (event === "token:updated") io.to(rooms.players(roomId)).emit("token:deleted", { tokenId: token.id });
+  emitTokenToPlayers(io, roomId, token, event, fog);
 }
 
 export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): void {
@@ -34,7 +35,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
         if (!owner || owner.roomId !== ctx.roomId) throw new HandlerError("Dono inválido");
       }
       const token = toToken(await prisma.token.create({ data }));
-      broadcastToken(io, ctx.roomId, token, "token:created");
+      broadcastToken(io, ctx.roomId, token, "token:created", toScene(scene).fog);
       return token;
     }, { gmOnly: true }),
   );
@@ -51,7 +52,8 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
         if (!owner || owner.roomId !== ctx.roomId) throw new HandlerError("Dono inválido");
       }
       const token = toToken(await prisma.token.update({ where: { id }, data: fields }));
-      broadcastToken(io, ctx.roomId, token, "token:updated");
+      // A cena já veio junto com o token (requireToken): sem consulta extra a cada movimento.
+      broadcastToken(io, ctx.roomId, token, "token:updated", toScene(row.scene).fog);
       return token;
     }),
   );
@@ -77,7 +79,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
         if (!canEditCharacter(ctx, character)) throw new HandlerError("Você não controla esta ficha");
       }
       const token = toToken(await prisma.token.update({ where: { id: tokenId }, data: { characterId } }));
-      broadcastToken(io, ctx.roomId, token, "token:updated");
+      broadcastToken(io, ctx.roomId, token, "token:updated", toScene(row.scene).fog);
       return token;
     }),
   );

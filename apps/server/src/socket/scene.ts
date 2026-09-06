@@ -5,7 +5,7 @@ import { guarded, HandlerError } from "./ack.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
 /** Garante que a cena existe e pertence à sala do socket (evita editar cena alheia). */
-async function requireScene(sceneId: string, roomId: string) {
+export async function requireScene(sceneId: string, roomId: string) {
   const scene = await prisma.scene.findUnique({ where: { id: sceneId } });
   if (!scene || scene.roomId !== roomId) throw new HandlerError("Cena não encontrada");
   return scene;

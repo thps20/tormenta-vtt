@@ -13,6 +13,7 @@ import type {
 } from "@prisma/client";
 import {
   ChatMessageSchema,
+  FogConfigSchema,
   GridConfigSchema,
   type ChatMessage,
   type InitiativeEntry,
@@ -47,6 +48,7 @@ export function toScene(scene: DbScene): Scene {
     mapHeight: scene.mapHeight,
     // Se o JSON estiver incompleto, os defaults do schema preenchem.
     grid: GridConfigSchema.parse(scene.grid ?? {}),
+    fog: FogConfigSchema.parse(scene.fog ?? {}),
   };
 }
 

@@ -23,7 +23,7 @@ import {
   toJson,
 } from "../services/characters.js";
 import { createRollMessage } from "../services/rolls.js";
-import { toChatMessage, toToken } from "../services/serialize.js";
+import { toChatMessage, toScene, toToken } from "../services/serialize.js";
 import { guarded, HandlerError } from "./ack.js";
 import { broadcastToken } from "./token.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
@@ -92,10 +92,10 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
       if (!canEditCharacter(ctx, toCharacter(row))) throw new HandlerError("Você não controla esta ficha");
 
       // O banco desvincula os tokens (onDelete: SetNull); avisamos os clientes para atualizarem o cache.
-      const linked = await prisma.token.findMany({ where: { characterId } });
+      const linked = await prisma.token.findMany({ where: { characterId }, include: { scene: true } });
       await prisma.character.delete({ where: { id: characterId } });
       io.to(rooms.all(ctx.roomId)).emit("character:deleted", { characterId });
-      for (const t of linked) broadcastToken(io, ctx.roomId, toToken({ ...t, characterId: null }), "token:updated");
+      for (const t of linked) broadcastToken(io, ctx.roomId, toToken({ ...t, characterId: null }), "token:updated", toScene(t.scene).fog);
     }),
   );
 

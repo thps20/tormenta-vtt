@@ -1,17 +1,13 @@
-import type { ChatMessage, RoomSnapshot, Token } from "@tormenta-vtt/shared";
+import { FogConfigSchema, type ChatMessage, type RoomSnapshot } from "@tormenta-vtt/shared";
 import type { Participant as DbParticipant, Room as DbRoom } from "@prisma/client";
 import { prisma } from "../db.js";
 import { isConnected } from "./presence.js";
 import { loadInitiativeState } from "./initiativeState.js";
 import { toChatMessage, toParticipant, toRoomPublic, toScene, toToken } from "./serialize.js";
 import { characterVisibleTo, toCharacter } from "./characters.js";
+import { tokenVisibleTo } from "./visibility.js";
 
 const CHAT_HISTORY_LIMIT = 100;
-
-/** Jogador só vê tokens visíveis. */
-export function tokenVisibleTo(token: Token, role: "gm" | "player"): boolean {
-  return role === "gm" || token.visible;
-}
 
 /** Rolagem secreta: só GM e autor. */
 export function messageVisibleTo(msg: ChatMessage, role: "gm" | "player", participantId: string): boolean {
@@ -36,13 +32,18 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     prisma.character.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
   ]);
 
+  // Névoa da cena ativa: decide quais tokens alheios um jogador recebe.
+  const activeScene = scenes.find((sc) => sc.id === room.activeSceneId);
+  const fog = FogConfigSchema.parse(activeScene?.fog ?? {});
+  const viewer = { role: me.role, participantId: me.id };
+
   return {
     room: toRoomPublic(room),
     me: toParticipant(me, true),
     sessionToken: me.sessionToken,
     participants: participants.map((p) => toParticipant(p, isConnected(room.id, p.id))),
     scenes: scenes.map(toScene),
-    tokens: tokens.map(toToken).filter((t) => tokenVisibleTo(t, me.role)),
+    tokens: tokens.map(toToken).filter((t) => tokenVisibleTo(t, viewer, fog)),
     initiative,
     chat: messages
       .reverse()
