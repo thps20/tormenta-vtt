@@ -65,6 +65,7 @@ export function toToken(t: DbToken): Token {
     visible: t.visible,
     ownerId: t.ownerId,
     color: t.color,
+    characterId: t.characterId,
   };
 }
 

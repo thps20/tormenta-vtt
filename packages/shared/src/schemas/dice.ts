@@ -31,6 +31,10 @@ export const DiceRollSchema = z.object({
   total: z.number().int(),
   /** true = só GM e quem rolou veem o resultado. */
   secret: z.boolean().default(false),
+  /** Rolagem feita a partir de uma ficha. */
+  characterId: IdSchema.optional(),
+  /** Resultado natural do dado a partir do qual é crítico (ataques com margem ampliada). Ausente = máximo do dado. */
+  critThreshold: z.number().int().optional(),
   createdAt: z.string().datetime(),
 });
 export type DiceRoll = z.infer<typeof DiceRollSchema>;

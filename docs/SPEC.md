@@ -8,7 +8,9 @@
 VTT (Virtual Tabletop) web para jogar RPG de mesa online com amigos. Primeiro sistema: **Tormenta20**.
 Arquitetura **agnóstica de sistema**: tudo que é regra (atributos, perícias, fórmulas) vive em `packages/shared/systems/<id>.json`, validado pelo `SystemDefinitionSchema`. O código nunca conhece "FOR" ou "Percepção".
 
-**Fora do MVP** (explicitamente): login/contas, ficha de personagem completa, fog of war, medição de distância, áudio/vídeo, múltiplos mapas simultâneos, compêndio de magias/itens, automação de regras.
+**Fora do MVP** (explicitamente): login/contas, fog of war, medição de distância, áudio/vídeo, múltiplos mapas simultâneos, compêndio de magias/itens, automação avançada da ficha (classes e raças como itens, efeitos ativos, progressão por nível).
+
+A **ficha básica** (§3.6) entrou no escopo em setembro/2026: atributos, perícias, recursos, stats derivados, modificadores e itens físicos com ataque/dano ligados ao chat. Poderes e magias já existem nos tipos, mas a lógica de ativação (custo, CD) vem depois. Raciocínio e mapeamento em `docs/modelo-personagem.md`.
 
 ## 2. Papéis
 
@@ -68,7 +70,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - `evaluateConstant()` avalia a mesma gramática sem dados (usada para stats derivados da ficha).
   - Rolagem acontece **no servidor** (jogadores não podem forjar resultados).
 - Resultado exibido como: `Thiago rolou 1d20+5: [14] + 5 = 19`. Dados naturais máximo/mínimo destacados (crítico/falha), regra visual apenas.
-- Placeholders de sistema (`{attr.for}`, `{skill.percepcao}`) são resolvidos **antes** do parser a partir da ficha; no MVP, como não há ficha, só a fórmula crua é suportada. O JSON do sistema já define as fórmulas para a fase seguinte.
+- Placeholders de sistema (`{attr.for}`, `{skill.percepcao}`, `{derived.defense}`, `{level}`...) são resolvidos **antes** do parser a partir da ficha do autor. Regra do `/r`: o autor precisa ter exatamente **uma** ficha própria na sala; com zero ou várias, o ack devolve erro pedindo para rolar pela ficha (`character:roll`), que sabe qual usar.
 
 ### 3.5 Iniciativa
 - Painel lateral com lista ordenada por `value` desc, depois `tiebreak` desc.
@@ -79,6 +81,16 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Jogadores veem a lista (entradas `visible = true`) e o destaque de quem está agindo. Token do turno atual ganha um contorno no mapa.
 - A fórmula de iniciativa vem do JSON do sistema (`rolls.initiative`), mas no MVP o valor é digitado ou rolado com `/r`.
 
+### 3.6 Ficha de personagem
+- Tudo que é regra vem do JSON do sistema (`SystemDefinitionSchema` v2): atributos, perícias (com tags, variantes como "Ofício" e flags de tamanho/armadura), recursos, stats derivados por fórmula (`derived[]`: Defesa, CD, carga...), tamanhos, tipos de dano, moedas, campos de traço, stats de equipamento (`equipStats`) e tipos de item com campos declarados (`itemKinds`).
+- A ficha guarda só **entradas**: base dos atributos, treinado/outros por perícia, atual/temporário/máximo digitado por recurso, overrides de derivados, modificadores, traços, moedas, itens. Os valores finais vêm de `computeCharacter(def, character)` (função pura em `packages/shared/src/rules/compute.ts`), que servidor e cliente rodam igual. O cliente usa só para exibir; o servidor é quem monta e rola.
+- **Modificador** = `{ target, value }` com `target` textual validado por regex (`attr.for`, `skill.luta`, `skill.*`, `skill[tag=ataque]`, `derived.defense`, `resource.pv.max`, `attack`, `attack.luta`, `damage`, `damage.pontaria`). Cobre bônus de poderes, condições e itens sem o código conhecer nenhuma chave.
+- **Item** = tipo (`kind` de `itemKinds`), campos do tipo (`fields`), `equipped`, `statBonuses` (ex.: armadura dá `defense`, `maxAttr`, `armorPenalty`; só contam equipados) e **ações**: `attack` (perícia + atributo alternativo + margem de crítico), `damage` (fórmula + atributo `auto` pela regra `damageAttribute` do sistema + tipo), `check` e `formula`. Blocos `activation` e `save` existem nos tipos para poderes/magias; a lógica de custo/CD é fase 3.
+- `character:roll` monta a fórmula no servidor (`buildCharacterRoll`), rola e publica no chat como `ChatMessage{kind:"roll"}` com `characterId` e, em ataques, `critThreshold` (o chat destaca crítico a partir dele).
+- Permissões: GM vê e edita todas; jogador vê as fichas `kind = "pc"`, cria só para si e edita/rola só as que possui (`ownerId`). Fichas `npc` não vão para jogadores (`character:deleted` se uma PC virar NPC).
+- Vínculo com token: `token:link-character` (GM, ou dono do token que também é dono da ficha). Apagar a ficha desvincula os tokens (`token:updated` com `characterId = null`).
+- Nível é digitado (`level.source = "manual"`); PV/PM máximos são digitados (`maxOverride`) até classes virarem itens (fase 4).
+
 ## 4. Modelo de dados
 
 Espelhado em `apps/server/prisma/schema.prisma` (persistência) e `packages/shared/src/schemas` (validação/transporte).
@@ -86,6 +98,8 @@ Espelhado em `apps/server/prisma/schema.prisma` (persistência) e `packages/shar
 ```
 Room 1───* Participant
 Room 1───* Scene 1───* Token *───? Participant (owner)
+Room 1───* Character *───? Participant (owner)
+Token *───? Character
 Room 1───* ChatMessage
 Room 1───* InitiativeEntry ?──1 Token
 ```
@@ -95,10 +109,11 @@ Room 1───* InitiativeEntry ?──1 Token
 | **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`) |
 | **Participant** | `id, roomId, nickname, role, sessionToken` | `connected` é estado em memória, não persistido |
 | **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON)` | `grid` é JSON para evoluir sem migration |
-| **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color` | Coordenadas em **pixels do mapa**, não em células |
+| **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character` |
+| **Character** | `id, roomId, ownerId?, name, kind, data(JSON)` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration |
 | **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON)` | `roll` segue `DiceRollSchema` |
 | **InitiativeEntry** | `id, roomId, tokenId?, name, value, tiebreak, visible` | `currentIndex` e `round` ficam em memória por sala (perdem-se ao reiniciar o servidor; aceitável no MVP) |
-| **SystemDefinition** | `id, name, attributes[], skills[], resources[], rolls{}, trainedBonus[]` | Arquivo JSON, **não** está no banco |
+| **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypes[], currencies[], traitFields[], equipStats[], itemKinds[], activation, skillTotal, rolls{}, damageAttribute, trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web |
 
 Decisão: coordenadas em pixels (não células) para o token poder ficar "fora do grid" e para suportar `grid.type = none`. A conversão célula↔pixel é uma função pura usando `cellSize` e `offset`.
 
@@ -121,6 +136,11 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `token:create` | `TokenCreate` | GM | `token:created` |
 | `token:update` | `TokenPatch` (`id` + campos) | GM ou owner | `token:updated` |
 | `token:delete` | `{ tokenId }` | GM ou owner | `token:deleted` |
+| `token:link-character` | `{ tokenId, characterId \| null }` | GM, ou owner do token que é owner da ficha | `token:updated` |
+| `character:create` | `{ name, kind?, ownerId? }` | todos (jogador: `ownerId` = ele, `kind` = pc) | `character:created` (NPC só para o GM) |
+| `character:update` | `{ id, patch }` (patch raso de `CharacterDataSchema` + `name`, `ownerId`, `kind`) | GM ou owner (jogador não muda `ownerId`/`kind`) | `character:updated` |
+| `character:delete` | `{ characterId }` | GM ou owner | `character:deleted` + `token:updated` dos tokens desvinculados |
+| `character:roll` | `{ characterId, roll: {type: attribute\|skill\|initiative\|extra\|action, ...}, secret? }` | GM ou owner | `chat:message` (rolagem com `characterId`) |
 | `chat:send` | `{ text }` | todos | `chat:message` (rolagem secreta só p/ GM + autor) |
 | `initiative:add` | `InitiativeEntry` sem `id` | GM | `initiative:updated` |
 | `initiative:update` | `{ id, ...campos }` | GM | `initiative:updated` |
@@ -137,6 +157,8 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `token:created` / `token:updated` | `Token` |
 | `token:deleted` | `{ tokenId }` |
 | `chat:message` | `ChatMessage` |
+| `character:created` / `character:updated` | `Character` (jogadores só recebem `kind = "pc"`) |
+| `character:deleted` | `{ characterId }` |
 | `initiative:updated` | `InitiativeState` (estado completo, simples de sincronizar) |
 | `server:error` | `{ message }` |
 
@@ -173,11 +195,17 @@ apps/server/src/
   index.ts, env.ts, db.ts
   http/         rooms.ts, upload.ts
   socket/       index.ts, types.ts, ack.ts (validação Zod + ack), room.ts, scene.ts,
-                token.ts, chat.ts, initiative.ts
+                token.ts, chat.ts, initiative.ts, character.ts
   services/     serialize.ts (Prisma → shared), snapshot.ts, presence.ts,
-                initiativeState.ts, permissions.ts, chatCommands.ts, ids.ts
+                initiativeState.ts, permissions.ts, chatCommands.ts, ids.ts,
+                characters.ts (Prisma ↔ Character, visibilidade, broadcast),
+                rolls.ts (rola, persiste e publica; usado pelo chat e pela ficha)
 packages/shared/src/
-  schemas/      (Zod, inclui payloads.ts)  events.ts  dice/ (parser + roller, puro, sem I/O)
+  schemas/      (Zod, inclui payloads.ts e character.ts)  events.ts
+  dice/         parser + roller, puro, sem I/O
+  rules/        placeholders.ts, modifierTarget.ts (regex do target),
+                compute.ts (computeCharacter), rolls.ts (buildCharacterRoll), defaults.ts
+  systems.ts    registro dos JSONs (getSystemDefinition)
 packages/shared/systems/
   tormenta20.json
 ```

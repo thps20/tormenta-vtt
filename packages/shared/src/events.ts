@@ -11,6 +11,10 @@
  * então tipo e validação nunca divergem.
  */
 import type {
+  Character,
+  CharacterCreatePayload,
+  CharacterRollPayload,
+  CharacterUpdatePayload,
   ChatMessage,
   InitiativeAddPayload,
   InitiativeState,
@@ -23,6 +27,7 @@ import type {
   SceneUpdateGridPayload,
   Token,
   TokenCreate,
+  TokenLinkCharacterPayload,
   TokenPatch,
 } from "./schemas/index.js";
 
@@ -41,6 +46,8 @@ export interface RoomSnapshot {
   tokens: Token[];
   initiative: InitiativeState;
   chat: ChatMessage[];
+  /** Fichas da sala (jogadores não recebem as de kind = "npc"). */
+  characters: Character[];
 }
 
 export interface ClientToServerEvents {
@@ -59,6 +66,17 @@ export interface ClientToServerEvents {
   /** Usado para arrastar/redimensionar. Cliente envia throttled (~30/s) enquanto arrasta. */
   "token:update": (payload: TokenPatch, ack: Ack<Token>) => void;
   "token:delete": (payload: { tokenId: string }, ack: Ack) => void;
+  /** GM, ou dono do token que também é dono da ficha. characterId null desvincula. */
+  "token:link-character": (payload: TokenLinkCharacterPayload, ack: Ack<Token>) => void;
+
+  // Ficha de personagem
+  /** Jogador cria só para si (ownerId = ele, kind = pc); GM cria qualquer uma. */
+  "character:create": (payload: CharacterCreatePayload, ack: Ack<Character>) => void;
+  /** GM ou dono. Patch raso (ver CharacterPatchSchema). */
+  "character:update": (payload: CharacterUpdatePayload, ack: Ack<Character>) => void;
+  "character:delete": (payload: { characterId: string }, ack: Ack) => void;
+  /** Rola atributo/perícia/iniciativa/ação de item a partir da ficha; o servidor monta a fórmula e rola. */
+  "character:roll": (payload: CharacterRollPayload, ack: Ack<ChatMessage>) => void;
 
   // Chat + dados
   /** "/r <fórmula> [# rótulo]" rola; "/gr" rola em segredo (só GM + autor veem). */
@@ -88,6 +106,10 @@ export interface ServerToClientEvents {
   "token:deleted": (p: { tokenId: string }) => void;
 
   "chat:message": (msg: ChatMessage) => void;
+
+  "character:created": (character: Character) => void;
+  "character:updated": (character: Character) => void;
+  "character:deleted": (p: { characterId: string }) => void;
 
   "initiative:updated": (state: InitiativeState) => void;
 

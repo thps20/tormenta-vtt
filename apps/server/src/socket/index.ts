@@ -4,6 +4,7 @@ import { registerSceneHandlers } from "./scene.js";
 import { registerTokenHandlers } from "./token.js";
 import { registerChatHandlers } from "./chat.js";
 import { registerInitiativeHandlers } from "./initiative.js";
+import { registerCharacterHandlers } from "./character.js";
 import type { TypedServer } from "./types.js";
 
 /** Ponto único que liga todos os handlers de socket. */
@@ -20,6 +21,7 @@ export function registerSocketHandlers(io: TypedServer, log: FastifyBaseLogger):
     registerTokenHandlers(io, socket);
     registerChatHandlers(io, socket);
     registerInitiativeHandlers(io, socket);
+    registerCharacterHandlers(io, socket);
 
     socket.on("disconnect", (reason) => {
       log.info({ socketId: socket.id, reason }, "socket desconectado");

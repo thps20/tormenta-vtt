@@ -1,4 +1,4 @@
-import type { ZodType } from "zod";
+import type { ZodType, ZodTypeDef } from "zod";
 import type { Ack } from "@tormenta-vtt/shared";
 import type { TypedSocket } from "./types.js";
 
@@ -25,7 +25,8 @@ export interface Ctx {
  */
 export function guarded<TIn, TOut>(
   socket: TypedSocket,
-  schema: ZodType<TIn>,
+  // Input = unknown: TIn é o tipo de SAÍDA do schema (com os .default() já aplicados).
+  schema: ZodType<TIn, ZodTypeDef, unknown>,
   fn: (data: TIn, ctx: Ctx) => Promise<TOut>,
   opts: { gmOnly?: boolean } = {},
 ) {

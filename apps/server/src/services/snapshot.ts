@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { isConnected } from "./presence.js";
 import { loadInitiativeState } from "./initiativeState.js";
 import { toChatMessage, toParticipant, toRoomPublic, toScene, toToken } from "./serialize.js";
+import { characterVisibleTo, toCharacter } from "./characters.js";
 
 const CHAT_HISTORY_LIMIT = 100;
 
@@ -20,7 +21,7 @@ export function messageVisibleTo(msg: ChatMessage, role: "gm" | "player", partic
 
 /** Estado completo da sala do ponto de vista de `me`. */
 export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<RoomSnapshot> {
-  const [participants, scenes, tokens, messages, initiative] = await Promise.all([
+  const [participants, scenes, tokens, messages, initiative, characters] = await Promise.all([
     prisma.participant.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
     prisma.scene.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
     room.activeSceneId
@@ -32,6 +33,7 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
       take: CHAT_HISTORY_LIMIT,
     }),
     loadInitiativeState(room.id, me.role === "gm"),
+    prisma.character.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
   ]);
 
   return {
@@ -46,5 +48,6 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
       .reverse()
       .map(toChatMessage)
       .filter((m) => messageVisibleTo(m, me.role, me.id)),
+    characters: characters.map(toCharacter).filter((c) => characterVisibleTo(c, me.role)),
   };
 }

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { IdSchema } from "./common.js";
 import { GridConfigSchema } from "./scene.js";
 import { InitiativeEntrySchema } from "./initiative.js";
+import { CharacterDataSchema, CharacterKindSchema, CharacterRollRequestSchema } from "./character.js";
 
 /**
  * Schemas dos payloads que entram no servidor (socket e HTTP).
@@ -60,6 +61,42 @@ export type SceneUpdateGridPayload = z.infer<typeof SceneUpdateGridSchema>;
 // --- Tokens ----------------------------------------------------------------
 
 export const TokenDeleteSchema = z.object({ tokenId: IdSchema });
+/** Vincula (ou desvincula, com null) uma ficha ao token. */
+export const TokenLinkCharacterSchema = z.object({ tokenId: IdSchema, characterId: IdSchema.nullable() });
+export type TokenLinkCharacterPayload = z.infer<typeof TokenLinkCharacterSchema>;
+
+// --- Ficha -----------------------------------------------------------------
+
+/** O servidor preenche os defaults do sistema (createDefaultCharacterData). */
+export const CharacterCreateSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  kind: CharacterKindSchema.default("pc"),
+  ownerId: IdSchema.nullable().default(null),
+});
+export type CharacterCreatePayload = z.infer<typeof CharacterCreateSchema>;
+
+/**
+ * Patch raso: cada campo enviado substitui o campo inteiro (ex.: `items` manda
+ * a lista completa). Jogador não pode mudar ownerId nem kind (servidor ignora).
+ */
+export const CharacterPatchSchema = CharacterDataSchema.partial().extend({
+  name: z.string().trim().min(1).max(80).optional(),
+  ownerId: IdSchema.nullable().optional(),
+  kind: CharacterKindSchema.optional(),
+});
+export type CharacterPatch = z.infer<typeof CharacterPatchSchema>;
+
+export const CharacterUpdateSchema = z.object({ id: IdSchema, patch: CharacterPatchSchema });
+export type CharacterUpdatePayload = z.infer<typeof CharacterUpdateSchema>;
+
+export const CharacterDeleteSchema = z.object({ characterId: IdSchema });
+
+export const CharacterRollSchema = z.object({
+  characterId: IdSchema,
+  roll: CharacterRollRequestSchema,
+  secret: z.boolean().default(false),
+});
+export type CharacterRollPayload = z.infer<typeof CharacterRollSchema>;
 
 // --- Chat ------------------------------------------------------------------
 

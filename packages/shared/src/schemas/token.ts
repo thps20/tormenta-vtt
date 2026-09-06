@@ -21,13 +21,15 @@ export const TokenSchema = z.object({
   /** Participante que "controla" o token (pode arrastar). null = só o GM. */
   ownerId: IdSchema.nullable(),
   color: z.string().default("#e11d48"),
+  /** Ficha vinculada (ver token:link-character). null = sem ficha. */
+  characterId: IdSchema.nullable().default(null),
 });
 export type Token = z.infer<typeof TokenSchema>;
 
-/** Payload de criação: servidor gera o id. */
-export const TokenCreateSchema = TokenSchema.omit({ id: true });
+/** Payload de criação: servidor gera o id. O vínculo com ficha é feito depois, por token:link-character. */
+export const TokenCreateSchema = TokenSchema.omit({ id: true, characterId: true });
 export type TokenCreate = z.infer<typeof TokenCreateSchema>;
 
 /** Atualização parcial (arrastar manda só x/y; redimensionar manda width/height). */
-export const TokenPatchSchema = TokenSchema.partial().required({ id: true });
+export const TokenPatchSchema = TokenSchema.omit({ characterId: true }).partial().required({ id: true });
 export type TokenPatch = z.infer<typeof TokenPatchSchema>;
