@@ -35,6 +35,10 @@ export const CharacterHeader: React.FC<CharacterHeaderProps> = ({
   const isGm = me.role === "gm";
   const ownerName = character.ownerId ? (participants.find((p) => p.id === character.ownerId)?.nickname ?? "Jogador") : "Apenas GM";
   const nextLevelXp = def.level.xpTable?.[computed.level];
+  // Atributo de conjuração: só faz sentido quando o sistema calcula CD por fórmula (activation.saveDc).
+  const hasSpellcasting = def.activation.saveDc !== undefined;
+  const spellcastingLabel = def.activation.spellcastingLabel;
+  const spellcastingAttr = def.attributes.find((a) => a.key === character.spellcastingAttribute);
 
   const setTrait = (key: string, value: string) => onPatch({ traits: { ...character.traits, [key]: value } });
 
@@ -139,6 +143,17 @@ export const CharacterHeader: React.FC<CharacterHeaderProps> = ({
                   <NumInput value={character.xp} onCommit={(v) => onPatch({ xp: Math.max(0, Math.floor(v ?? 0)) })} className="w-20" />
                 </label>
               )}
+              {hasSpellcasting && (
+                <label className="flex items-center gap-1 text-zinc-400" title={`${spellcastingLabel}: entra na CD dos poderes e magias`}>
+                  {spellcastingLabel}
+                  <Select
+                    id="sheet-spellcasting-attribute"
+                    value={character.spellcastingAttribute ?? ""}
+                    onChange={(v) => onPatch({ spellcastingAttribute: v || null })}
+                    options={[{ value: "", label: "Nenhum" }, ...def.attributes.map((a) => ({ value: a.key, label: a.abbr }))]}
+                  />
+                </label>
+              )}
               {isGm && (
                 <>
                   <Select
@@ -160,7 +175,16 @@ export const CharacterHeader: React.FC<CharacterHeaderProps> = ({
               )}
             </div>
           )}
-          {!isEditMode && <div className="mt-1 text-[11px] text-zinc-500 font-serif">Dono: {ownerName}</div>}
+          {!isEditMode && (
+            <div className="mt-1 text-[11px] text-zinc-500 font-serif flex items-center gap-3 flex-wrap">
+              <span>Dono: {ownerName}</span>
+              {hasSpellcasting && (
+                <span title={spellcastingLabel}>
+                  {spellcastingLabel}: <span className="text-amber-200 font-bold">{spellcastingAttr?.abbr ?? "—"}</span>
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Traços livres do sistema (raça, origem, divindade...) */}
           {def.traitFields.length > 0 && (
