@@ -243,6 +243,11 @@ export const SystemDefinitionSchema = z.object({
     .optional(),
   /** Outras fórmulas específicas do sistema, livres. */
   extraRolls: z.array(RollTemplateSchema).default([]),
+  /**
+   * Recurso exibido como barra de vida no token (chave de resources[]).
+   * Ausente = tokens sem barra. A UI lê o atual/máximo da ficha vinculada.
+   */
+  tokenBar: KeySchema.optional(),
   /** Regras de treinamento por faixa de nível (T20: +2/+4/+6). */
   trainedBonus: z
     .array(
@@ -301,6 +306,9 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
   }
   for (const key of def.attackSkills) {
     if (!skillKeys.has(key)) fail(def, `attackSkills referencia perícia inexistente "${key}"`);
+  }
+  if (def.tokenBar !== undefined && !resourceKeys.has(def.tokenBar)) {
+    fail(def, `tokenBar referencia recurso inexistente "${def.tokenBar}"`);
   }
   for (const kind of def.itemKinds) {
     for (const stat of kind.statBonuses) {

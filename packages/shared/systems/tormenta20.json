@@ -231,6 +231,8 @@
     { "key": "atk_ranged", "label": "Ataque à distância (Pontaria)", "formula": "1d20 + {skill.pontaria}" }
   ],
 
+  "tokenBar": "pv",
+
   "trainedBonus": [
     { "minLevel": 1,  "bonus": 2 },
     { "minLevel": 7,  "bonus": 4 },

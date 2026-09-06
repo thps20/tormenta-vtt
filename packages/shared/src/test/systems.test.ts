@@ -55,6 +55,10 @@ describe("validateSystemDefinition (integridade)", () => {
     expect(() => validateSystemDefinition(withPatch({ itemKinds }))).toThrow(/equipStat inexistente/);
   });
 
+  it("rejeita tokenBar apontando para recurso inexistente", () => {
+    expect(() => validateSystemDefinition(withPatch({ tokenBar: "nope" }))).toThrow(/tokenBar/);
+  });
+
   it("rejeita damageAttribute apontando para opção que não existe", () => {
     const damageAttribute = { field: "purpose", map: { voo: "for" } };
     expect(() => validateSystemDefinition(withPatch({ damageAttribute }))).toThrow(/opção "voo"/);
@@ -77,6 +81,11 @@ describe("tormenta20.json", () => {
 
   it("teste de perícia usa 1d20", () => {
     expect(def.rolls.skillCheck.startsWith("1d20")).toBe(true);
+  });
+
+  it("aponta a barra do token para um recurso declarado", () => {
+    expect(def.tokenBar).toBeDefined();
+    expect(def.resources.some((r) => r.key === def.tokenBar)).toBe(true);
   });
 
   it("declara Defesa como stat derivado e armadura como tipo de item com bônus de Defesa", () => {
