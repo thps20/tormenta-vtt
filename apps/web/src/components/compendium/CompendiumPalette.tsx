@@ -5,6 +5,7 @@ import { checkInsert, matchesQuery, type InsertCheck } from "../../lib/compendiu
 import { useCompendium } from "../../store/compendium";
 import { kindIcon } from "../character/kindIcons";
 import { EntryPreview } from "./EntryPreview";
+import { useCompendiumDrag } from "./DragGhost";
 
 export interface CompendiumPaletteProps {
   def: SystemDefinition;
@@ -37,6 +38,8 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
   const [justInserted, setJustInserted] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const dragging = useCompendium((s) => s.drag !== null);
+  const { onRowPointerDown } = useCompendiumDrag();
 
   useEffect(() => inputRef.current?.focus(), []);
 
@@ -107,7 +110,12 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
   };
 
   return (
-    <div className="absolute inset-0 z-30 flex items-start justify-center pt-10 px-4 bg-black/60 backdrop-blur-[1px]" onPointerDown={onClose} id="compendium-palette">
+    <div
+      id="compendium-palette"
+      onPointerDown={onClose}
+      // Arrastando: a paleta fica translúcida e deixa o cursor "passar" (elementFromPoint acha a ficha).
+      className={`absolute inset-0 z-30 flex items-start justify-center pt-10 px-4 bg-black/60 backdrop-blur-[1px] transition-opacity ${dragging ? "opacity-25 pointer-events-none" : ""}`}
+    >
       <div
         role="dialog"
         aria-label="Compêndio"
@@ -179,6 +187,7 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
                     inserted={justInserted === row.entry.id}
                     onFocus={() => setFocused(flat.indexOf(row))}
                     onInsert={() => void insert(row, true)}
+                    onPointerDown={(e) => row.check.ok && onRowPointerDown(e, row.entry.id)}
                   />
                 ))}
               </div>
@@ -201,6 +210,7 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
           <span><kbd className="font-mono">Enter</kbd> inserir</span>
           <span><kbd className="font-mono">Ctrl+Enter</kbd> inserir e continuar</span>
           <span><kbd className="font-mono">Esc</kbd> fechar</span>
+          <span>arraste uma entrada para a ficha</span>
         </div>
       </div>
     </div>
@@ -213,17 +223,21 @@ interface PaletteRowViewProps {
   inserted: boolean;
   onFocus: () => void;
   onInsert: () => void;
+  /** Início de um possível arrasto (só entradas inseríveis). */
+  onPointerDown: (e: React.PointerEvent) => void;
 }
 
-const PaletteRowView: React.FC<PaletteRowViewProps> = ({ row, focused, inserted, onFocus, onInsert }) => {
+const PaletteRowView: React.FC<PaletteRowViewProps> = ({ row, focused, inserted, onFocus, onInsert, onPointerDown }) => {
   const { entry, check } = row;
   return (
     <div
       data-entry-id={entry.id}
       onPointerEnter={onFocus}
+      onPointerDown={onPointerDown}
       onClick={onFocus}
       onDoubleClick={() => check.ok && onInsert()}
-      className={`group flex items-center gap-2 mx-1 px-2 py-1.5 rounded cursor-pointer transition-colors ${
+      title={check.ok ? "Arraste para a ficha ou pressione Enter" : undefined}
+      className={`group flex items-center gap-2 mx-1 px-2 py-1.5 rounded transition-colors ${check.ok ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed"} ${
         focused ? "bg-[#1e1a14] ring-1 ring-[#d4af37]/60" : "hover:bg-[#161412]"
       } ${check.ok ? "" : "opacity-50"}`}
     >

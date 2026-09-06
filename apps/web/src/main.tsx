@@ -19,7 +19,8 @@ if (import.meta.env.DEV) {
     import("./store/initiative"),
     import("./store/characters"),
     import("./store/tools"),
-  ]).then(([c, r, t, ch, i, ca, tl]) => {
+    import("./store/compendium"),
+  ]).then(([c, r, t, ch, i, ca, tl, co]) => {
     Object.assign(window, {
       __vtt: {
         useConnection: c.useConnection,
@@ -29,6 +30,7 @@ if (import.meta.env.DEV) {
         useInitiative: i.useInitiative,
         useCharacters: ca.useCharacters,
         useTools: tl.useTools,
+        useCompendium: co.useCompendium,
       },
     });
   });

@@ -10,7 +10,12 @@ import { ItemsSection } from "./character/ItemsSection";
 import { ModifiersSection } from "./character/ModifiersSection";
 import { DetailsSection } from "./character/DetailsSection";
 import { CompendiumPalette } from "./compendium/CompendiumPalette";
+import { DragGhost } from "./compendium/DragGhost";
 import { useCompendium } from "../store/compendium";
+import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
+
+/** Id do alvo de soltura da ficha (lib/dropTargets). */
+const SHEET_DROP_TARGET = "character-sheet";
 
 export interface CharacterSheetDrawerProps {
   def: SystemDefinition;
@@ -44,6 +49,18 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
     if (!(isEditMode && canEdit)) closeCompendium();
   }, [isEditMode, canEdit, closeCompendium]);
   useEffect(() => () => closeCompendium(), [closeCompendium]);
+
+  // A ficha inteira é zona de soltura para entradas do compêndio (soltar = inserir e fechar a paleta).
+  const dragOverSheet = useCompendium((s) => s.drag?.targetId === SHEET_DROP_TARGET);
+  const characterId = character?.id ?? null;
+  useEffect(() => {
+    if (!characterId || !(isEditMode && canEdit)) return;
+    return registerDropTarget({
+      id: SHEET_DROP_TARGET,
+      accepts: () => true,
+      onDrop: (entry) => void onInsertFromCompendium(entry.id).then((itemId) => itemId && closeCompendium()),
+    });
+  }, [characterId, isEditMode, canEdit, onInsertFromCompendium, closeCompendium]);
   const computed = useMemo(() => (character ? computeCharacter(def, character) : null), [def, character]);
   // Quem não pode editar nunca fica em modo edição (ex.: jogador vendo a ficha de outro).
   const editing = isEditMode && canEdit;
@@ -58,7 +75,10 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
       >
         {character && computed ? (
           <>
-            <div className="flex-1 overflow-y-auto">
+            <div
+              className={`flex-1 overflow-y-auto transition-shadow ${dragOverSheet ? "shadow-[inset_0_0_0_3px_rgba(212,175,55,0.9),inset_0_0_40px_rgba(212,175,55,0.25)]" : ""}`}
+              {...{ [DROP_TARGET_ATTR]: SHEET_DROP_TARGET }}
+            >
               <CharacterHeader
                 def={def}
                 character={character}
@@ -95,7 +115,12 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
               <span>{editing ? "Modo edição" : canEdit ? "Modo visualização (clique para rolar)" : "Somente leitura"}</span>
             </div>
 
-            {compendiumOpen && editing && <CompendiumPalette def={def} character={character} onInsert={onInsertFromCompendium} onClose={closeCompendium} />}
+            {compendiumOpen && editing && (
+              <>
+                <CompendiumPalette def={def} character={character} onInsert={onInsertFromCompendium} onClose={closeCompendium} />
+                <DragGhost def={def} />
+              </>
+            )}
           </>
         ) : (
           <EmptyState onCreate={onCreateMine} onClose={onClose} />
