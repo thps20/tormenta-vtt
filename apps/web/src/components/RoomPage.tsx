@@ -120,6 +120,7 @@ function Table() {
   const updateCharacter = useCharacters((s) => s.update);
   const deleteCharacter = useCharacters((s) => s.delete);
   const rollCharacter = useCharacters((s) => s.roll);
+  const useCharacterItem = useCharacters((s) => s.useItem);
   const linkCharacter = useTokens((s) => s.linkCharacter);
   const systemDef = useSystemDef();
 
@@ -286,6 +287,7 @@ function Table() {
           canEdit={openChar !== null && canEditCharacter(me, openChar)}
           onPatch={(patch) => openChar && void updateCharacter(openChar.id, patch)}
           onRoll={(request) => openChar && void rollCharacter(openChar.id, request)}
+          onUseItem={(itemId) => openChar && void useCharacterItem(openChar.id, itemId)}
           onCreateMine={() => void createCharacter({ name: me.nickname, kind: "pc", ownerId: me.id }).then((c) => c && openCharacter(c.id))}
           onClose={() => openCharacter(null)}
         />

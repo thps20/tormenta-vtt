@@ -1,15 +1,20 @@
 import React, { useState } from "react";
-import { CheckCircle, ChevronDown, ChevronUp, Circle, Dices, Flame, Package, Plus, Shield, Sparkles, Sword, Trash2, Wand2 } from "lucide-react";
+import { CheckCircle, ChevronDown, ChevronUp, Circle, Dices, Flame, Package, Plus, Shield, Sparkles, Sword, Trash2, Wand2, Zap } from "lucide-react";
 import {
   buildCharacterRoll,
   createDefaultItem,
+  describeActivation,
+  effectiveCost,
+  isPassiveItem,
   RollBuildError,
+  saveDcFor,
   type Action,
   type Activation,
   type Character,
   type CharacterItem,
   type CharacterPatch,
   type CharacterRollRequest,
+  type ComputedCharacter,
   type ItemKindDef,
   type SystemDefinition,
 } from "@tormenta-vtt/shared";
@@ -19,10 +24,13 @@ import { NumInput, Select, TextArea, TextInput, ghostBtn, smallBtn } from "./fie
 interface ItemsSectionProps {
   def: SystemDefinition;
   character: Character;
+  computed: ComputedCharacter;
   canEdit: boolean;
   isEditMode: boolean;
   onPatch: (patch: CharacterPatch) => void;
   onRoll: (request: CharacterRollRequest) => void;
+  /** Usa um item ativo (custo + card no chat). */
+  onUseItem: (itemId: string) => void;
 }
 
 /** Ícone por POSIÇÃO em itemKinds[] (o código não sabe o que é "arma"). */
@@ -67,7 +75,7 @@ const optionLabel = (options: { key: string; label: string }[] | undefined, key:
  * Itens da ficha em abas por tipo (itemKinds[] do sistema). Os campos, stats de
  * equipamento e enumerações de ativação vêm todos do JSON, nunca do código.
  */
-export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, canEdit, isEditMode, onPatch, onRoll }) => {
+export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, computed, canEdit, isEditMode, onPatch, onRoll, onUseItem }) => {
   const [activeTab, setActiveTab] = useState<string>(def.itemKinds[0]?.key ?? "");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggleExpand = (id: string) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -134,6 +142,7 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, canE
               key={item.id}
               def={def}
               character={character}
+              computed={computed}
               kind={currentKind}
               item={item}
               canEdit={canEdit}
@@ -143,6 +152,7 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, canE
               onPatch={(p) => patchItem(item.id, p)}
               onRemove={() => setItems(items.filter((i) => i.id !== item.id))}
               onRoll={(actionId) => onRoll({ type: "action", itemId: item.id, actionId })}
+              onUse={() => onUseItem(item.id)}
             />
           ))}
         </div>
@@ -156,6 +166,7 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, canE
 interface ItemCardProps {
   def: SystemDefinition;
   character: Character;
+  computed: ComputedCharacter;
   kind: ItemKindDef | undefined;
   item: CharacterItem;
   canEdit: boolean;
@@ -165,11 +176,22 @@ interface ItemCardProps {
   onPatch: (p: Partial<CharacterItem>) => void;
   onRemove: () => void;
   onRoll: (actionId: string) => void;
+  onUse: () => void;
 }
 
-const ItemCard: React.FC<ItemCardProps> = ({ def, character, kind, item, canEdit, isEditMode, expanded, onToggle, onPatch, onRemove, onRoll }) => {
+const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, item, canEdit, isEditMode, expanded, onToggle, onPatch, onRemove, onRoll, onUse }) => {
   const physical = kind?.physical ?? true;
   const canRoll = canEdit && !isEditMode;
+
+  // Ativação: só tipos com bloco de ativação e item não passivo ganham o botão "Usar".
+  // Custo efetivo (com modificadores) e recurso disponível vêm do sistema, não do código.
+  const passive = isPassiveItem(def, item);
+  const usable = (kind?.hasActivation ?? false) && !passive;
+  const cost = usable ? effectiveCost(def, character, item) : 0;
+  const costResource = def.activation.resource ? def.resources.find((r) => r.key === def.activation.resource) : undefined;
+  const available = costResource ? (character.resources[costResource.key]?.current ?? 0) + (character.resources[costResource.key]?.temp ?? 0) : 0;
+  const insufficient = cost > 0 && costResource !== undefined && available < cost;
+  const saveDc = !passive && item.save ? saveDcFor(def, computed, character, item) : null;
 
   return (
     <div className={`bg-[#161513] border rounded-lg transition-all ${item.equipped ? "border-[#d4af37]/60 shadow-[0_0_8px_rgba(212,175,55,0.1)]" : "border-[#292319]"}`}>
@@ -214,7 +236,12 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, kind, item, canEdit
                   {def.equipStats.find((s) => s.key === statKey)?.label ?? statKey}: {value >= 0 ? `+${value}` : value}
                 </span>
               ))}
-              {item.activation && item.activation.cost > 0 && <span className="bg-[#14202a] border border-sky-900/60 px-1.5 py-0.5 rounded text-sky-300 font-mono font-bold">Custo {item.activation.cost}</span>}
+              {usable && cost > 0 && (
+                <span className="bg-[#14202a] border border-sky-900/60 px-1.5 py-0.5 rounded text-sky-300 font-mono font-bold" title={cost !== item.activation?.cost ? `Custo base ${item.activation?.cost}, com modificadores ${cost}` : undefined}>
+                  {cost} {costResource?.abbr ?? ""}
+                </span>
+              )}
+              {passive && (kind?.hasActivation ?? false) && <span className="bg-[#1a1a1a] border border-zinc-700 px-1.5 py-0.5 rounded text-zinc-400">Passivo</span>}
             </div>
           </div>
         </div>
@@ -231,9 +258,32 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, kind, item, canEdit
         </div>
       </div>
 
-      {/* Botões de rolagem das ações, com a fórmula que o servidor vai usar */}
-      {!isEditMode && item.actions.length > 0 && (
+      {/* Botão de uso (poder/magia) + rolagens das ações, com a fórmula que o servidor vai usar */}
+      {!isEditMode && (usable || item.actions.length > 0) && (
         <div className="px-3 pb-2.5 flex items-center gap-2 flex-wrap">
+          {usable && (
+            <button
+              onClick={onUse}
+              disabled={!canRoll}
+              id={`btn-use-item-${item.id}`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-serif font-bold transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                insufficient
+                  ? "bg-red-950/40 hover:bg-red-950/60 border-red-800/70 hover:border-red-500 text-red-200"
+                  : "bg-[#14202a] hover:bg-[#1b2c3a] border-sky-700/60 hover:border-sky-400 text-sky-100"
+              }`}
+              title={
+                insufficient
+                  ? `${costResource?.abbr ?? "Recurso"} insuficiente: precisa de ${cost}, tem ${available}`
+                  : cost > 0
+                    ? `${kind?.useLabel ?? "Usar"} (custa ${cost} ${costResource?.abbr ?? ""})`
+                    : kind?.useLabel ?? "Usar"
+              }
+            >
+              <Zap className={`w-3.5 h-3.5 ${insufficient ? "text-red-400" : "text-sky-300"}`} />
+              <span>{kind?.useLabel ?? "Usar"}</span>
+              {cost > 0 && <span className="font-mono ml-0.5">({cost} {costResource?.abbr ?? ""})</span>}
+            </button>
+          )}
           {item.actions.map((act) => {
             const formula = previewFormula(def, character, item.id, act.id);
             return (
@@ -259,11 +309,13 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, kind, item, canEdit
             <ItemEditor def={def} kind={kind} item={item} onPatch={onPatch} />
           ) : (
             <>
-              {item.activation && <ActivationView def={def} activation={item.activation} />}
-              {item.save && (
-                <div className="text-[11px] text-zinc-400 font-mono">
-                  Resistência: {def.skills.find((s) => s.key === item.save?.skill)?.label ?? item.save.skill}
-                  {item.save.text && <span className="text-zinc-500 font-serif"> — {item.save.text}</span>}
+              {/* Passivo: só a descrição. Ativo: bloco de ativação + resistência com a CD calculada. */}
+              {!passive && item.activation && <ActivationView def={def} activation={item.activation} />}
+              {!passive && item.save && (
+                <div className="text-[11px] text-zinc-400 font-mono flex items-center gap-2">
+                  {saveDc !== null && <span className="px-1.5 py-0.5 rounded bg-[#2d2417] border border-[#d4af37]/40 text-[#d4af37] font-bold">CD {saveDc}</span>}
+                  <span>Resistência: {def.skills.find((s) => s.key === item.save?.skill)?.label ?? item.save.skill}</span>
+                  {item.save.text && <span className="text-zinc-500 font-serif">— {item.save.text}</span>}
                 </div>
               )}
               {item.description ? <div className="text-zinc-400 font-serif leading-relaxed italic">"{item.description}"</div> : <div className="text-zinc-600 italic">Sem descrição.</div>}
@@ -279,16 +331,17 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, kind, item, canEdit
 
 const ActivationView: React.FC<{ def: SystemDefinition; activation: Activation }> = ({ def, activation }) => {
   const a = activation;
+  const d = describeActivation(def, a);
   const parts: string[] = [];
-  if (a.execution) parts.push(`Execução: ${optionLabel(def.activation.executions, a.execution)}`);
-  if (a.duration.units) parts.push(`Duração: ${a.duration.value > 0 ? `${a.duration.value} ` : ""}${optionLabel(def.activation.durationUnits, a.duration.units)}`);
-  if (a.range.units) parts.push(`Alcance: ${a.range.value > 0 ? `${a.range.value} ` : ""}${optionLabel(def.activation.rangeUnits, a.range.units)}`);
+  if (d.execution) parts.push(`Execução: ${d.execution}`);
+  if (d.duration) parts.push(`Duração: ${d.duration}`);
+  if (d.range) parts.push(`Alcance: ${d.range}`);
   if (a.target) parts.push(`Alvo: ${a.target}`);
   if (a.area) parts.push(`Área: ${a.area}`);
   return (
     <div className="p-2 rounded bg-[#181613] border border-[#2d261c] text-zinc-300 space-y-1">
       <div className="flex items-center gap-3 text-[11px] font-mono text-zinc-400 flex-wrap">
-        {a.cost > 0 && <span className="text-sky-300 font-bold">Custo: {a.cost}</span>}
+        {a.cost > 0 && <span className="text-sky-300 font-bold" title="Antes de modificadores; o botão mostra o custo efetivo">Custo base: {a.cost}</span>}
         {parts.map((p) => (
           <span key={p}>{p}</span>
         ))}

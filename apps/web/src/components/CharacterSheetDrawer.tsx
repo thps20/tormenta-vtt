@@ -19,6 +19,8 @@ export interface CharacterSheetDrawerProps {
   canEdit: boolean;
   onPatch: (patch: CharacterPatch) => void;
   onRoll: (request: CharacterRollRequest) => void;
+  /** Usa um item ativo (poder, magia): o servidor desconta o custo e publica o card. */
+  onUseItem: (itemId: string) => void;
   /** Estado vazio: cria a ficha do próprio jogador. */
   onCreateMine: () => void;
   onClose: () => void;
@@ -29,7 +31,7 @@ export interface CharacterSheetDrawerProps {
  * sistema; os valores finais vêm de computeCharacter (uma vez por render).
  * Modo visualização = rolagens rápidas; modo edição = inputs.
  */
-export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def, character, participants, me, canEdit, onPatch, onRoll, onCreateMine, onClose }) => {
+export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def, character, participants, me, canEdit, onPatch, onRoll, onUseItem, onCreateMine, onClose }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const computed = useMemo(() => (character ? computeCharacter(def, character) : null), [def, character]);
   // Quem não pode editar nunca fica em modo edição (ex.: jogador vendo a ficha de outro).
@@ -70,7 +72,7 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
               <ResourcesBlock def={def} character={character} computed={computed} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} />
               <DerivedStatsBar def={def} character={character} computed={computed} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} onRoll={onRoll} />
               <SkillsSection def={def} character={character} computed={computed} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} onRoll={onRoll} />
-              <ItemsSection def={def} character={character} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} onRoll={onRoll} />
+              <ItemsSection def={def} character={character} computed={computed} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} onRoll={onRoll} onUseItem={onUseItem} />
               <ModifiersSection def={def} character={character} canEdit={canEdit} onPatch={onPatch} />
               <DetailsSection def={def} character={character} isEditMode={editing} onPatch={onPatch} />
             </div>
