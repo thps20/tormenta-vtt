@@ -6,6 +6,7 @@ import { CharactersTab } from './CharactersTab';
 import type {
   Character,
   CharacterCreatePayload,
+  CharacterRollRequest,
   ChatMessage,
   InitiativeAddPayload,
   InitiativeState,
@@ -41,6 +42,8 @@ interface SidePanelProps {
   onOpenCharacter: (characterId: string) => void;
   onCreateCharacter: (payload: CharacterCreatePayload) => void;
   onDeleteCharacter: (characterId: string) => void;
+  /** Botões de ação nos cards de item do chat (dano, cura) rolam pela ficha. */
+  onRollCharacter: (characterId: string, request: CharacterRollRequest) => void;
 }
 
 export const SidePanel: React.FC<SidePanelProps> = ({
@@ -66,6 +69,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   onOpenCharacter,
   onCreateCharacter,
   onDeleteCharacter,
+  onRollCharacter,
 }) => {
   const setActiveTab = onTabChange;
 
@@ -149,8 +153,10 @@ export const SidePanel: React.FC<SidePanelProps> = ({
           <ChatTab
             messages={messages}
             participants={participants}
-            currentUserId={currentUserId}
+            me={me}
+            characters={characters}
             onSendMessage={onSendMessage}
+            onRollCharacter={onRollCharacter}
           />
         ) : activeTab === 'characters' ? (
           <CharactersTab

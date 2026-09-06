@@ -22,6 +22,11 @@ interface CharactersState {
   delete: (characterId: string) => Promise<boolean>;
   /** Sem otimismo: a rolagem só existe depois do servidor (chega por chat:message). */
   roll: (characterId: string, roll: CharacterRollRequest, secret?: boolean) => Promise<boolean>;
+  /**
+   * Usa um item ativo (poder, magia). Sem otimismo: o servidor desconta o custo
+   * (character:updated) e publica o card (chat:message). Erro (ex.: PM insuficiente) vira toast.
+   */
+  useItem: (characterId: string, itemId: string) => Promise<boolean>;
 }
 
 export const useCharacters = create<CharactersState>((set, get) => ({
@@ -82,6 +87,12 @@ export const useCharacters = create<CharactersState>((set, get) => ({
 
   roll: async (characterId, roll, secret = false) => {
     const res = await emitAck("character:roll", { characterId, roll, secret });
+    if (!res.ok) toast(res.error);
+    return res.ok;
+  },
+
+  useItem: async (characterId, itemId) => {
+    const res = await emitAck("character:use-item", { characterId, itemId });
     if (!res.ok) toast(res.error);
     return res.ok;
   },

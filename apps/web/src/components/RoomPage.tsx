@@ -258,6 +258,7 @@ function Table() {
           currentUserId={me.id}
           initiative={initiative}
           tokens={tokens}
+          onRollCharacter={(characterId, request) => void rollCharacter(characterId, request)}
           isGm={isGm}
           onSendMessage={(text) => void sendMessage(text)}
           onNextTurn={() => void nextTurn()}

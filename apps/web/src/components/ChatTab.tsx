@@ -1,20 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Dices, Scroll, ShieldAlert } from 'lucide-react';
-import type { ChatMessage, Participant } from '@tormenta-vtt/shared';
+import type { Character, CharacterRollRequest, ChatMessage, Participant } from '@tormenta-vtt/shared';
+import { canEditCharacter } from '../store/characters';
+import { ItemCardMessage } from './chat/ItemCardMessage';
 
 interface ChatTabProps {
   messages: ChatMessage[];
   participants: Participant[];
-  currentUserId: string;
+  me: Participant;
+  /** Fichas visíveis: decide se os botões do card de item ficam ativos. */
+  characters: Character[];
   onSendMessage: (text: string) => void;
+  onRollCharacter: (characterId: string, request: CharacterRollRequest) => void;
 }
 
 export const ChatTab: React.FC<ChatTabProps> = ({
   messages,
   participants,
-  currentUserId,
+  me,
+  characters,
   onSendMessage,
+  onRollCharacter,
 }) => {
+  const currentUserId = me.id;
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -84,7 +92,26 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             );
           }
 
-          // 2. DICE ROLL MESSAGE (HIGHLIGHTED) - Elegant Dark
+          // 2. CARD DE ITEM USADO (poder, magia) com botões de ação
+          if (msg.kind === 'item' && msg.item) {
+            const card = msg.item;
+            const character = characters.find((c) => c.id === card.characterId);
+            const canAct = character !== undefined && canEditCharacter(me, character);
+            return (
+              <ItemCardMessage
+                key={msg.id}
+                msg={msg}
+                card={card}
+                isGm={isGm}
+                isMe={isMe}
+                time={formatTime(msg.createdAt)}
+                canAct={canAct}
+                onRoll={(actionId) => onRollCharacter(card.characterId, { type: 'action', itemId: card.itemId, actionId })}
+              />
+            );
+          }
+
+          // 3. DICE ROLL MESSAGE (HIGHLIGHTED) - Elegant Dark
           if (msg.kind === 'roll' && msg.roll) {
             const roll = msg.roll;
             // Crítico a partir de critThreshold (ataques com margem ampliada); padrão = 20 natural.
@@ -179,7 +206,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             );
           }
 
-          // 3. STANDARD TEXT MESSAGE - Elegant Dark
+          // 4. STANDARD TEXT MESSAGE - Elegant Dark
           return (
             <div
               key={msg.id}
