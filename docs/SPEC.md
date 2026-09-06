@@ -36,7 +36,13 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - `POST /api/upload` (multipart, PNG/JPG/WebP, máx. 20 MB) → salva em `apps/server/uploads/` e devolve `{ url, width, height }`.
 - GM emite `scene:setMap` com a URL e dimensões. Servidor persiste e faz broadcast de `scene:updated`.
 - Painel de grid: tipo (`square`/`none`), `cellSize` (px), `offsetX/Y`, cor, snap. Emite `scene:updateGrid`.
-- O canvas (react-konva) desenha: imagem do mapa → linhas do grid → tokens. Pan arrastando o fundo do mapa (botão esquerdo); zoom com scroll e botões +/−/ajustar.
+- O canvas (react-konva) desenha: imagem do mapa → linhas do grid → tokens → réguas/caixa de seleção. Pan no modo "Mover mapa" (ou espaço segurado); zoom com scroll e botões +/−/ajustar.
+- **Barra de ferramentas** (coluna à esquerda do canvas, um modo por vez, estado em `store/tools.ts`, atalhos em `lib/useToolShortcuts.ts`):
+  - **Selecionar (V)**: clicar/arrastar tokens; arrastar no mapa vazio desenha uma caixa que seleciona os tokens com o centro dentro dela; shift+clique entra/sai da seleção; arrastar um token selecionado move todos os selecionados que o usuário controla. O Stage não faz pan.
+  - **Mover mapa (H)**: arrastar em qualquer lugar faz pan; tokens não respondem. Barra de espaço segurada ativa este modo temporariamente.
+  - **Régua (R)**: clicar e arrastar mede do ponto inicial ao ponteiro (pontos grudam no centro da célula quando há grid e snap). A distância usa `grid` do `SystemDefinition` (`cellSize` na unidade do jogo, `unit`, regra de diagonais `euclidean | manhattan | alternating | chebyshev`; `rules/measure.ts` faz a conta) e o `cellSize` em px da cena. A régua é enviada por `ruler:update` (efêmero) e os outros a veem com o nickname do autor; some ao soltar.
+  - Névoa e Desenho: botões reservados (desabilitados), fora do MVP.
+  - Esc cancela o gesto em andamento e volta para Selecionar. Scroll = zoom em todos os modos.
 - Sem mapa (`mapUrl = null`) o canvas desenha um retângulo escuro de `mapWidth × mapHeight` (padrão 1600×1100) só para o grid e os tokens terem onde ficar.
 - Renomear cena está fora do MVP (o nome é definido em `scene:create`).
 
@@ -187,21 +193,23 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 ```
 apps/web/src/
   App.tsx       escolhe a tela pela URL
-  components/   Lobby, RoomPage (liga stores aos componentes), TopBar, VttCanvas,
+  components/   Lobby, RoomPage (liga stores aos componentes), TopBar, Toolbar, VttCanvas,
                 TokenInspector, SidePanel, ChatTab, InitiativeTab, CharactersTab,
                 MapConfigModal, NicknamePrompt, Toasts, CharacterSheetDrawer (gaveta da ficha)
   components/character/  seções da ficha: CharacterHeader, AttributesGrid, ResourcesBlock,
                 DerivedStatsBar, SkillsSection, ItemsSection, ModifiersSection, DetailsSection,
                 fields.tsx (inputs "commit on blur")
   store/        connection.ts (socket + emitAck), bindSocket.ts (broadcast → store),
-                room.ts, tokens.ts, chat.ts, initiative.ts, characters.ts, ui.ts (toasts)
+                room.ts, tokens.ts, chat.ts, initiative.ts, characters.ts, ui.ts (toasts),
+                tools.ts (ferramenta ativa, régua)
   lib/          router.ts (2 rotas, sem lib), api.ts (HTTP), grid.ts (célula↔pixel, puro),
-                session.ts (localStorage), throttle.ts, useImage.ts, system.ts (useSystemDef), ids.ts
+                session.ts (localStorage), throttle.ts, useImage.ts, system.ts (useSystemDef), ids.ts,
+                useToolShortcuts.ts (V/H/R/Esc/espaço)
 apps/server/src/
   index.ts, env.ts, db.ts
   http/         rooms.ts, upload.ts
   socket/       index.ts, types.ts, ack.ts (validação Zod + ack), room.ts, scene.ts,
-                token.ts, chat.ts, initiative.ts, character.ts
+                token.ts, chat.ts, initiative.ts, character.ts, ruler.ts (efêmero)
   services/     serialize.ts (Prisma → shared), snapshot.ts, presence.ts,
                 initiativeState.ts, permissions.ts, chatCommands.ts, ids.ts,
                 characters.ts (Prisma ↔ Character, visibilidade, broadcast),

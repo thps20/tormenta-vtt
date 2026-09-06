@@ -1,12 +1,12 @@
 import React, { useRef, useState, useEffect, useMemo } from "react";
-import { Stage, Layer, Rect, Circle, Text, Group, Line, Image as KonvaImage, Transformer } from "react-konva";
+import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
-import type { Character, Participant, Scene, Token, TokenPatch } from "@tormenta-vtt/shared";
+import { measureDistance, type Character, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
-import { clampToMap, gridLines, snapToGrid, tokensInBox, type Box } from "../lib/grid";
+import { clampToMap, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
 import { useImage } from "../lib/useImage";
-import type { ToolMode } from "../store/tools";
+import type { RemoteRuler, ToolMode } from "../store/tools";
 import { TokenInspector } from "./TokenInspector";
 
 /** Tamanho padrão quando a cena ainda não tem mapa. */
@@ -26,8 +26,14 @@ interface VttCanvasProps {
   selectedIds: string[];
   /** Pedido externo de centralizar num token (clique na iniciativa). */
   focusRequest: { tokenId: string; nonce: number } | null;
-  /** Esc: muda a cada pedido de cancelar o gesto em andamento (caixa de seleção). */
+  /** Esc: muda a cada pedido de cancelar o gesto em andamento (caixa de seleção, régua). */
   cancelNonce: number;
+  /** Régua: a minha, as dos outros (já filtradas pela cena) e o sistema, que diz quanto vale uma célula. */
+  ruler: Ruler | null;
+  remoteRulers: RemoteRuler[];
+  systemDef: SystemDefinition | null;
+  onRulerUpdate: (ruler: Ruler) => void;
+  onRulerClear: () => void;
   onSelectToken: (tokenId: string | null) => void;
   /** Caixa de seleção: substitui a seleção pelos tokens dentro dela. */
   onSelectMany: (tokenIds: string[]) => void;
@@ -88,6 +94,11 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   selectedIds,
   focusRequest,
   cancelNonce,
+  ruler,
+  remoteRulers,
+  systemDef,
+  onRulerUpdate,
+  onRulerClear,
   onSelectToken,
   onSelectMany,
   onToggleSelect,
@@ -119,19 +130,28 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   const boxJustEndedRef = useRef(false);
   /** Arraste em grupo: posição inicial do líder e dos outros selecionados que eu controlo. */
   const groupDragRef = useRef<{ leader: { x: number; y: number }; others: Array<{ token: Token; x: number; y: number }> } | null>(null);
+  /** Ponto inicial da régua em andamento (pixels do mapa). */
+  const rulerStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Esc cancela a caixa em andamento.
-  useEffect(() => {
+  const cancelGestures = () => {
     boxStartRef.current = null;
     setSelectionBox(null);
+    if (rulerStartRef.current) {
+      rulerStartRef.current = null;
+      onRulerClear();
+    }
+  };
+
+  // Esc cancela a caixa/régua em andamento.
+  useEffect(() => {
+    cancelGestures();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cancelNonce]);
 
-  // Trocar de ferramenta no meio de uma caixa também a descarta.
+  // Trocar de ferramenta no meio de um gesto também o descarta.
   useEffect(() => {
-    if (mode !== "select") {
-      boxStartRef.current = null;
-      setSelectionBox(null);
-    }
+    cancelGestures();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   const mapImage = useImage(assetUrl(scene.mapUrl));
@@ -276,10 +296,20 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     return g !== null && (target === g || g.isAncestorOf(target));
   };
 
-  /** Cursor conforme o modo; no modo Selecionar, "grab" sobre um token que posso mover. Também estica a caixa de seleção. */
+  /** Ponto da régua: centro da célula quando há grid e o snap está ligado; senão, livre. */
+  const rulerPoint = (p: { x: number; y: number }) => (snapEnabled ? snapToCellCenter(p.x, p.y, scene.grid) : p);
+
+  /** Cursor conforme o modo; no modo Selecionar, "grab" sobre um token que posso mover. Também estica a caixa de seleção e a régua. */
   const handleStageMouseMove = () => {
     if (Konva.isDragging()) return; // no meio de um arraste não mexemos em nada
     if (mode === "pan") return setCursor("grab");
+    if (mode === "ruler") {
+      setCursor("crosshair");
+      const start = rulerStartRef.current;
+      const p = pointerMapPos();
+      if (start && p) onRulerUpdate({ start, end: rulerPoint(p) });
+      return;
+    }
     if (mode !== "select") return setCursor("crosshair");
     const start = boxStartRef.current;
     if (start) {
@@ -299,13 +329,32 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
    * reconheceu (para o Konva iniciar o drag); no mapa vazio, começa a caixa de seleção.
    */
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (mode !== "select" || e.evt.button !== 0) return;
+    if (e.evt.button !== 0) return;
+    if (mode === "ruler") {
+      const p = pointerMapPos();
+      if (!p) return;
+      const start = rulerPoint(p);
+      rulerStartRef.current = start;
+      onRulerUpdate({ start, end: start });
+      return;
+    }
+    if (mode !== "select") return;
     const t = tokenAtPointer();
     if (t) {
       if (!hitLandedOnToken(e.target, t.id)) tokenGroup(t.id)?.fire("mousedown", { evt: e.evt, pointerId: e.pointerId }, false);
       return;
     }
     boxStartRef.current = pointerMapPos();
+  };
+
+  /** Soltou o mouse: fecha a régua (some) ou a caixa de seleção (seleciona o que está dentro). */
+  const handleStageMouseUp = () => {
+    if (rulerStartRef.current) {
+      rulerStartRef.current = null;
+      onRulerClear();
+      return;
+    }
+    finishSelectionBox();
   };
 
   /** Fim da caixa de seleção: seleciona os tokens dentro dela. Sem caixa (clique parado), o `click` cuida. */
@@ -415,8 +464,8 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         }}
         onMouseMove={handleStageMouseMove}
         onMouseDown={handleStageMouseDown}
-        onMouseUp={finishSelectionBox}
-        onMouseLeave={finishSelectionBox}
+        onMouseUp={handleStageMouseUp}
+        onMouseLeave={handleStageMouseUp}
         onClick={handleStageClick}
       >
         {/* Camada 1: mapa + grid */}
@@ -482,8 +531,12 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
           />
         </Layer>
 
-        {/* Camada 3: caixa de seleção (só desenho) */}
+        {/* Camada 3: réguas e caixa de seleção (só desenho) */}
         <Layer listening={false}>
+          {remoteRulers.map((r) => (
+            <RulerShape key={r.participantId} ruler={r.ruler} grid={scene.grid} systemDef={systemDef} stageScale={stageScale} color="#60a5fa" author={r.nickname} />
+          ))}
+          {ruler && <RulerShape ruler={ruler} grid={scene.grid} systemDef={systemDef} stageScale={stageScale} color="#d4af37" author={null} />}
           {selectionBox && (
             <Rect
               x={Math.min(selectionBox.x1, selectionBox.x2)}
@@ -700,6 +753,48 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected
         `fill="transparent"` não desenha nada, mas deixa explícito que a área conta como preenchida.
       */}
       <Circle name="token-hit" x={cx} y={cy} radius={radius + BODY_STROKE} fill="transparent" />
+    </Group>
+  );
+};
+
+// --- Régua -----------------------------------------------------------------
+
+const distanceFormat = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+
+/** "6 m · 4 células" (sistema com `grid`) ou só "4 células". */
+export function formatDistance(d: { cells: number; value: number | null; unit: string | null }): string {
+  const cells = `${distanceFormat.format(d.cells)} ${d.cells === 1 ? "célula" : "células"}`;
+  return d.value !== null && d.unit !== null ? `${distanceFormat.format(d.value)} ${d.unit} · ${cells}` : cells;
+}
+
+interface RulerShapeProps {
+  ruler: Ruler;
+  grid: Scene["grid"];
+  systemDef: SystemDefinition | null;
+  /** Zoom atual: traço, pontas e rótulo mantêm tamanho de tela. */
+  stageScale: number;
+  color: string;
+  /** Nickname de quem mede (réguas remotas); null na minha. */
+  author: string | null;
+}
+
+/** Linha da régua com o rótulo da distância. O deslocamento em células vem do cellSize da CENA; a regra, do sistema. */
+const RulerShape: React.FC<RulerShapeProps> = ({ ruler, grid, systemDef, stageScale, color, author }) => {
+  const { start, end } = ruler;
+  const dxCells = (end.x - start.x) / grid.cellSize;
+  const dyCells = (end.y - start.y) / grid.cellSize;
+  const label = formatDistance(measureDistance(systemDef ?? { grid: undefined }, dxCells, dyCells));
+  const k = 1 / stageScale;
+  return (
+    <Group>
+      <Line points={[start.x, start.y, end.x, end.y]} stroke="#000" strokeWidth={4 * k} opacity={0.5} lineCap="round" />
+      <Line points={[start.x, start.y, end.x, end.y]} stroke={color} strokeWidth={2 * k} dash={[8 * k, 6 * k]} lineCap="round" />
+      <Circle x={start.x} y={start.y} radius={4 * k} fill={color} stroke="#000" strokeWidth={k} />
+      <Circle x={end.x} y={end.y} radius={4 * k} fill={color} stroke="#000" strokeWidth={k} />
+      <Label x={end.x} y={end.y - 14 * k} scaleX={k} scaleY={k}>
+        <Tag fill="#1a1a1a" stroke={color} strokeWidth={1} cornerRadius={3} pointerDirection="down" pointerWidth={8} pointerHeight={6} opacity={0.95} />
+        <Text text={author ? `${author}: ${label}` : label} fontSize={12} fontFamily="monospace" fontStyle="bold" fill={color} padding={5} />
+      </Label>
     </Group>
   );
 };

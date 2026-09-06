@@ -5,6 +5,7 @@ import { useTokens } from "./tokens";
 import { useChat } from "./chat";
 import { useInitiative } from "./initiative";
 import { useCharacters } from "./characters";
+import { useTools } from "./tools";
 import { toast } from "./ui";
 
 /**
@@ -22,7 +23,11 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   });
 
   socket.on("room:participantJoined", (p) => useRoom.getState().upsertParticipant(p));
-  socket.on("room:participantLeft", ({ id }) => useRoom.getState().markDisconnected(id));
+  socket.on("room:participantLeft", ({ id }) => {
+    useRoom.getState().markDisconnected(id);
+    // Quem caiu no meio de uma medição não vai mandar o "apagar".
+    useTools.getState().removeRemoteRuler(id);
+  });
   socket.on("room:activeSceneChanged", ({ sceneId }) => useRoom.getState().setActiveScene(sceneId));
 
   socket.on("scene:created", (scene) => useRoom.getState().upsertScene(scene));
@@ -35,6 +40,8 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("chat:message", (msg) => useChat.getState().append(msg));
 
   socket.on("initiative:updated", (state) => useInitiative.getState().setState(state));
+
+  socket.on("ruler:updated", (p) => useTools.getState().setRemoteRuler(p));
 
   socket.on("character:created", (c) => useCharacters.getState().upsert(c));
   socket.on("character:updated", (c) => useCharacters.getState().upsert(c));

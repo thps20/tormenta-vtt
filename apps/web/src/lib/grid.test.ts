@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampToMap, gridLines, normalizeOffset, snapToGrid, tokensInBox } from "./grid";
+import { clampToMap, gridLines, normalizeOffset, snapToCellCenter, snapToGrid, tokensInBox } from "./grid";
 import type { GridConfig } from "@tormenta-vtt/shared";
 
 const grid: GridConfig = { type: "square", cellSize: 50, offsetX: 10, offsetY: 0, color: "#000", snap: true };
@@ -17,6 +17,13 @@ describe("grid", () => {
 
   it("snap não faz nada com grid none", () => {
     expect(snapToGrid(72, 26, { ...grid, type: "none" })).toEqual({ x: 72, y: 26 });
+  });
+
+  it("snapToCellCenter vai ao centro da célula que contém o ponto", () => {
+    // offsetX 10: células em [10,60), [60,110)... centros em 35, 85...
+    expect(snapToCellCenter(12, 49, grid)).toEqual({ x: 35, y: 25 });
+    expect(snapToCellCenter(59, 51, grid)).toEqual({ x: 35, y: 75 });
+    expect(snapToCellCenter(12, 49, { ...grid, type: "none" })).toEqual({ x: 12, y: 49 });
   });
 
   it("clamp segura o token dentro do mapa", () => {

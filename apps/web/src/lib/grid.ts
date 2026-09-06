@@ -22,6 +22,17 @@ export function snapToGrid(x: number, y: number, grid: GridConfig): { x: number;
   };
 }
 
+/** Centro da célula que contém o ponto (régua). Grid "none" devolve o ponto como está. */
+export function snapToCellCenter(x: number, y: number, grid: GridConfig): { x: number; y: number } {
+  if (grid.type === "none") return { x, y };
+  const ox = normalizeOffset(grid.offsetX, grid.cellSize);
+  const oy = normalizeOffset(grid.offsetY, grid.cellSize);
+  return {
+    x: Math.floor((x - ox) / grid.cellSize) * grid.cellSize + ox + grid.cellSize / 2,
+    y: Math.floor((y - oy) / grid.cellSize) * grid.cellSize + oy + grid.cellSize / 2,
+  };
+}
+
 /** Mantém o token dentro dos limites do mapa. */
 export function clampToMap(
   x: number,

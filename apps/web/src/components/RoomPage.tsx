@@ -77,6 +77,10 @@ function Table() {
   const effectiveMode = useTools(selectEffectiveMode);
   const setToolMode = useTools((s) => s.setMode);
   const cancelNonce = useTools((s) => s.cancelNonce);
+  const ruler = useTools((s) => s.ruler);
+  const remoteRulersById = useTools((s) => s.remoteRulers);
+  const updateRuler = useTools((s) => s.updateRuler);
+  const clearRuler = useTools((s) => s.clearRuler);
   useToolShortcuts();
 
   // Seleciona o objeto estável (byId) e deriva a lista com useMemo: um seletor que
@@ -118,6 +122,9 @@ function Table() {
   const rollCharacter = useCharacters((s) => s.roll);
   const linkCharacter = useTokens((s) => s.linkCharacter);
   const systemDef = useSystemDef();
+
+  // Réguas dos outros só valem na cena que estou vendo.
+  const remoteRulers = useMemo(() => Object.values(remoteRulersById).filter((r) => r.sceneId === scene?.id), [remoteRulersById, scene?.id]);
 
   // Barra de vida: para cada token vinculado a uma ficha visível, o atual/máximo
   // do recurso apontado por tokenBar no JSON do sistema (computeCharacter dá o máximo).
@@ -196,6 +203,11 @@ function Table() {
                 selectedIds={selectedIds}
                 focusRequest={focusRequest}
                 cancelNonce={cancelNonce}
+                ruler={ruler}
+                remoteRulers={remoteRulers}
+                systemDef={systemDef}
+                onRulerUpdate={(r) => updateRuler(scene.id, r)}
+                onRulerClear={() => clearRuler(scene.id)}
                 onSelectMany={selectMany}
                 onToggleSelect={toggleSelect}
                 onSelectToken={(tokenId) => {
