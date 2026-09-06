@@ -169,7 +169,7 @@
       ]
     },
     {
-      "key": "spell", "label": "Magia", "physical": false, "hasActivation": true, "hasSave": true,
+      "key": "spell", "label": "Magia", "physical": false, "hasActivation": true, "hasSave": true, "useLabel": "Conjurar",
       "fields": [
         { "key": "circle", "label": "Círculo", "type": "number", "default": 1 },
         { "key": "school", "label": "Escola", "type": "enum", "default": "evocacao", "options": [
@@ -186,8 +186,13 @@
   ],
 
   "activation": {
+    "$comment": "Poderes e magias custam PM. Reduções de custo (modificador resource.pm.cost) nunca levam abaixo de 1 PM. CD de resistência = 10 + meio nível + atributo de conjuração (ou o do item) + bônus do item.",
+    "resource": "pm",
+    "minCost": 1,
+    "saveDc": "10 + {halfLevel} + {saveAttr} + {saveBonus}",
+    "spellcastingLabel": "Atributo de conjuração",
     "executions": [
-      { "key": "passive", "label": "Passiva" }, { "key": "standard", "label": "Padrão" },
+      { "key": "passive", "label": "Passiva", "passive": true }, { "key": "standard", "label": "Padrão" },
       { "key": "move", "label": "Movimento" }, { "key": "full", "label": "Completa" },
       { "key": "reaction", "label": "Reação" }, { "key": "free", "label": "Livre" }, { "key": "special", "label": "Especial" }
     ],

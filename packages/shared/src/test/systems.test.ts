@@ -59,6 +59,18 @@ describe("validateSystemDefinition (integridade)", () => {
     expect(() => validateSystemDefinition(withPatch({ tokenBar: "nope" }))).toThrow(/tokenBar/);
   });
 
+  it("rejeita activation.resource apontando para recurso inexistente", () => {
+    const activation = { ...(base.activation as Record<string, unknown>), resource: "nope" };
+    expect(() => validateSystemDefinition(withPatch({ activation }))).toThrow(/activation.resource/);
+  });
+
+  it("rejeita placeholder desconhecido em activation.saveDc (mas aceita os contextuais)", () => {
+    const activation = { ...(base.activation as Record<string, unknown>), saveDc: "10 + {saveAttr} + {attr.zzz}" };
+    expect(() => validateSystemDefinition(withPatch({ activation }))).toThrow(/activation.saveDc/);
+    const ok = { ...(base.activation as Record<string, unknown>), saveDc: "10 + {halfLevel} + {saveAttr} + {saveBonus}" };
+    expect(() => validateSystemDefinition(withPatch({ activation: ok }))).not.toThrow();
+  });
+
   it("rejeita damageAttribute apontando para opção que não existe", () => {
     const damageAttribute = { field: "purpose", map: { voo: "for" } };
     expect(() => validateSystemDefinition(withPatch({ damageAttribute }))).toThrow(/opção "voo"/);
@@ -92,6 +104,13 @@ describe("tormenta20.json", () => {
     expect(def.grid).toBeDefined();
     expect(def.grid?.cellSize).toBeGreaterThan(0);
     expect(def.grid?.unit).toBeTruthy();
+  });
+
+  it("ativação desconta de um recurso declarado, com piso 1 e CD por fórmula", () => {
+    expect(def.resources.some((r) => r.key === def.activation.resource)).toBe(true);
+    expect(def.activation.minCost).toBe(1);
+    expect(def.activation.saveDc).toBeDefined();
+    expect(def.activation.executions.some((e) => e.passive)).toBe(true);
   });
 
   it("declara Defesa como stat derivado e armadura como tipo de item com bônus de Defesa", () => {

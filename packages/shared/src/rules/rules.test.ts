@@ -68,13 +68,13 @@ describe("placeholders", () => {
 
 describe("modifierTarget", () => {
   it("aceita a gramática", () => {
-    for (const ok of ["attr.for", "skill.luta", "skill.oficio:alquimia", "skill.*", "skill[tag=ataque]", "derived.defense", "resource.pv.max", "attack", "attack.luta", "damage", "damage.pontaria"]) {
+    for (const ok of ["attr.for", "skill.luta", "skill.oficio:alquimia", "skill.*", "skill[tag=ataque]", "derived.defense", "resource.pv.max", "resource.pm.cost", "attack", "attack.luta", "damage", "damage.pontaria"]) {
       expect(ModifierTargetSchema.safeParse(ok).success, ok).toBe(true);
     }
   });
 
   it("rejeita seletores fora da gramática", () => {
-    for (const bad of ["", "for", "attr", "attr.", "skill[ataque]", "resource.pv", "resource.pv.min", "Attack", "attr.for.max", "derived"]) {
+    for (const bad of ["", "for", "attr", "attr.", "skill[ataque]", "resource.pv", "resource.pv.min", "resource.pm.cost.x", "Attack", "attr.for.max", "derived"]) {
       expect(ModifierTargetSchema.safeParse(bad).success, bad).toBe(false);
     }
   });
@@ -83,9 +83,14 @@ describe("modifierTarget", () => {
     expect(parseModifierTarget("skill[tag=resistencia]")).toEqual({ kind: "skillTag", tag: "resistencia" });
     expect(parseModifierTarget("attack.luta")).toEqual({ kind: "attack", skill: "luta" });
     expect(parseModifierTarget("resource.pv.max")).toEqual({ kind: "resourceMax", key: "pv" });
+    expect(parseModifierTarget("resource.pm.cost")).toEqual({ kind: "resourceCost", key: "pm" });
+    expect(describeModifierTarget("resource.pm.cost", def)).toBe("Pontos de Mana (custo)");
     expect(describeModifierTarget("attr.for", def)).toBe("Força");
     expect(describeModifierTarget("damage.pontaria", def)).toBe("Dano (Pontaria)");
     expect(listModifierTargets(def).some((t) => t.value === "derived.defense")).toBe(true);
+    // Só o recurso de ativação (activation.resource) aparece com "(custo)" na lista.
+    const costTargets = listModifierTargets(def).filter((t) => t.value.endsWith(".cost")).map((t) => t.value);
+    expect(costTargets).toEqual([`resource.${def.activation.resource}.cost`]);
   });
 });
 

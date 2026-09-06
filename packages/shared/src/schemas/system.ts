@@ -32,6 +32,7 @@ export type OptionDef = z.infer<typeof OptionDefSchema>;
  *   {attr} {trained} {sizeMod} {armorPenalty}  em skillTotal / attributeCheck
  *   {skill}                                    em skillCheck / attack (perícia da ação)
  *   {max}                                      em resources[].minFormula
+ *   {saveAttr} {saveBonus}                     em activation.saveDc (atributo e bônus do save do item)
  * O resultado após substituição deve ser uma fórmula válida para o parser em dice/.
  */
 export const FormulaSchema = z.string().min(1);
@@ -180,6 +181,8 @@ export const ItemKindDefSchema = z.object({
   physical: z.boolean().default(true),
   /** Tem bloco de ativação (custo, execução, duração, alcance...). */
   hasActivation: z.boolean().default(false),
+  /** Texto do botão que ativa o item ("Usar", "Conjurar"). */
+  useLabel: z.string().min(1).max(20).default("Usar"),
   /** Tem teste de resistência (perícia + CD). */
   hasSave: z.boolean().default(false),
   fields: z.array(ItemFieldDefSchema).default([]),
@@ -188,12 +191,34 @@ export const ItemKindDefSchema = z.object({
 });
 export type ItemKindDef = z.infer<typeof ItemKindDefSchema>;
 
-/** Enumerações do bloco de ativação (poderes, magias, consumíveis). */
+/** Opção de execução; `passive` marca as que não podem ser "usadas" (só descrição). */
+export const ExecutionDefSchema = OptionDefSchema.extend({ passive: z.boolean().default(false) });
+export type ExecutionDef = z.infer<typeof ExecutionDefSchema>;
+
+/**
+ * Regras de ativação (poderes, magias, consumíveis): enumerações do bloco
+ * `activation` do item e como usar um item ativo.
+ */
 export const ActivationDefSchema = z.object({
-  executions: z.array(OptionDefSchema).default([]),
+  executions: z.array(ExecutionDefSchema).default([]),
   durationUnits: z.array(OptionDefSchema).default([]),
   rangeUnits: z.array(OptionDefSchema).default([]),
   targetTypes: z.array(OptionDefSchema).default([]),
+  /** Recurso (resources[].key) descontado por activation.cost. Ausente = custo só informativo. */
+  resource: KeySchema.optional(),
+  /**
+   * Piso do custo depois dos modificadores "resource.<key>.cost" (T20: reduções
+   * nunca levam abaixo de 1 PM). Custo base 0 continua 0.
+   */
+  minCost: z.number().int().min(0).default(0),
+  /**
+   * CD do teste de resistência de um item. Contextuais: {saveAttr} (valor do
+   * atributo do save do item, ou do atributo de conjuração da ficha) e
+   * {saveBonus} (save.bonus). Ausente = sem CD calculada.
+   */
+  saveDc: FormulaSchema.optional(),
+  /** Rótulo do campo "atributo de conjuração" na ficha. */
+  spellcastingLabel: z.string().min(1).max(40).default("Atributo de conjuração"),
 });
 export type ActivationDef = z.infer<typeof ActivationDefSchema>;
 
@@ -290,6 +315,7 @@ const CONTEXTUAL: Record<string, string[]> = {
   skillCheck: ["skill"],
   attack: ["skill"],
   minFormula: ["max"],
+  saveDc: ["saveAttr", "saveBonus"],
   maxFormula: [],
   derived: [],
   initiative: [],
@@ -332,6 +358,9 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
   }
   if (def.tokenBar !== undefined && !resourceKeys.has(def.tokenBar)) {
     fail(def, `tokenBar referencia recurso inexistente "${def.tokenBar}"`);
+  }
+  if (def.activation.resource !== undefined && !resourceKeys.has(def.activation.resource)) {
+    fail(def, `activation.resource referencia recurso inexistente "${def.activation.resource}"`);
   }
   for (const kind of def.itemKinds) {
     for (const stat of kind.statBonuses) {
@@ -382,6 +411,7 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
     if (r.minFormula) check(r.minFormula, `resource "${r.key}".minFormula`, CONTEXTUAL.minFormula ?? []);
   }
   for (const r of def.extraRolls) check(r.formula, `extraRoll "${r.key}"`, CONTEXTUAL.extraRoll ?? []);
+  if (def.activation.saveDc) check(def.activation.saveDc, "activation.saveDc", CONTEXTUAL.saveDc ?? []);
 
   return def;
 }

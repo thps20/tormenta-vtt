@@ -9,6 +9,7 @@
  *   skill[tag=<tag>]      perícias com a tag (ex.: skill[tag=resistencia])
  *   derived.<key>         stat derivado (Defesa, CD...)
  *   resource.<key>.max    máximo de um recurso (PV, PM...)
+ *   resource.<key>.cost   custo de ativação pago com o recurso (ex.: -1 PM em magias)
  *   attack                todas as rolagens de ataque
  *   attack.<skill>        ataques feitos com a perícia
  *   damage                todo dano
@@ -21,12 +22,12 @@ const KEY = "[a-z][a-zA-Z0-9_]*";
 const SKILL_KEY = `${KEY}(?::[a-z0-9_]+)?`;
 
 export const MODIFIER_TARGET_RE = new RegExp(
-  `^(?:attr\\.${KEY}|skill\\.(?:\\*|${SKILL_KEY})|skill\\[tag=${KEY}\\]|derived\\.${KEY}|resource\\.${KEY}\\.max|attack(?:\\.${SKILL_KEY})?|damage(?:\\.${SKILL_KEY})?)$`,
+  `^(?:attr\\.${KEY}|skill\\.(?:\\*|${SKILL_KEY})|skill\\[tag=${KEY}\\]|derived\\.${KEY}|resource\\.${KEY}\\.(?:max|cost)|attack(?:\\.${SKILL_KEY})?|damage(?:\\.${SKILL_KEY})?)$`,
 );
 
 export const ModifierTargetSchema = z
   .string()
-  .regex(MODIFIER_TARGET_RE, "Alvo inválido (ex.: attr.for, skill.luta, skill[tag=ataque], derived.defense, resource.pv.max, attack, damage.luta)");
+  .regex(MODIFIER_TARGET_RE, "Alvo inválido (ex.: attr.for, skill.luta, skill[tag=ataque], derived.defense, resource.pv.max, resource.pm.cost, attack, damage.luta)");
 
 export type ModifierTarget =
   | { kind: "attr"; key: string }
@@ -35,6 +36,7 @@ export type ModifierTarget =
   | { kind: "skillTag"; tag: string }
   | { kind: "derived"; key: string }
   | { kind: "resourceMax"; key: string }
+  | { kind: "resourceCost"; key: string }
   | { kind: "attack"; skill: string | null }
   | { kind: "damage"; skill: string | null };
 
@@ -54,7 +56,7 @@ export function parseModifierTarget(target: string): ModifierTarget | null {
     case "derived":
       return { kind: "derived", key };
     case "resource":
-      return { kind: "resourceMax", key: rest[0] ?? "" };
+      return rest[1] === "cost" ? { kind: "resourceCost", key: rest[0] ?? "" } : { kind: "resourceMax", key: rest[0] ?? "" };
     case "attack":
       return { kind: "attack", skill: key || null };
     case "damage":
@@ -86,6 +88,8 @@ export function describeModifierTarget(target: string, def: SystemDefinition): s
       return def.derived.find((d) => d.key === t.key)?.label ?? target;
     case "resourceMax":
       return `${def.resources.find((r) => r.key === t.key)?.label ?? t.key} (máx.)`;
+    case "resourceCost":
+      return `${def.resources.find((r) => r.key === t.key)?.label ?? t.key} (custo)`;
     case "attack":
       return t.skill ? `Ataque (${skillLabel(t.skill)})` : "Ataque";
     case "damage":
@@ -103,6 +107,9 @@ export function listModifierTargets(def: SystemDefinition): { value: string; lab
   for (const s of def.skills) if (!s.variants) out.push({ value: `skill.${s.key}`, label: s.label });
   for (const d of def.derived) out.push({ value: `derived.${d.key}`, label: d.label });
   for (const r of def.resources) out.push({ value: `resource.${r.key}.max`, label: `${r.label} (máx.)` });
+  // Só o recurso de ativação tem custo; "resource.pv.cost" seria válido na gramática, mas sem efeito.
+  const costResource = def.activation.resource ? def.resources.find((r) => r.key === def.activation.resource) : undefined;
+  if (costResource) out.push({ value: `resource.${costResource.key}.cost`, label: `${costResource.label} (custo)` });
   out.push({ value: "attack", label: "Ataque" });
   out.push({ value: "damage", label: "Dano" });
   for (const key of def.attackSkills) {
