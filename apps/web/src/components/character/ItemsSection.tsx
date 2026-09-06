@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { CheckCircle, ChevronDown, ChevronUp, Circle, Dices, Flame, Package, Plus, Shield, Sparkles, Sword, Trash2, Wand2, Zap } from "lucide-react";
+import { AlertCircle, CheckCircle, ChevronDown, ChevronUp, Circle, Dices, Dna, Flame, GraduationCap, Package, Plus, Shield, Sparkles, Sword, Trash2, Wand2, Zap } from "lucide-react";
 import {
   buildCharacterRoll,
   createDefaultItem,
   describeActivation,
   effectiveCost,
   isPassiveItem,
+  pendingChoices,
   RollBuildError,
   saveDcFor,
   saveSkills,
@@ -16,12 +17,14 @@ import {
   type CharacterPatch,
   type CharacterRollRequest,
   type ComputedCharacter,
+  type ItemFieldDef,
   type ItemKindDef,
   type Save,
   type SystemDefinition,
 } from "@tormenta-vtt/shared";
 import { newId } from "../../lib/ids";
 import { NumInput, Select, TextArea, TextInput, ghostBtn, smallBtn } from "./fields";
+import { AttributeBonusesEditor, AttributeChoiceField, SizeField, SkillGrantsField, summarizeField } from "./StructuredFields";
 
 interface ItemsSectionProps {
   def: SystemDefinition;
@@ -35,8 +38,12 @@ interface ItemsSectionProps {
   onUseItem: (itemId: string) => void;
 }
 
-/** Ícone por POSIÇÃO em itemKinds[] (o código não sabe o que é "arma"). */
-const KIND_ICONS = [Sword, Shield, Package, Flame, Sparkles, Wand2];
+/** Ícone por POSIÇÃO em itemKinds[] (o código não sabe o que é "classe" ou "arma"). */
+const KIND_ICONS = [GraduationCap, Dna, Sword, Shield, Package, Flame, Sparkles, Wand2];
+
+/** Tipos de campo com efeito na ficha (têm editor próprio e podem pedir escolha). */
+const STRUCTURED: ItemFieldDef["type"][] = ["attributeBonuses", "attributeChoice", "skillGrants", "size"];
+const hasChoice = (f: ItemFieldDef) => f.type === "attributeChoice" || f.type === "skillGrants";
 
 const ACTION_KINDS: { kind: Action["kind"]; label: string }[] = [
   { kind: "attack", label: "Ataque" },
@@ -84,10 +91,13 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, comp
 
   const items = character.items;
   const setItems = (next: CharacterItem[]) => onPatch({ items: next });
-  const patchItem = (id: string, p: Partial<CharacterItem>) => setItems(items.map((i) => (i.id === id ? { ...i, ...p } : i)));
+  /** `extra` permite mudar outra parte da ficha no mesmo patch (ex.: tamanho da raça). */
+  const patchItem = (id: string, p: Partial<CharacterItem>, extra: Omit<CharacterPatch, "items"> = {}) =>
+    onPatch({ ...extra, items: items.map((i) => (i.id === id ? { ...i, ...p } : i)) });
 
   const currentKind = def.itemKinds.find((k) => k.key === activeTab);
   const itemsOfKind = items.filter((i) => i.kind === activeTab);
+  const atLimit = currentKind?.maxCount !== undefined && itemsOfKind.length >= currentKind.maxCount;
 
   const addItem = () => {
     if (!currentKind) return;
@@ -102,11 +112,16 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, comp
     <div className="p-4 bg-[#111] border-b border-[#2d2417]">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
         <h3 className="text-xs uppercase font-serif font-bold tracking-widest text-[#d4af37]">Equipamentos e habilidades</h3>
-        {isEditMode && currentKind && (
+        {isEditMode && currentKind && !atLimit && (
           <button onClick={addItem} className={smallBtn} id="btn-add-item">
             <Plus className="w-3.5 h-3.5" />
             <span>Adicionar {currentKind.label}</span>
           </button>
+        )}
+        {isEditMode && currentKind && atLimit && (
+          <span className="text-[11px] text-zinc-500 font-serif">
+            {currentKind.maxCount === 1 ? `Só 1 ${currentKind.label} por ficha` : `No máximo ${currentKind.maxCount} por ficha`}
+          </span>
         )}
       </div>
 
@@ -151,7 +166,7 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, comp
               isEditMode={isEditMode}
               expanded={expanded[item.id] ?? false}
               onToggle={() => toggleExpand(item.id)}
-              onPatch={(p) => patchItem(item.id, p)}
+              onPatch={(p, extra) => patchItem(item.id, p, extra)}
               onRemove={() => setItems(items.filter((i) => i.id !== item.id))}
               onRoll={(actionId) => onRoll({ type: "action", itemId: item.id, actionId })}
               onUse={() => onUseItem(item.id)}
@@ -175,7 +190,8 @@ interface ItemCardProps {
   isEditMode: boolean;
   expanded: boolean;
   onToggle: () => void;
-  onPatch: (p: Partial<CharacterItem>) => void;
+  /** `extra` = outras partes da ficha a mudar no mesmo patch (tamanho vindo da raça). */
+  onPatch: (p: Partial<CharacterItem>, extra?: Omit<CharacterPatch, "items">) => void;
   onRemove: () => void;
   onRoll: (actionId: string) => void;
   onUse: () => void;
@@ -184,6 +200,11 @@ interface ItemCardProps {
 const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, item, canEdit, isEditMode, expanded, onToggle, onPatch, onRemove, onRoll, onUse }) => {
   const physical = kind?.physical ?? true;
   const canRoll = canEdit && !isEditMode;
+  // Escolhas (atributos flexíveis, perícias da classe) ficam visíveis fora do modo edição.
+  const choiceFields = kind?.fields.filter(hasChoice) ?? [];
+  const pending = pendingChoices(def, item);
+  const missing = pending.reduce((acc, p) => acc + p.missing, 0);
+  const setField = (key: string, value: CharacterItem["fields"][string]) => onPatch({ fields: { ...item.fields, [key]: value } });
 
   // Ativação: só tipos com bloco de ativação e item não passivo ganham o botão "Usar".
   // Custo efetivo (com modificadores) e recurso disponível vêm do sistema, não do código.
@@ -226,13 +247,19 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
               {kind?.fields.map((f) => {
                 const v = item.fields[f.key];
                 if (v === undefined || v === "" || v === false) return null;
-                const text = f.type === "enum" ? optionLabel(f.options, String(v)) : f.type === "boolean" ? "sim" : String(v);
+                const text = STRUCTURED.includes(f.type) ? summarizeField(def, f, v) : f.type === "enum" ? optionLabel(f.options, String(v)) : f.type === "boolean" ? "sim" : String(v);
+                if (text === null) return null;
                 return (
                   <span key={f.key} className="bg-[#1f1d19] border border-[#332b20] px-1.5 py-0.5 rounded text-zinc-300">
                     <span className="text-zinc-500">{f.label}:</span> {text}
                   </span>
                 );
               })}
+              {missing > 0 && (
+                <span className="flex items-center gap-1 bg-amber-950/40 border border-amber-700/60 px-1.5 py-0.5 rounded text-amber-300 font-bold" title={pending.map((p) => `${p.label}: faltam ${p.missing}`).join("; ")}>
+                  <AlertCircle className="w-3 h-3" /> {missing === 1 ? "falta 1 escolha" : `faltam ${missing} escolhas`}
+                </span>
+              )}
               {Object.entries(item.statBonuses).map(([statKey, value]) => (
                 <span key={statKey} className="bg-[#241f17] border border-amber-900/50 px-1.5 py-0.5 rounded text-amber-300 font-mono font-bold">
                   {def.equipStats.find((s) => s.key === statKey)?.label ?? statKey}: {value >= 0 ? `+${value}` : value}
@@ -305,6 +332,19 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
         </div>
       )}
 
+      {/* Escolhas do item (fora do modo edição): chips que o dono marca sem "editar a ficha". */}
+      {!isEditMode && choiceFields.length > 0 && (
+        <div className="px-3 pb-2.5 space-y-1.5">
+          {choiceFields.map((f) =>
+            f.type === "attributeChoice" ? (
+              <AttributeChoiceField key={f.key} def={def} value={item.fields[f.key]} canChoose={canEdit} isEditMode={false} onChange={(v) => setField(f.key, v)} />
+            ) : (
+              <SkillGrantsField key={f.key} def={def} value={item.fields[f.key]} canChoose={canEdit} isEditMode={false} onChange={(v) => setField(f.key, v)} />
+            ),
+          )}
+        </div>
+      )}
+
       {expanded && (
         <div className="px-3 pb-3 pt-2 border-t border-[#231e17] text-xs space-y-2 bg-[#12110f]/50">
           {isEditMode ? (
@@ -366,11 +406,14 @@ interface ItemEditorProps {
   character: Character;
   kind: ItemKindDef | undefined;
   item: CharacterItem;
-  onPatch: (p: Partial<CharacterItem>) => void;
+  onPatch: (p: Partial<CharacterItem>, extra?: Omit<CharacterPatch, "items">) => void;
 }
 
 const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onPatch }) => {
   const physical = kind?.physical ?? true;
+  const scalarFields = kind?.fields.filter((f) => !STRUCTURED.includes(f.type)) ?? [];
+  const structuredFields = kind?.fields.filter((f) => STRUCTURED.includes(f.type)) ?? [];
+  const setField = (key: string, value: CharacterItem["fields"][string], extra?: Omit<CharacterPatch, "items">) => onPatch({ fields: { ...item.fields, [key]: value } }, extra);
   // Resistência: perícias vêm da tag do sistema; atributo null = o de conjuração da ficha.
   const saveSkillOptions = saveSkills(def).map((s) => ({ value: s.key, label: s.label }));
   const spellcastingAbbr = def.attributes.find((a) => a.key === character.spellcastingAttribute)?.abbr;
@@ -404,7 +447,7 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onP
             </label>
           </>
         )}
-        {kind?.fields.map((f) => (
+        {scalarFields.map((f) => (
           <label key={f.key} className="flex items-center gap-1 text-zinc-400">
             {f.label}
             {f.type === "enum" ? (
@@ -419,6 +462,19 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onP
           </label>
         ))}
       </div>
+
+      {/* Campos com efeito na ficha: o que o item concede (bônus, escolhas, tamanho). */}
+      {structuredFields.map((f) => (
+        <div key={f.key} className="p-2 rounded bg-[#181613] border border-[#2d261c] space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-zinc-500">{f.label}:</span>
+            {f.type === "attributeBonuses" && <AttributeBonusesEditor def={def} value={item.fields[f.key]} onChange={(v) => setField(f.key, v)} />}
+            {f.type === "size" && <SizeField def={def} value={item.fields[f.key]} onChange={(size) => setField(f.key, size, { size })} />}
+          </div>
+          {f.type === "attributeChoice" && <AttributeChoiceField def={def} value={item.fields[f.key]} canChoose isEditMode onChange={(v) => setField(f.key, v)} />}
+          {f.type === "skillGrants" && <SkillGrantsField def={def} value={item.fields[f.key]} canChoose isEditMode onChange={(v) => setField(f.key, v)} />}
+        </div>
+      ))}
 
       {kind && kind.statBonuses.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">

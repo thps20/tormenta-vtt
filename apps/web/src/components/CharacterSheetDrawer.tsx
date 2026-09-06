@@ -73,7 +73,7 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
               <DerivedStatsBar def={def} character={character} computed={computed} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} onRoll={onRoll} />
               <SkillsSection def={def} character={character} computed={computed} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} onRoll={onRoll} />
               <ItemsSection def={def} character={character} computed={computed} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} onRoll={onRoll} onUseItem={onUseItem} />
-              <ModifiersSection def={def} character={character} canEdit={canEdit} onPatch={onPatch} />
+              <ModifiersSection def={def} character={character} computed={computed} canEdit={canEdit} onPatch={onPatch} />
               <DetailsSection def={def} character={character} isEditMode={editing} onPatch={onPatch} />
             </div>
 

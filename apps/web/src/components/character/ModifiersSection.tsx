@@ -1,12 +1,13 @@
 import React, { useState } from "react";
-import { CheckCircle2, Circle, Plus, Sliders, Trash2 } from "lucide-react";
-import { listModifierTargets, type Character, type CharacterPatch, type Modifier, type SystemDefinition } from "@tormenta-vtt/shared";
+import { CheckCircle2, Circle, Lock, Plus, Sliders, Trash2 } from "lucide-react";
+import { listModifierTargets, type Character, type CharacterPatch, type ComputedCharacter, type Modifier, type SystemDefinition } from "@tormenta-vtt/shared";
 import { newId } from "../../lib/ids";
 import { NumInput, Select, TextInput, smallBtn } from "./fields";
 
 interface ModifiersSectionProps {
   def: SystemDefinition;
   character: Character;
+  computed: ComputedCharacter;
   canEdit: boolean;
   onPatch: (patch: CharacterPatch) => void;
 }
@@ -15,8 +16,9 @@ interface ModifiersSectionProps {
  * Modificadores: bônus/penalidades com alvo textual (attr.for, skill[tag=ataque]...).
  * A lista de alvos vem do JSON do sistema (listModifierTargets); ligar/desligar
  * funciona fora do modo edição, porque condições mudam no meio do combate.
+ * Os gerados por itens (raça etc.) aparecem travados: somem ao remover o item.
  */
-export const ModifiersSection: React.FC<ModifiersSectionProps> = ({ def, character, canEdit, onPatch }) => {
+export const ModifiersSection: React.FC<ModifiersSectionProps> = ({ def, character, computed, canEdit, onPatch }) => {
   const targets = listModifierTargets(def);
   const [isAdding, setIsAdding] = useState(false);
   const [label, setLabel] = useState("");
@@ -88,10 +90,26 @@ export const ModifiersSection: React.FC<ModifiersSectionProps> = ({ def, charact
         </form>
       )}
 
-      {modifiers.length === 0 ? (
+      {modifiers.length === 0 && computed.itemModifiers.length === 0 ? (
         <div className="py-4 text-center text-zinc-500 font-serif text-xs border border-dashed border-[#242018] rounded">Nenhum modificador ativo. Use para poderes, condições e bônus temporários.</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {computed.itemModifiers.map((mod, i) => (
+            <div key={`${mod.itemId}-${mod.target}-${i}`} className="flex items-center justify-between p-2 rounded border bg-[#141311] border-[#2a2419]" title="Vem de um item da ficha; some ao remover o item">
+              <div className="flex items-center gap-2 min-w-0">
+                <Lock className="w-4 h-4 text-zinc-500 shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs font-serif font-bold text-zinc-300 truncate">{mod.itemName}</div>
+                  <div className="text-[10px] text-zinc-500 font-mono truncate" title={mod.target}>
+                    Alvo: <span className="text-amber-300 font-semibold">{targetLabel(mod.target)}</span>
+                  </div>
+                </div>
+              </div>
+              <span className={`font-mono text-xs font-bold px-1.5 py-0.5 rounded border shrink-0 ml-2 ${mod.value >= 0 ? "bg-emerald-950/60 text-emerald-300 border-emerald-900/60" : "bg-red-950/60 text-red-300 border-red-900/60"}`}>
+                {mod.value >= 0 ? `+${mod.value}` : mod.value}
+              </span>
+            </div>
+          ))}
           {modifiers.map((mod) => {
             const isPositive = mod.value >= 0;
             return (
