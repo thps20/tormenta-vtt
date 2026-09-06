@@ -1,0 +1,509 @@
+import React, { useState } from "react";
+import { CheckCircle, ChevronDown, ChevronUp, Circle, Dices, Flame, Package, Plus, Shield, Sparkles, Sword, Trash2, Wand2 } from "lucide-react";
+import {
+  buildCharacterRoll,
+  createDefaultItem,
+  RollBuildError,
+  type Action,
+  type Activation,
+  type Character,
+  type CharacterItem,
+  type CharacterPatch,
+  type CharacterRollRequest,
+  type ItemKindDef,
+  type SystemDefinition,
+} from "@tormenta-vtt/shared";
+import { newId } from "../../lib/ids";
+import { NumInput, Select, TextArea, TextInput, ghostBtn, smallBtn } from "./fields";
+
+interface ItemsSectionProps {
+  def: SystemDefinition;
+  character: Character;
+  canEdit: boolean;
+  isEditMode: boolean;
+  onPatch: (patch: CharacterPatch) => void;
+  onRoll: (request: CharacterRollRequest) => void;
+}
+
+/** Ícone por POSIÇÃO em itemKinds[] (o código não sabe o que é "arma"). */
+const KIND_ICONS = [Sword, Shield, Package, Flame, Sparkles, Wand2];
+
+const ACTION_KINDS: { kind: Action["kind"]; label: string }[] = [
+  { kind: "attack", label: "Ataque" },
+  { kind: "damage", label: "Dano" },
+  { kind: "check", label: "Teste" },
+  { kind: "formula", label: "Fórmula" },
+];
+
+/** Ação nova de cada tipo, com defaults vindos do sistema (primeira perícia de ataque etc.). */
+function newAction(def: SystemDefinition, kind: Action["kind"]): Action {
+  const id = newId();
+  const attackSkill = def.attackSkills[0] ?? def.skills[0]?.key ?? "skill";
+  switch (kind) {
+    case "attack":
+      return { id, label: "Ataque", kind, skill: attackSkill, attributeOverride: null, bonus: 0, critRange: 20, critMult: 2 };
+    case "damage":
+      return { id, label: "Dano", kind, formula: "1d6", attribute: "auto", damageType: def.damageTypes[0]?.key ?? null, bonus: 0 };
+    case "check":
+      return { id, label: "Teste", kind, skill: def.skills[0]?.key ?? "skill", bonus: 0 };
+    case "formula":
+      return { id, label: "Fórmula", kind, formula: "1d20" };
+  }
+}
+
+/** Fórmula que o servidor rolaria para esta ação (só para mostrar no botão). */
+function previewFormula(def: SystemDefinition, character: Character, itemId: string, actionId: string): string | null {
+  try {
+    return buildCharacterRoll(def, character, { type: "action", itemId, actionId }).formula;
+  } catch (err) {
+    if (err instanceof RollBuildError) return null;
+    throw err;
+  }
+}
+
+const optionLabel = (options: { key: string; label: string }[] | undefined, key: string) => options?.find((o) => o.key === key)?.label ?? key;
+
+/**
+ * Itens da ficha em abas por tipo (itemKinds[] do sistema). Os campos, stats de
+ * equipamento e enumerações de ativação vêm todos do JSON, nunca do código.
+ */
+export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, canEdit, isEditMode, onPatch, onRoll }) => {
+  const [activeTab, setActiveTab] = useState<string>(def.itemKinds[0]?.key ?? "");
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggleExpand = (id: string) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  const items = character.items;
+  const setItems = (next: CharacterItem[]) => onPatch({ items: next });
+  const patchItem = (id: string, p: Partial<CharacterItem>) => setItems(items.map((i) => (i.id === id ? { ...i, ...p } : i)));
+
+  const currentKind = def.itemKinds.find((k) => k.key === activeTab);
+  const itemsOfKind = items.filter((i) => i.kind === activeTab);
+
+  const addItem = () => {
+    if (!currentKind) return;
+    const item = createDefaultItem(def, currentKind.key, newId());
+    setItems([...items, item]);
+    setExpanded((prev) => ({ ...prev, [item.id]: true }));
+  };
+
+  if (def.itemKinds.length === 0) return null;
+
+  return (
+    <div className="p-4 bg-[#111] border-b border-[#2d2417]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+        <h3 className="text-xs uppercase font-serif font-bold tracking-widest text-[#d4af37]">Equipamentos e habilidades</h3>
+        {isEditMode && currentKind && (
+          <button onClick={addItem} className={smallBtn} id="btn-add-item">
+            <Plus className="w-3.5 h-3.5" />
+            <span>Adicionar {currentKind.label}</span>
+          </button>
+        )}
+      </div>
+
+      {/* Abas por tipo de item */}
+      <div className="flex items-center gap-1 overflow-x-auto pb-1.5 border-b border-[#242018] mb-3">
+        {def.itemKinds.map((kind, index) => {
+          const Icon = KIND_ICONS[index % KIND_ICONS.length] ?? Package;
+          const count = items.filter((i) => i.kind === kind.key).length;
+          const isActive = activeTab === kind.key;
+          return (
+            <button
+              key={kind.key}
+              id={`item-tab-${kind.key}`}
+              onClick={() => setActiveTab(kind.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-t text-xs font-serif font-bold transition-all shrink-0 cursor-pointer ${
+                isActive ? "bg-[#1e1a14] text-[#d4af37] border-b-2 border-[#d4af37]" : "text-zinc-400 hover:text-zinc-200 hover:bg-[#181818]"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{kind.label}</span>
+              <span className="text-[10px] font-mono px-1 rounded bg-[#101010] text-zinc-400">{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {itemsOfKind.length === 0 ? (
+        <div className="py-6 text-center text-zinc-500 font-serif text-xs border border-dashed border-[#26221c] rounded">
+          Nenhum item em "{currentKind?.label}".{isEditMode && " Clique no botão acima para adicionar."}
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {itemsOfKind.map((item) => (
+            <ItemCard
+              key={item.id}
+              def={def}
+              character={character}
+              kind={currentKind}
+              item={item}
+              canEdit={canEdit}
+              isEditMode={isEditMode}
+              expanded={expanded[item.id] ?? false}
+              onToggle={() => toggleExpand(item.id)}
+              onPatch={(p) => patchItem(item.id, p)}
+              onRemove={() => setItems(items.filter((i) => i.id !== item.id))}
+              onRoll={(actionId) => onRoll({ type: "action", itemId: item.id, actionId })}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Cartão de item ----------------------------------------------------------
+
+interface ItemCardProps {
+  def: SystemDefinition;
+  character: Character;
+  kind: ItemKindDef | undefined;
+  item: CharacterItem;
+  canEdit: boolean;
+  isEditMode: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  onPatch: (p: Partial<CharacterItem>) => void;
+  onRemove: () => void;
+  onRoll: (actionId: string) => void;
+}
+
+const ItemCard: React.FC<ItemCardProps> = ({ def, character, kind, item, canEdit, isEditMode, expanded, onToggle, onPatch, onRemove, onRoll }) => {
+  const physical = kind?.physical ?? true;
+  const canRoll = canEdit && !isEditMode;
+
+  return (
+    <div className={`bg-[#161513] border rounded-lg transition-all ${item.equipped ? "border-[#d4af37]/60 shadow-[0_0_8px_rgba(212,175,55,0.1)]" : "border-[#292319]"}`}>
+      <div className="p-3 flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2.5 min-w-0">
+          {physical && (
+            <button
+              onClick={() => onPatch({ equipped: !item.equipped })}
+              disabled={!canEdit}
+              className={`mt-0.5 p-0.5 rounded transition-colors cursor-pointer disabled:cursor-default ${item.equipped ? "text-[#d4af37] hover:text-amber-300" : "text-zinc-600 hover:text-zinc-400"}`}
+              title={item.equipped ? "Equipado (clique para desequipar)" : "Não equipado (clique para equipar)"}
+            >
+              {item.equipped ? <CheckCircle className="w-4 h-4 fill-[#d4af37]/20" /> : <Circle className="w-4 h-4" />}
+            </button>
+          )}
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {isEditMode ? (
+                <TextInput value={item.name} onCommit={(name) => name.trim() && onPatch({ name: name.trim() })} className="text-sm font-serif font-bold text-amber-200 w-56" maxLength={80} />
+              ) : (
+                <h4 className="text-sm font-serif font-bold text-zinc-100 truncate">{item.name}</h4>
+              )}
+              {physical && item.quantity !== 1 && <span className="text-[10px] bg-[#222] border border-zinc-700 px-1.5 py-0.5 rounded font-mono text-zinc-300">×{item.quantity}</span>}
+              {item.equipped && <span className="text-[9px] uppercase tracking-wider bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40 px-1.5 rounded font-serif font-bold">Equipado</span>}
+            </div>
+
+            {/* Resumo: campos do tipo e stats de equipamento, com os rótulos do sistema */}
+            <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[10px] text-zinc-400 font-serif">
+              {kind?.fields.map((f) => {
+                const v = item.fields[f.key];
+                if (v === undefined || v === "" || v === false) return null;
+                const text = f.type === "enum" ? optionLabel(f.options, String(v)) : f.type === "boolean" ? "sim" : String(v);
+                return (
+                  <span key={f.key} className="bg-[#1f1d19] border border-[#332b20] px-1.5 py-0.5 rounded text-zinc-300">
+                    <span className="text-zinc-500">{f.label}:</span> {text}
+                  </span>
+                );
+              })}
+              {Object.entries(item.statBonuses).map(([statKey, value]) => (
+                <span key={statKey} className="bg-[#241f17] border border-amber-900/50 px-1.5 py-0.5 rounded text-amber-300 font-mono font-bold">
+                  {def.equipStats.find((s) => s.key === statKey)?.label ?? statKey}: {value >= 0 ? `+${value}` : value}
+                </span>
+              ))}
+              {item.activation && item.activation.cost > 0 && <span className="bg-[#14202a] border border-sky-900/60 px-1.5 py-0.5 rounded text-sky-300 font-mono font-bold">Custo {item.activation.cost}</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isEditMode && (
+            <button onClick={onRemove} className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-red-950/40 transition-colors cursor-pointer" title="Remover item">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          <button onClick={onToggle} className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-[#202020] transition-colors cursor-pointer" title={expanded ? "Recolher" : isEditMode ? "Editar detalhes" : "Ver detalhes"}>
+            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Botões de rolagem das ações, com a fórmula que o servidor vai usar */}
+      {!isEditMode && item.actions.length > 0 && (
+        <div className="px-3 pb-2.5 flex items-center gap-2 flex-wrap">
+          {item.actions.map((act) => {
+            const formula = previewFormula(def, character, item.id, act.id);
+            return (
+              <button
+                key={act.id}
+                onClick={() => onRoll(act.id)}
+                disabled={!canRoll}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#221c14] hover:bg-[#33281b] border border-[#d4af37]/50 hover:border-[#d4af37] text-amber-100 text-xs font-serif font-semibold transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                title={formula ? `Rolar ${act.label}: ${formula}` : `Rolar ${act.label}`}
+              >
+                <Dices className="w-3.5 h-3.5 text-[#d4af37]" />
+                <span>{act.label}</span>
+                {formula && <span className={`font-mono font-bold ml-0.5 ${act.kind === "attack" ? "text-emerald-400" : "text-amber-300"}`}>({formula})</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {expanded && (
+        <div className="px-3 pb-3 pt-2 border-t border-[#231e17] text-xs space-y-2 bg-[#12110f]/50">
+          {isEditMode ? (
+            <ItemEditor def={def} kind={kind} item={item} onPatch={onPatch} />
+          ) : (
+            <>
+              {item.activation && <ActivationView def={def} activation={item.activation} />}
+              {item.save && (
+                <div className="text-[11px] text-zinc-400 font-mono">
+                  Resistência: {def.skills.find((s) => s.key === item.save?.skill)?.label ?? item.save.skill}
+                  {item.save.text && <span className="text-zinc-500 font-serif"> — {item.save.text}</span>}
+                </div>
+              )}
+              {item.description ? <div className="text-zinc-400 font-serif leading-relaxed italic">"{item.description}"</div> : <div className="text-zinc-600 italic">Sem descrição.</div>}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Ativação (poderes, magias, consumíveis) --------------------------------
+
+const ActivationView: React.FC<{ def: SystemDefinition; activation: Activation }> = ({ def, activation }) => {
+  const a = activation;
+  const parts: string[] = [];
+  if (a.execution) parts.push(`Execução: ${optionLabel(def.activation.executions, a.execution)}`);
+  if (a.duration.units) parts.push(`Duração: ${a.duration.value > 0 ? `${a.duration.value} ` : ""}${optionLabel(def.activation.durationUnits, a.duration.units)}`);
+  if (a.range.units) parts.push(`Alcance: ${a.range.value > 0 ? `${a.range.value} ` : ""}${optionLabel(def.activation.rangeUnits, a.range.units)}`);
+  if (a.target) parts.push(`Alvo: ${a.target}`);
+  if (a.area) parts.push(`Área: ${a.area}`);
+  return (
+    <div className="p-2 rounded bg-[#181613] border border-[#2d261c] text-zinc-300 space-y-1">
+      <div className="flex items-center gap-3 text-[11px] font-mono text-zinc-400 flex-wrap">
+        {a.cost > 0 && <span className="text-sky-300 font-bold">Custo: {a.cost}</span>}
+        {parts.map((p) => (
+          <span key={p}>{p}</span>
+        ))}
+      </div>
+      {a.effect && (
+        <div className="text-amber-200/90 font-serif">
+          <strong>Efeito:</strong> {a.effect}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Editor (modo edição) ----------------------------------------------------
+
+interface ItemEditorProps {
+  def: SystemDefinition;
+  kind: ItemKindDef | undefined;
+  item: CharacterItem;
+  onPatch: (p: Partial<CharacterItem>) => void;
+}
+
+const ItemEditor: React.FC<ItemEditorProps> = ({ def, kind, item, onPatch }) => {
+  const physical = kind?.physical ?? true;
+  const patchAction = (id: string, p: Partial<Action>) => onPatch({ actions: item.actions.map((a) => (a.id === id ? ({ ...a, ...p } as Action) : a)) });
+  const patchActivation = (p: Partial<Activation>) => {
+    const base: Activation = item.activation ?? { cost: 0, execution: "", duration: { units: "", value: 0 }, range: { units: "", value: 0 }, target: "", area: "", effect: "" };
+    onPatch({ activation: { ...base, ...p } });
+  };
+  const withEmpty = (options: { key: string; label: string }[]) => [{ value: "", label: "—" }, ...options.map((o) => ({ value: o.key, label: o.label }))];
+
+  return (
+    <div className="space-y-2 text-[11px]">
+      <div className="flex flex-wrap items-center gap-2">
+        {physical && (
+          <>
+            <label className="flex items-center gap-1 text-zinc-400">
+              Qtd.
+              <NumInput value={item.quantity} onCommit={(v) => onPatch({ quantity: Math.max(0, Math.floor(v ?? 0)) })} />
+            </label>
+            <label className="flex items-center gap-1 text-zinc-400">
+              Espaços
+              <NumInput value={item.slots} onCommit={(v) => onPatch({ slots: Math.max(0, v ?? 0) })} />
+            </label>
+            <label className="flex items-center gap-1 text-zinc-400">
+              Preço
+              <NumInput value={item.price} onCommit={(v) => onPatch({ price: Math.max(0, v ?? 0) })} className="w-16" />
+            </label>
+          </>
+        )}
+        {kind?.fields.map((f) => (
+          <label key={f.key} className="flex items-center gap-1 text-zinc-400">
+            {f.label}
+            {f.type === "enum" ? (
+              <Select value={String(item.fields[f.key] ?? "")} onChange={(v) => onPatch({ fields: { ...item.fields, [f.key]: v } })} options={(f.options ?? []).map((o) => ({ value: o.key, label: o.label }))} />
+            ) : f.type === "number" ? (
+              <NumInput value={Number(item.fields[f.key] ?? 0)} onCommit={(v) => onPatch({ fields: { ...item.fields, [f.key]: v ?? 0 } })} />
+            ) : f.type === "boolean" ? (
+              <input type="checkbox" checked={Boolean(item.fields[f.key])} onChange={(e) => onPatch({ fields: { ...item.fields, [f.key]: e.target.checked } })} className="accent-[#d4af37]" />
+            ) : (
+              <TextInput value={String(item.fields[f.key] ?? "")} onCommit={(v) => onPatch({ fields: { ...item.fields, [f.key]: v } })} className="w-40" maxLength={500} />
+            )}
+          </label>
+        ))}
+      </div>
+
+      {kind && kind.statBonuses.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-zinc-500">Quando equipado:</span>
+          {kind.statBonuses.map((statKey) => {
+            const stat = def.equipStats.find((s) => s.key === statKey);
+            return (
+              <label key={statKey} className="flex items-center gap-1 text-zinc-400" title={`Vazio = este item não define ${stat?.label ?? statKey}`}>
+                {stat?.label ?? statKey}
+                <NumInput
+                  value={item.statBonuses[statKey] ?? null}
+                  allowEmpty
+                  placeholder="—"
+                  onCommit={(v) => {
+                    const next = { ...item.statBonuses };
+                    if (v === null) delete next[statKey];
+                    else next[statKey] = v;
+                    onPatch({ statBonuses: next });
+                  }}
+                />
+              </label>
+            );
+          })}
+        </div>
+      )}
+
+      {kind?.hasActivation && (
+        <div className="p-2 rounded bg-[#181613] border border-[#2d261c] space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-zinc-500">Ativação:</span>
+            <label className="flex items-center gap-1 text-zinc-400">
+              Custo <NumInput value={item.activation?.cost ?? 0} onCommit={(v) => patchActivation({ cost: Math.max(0, Math.floor(v ?? 0)) })} />
+            </label>
+            <label className="flex items-center gap-1 text-zinc-400">
+              Execução <Select value={item.activation?.execution ?? ""} onChange={(v) => patchActivation({ execution: v })} options={withEmpty(def.activation.executions)} />
+            </label>
+            <label className="flex items-center gap-1 text-zinc-400">
+              Duração
+              <NumInput value={item.activation?.duration.value ?? 0} onCommit={(v) => patchActivation({ duration: { units: item.activation?.duration.units ?? "", value: Math.max(0, v ?? 0) } })} className="w-10" />
+              <Select value={item.activation?.duration.units ?? ""} onChange={(v) => patchActivation({ duration: { units: v, value: item.activation?.duration.value ?? 0 } })} options={withEmpty(def.activation.durationUnits)} />
+            </label>
+            <label className="flex items-center gap-1 text-zinc-400">
+              Alcance
+              <NumInput value={item.activation?.range.value ?? 0} onCommit={(v) => patchActivation({ range: { units: item.activation?.range.units ?? "", value: Math.max(0, v ?? 0) } })} className="w-10" />
+              <Select value={item.activation?.range.units ?? ""} onChange={(v) => patchActivation({ range: { units: v, value: item.activation?.range.value ?? 0 } })} options={withEmpty(def.activation.rangeUnits)} />
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1 text-zinc-400">
+              Alvo <TextInput value={item.activation?.target ?? ""} onCommit={(v) => patchActivation({ target: v })} className="w-40" maxLength={200} />
+            </label>
+            <label className="flex items-center gap-1 text-zinc-400">
+              Área <TextInput value={item.activation?.area ?? ""} onCommit={(v) => patchActivation({ area: v })} className="w-40" maxLength={200} />
+            </label>
+          </div>
+          <TextArea value={item.activation?.effect ?? ""} onCommit={(v) => patchActivation({ effect: v })} placeholder="Efeito" rows={2} />
+        </div>
+      )}
+
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-zinc-500">Ações</span>
+          {ACTION_KINDS.map((k) => (
+            <button key={k.kind} onClick={() => onPatch({ actions: [...item.actions, newAction(def, k.kind)] })} className={ghostBtn}>
+              <Plus className="w-3 h-3" /> {k.label}
+            </button>
+          ))}
+        </div>
+        {item.actions.map((a) => (
+          <ActionRow key={a.id} def={def} action={a} onPatch={(p) => patchAction(a.id, p)} onRemove={() => onPatch({ actions: item.actions.filter((x) => x.id !== a.id) })} />
+        ))}
+      </div>
+
+      <TextArea value={item.description} onCommit={(description) => onPatch({ description })} placeholder="Descrição" rows={2} />
+    </div>
+  );
+};
+
+interface ActionRowProps {
+  def: SystemDefinition;
+  action: Action;
+  onPatch: (p: Partial<Action>) => void;
+  onRemove: () => void;
+}
+
+const ActionRow: React.FC<ActionRowProps> = ({ def, action, onPatch, onRemove }) => {
+  const attackSkills = (def.attackSkills.length ? def.skills.filter((s) => def.attackSkills.includes(s.key)) : def.skills).map((s) => ({ value: s.key, label: s.label }));
+  const allSkills = def.skills.filter((s) => !s.variants).map((s) => ({ value: s.key, label: s.label }));
+  const attrOptions = def.attributes.map((a) => ({ value: a.key, label: a.abbr }));
+  const kindLabel = ACTION_KINDS.find((k) => k.kind === action.kind)?.label ?? action.kind;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 pl-2 border-l-2 border-[#2d2417]">
+      <span className="text-[9px] px-1 rounded bg-zinc-800 text-zinc-400 uppercase tracking-wider">{kindLabel}</span>
+      <TextInput value={action.label} onCommit={(label) => label.trim() && onPatch({ label: label.trim() })} className="w-28" maxLength={60} />
+
+      {action.kind === "attack" && (
+        <>
+          <Select value={action.skill} onChange={(skill) => onPatch({ skill })} options={attackSkills} title="Perícia do ataque" />
+          <Select
+            value={action.attributeOverride ?? ""}
+            onChange={(v) => onPatch({ attributeOverride: v || null })}
+            options={[{ value: "", label: "atributo padrão" }, ...attrOptions]}
+            title="Trocar o atributo da perícia (ex.: arma ágil)"
+          />
+          <label className="flex items-center gap-1 text-zinc-500">
+            bônus <NumInput value={action.bonus} onCommit={(v) => onPatch({ bonus: v ?? 0 })} />
+          </label>
+          <label className="flex items-center gap-1 text-zinc-500">
+            crítico <NumInput value={action.critRange} onCommit={(v) => onPatch({ critRange: Math.max(1, v ?? 20) })} title="Margem de crítico (natural ≥)" />
+            ×<NumInput value={action.critMult} onCommit={(v) => onPatch({ critMult: Math.max(1, v ?? 2) })} className="w-8" title="Multiplicador" />
+          </label>
+        </>
+      )}
+
+      {action.kind === "damage" && (
+        <>
+          <TextInput value={action.formula} onCommit={(formula) => formula.trim() && onPatch({ formula: formula.trim() })} className="w-20 font-mono" maxLength={200} placeholder="1d8" />
+          <Select
+            value={action.attribute === null ? "none" : action.attribute}
+            onChange={(v) => onPatch({ attribute: v === "none" ? null : v })}
+            options={[{ value: "auto", label: "atributo: auto" }, { value: "none", label: "sem atributo" }, ...attrOptions.map((a) => ({ value: a.value, label: `+ ${a.label}` }))]}
+            title="Atributo somado ao dano"
+          />
+          {def.damageTypes.length > 0 && (
+            <Select value={action.damageType ?? ""} onChange={(v) => onPatch({ damageType: v || null })} options={[{ value: "", label: "tipo —" }, ...def.damageTypes.map((d) => ({ value: d.key, label: d.label }))]} />
+          )}
+          <label className="flex items-center gap-1 text-zinc-500">
+            bônus <NumInput value={action.bonus} onCommit={(v) => onPatch({ bonus: v ?? 0 })} />
+          </label>
+        </>
+      )}
+
+      {action.kind === "check" && (
+        <>
+          <Select value={action.skill} onChange={(skill) => onPatch({ skill })} options={allSkills} />
+          <label className="flex items-center gap-1 text-zinc-500">
+            bônus <NumInput value={action.bonus} onCommit={(v) => onPatch({ bonus: v ?? 0 })} />
+          </label>
+        </>
+      )}
+
+      {action.kind === "formula" && (
+        <TextInput value={action.formula} onCommit={(formula) => formula.trim() && onPatch({ formula: formula.trim() })} className="w-48 font-mono" maxLength={200} placeholder="1d20 + {skill.luta}" />
+      )}
+
+      <button onClick={onRemove} className="text-zinc-600 hover:text-red-400 cursor-pointer" title="Remover ação">
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+};
+
