@@ -41,3 +41,16 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #4a3c26;
 }
+
+/* Gaveta da ficha entra deslizando da direita. */
+@keyframes drawer-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.drawer-slide-in {
+  animation: drawer-slide-in 0.25s ease-out;
+}

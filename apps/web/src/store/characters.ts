@@ -5,13 +5,16 @@ import { toast } from "./ui";
 
 interface CharactersState {
   byId: Record<string, Character>;
-  /** Ficha aberta no modal (estado de UI, não vem do servidor). */
+  /** Ficha aberta na gaveta (estado de UI, não vem do servidor). */
   openId: string | null;
+  /** Gaveta aberta no estado vazio ("crie seu personagem"), sem ficha. */
+  emptyOpen: boolean;
 
   setAll: (characters: Character[]) => void;
   upsert: (character: Character) => void;
   remove: (characterId: string) => void;
   open: (characterId: string | null) => void;
+  openEmpty: () => void;
 
   create: (payload: CharacterCreatePayload) => Promise<Character | null>;
   /** Otimista com ack e reversão. Patch raso: cada campo enviado substitui o campo inteiro. */
@@ -24,6 +27,7 @@ interface CharactersState {
 export const useCharacters = create<CharactersState>((set, get) => ({
   byId: {},
   openId: null,
+  emptyOpen: false,
 
   setAll: (characters) => set({ byId: Object.fromEntries(characters.map((c) => [c.id, c])) }),
   upsert: (character) => set((s) => ({ byId: { ...s.byId, [character.id]: character } })),
@@ -32,7 +36,8 @@ export const useCharacters = create<CharactersState>((set, get) => ({
       const { [characterId]: _removed, ...rest } = s.byId;
       return { byId: rest, openId: s.openId === characterId ? null : s.openId };
     }),
-  open: (characterId) => set({ openId: characterId }),
+  open: (characterId) => set({ openId: characterId, emptyOpen: false }),
+  openEmpty: () => set({ openId: null, emptyOpen: true }),
 
   create: async (payload) => {
     const res = await emitAck("character:create", payload);

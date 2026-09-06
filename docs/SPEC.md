@@ -186,8 +186,9 @@ apps/web/src/
   App.tsx       escolhe a tela pela URL
   components/   Lobby, RoomPage (liga stores aos componentes), TopBar, VttCanvas,
                 TokenInspector, SidePanel, ChatTab, InitiativeTab, CharactersTab,
-                MapConfigModal, NicknamePrompt, Toasts
-  components/sheet/  CharacterSheet (modal), CharacterItems, CharacterModifiers,
+                MapConfigModal, NicknamePrompt, Toasts, CharacterSheetDrawer (gaveta da ficha)
+  components/character/  seções da ficha: CharacterHeader, AttributesGrid, ResourcesBlock,
+                DerivedStatsBar, SkillsSection, ItemsSection, ModifiersSection, DetailsSection,
                 fields.tsx (inputs "commit on blur")
   store/        connection.ts (socket + emitAck), bindSocket.ts (broadcast → store),
                 room.ts, tokens.ts, chat.ts, initiative.ts, characters.ts, ui.ts (toasts)

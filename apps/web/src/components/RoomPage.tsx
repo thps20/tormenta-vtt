@@ -6,7 +6,7 @@ import { useChat } from "../store/chat";
 import { currentEntry, useInitiative } from "../store/initiative";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
 import { useSystemDef } from "../lib/system";
-import { CharacterSheet } from "./sheet/CharacterSheet";
+import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { TopBar } from "./TopBar";
 import { VttCanvas } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
@@ -93,6 +93,7 @@ function Table() {
   const charById = useCharacters((s) => s.byId);
   const characters = useMemo(() => sortedCharacters(charById), [charById]);
   const openCharacterId = useCharacters((s) => s.openId);
+  const emptySheetOpen = useCharacters((s) => s.emptyOpen);
   const openCharacter = useCharacters((s) => s.open);
   const createCharacter = useCharacters((s) => s.create);
   const updateCharacter = useCharacters((s) => s.update);
@@ -103,6 +104,7 @@ function Table() {
 
   if (!room || !me) return null;
   const openChar = openCharacterId ? (charById[openCharacterId] ?? null) : null;
+  const sheetOpen = openChar !== null || emptySheetOpen;
   const linkableCharacters = characters.filter((c) => canEditCharacter(me, c));
   const isGm = me.role === "gm";
   const activeTurnTokenId = currentEntry(initiative)?.tokenId ?? null;
@@ -196,15 +198,16 @@ function Table() {
         />
       </div>
 
-      {openChar && systemDef && (
-        <CharacterSheet
+      {sheetOpen && systemDef && (
+        <CharacterSheetDrawer
           def={systemDef}
           character={openChar}
           participants={participants}
           me={me}
-          canEdit={canEditCharacter(me, openChar)}
-          onPatch={(patch) => void updateCharacter(openChar.id, patch)}
-          onRoll={(request) => void rollCharacter(openChar.id, request)}
+          canEdit={openChar !== null && canEditCharacter(me, openChar)}
+          onPatch={(patch) => openChar && void updateCharacter(openChar.id, patch)}
+          onRoll={(request) => openChar && void rollCharacter(openChar.id, request)}
+          onCreateMine={() => void createCharacter({ name: me.nickname, kind: "pc", ownerId: me.id }).then((c) => c && openCharacter(c.id))}
           onClose={() => openCharacter(null)}
         />
       )}
