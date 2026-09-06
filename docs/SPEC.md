@@ -8,7 +8,7 @@
 VTT (Virtual Tabletop) web para jogar RPG de mesa online com amigos. Primeiro sistema: **Tormenta20**.
 Arquitetura **agnóstica de sistema**: tudo que é regra (atributos, perícias, fórmulas) vive em `packages/shared/systems/<id>.json`, validado pelo `SystemDefinitionSchema`. O código nunca conhece "FOR" ou "Percepção".
 
-**Fora do MVP** (explicitamente): login/contas, fog of war, medição de distância, áudio/vídeo, múltiplos mapas simultâneos, compêndio de magias/itens, automação avançada da ficha (classes e raças como itens, efeitos ativos, progressão por nível).
+**Fora do MVP** (explicitamente): login/contas, fog of war, medição de distância, áudio/vídeo, múltiplos mapas simultâneos, compêndio de magias/itens, automação avançada da ficha (classes e raças como itens, efeitos ativos, progressão por nível). O que já foi feito além do MVP está em **§9 Fase 2**.
 
 A **ficha básica** (§3.6) entrou no escopo em setembro/2026: atributos, perícias, recursos, stats derivados, modificadores e itens físicos com ataque/dano ligados ao chat. Poderes e magias com ativação (custo de PM, CD de resistência, card no chat) entraram em seguida (fase 3). Raciocínio e mapeamento em `docs/modelo-personagem.md`; plano da fase 3 em `docs/plano-passo3.md`.
 
@@ -119,7 +119,7 @@ Room 1───* InitiativeEntry ?──1 Token
 |---|---|---|
 | **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`) |
 | **Participant** | `id, roomId, nickname, role, sessionToken` | `connected` é estado em memória, não persistido |
-| **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON)` | `grid` é JSON para evoluir sem migration |
+| **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON)` | `grid` e `fog` são JSON para evoluir sem migration. `fog` segue `FogConfigSchema` (§9.3) |
 | **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character` |
 | **Character** | `id, roomId, ownerId?, name, kind, data(JSON)` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration |
 | **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON)` | `roll` segue `DiceRollSchema`; `item` segue `ItemCardSchema` (kind `item`) |
@@ -144,6 +144,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `scene:activate` | `{ sceneId }` | GM | `room:activeSceneChanged` (clientes reemitem `room:join` para receber os tokens da nova cena) |
 | `scene:setMap` | `{ sceneId, mapUrl, mapWidth, mapHeight }` (`null` remove o mapa) | GM | `scene:updated` |
 | `scene:updateGrid` | `{ sceneId, grid: Partial<GridConfig> }` | GM | `scene:updated` |
+| `fog:update` | `{ sceneId, op }` com `op` = `add {shape}` \| `removeLast` \| `revealAll` \| `hideAll` \| `setEnabled {enabled}` | GM | `fog:updated` + reenvio dos tokens da cena conforme a visibilidade nova (§9.3) |
 | `token:create` | `TokenCreate` | GM | `token:created` |
 | `token:update` | `TokenPatch` (`id` + campos) | GM ou owner | `token:updated` |
 | `token:delete` | `{ tokenId }` | GM ou owner | `token:deleted` |
@@ -167,6 +168,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `room:participantJoined` / `room:participantLeft` | `Participant` (novo ou reconectado; cliente faz upsert) / `{ id }` (marca `connected = false`) |
 | `room:activeSceneChanged` | `{ sceneId }` |
 | `scene:created` / `scene:updated` | `Scene` |
+| `fog:updated` | `{ sceneId, fog: FogConfig }` (estado completo; cliente substitui `scene.fog`) |
 | `token:created` / `token:updated` | `Token` |
 | `token:deleted` | `{ tokenId }` |
 | `chat:message` | `ChatMessage` |
@@ -237,3 +239,23 @@ Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a fi
 - Só existe UI para uma cena por sala (`scene:create`/`scene:activate` funcionam no servidor, sem botão no web).
 - `currentIndex`/`round` da iniciativa e a presença (`connected`) se perdem ao reiniciar o servidor.
 - Uploads ficam em disco (`apps/server/uploads/`), sem limpeza de arquivos órfãos.
+
+## 9. Fase 2 (pós-MVP)
+
+Funcionalidades entregues depois do MVP, na ordem em que entraram. O §1 continua descrevendo só o MVP.
+
+### 9.1 Ficha de personagem
+Descrita em §3.6 (entrou em setembro/2026). Poderes e magias com ativação são a "fase 3" da ficha (`docs/plano-passo3.md`).
+
+### 9.2 Barra de ferramentas e régua
+Descritas em §3.2: modos Selecionar / Mover mapa / Régua com atalhos, caixa de seleção, movimento em grupo e a régua efêmera (`ruler:update`).
+
+### 9.3 Fog of war manual
+Névoa pintada à mão pelo GM. **Sem** luz dinâmica, paredes ou visão por token (ficam para depois). Plano e decisões em `docs/plano-fog.md`.
+
+- **Modelo**: `Scene.fog = { enabled, base: "hidden" | "revealed", shapes: FogShape[] }` (`FogConfigSchema`, `packages/shared/src/schemas/fog.ts`). `FogShape = { id, mode: "reveal" | "hide" }` + geometria em **pixels do mapa**: `circle {cx, cy, r}`, `rect {x, y, width, height}`, `polygon {points}` ou `stroke {points, width}` (pincel: um arrasto inteiro vira uma polilinha com largura, e não dezenas de círculos). A área visível é a composição em ordem: parte de `base` e a última shape que contém o ponto decide (`isPointRevealed`, `packages/shared/src/fog/visibility.ts`, usada por cliente e servidor).
+- **Eventos**: `fog:update { sceneId, op }` (GM) com as operações `add`, `removeLast` (desfazer último; sem histórico completo), `revealAll` / `hideAll` (limpam a lista e setam `base`) e `setEnabled`. O cliente manda a operação, não a lista, para dois cliques rápidos não se sobrescreverem. O servidor aplica, persiste e faz broadcast de `fog:updated` com o estado completo.
+- **Visibilidade de tokens**: o GM vê todos. O jogador vê um token se `visible` e (é dono, ou fog desligado, ou o **centro** do token está em área revelada). Token que o jogador não pode ver **não é enviado** (mesmo mecanismo de `visible = false`: `token:deleted` ao esconder, `token:updated` ao reaparecer), então nem nome nem existência vazam. Como "é dono" varia por pessoa, o broadcast vai para a sala do GM, a sala do dono e `players` exceto o dono. Após `fog:update` o servidor reenvia todos os tokens da cena com essa regra; o snapshot filtra igual. O cliente aplica a mesma função nos tokens alheios para cobrir broadcasts fora de ordem.
+- **Renderização**: camadas mapa → tokens que o usuário **não** controla → névoa → tokens que controla → réguas. Jogador vê a névoa preta opaca; GM a vê a 50% (opacidade CSS no canvas da Layer, para o `destination-out` das áreas reveladas continuar exato). Shapes `reveal` apagam com `destination-out`; `hide` pintam preto por cima.
+- **Ferramentas** (só GM, modo Névoa, atalho **F**): sub-modos Revelar / Ocultar; formas Pincel (círculo que segue o arrasto, tamanho ajustável), Retângulo e Polígono (cliques; duplo clique fecha; Esc cancela); botões Desfazer último (Ctrl+Z no modo Névoa), Revelar tudo, Ocultar tudo e o toggle "Fog ativo". O pincel envia ao soltar o mouse, nunca a cada movimento, com os pontos decimados.
+- **Limite de shapes** (decisão): o cliente avisa o GM ao passar de 400 e o servidor recusa `add` acima de 500 (constantes `FOG_SHAPES_WARN` / `FOG_SHAPES_MAX`). Não há mesclagem automática de geometria: unir polígonos com precisão é complexo, e na prática um arrasto já é uma shape só e "Revelar/Ocultar tudo" zera a lista. Cada shape aceita no máximo 2000 pontos.

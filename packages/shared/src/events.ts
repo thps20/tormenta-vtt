@@ -17,6 +17,8 @@ import type {
   CharacterUpdatePayload,
   CharacterUseItemPayload,
   ChatMessage,
+  FogConfig,
+  FogUpdatePayload,
   InitiativeAddPayload,
   InitiativeState,
   InitiativeUpdatePayload,
@@ -63,6 +65,8 @@ export interface ClientToServerEvents {
   "scene:updateGrid": (payload: SceneUpdateGridPayload, ack: Ack<Scene>) => void;
   /** mapUrl vem do upload HTTP (POST /api/upload) feito antes. null remove o mapa. */
   "scene:setMap": (payload: SceneSetMapPayload, ack: Ack<Scene>) => void;
+  /** Névoa manual da cena: add / removeLast / revealAll / hideAll / setEnabled. Ack devolve o estado completo. */
+  "fog:update": (payload: FogUpdatePayload, ack: Ack<FogConfig>) => void;
 
   // Tokens
   "token:create": (payload: TokenCreate, ack: Ack<Token>) => void;
@@ -113,6 +117,8 @@ export interface ServerToClientEvents {
 
   "scene:created": (scene: Scene) => void;
   "scene:updated": (scene: Scene) => void;
+  /** Estado completo da névoa após uma operação (cliente só substitui `scene.fog`). */
+  "fog:updated": (p: { sceneId: string; fog: FogConfig }) => void;
 
   "token:created": (token: Token) => void;
   "token:updated": (token: Token) => void;

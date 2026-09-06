@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { IdSchema } from "./common.js";
+import { FogConfigSchema } from "./fog.js";
 
 export const GridTypeSchema = z.enum(["square", "none"]);
 
@@ -25,5 +26,7 @@ export const SceneSchema = z.object({
   mapWidth: z.number().int().positive().nullable(),
   mapHeight: z.number().int().positive().nullable(),
   grid: GridConfigSchema,
+  /** Névoa manual (fase 2). JSON no banco, como `grid`. */
+  fog: FogConfigSchema,
 });
 export type Scene = z.infer<typeof SceneSchema>;

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { IdSchema } from "./common.js";
 import { GridConfigSchema } from "./scene.js";
+import { FogShapeSchema } from "./fog.js";
 import { InitiativeEntrySchema } from "./initiative.js";
 import { CharacterDataSchema, CharacterKindSchema, CharacterRollRequestSchema } from "./character.js";
 
@@ -57,6 +58,27 @@ export const SceneUpdateGridSchema = z.object({
 });
 export type SceneSetMapPayload = z.infer<typeof SceneSetMapSchema>;
 export type SceneUpdateGridPayload = z.infer<typeof SceneUpdateGridSchema>;
+
+// --- Névoa (fog of war manual) ----------------------------------------------
+
+/**
+ * Operações sobre a névoa da cena. O cliente manda a OPERAÇÃO, não a lista inteira:
+ * assim dois cliques rápidos do GM não sobrescrevem um ao outro. O servidor aplica,
+ * persiste e devolve o estado completo em `fog:updated`.
+ */
+export const FogOpSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("add"), shape: FogShapeSchema }),
+  /** Desfazer último: tira a última shape da lista (sem histórico completo). */
+  z.object({ type: z.literal("removeLast") }),
+  /** Limpa a lista e seta base = revealed / hidden. */
+  z.object({ type: z.literal("revealAll") }),
+  z.object({ type: z.literal("hideAll") }),
+  z.object({ type: z.literal("setEnabled"), enabled: z.boolean() }),
+]);
+export type FogOp = z.infer<typeof FogOpSchema>;
+
+export const FogUpdateSchema = z.object({ sceneId: IdSchema, op: FogOpSchema });
+export type FogUpdatePayload = z.infer<typeof FogUpdateSchema>;
 
 // --- Tokens ----------------------------------------------------------------
 
