@@ -8,6 +8,7 @@ import { clampToMap, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type 
 import { useImage } from "../lib/useImage";
 import type { RemoteRuler, ToolMode } from "../store/tools";
 import { TokenInspector } from "./TokenInspector";
+import { FogLayer } from "./FogLayer";
 
 /** Tamanho padrão quando a cena ainda não tem mapa. */
 export const DEFAULT_MAP = { width: 1600, height: 1100 };
@@ -437,6 +438,45 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     }
   };
 
+  // Partição das camadas de tokens (ver comentário no JSX). Ordem por zIndex é mantida dentro de cada uma.
+  const tokensAboveFog = tokens.filter((t) => canControl(me, t));
+  const tokensBelowFog = tokens.filter((t) => !canControl(me, t));
+
+  const renderToken = (token: Token) => (
+    <TokenNode
+      key={token.id}
+      token={token}
+      bar={tokenBars[token.id] ?? null}
+      draggable={mode === "select" && canControl(me, token)}
+      isSelected={selectedIds.includes(token.id)}
+      isActiveTurn={token.id === activeTurnTokenId}
+      onSelect={(additive) => mode === "select" && selectByClick(token.id, additive)}
+      onCursor={setCursor}
+      onDragStart={(node) => handleTokenDragStart(token, node)}
+      onDragMove={(node) => handleTokenDragMove(token, node)}
+      onDragEnd={(node) => handleTokenDragEnd(token, node)}
+      onTransformEnd={(node) => {
+        // O Transformer altera scaleX/scaleY do Group; convertemos em width/height reais
+        // e zeramos a escala, porque o token é desenhado a partir de width/height.
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
+        node.scale({ x: 1, y: 1 });
+        const min = 8;
+        let width = Math.max(min, token.width * scaleX);
+        let height = Math.max(min, token.height * scaleY);
+        if (snapEnabled && scene.grid.type === "square") {
+          const cells = Math.max(1, Math.round(width / scene.grid.cellSize));
+          width = height = cells * scene.grid.cellSize;
+        }
+        let pos = { x: node.x(), y: node.y() };
+        if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
+        pos = clampToMap(pos.x, pos.y, { width, height }, map);
+        node.position(pos);
+        onTokenPatch({ id: token.id, x: pos.x, y: pos.y, width, height });
+      }}
+    />
+  );
+
   return (
     <div
       ref={containerRef}
@@ -481,42 +521,17 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
           ))}
         </Layer>
 
-        {/* Camada 2: tokens */}
+        {/*
+          Camadas 2 a 4: tokens que NÃO controlo → névoa → tokens que controlo (+ Transformer).
+          Assim a névoa cobre os tokens alheios, mas os meus ficam sempre visíveis. Para o GM,
+          que controla tudo, todos os tokens ficam acima da névoa (que ele vê a 50%).
+        */}
+        <Layer id="tokens-layer-below-fog">{tokensBelowFog.map(renderToken)}</Layer>
+
+        <FogLayer fog={scene.fog} map={map} isGm={me.role === "gm"} />
+
         <Layer id="tokens-layer">
-          {tokens.map((token) => (
-            <TokenNode
-              key={token.id}
-              token={token}
-              bar={tokenBars[token.id] ?? null}
-              draggable={mode === "select" && canControl(me, token)}
-              isSelected={selectedIds.includes(token.id)}
-              isActiveTurn={token.id === activeTurnTokenId}
-              onSelect={(additive) => mode === "select" && selectByClick(token.id, additive)}
-              onCursor={setCursor}
-              onDragStart={(node) => handleTokenDragStart(token, node)}
-              onDragMove={(node) => handleTokenDragMove(token, node)}
-              onDragEnd={(node) => handleTokenDragEnd(token, node)}
-              onTransformEnd={(node) => {
-                // O Transformer altera scaleX/scaleY do Group; convertemos em width/height reais
-                // e zeramos a escala, porque o token é desenhado a partir de width/height.
-                const scaleX = node.scaleX();
-                const scaleY = node.scaleY();
-                node.scale({ x: 1, y: 1 });
-                const min = 8;
-                let width = Math.max(min, token.width * scaleX);
-                let height = Math.max(min, token.height * scaleY);
-                if (snapEnabled && scene.grid.type === "square") {
-                  const cells = Math.max(1, Math.round(width / scene.grid.cellSize));
-                  width = height = cells * scene.grid.cellSize;
-                }
-                let pos = { x: node.x(), y: node.y() };
-                if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
-                pos = clampToMap(pos.x, pos.y, { width, height }, map);
-                node.position(pos);
-                onTokenPatch({ id: token.id, x: pos.x, y: pos.y, width, height });
-              }}
-            />
-          ))}
+          {tokensAboveFog.map(renderToken)}
           <Transformer
             ref={transformerRef}
             rotateEnabled={false}

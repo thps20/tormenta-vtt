@@ -8,7 +8,7 @@ import { canEditCharacter, sortedCharacters, useCharacters } from "../store/char
 import { useSystemDef } from "../lib/system";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
 import { selectEffectiveMode, useTools } from "../store/tools";
-import { computeCharacter } from "@tormenta-vtt/shared";
+import { computeCharacter, isPointRevealed, tokenCenter } from "@tormenta-vtt/shared";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
@@ -95,7 +95,13 @@ function Table() {
   // Seleciona o objeto estável (byId) e deriva a lista com useMemo: um seletor que
   // devolvesse um array novo a cada chamada faria o Zustand re-renderizar sem parar.
   const byId = useTokens((s) => s.byId);
-  const tokens = useMemo(() => sceneTokens(byId, scene?.id), [byId, scene?.id]);
+  // Jogador: tokens alheios com o centro na névoa não aparecem (a mesma regra do servidor, que
+  // nem os envia; aqui cobre broadcasts fora de ordem entre fog:updated e token:deleted).
+  const tokens = useMemo(() => {
+    const all = sceneTokens(byId, scene?.id);
+    if (!scene || !me || me.role === "gm") return all;
+    return all.filter((t) => t.ownerId === me.id || isPointRevealed(scene.fog, tokenCenter(t)));
+  }, [byId, scene, me]);
   const selectedTokenId = useTokens((s) => s.selectedId);
   const selectedIds = useTokens((s) => s.selectedIds);
   const focusRequest = useTokens((s) => s.focusRequest);
