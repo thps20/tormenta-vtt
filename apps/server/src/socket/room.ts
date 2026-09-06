@@ -54,8 +54,9 @@ export function registerRoomHandlers(io: TypedServer, socket: TypedSocket): void
 
 /**
  * Decide quem é o participante:
- *  1. sessionToken válido desta sala -> reconecta como ele;
- *  2. gmSecret correto -> reaproveita o participante GM (evita GM duplicado se o localStorage foi limpo);
+ *  1. gmSecret correto -> é o GM: reaproveita o participante GM (nunca vira jogador
+ *     por causa de uma sessão de jogador salva no mesmo navegador);
+ *  2. sessionToken válido desta sala -> reconecta como ele;
  *  3. senão cria um jogador novo (precisa de nickname).
  */
 async function resolveParticipant(
@@ -63,13 +64,14 @@ async function resolveParticipant(
   roomGmSecret: string,
   input: { nickname?: string; gmSecret?: string; sessionToken?: string },
 ): Promise<DbParticipant> {
-  if (input.sessionToken) {
-    const existing = await prisma.participant.findUnique({ where: { sessionToken: input.sessionToken } });
-    if (existing && existing.roomId === roomId) return existing;
-  }
-
   const isGm = input.gmSecret !== undefined && input.gmSecret === roomGmSecret;
   if (input.gmSecret !== undefined && !isGm) throw new HandlerError("Segredo do GM inválido");
+
+  if (input.sessionToken) {
+    const existing = await prisma.participant.findUnique({ where: { sessionToken: input.sessionToken } });
+    // Com gmSecret válido, só aceita a sessão se ela já for do GM.
+    if (existing && existing.roomId === roomId && (!isGm || existing.role === "gm")) return existing;
+  }
 
   if (isGm) {
     const gm = await prisma.participant.findFirst({ where: { roomId, role: "gm" }, orderBy: { createdAt: "asc" } });

@@ -83,7 +83,8 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   const fitToScreen = () => {
     const scaleX = (dimensions.width - 60) / mapWidth;
     const scaleY = (dimensions.height - 60) / mapHeight;
-    const fitScale = Math.min(Math.max(Math.min(scaleX, scaleY), 0.1), 1.0);
+    // Mapas pequenos podem ser ampliados até 2x para os tokens não ficarem minúsculos.
+    const fitScale = Math.min(Math.max(Math.min(scaleX, scaleY), 0.1), 2.0);
     setStageScale(fitScale);
     setStagePos({
       x: Math.max(20, (dimensions.width - mapWidth * fitScale) / 2),
@@ -407,8 +408,8 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, draggable, isSelected, isA
         </>
       )}
 
-      {/* Nome abaixo do token */}
-      <Group y={token.height + 4} listening={false}>
+      {/* Nome abaixo do token (também serve para arrastar) */}
+      <Group y={token.height + 4}>
         <Rect x={cx - 42} y={0} width={84} height={15} fill="#0c0c0c" stroke="#2d2417" strokeWidth={1} cornerRadius={2} opacity={0.94} />
         <Text x={cx - 42} y={2} width={84} text={token.name} align="center" fontSize={9} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" ellipsis wrap="none" />
       </Group>

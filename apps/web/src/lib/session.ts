@@ -3,28 +3,33 @@
  * reconectar como o mesmo participante) e o último nickname usado.
  * Tudo em try/catch porque o localStorage pode estar bloqueado.
  */
-const key = (inviteCode: string) => `tvtt:session:${inviteCode.toUpperCase()}`;
+/**
+ * A chave inclui o papel: assim dá para abrir a mesa como GM numa aba e como
+ * jogador em outra, no mesmo navegador, sem uma sessão sobrescrever a outra.
+ */
+export type SessionRole = "gm" | "player";
+const key = (inviteCode: string, role: SessionRole) => `tvtt:session:${inviteCode.toUpperCase()}:${role}`;
 const NICK_KEY = "tvtt:nickname";
 
-export function getSessionToken(inviteCode: string): string | null {
+export function getSessionToken(inviteCode: string, role: SessionRole): string | null {
   try {
-    return localStorage.getItem(key(inviteCode));
+    return localStorage.getItem(key(inviteCode, role));
   } catch {
     return null;
   }
 }
 
-export function setSessionToken(inviteCode: string, token: string): void {
+export function setSessionToken(inviteCode: string, role: SessionRole, token: string): void {
   try {
-    localStorage.setItem(key(inviteCode), token);
+    localStorage.setItem(key(inviteCode, role), token);
   } catch {
     /* ignora */
   }
 }
 
-export function clearSessionToken(inviteCode: string): void {
+export function clearSessionToken(inviteCode: string, role: SessionRole): void {
   try {
-    localStorage.removeItem(key(inviteCode));
+    localStorage.removeItem(key(inviteCode, role));
   } catch {
     /* ignora */
   }

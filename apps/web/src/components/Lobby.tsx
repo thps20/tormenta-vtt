@@ -37,7 +37,7 @@ export const Lobby: React.FC = () => {
     try {
       const res = await createRoom({ name, nickname });
       // Guarda a sessão do GM para o room:join reconectar como o mesmo participante.
-      setSessionToken(res.room.inviteCode, res.sessionToken);
+      setSessionToken(res.room.inviteCode, "gm", res.sessionToken);
       setLastNickname(nickname);
       setCreated({ code: res.room.inviteCode, gmSecret: res.gmSecret });
     } catch (err) {

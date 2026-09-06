@@ -55,7 +55,9 @@ export const useRoom = create<RoomState>((set, get) => ({
   join: async (params) => {
     const socket = getSocket();
     set({ status: { kind: "joining" }, lastJoin: params });
-    const sessionToken = getSessionToken(params.inviteCode) ?? undefined;
+    // A URL com ?gm= define o papel desejado; a sessão salva é separada por papel.
+    const role = params.gmSecret ? "gm" : "player";
+    const sessionToken = getSessionToken(params.inviteCode, role) ?? undefined;
 
     // Sem sessão salva e sem nickname: a UI precisa perguntar antes.
     if (!sessionToken && !params.nickname && !params.gmSecret) {
@@ -77,12 +79,12 @@ export const useRoom = create<RoomState>((set, get) => ({
         return;
       }
       // Sessão inválida ou sem nickname: limpa e pede o nickname.
-      clearSessionToken(params.inviteCode);
+      clearSessionToken(params.inviteCode, role);
       set({ status: { kind: "needsNickname", error: params.nickname ? res.error : undefined } });
       return;
     }
 
-    setSessionToken(params.inviteCode, res.data.sessionToken);
+    setSessionToken(params.inviteCode, role, res.data.sessionToken);
     if (params.nickname) setLastNickname(params.nickname);
     get().applySnapshot(res.data);
     set({ status: { kind: "joined" } });
