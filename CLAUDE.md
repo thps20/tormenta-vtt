@@ -32,6 +32,7 @@ make down        # derruba o Postgres (dados ficam no volume)
 make db-migrate  # prisma migrate dev (cria/aplica migrations)
 make db-reset    # recria o banco do zero
 make db-studio   # GUI do banco
+make tunnel      # URL pública (Cloudflare quick tunnel) para jogadores fora da rede; exige make dev aberto
 make test        # vitest em todos os pacotes
 make typecheck   # tsc --noEmit em todos os pacotes
 make help        # lista tudo

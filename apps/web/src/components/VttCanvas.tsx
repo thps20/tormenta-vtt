@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Image as KonvaImage, Transformer } from "react-konva";
-import type Konva from "konva";
+import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
 import type { Character, Participant, Scene, Token, TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
@@ -41,6 +41,14 @@ export interface TokenBar {
   current: number;
   max: number;
   temp: number;
+}
+
+/** Largura da borda do círculo do token (pixels do mapa). */
+const BODY_STROKE = 3;
+
+/** Raio do círculo do token em pixels do mapa (o token é desenhado a partir de width/height). */
+function tokenRadius(t: { width: number; height: number }): number {
+  return Math.min(t.width, t.height) / 2;
 }
 
 /** GM move tudo; jogador só o que possui (mesma regra do servidor). */
@@ -183,6 +191,63 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     if (stageRef.current) stageRef.current.container().style.cursor = cursor;
   };
 
+  /**
+   * Token sob o ponteiro, por geometria (distância ao centro de cada token), em vez do canvas
+   * de hit do Konva. O canvas de hit depende de `getImageData`, que navegadores e extensões com
+   * proteção contra fingerprinting embaralham; aí o Konva "não vê" shape nenhuma sob o mouse.
+   * O último da lista é desenhado por cima, então tem prioridade.
+   */
+  const tokenAtPointer = (): Token | null => {
+    const stage = stageRef.current;
+    const p = stage?.getPointerPosition();
+    if (!stage || !p) return null;
+    const mx = (p.x - stage.x()) / stage.scaleX();
+    const my = (p.y - stage.y()) / stage.scaleY();
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      const t = tokens[i];
+      if (!t) continue;
+      const r = tokenRadius(t) + BODY_STROKE;
+      const dx = mx - (t.x + t.width / 2);
+      const dy = my - (t.y + t.height / 2);
+      if (dx * dx + dy * dy <= r * r) return t;
+    }
+    return null;
+  };
+
+  const tokenGroup = (tokenId: string) => stageRef.current?.findOne<Konva.Group>(`#token-group-${tokenId}`) ?? null;
+
+  /** O canvas de hit do Konva já entregou o evento ao Group deste token? */
+  const hitLandedOnToken = (target: Konva.Node, tokenId: string): boolean => {
+    const g = tokenGroup(tokenId);
+    return g !== null && (target === g || g.isAncestorOf(target));
+  };
+
+  /** Pan do mapa só quando o ponteiro NÃO está sobre um token, para o Stage não competir com o drag do token. */
+  const handleStageMouseMove = () => {
+    const stage = stageRef.current;
+    if (!stage || Konva.isDragging()) return; // no meio de um arraste não mexemos em nada
+    const over = tokenAtPointer();
+    stage.draggable(over === null);
+    setCursor(over ? (canControl(me, over) ? "grab" : "default") : "crosshair");
+  };
+
+  /** Se o canvas de hit não reconheceu o token sob o ponteiro, repassa o mousedown ao Group para o Konva iniciar o drag dele. */
+  const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const t = tokenAtPointer();
+    if (!t || hitLandedOnToken(e.target, t.id)) return;
+    tokenGroup(t.id)?.fire("mousedown", { evt: e.evt, pointerId: e.pointerId }, false);
+  };
+
+  const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    const t = tokenAtPointer();
+    if (t) {
+      // Se o hit tivesse acertado, o Group já teria tratado o clique (e cancelado o bubble).
+      if (!hitLandedOnToken(e.target, t.id)) onSelectToken(t.id);
+      return;
+    }
+    if (e.target === stageRef.current || e.target.name() === "map-background") onSelectToken(null);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -202,9 +267,9 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         onDragEnd={(e) => {
           if (e.target === stageRef.current) setStagePos({ x: e.target.x(), y: e.target.y() });
         }}
-        onClick={(e) => {
-          if (e.target === stageRef.current || e.target.name() === "map-background") onSelectToken(null);
-        }}
+        onMouseMove={handleStageMouseMove}
+        onMouseDown={handleStageMouseDown}
+        onClick={handleStageClick}
       >
         {/* Camada 1: mapa + grid */}
         <Layer id="map-layer">
@@ -368,6 +433,7 @@ interface TokenNodeProps {
   isSelected: boolean;
   isActiveTurn: boolean;
   onSelect: () => void;
+  /** Cursor durante o arraste (fora dele o Stage decide por geometria). */
   onCursor: (cursor: string) => void;
   onDragMove: (x: number, y: number) => void;
   onDragEnd: (node: Konva.Node) => void;
@@ -376,7 +442,7 @@ interface TokenNodeProps {
 
 const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected, isActiveTurn, onSelect, onCursor, onDragMove, onDragEnd, onTransformEnd }) => {
   const image = useImage(assetUrl(token.imageUrl));
-  const radius = Math.min(token.width, token.height) / 2;
+  const radius = tokenRadius(token);
   const cx = token.width / 2;
   const cy = token.height / 2;
   const highlight = isSelected || isActiveTurn;
@@ -402,8 +468,6 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected
         e.cancelBubble = true;
         onSelect();
       }}
-      onMouseEnter={() => onCursor(draggable ? "grab" : "default")}
-      onMouseLeave={() => onCursor("crosshair")}
       onDragStart={(e) => {
         e.cancelBubble = true;
         onCursor("grabbing");
@@ -416,22 +480,29 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected
       }}
       onTransformEnd={(e) => onTransformEnd(e.target)}
     >
+      {/*
+        Tudo abaixo é só desenho (listening={false}). Quem recebe o mouse é o círculo de hit
+        invisível no FIM do Group. Motivo: o Konva só dispara `click` quando o mousedown e o
+        mouseup caem na MESMA shape. Com várias shapes empilhadas (fundo, tinta, imagem), um
+        clique cujo mouse anda 1–2 px sobre a fronteira entre duas delas se perde; e o hit de
+        cada shape (ex.: anel do turno com raio+8) fazia a área clicável não bater com o círculo.
+      */}
       {isActiveTurn && (
-        <Circle x={cx} y={cy} radius={radius + 8} stroke="#d4af37" strokeWidth={2.5} dash={[6, 4]} shadowColor="#d4af37" shadowBlur={14} shadowOpacity={0.9} />
+        <Circle x={cx} y={cy} radius={radius + 8} stroke="#d4af37" strokeWidth={2.5} dash={[6, 4]} shadowColor="#d4af37" shadowBlur={14} shadowOpacity={0.9} listening={false} />
       )}
-      {isSelected && !isActiveTurn && <Circle x={cx} y={cy} radius={radius + 6} stroke="#d4af37" strokeWidth={1.5} dash={[4, 4]} />}
+      {isSelected && !isActiveTurn && <Circle x={cx} y={cy} radius={radius + 6} stroke="#d4af37" strokeWidth={1.5} dash={[4, 4]} listening={false} />}
 
-      <Circle x={cx} y={cy + 3} radius={radius} fill="rgba(0, 0, 0, 0.6)" />
-      <Circle x={cx} y={cy} radius={radius} fill="#141414" stroke={highlight ? "#d4af37" : token.color} strokeWidth={3} shadowColor="#000" shadowBlur={8} shadowOpacity={0.7} />
+      <Circle x={cx} y={cy + 3} radius={radius} fill="rgba(0, 0, 0, 0.6)" listening={false} />
+      <Circle x={cx} y={cy} radius={radius} fill="#141414" stroke={highlight ? "#d4af37" : token.color} strokeWidth={BODY_STROKE} shadowColor="#000" shadowBlur={8} shadowOpacity={0.7} listening={false} />
 
       {image ? (
         // Imagem recortada em círculo.
-        <Group clipFunc={(ctx) => ctx.arc(cx, cy, radius - 2, 0, Math.PI * 2, false)}>
+        <Group clipFunc={(ctx) => ctx.arc(cx, cy, radius - 2, 0, Math.PI * 2, false)} listening={false}>
           <KonvaImage image={image} x={0} y={0} width={token.width} height={token.height} />
         </Group>
       ) : (
         <>
-          <Circle x={cx} y={cy} radius={Math.max(1, radius - 4)} fill={token.color} opacity={0.16} />
+          <Circle x={cx} y={cy} radius={Math.max(1, radius - 4)} fill={token.color} opacity={0.16} listening={false} />
           <Text x={0} y={cy - radius * 0.4} width={token.width} text={token.name.charAt(0).toUpperCase()} align="center" fontSize={radius * 0.8} fontFamily="serif" fontStyle="bold" fill="#e0e0e0" listening={false} />
         </>
       )}
@@ -454,11 +525,19 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected
         </Group>
       )}
 
-      {/* Nome abaixo do token (também serve para arrastar) */}
+      {/* Nome abaixo do token. O Rect é a única shape com hit aqui (também serve para arrastar). */}
       <Group y={token.height + 4}>
         <Rect x={cx - 42} y={0} width={84} height={15} fill="#0c0c0c" stroke="#2d2417" strokeWidth={1} cornerRadius={2} opacity={0.94} />
-        <Text x={cx - 42} y={2} width={84} text={token.name} align="center" fontSize={9} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" ellipsis wrap="none" />
+        <Text x={cx - 42} y={2} width={84} text={token.name} align="center" fontSize={9} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" ellipsis wrap="none" listening={false} />
       </Group>
+
+      {/*
+        Área de hit do token para o canvas de hit do Konva: um único círculo, invisível, com a
+        mesma geometria que `tokenAtPointer` usa (raio + BODY_STROKE; metade é a borda, metade é
+        folga, porque o canvas de hit não tem anti-aliasing). Último filho = por cima de tudo.
+        `fill="transparent"` não desenha nada, mas deixa explícito que a área conta como preenchida.
+      */}
+      <Circle name="token-hit" x={cx} y={cy} radius={radius + BODY_STROKE} fill="transparent" />
     </Group>
   );
 };
