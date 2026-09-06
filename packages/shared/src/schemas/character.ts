@@ -27,43 +27,57 @@ export const ModifierSchema = z.object({
 });
 export type Modifier = z.infer<typeof ModifierSchema>;
 
-const ActionBase = { id: IdSchema, label: z.string().min(1).max(60) };
+const ActionLabel = { label: z.string().min(1).max(60) };
 
+/**
+ * Corpo de cada tipo de ação, SEM id. O compêndio guarda ações neste formato
+ * (ActionTemplateSchema); a ficha usa ActionSchema, que acrescenta o id.
+ */
+const AttackActionBody = z.object({
+  ...ActionLabel,
+  kind: z.literal("attack"),
+  /** Perícia usada no ataque (ex.: luta, pontaria). */
+  skill: KeySchema,
+  /** Troca o atributo da perícia (ex.: arma ágil usa DES em vez de FOR). */
+  attributeOverride: KeySchema.nullable().default(null),
+  bonus: z.number().int().default(0),
+  /** Resultado natural do dado a partir do qual é crítico. */
+  critRange: z.number().int().min(1).default(20),
+  critMult: z.number().int().min(1).default(2),
+});
+const DamageActionBody = z.object({
+  ...ActionLabel,
+  kind: z.literal("damage"),
+  /** Fórmula de dado, ex.: "1d8". Pode usar placeholders. */
+  formula: z.string().min(1).max(200),
+  /** "auto" = regra damageAttribute do sistema; null = nenhum; ou uma chave de atributo. */
+  attribute: z.union([z.literal("auto"), KeySchema]).nullable().default("auto"),
+  damageType: KeySchema.nullable().default(null),
+  bonus: z.number().int().default(0),
+});
+const CheckActionBody = z.object({
+  ...ActionLabel,
+  kind: z.literal("check"),
+  skill: KeySchema,
+  bonus: z.number().int().default(0),
+});
+const FormulaActionBody = z.object({
+  ...ActionLabel,
+  kind: z.literal("formula"),
+  formula: z.string().min(1).max(200),
+});
+
+/** Ação sem id: formato das entradas do compêndio (o id nasce ao copiar para a ficha). */
+export const ActionTemplateSchema = z.discriminatedUnion("kind", [AttackActionBody, DamageActionBody, CheckActionBody, FormulaActionBody]);
+export type ActionTemplate = z.infer<typeof ActionTemplateSchema>;
+
+const withId = { id: IdSchema };
 /** Uma rolagem que um item oferece (ataque, dano, teste, fórmula livre). */
 export const ActionSchema = z.discriminatedUnion("kind", [
-  z.object({
-    ...ActionBase,
-    kind: z.literal("attack"),
-    /** Perícia usada no ataque (ex.: luta, pontaria). */
-    skill: KeySchema,
-    /** Troca o atributo da perícia (ex.: arma ágil usa DES em vez de FOR). */
-    attributeOverride: KeySchema.nullable().default(null),
-    bonus: z.number().int().default(0),
-    /** Resultado natural do dado a partir do qual é crítico. */
-    critRange: z.number().int().min(1).default(20),
-    critMult: z.number().int().min(1).default(2),
-  }),
-  z.object({
-    ...ActionBase,
-    kind: z.literal("damage"),
-    /** Fórmula de dado, ex.: "1d8". Pode usar placeholders. */
-    formula: z.string().min(1).max(200),
-    /** "auto" = regra damageAttribute do sistema; null = nenhum; ou uma chave de atributo. */
-    attribute: z.union([z.literal("auto"), KeySchema]).nullable().default("auto"),
-    damageType: KeySchema.nullable().default(null),
-    bonus: z.number().int().default(0),
-  }),
-  z.object({
-    ...ActionBase,
-    kind: z.literal("check"),
-    skill: KeySchema,
-    bonus: z.number().int().default(0),
-  }),
-  z.object({
-    ...ActionBase,
-    kind: z.literal("formula"),
-    formula: z.string().min(1).max(200),
-  }),
+  AttackActionBody.extend(withId),
+  DamageActionBody.extend(withId),
+  CheckActionBody.extend(withId),
+  FormulaActionBody.extend(withId),
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 
