@@ -133,7 +133,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     const c = viewportCenter();
     let pos = { x: c.x - size / 2, y: c.y - size / 2 };
     if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
-    pos = clampToMap(pos.x, pos.y, { width: size, height: size }, map);
+    pos = findFreeSpot(pos, size, tokens, map);
     onTokenCreate(pos, size);
   };
 
@@ -304,13 +304,38 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         />
       )}
 
+      {!selectedToken && (
       <div className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a1a]/95 border border-[#2d2417] text-[11px] text-zinc-400 shadow-xl pointer-events-none">
         <Info className="w-3.5 h-3.5 text-[#d4af37]" />
         <span>Arraste tokens para mover • Arraste o fundo para navegar • Scroll = zoom</span>
       </div>
+      )}
     </div>
   );
 };
+
+/**
+ * Evita empilhar tokens novos no mesmo ponto (só o de cima receberia cliques):
+ * anda em espiral pelas células vizinhas até achar uma sem token.
+ */
+function findFreeSpot(
+  start: { x: number; y: number },
+  size: number,
+  tokens: Token[],
+  map: { width: number; height: number },
+): { x: number; y: number } {
+  const occupied = (x: number, y: number) =>
+    tokens.some((t) => Math.abs(t.x - x) < size * 0.75 && Math.abs(t.y - y) < size * 0.75);
+  const offsets: Array<[number, number]> = [[0, 0]];
+  for (let r = 1; r <= 6; r++) {
+    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r) offsets.push([dx, dy]);
+  }
+  for (const [dx, dy] of offsets) {
+    const p = clampToMap(start.x + dx * size, start.y + dy * size, { width: size, height: size }, map);
+    if (!occupied(p.x, p.y)) return p;
+  }
+  return clampToMap(start.x, start.y, { width: size, height: size }, map);
+}
 
 // --- Token ------------------------------------------------------------------
 

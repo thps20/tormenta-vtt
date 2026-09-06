@@ -57,7 +57,7 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({ token, participa
   const ownerName = token.ownerId ? (participants.find((p) => p.id === token.ownerId)?.nickname ?? "Jogador") : "Apenas GM";
 
   return (
-    <div id="token-inspector-overlay" className="absolute top-4 left-4 z-10 w-64 p-3 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl text-zinc-200">
+    <div id="token-inspector-overlay" className="absolute top-4 right-4 z-10 w-64 p-3 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl text-zinc-200">
       <div className="flex items-center justify-between border-b border-[#2d2417] pb-2 mb-2 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <div className="w-4 h-4 rounded-full border border-[#d4af37] shrink-0" style={{ backgroundColor: token.color }} />
