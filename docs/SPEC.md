@@ -8,7 +8,7 @@
 VTT (Virtual Tabletop) web para jogar RPG de mesa online com amigos. Primeiro sistema: **Tormenta20**.
 Arquitetura **agnóstica de sistema**: tudo que é regra (atributos, perícias, fórmulas) vive em `packages/shared/systems/<id>.json`, validado pelo `SystemDefinitionSchema`. O código nunca conhece "FOR" ou "Percepção".
 
-**Fora do MVP** (explicitamente): login/contas, fog of war, medição de distância, áudio/vídeo, múltiplos mapas simultâneos, compêndio de magias/itens/classes, automação avançada da ficha (efeitos ativos, poderes por nível com escolhas). O que já foi feito além do MVP está em **§9 Fase 2**.
+**Fora do MVP** (explicitamente): login/contas, fog of war, medição de distância, áudio/vídeo, múltiplos mapas simultâneos, compêndio de magias/itens/classes (entrou depois: §9.4), automação avançada da ficha (efeitos ativos, poderes por nível com escolhas). O que já foi feito além do MVP está em **§9 Fase 2**.
 
 A **ficha básica** (§3.6) entrou no escopo em setembro/2026: atributos, perícias, recursos, stats derivados, modificadores e itens físicos com ataque/dano ligados ao chat. Poderes e magias com ativação (custo de PM, CD de resistência, card no chat) entraram em seguida (fase 3), e classes e raças como itens que alimentam nível, PV/PM e atributos (fase 4). Raciocínio e mapeamento em `docs/modelo-personagem.md`; planos em `docs/plano-passo3.md` e `docs/plano-passo4.md`.
 
@@ -156,6 +156,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `character:delete` | `{ characterId }` | GM ou owner | `character:deleted` + `token:updated` dos tokens desvinculados |
 | `character:roll` | `{ characterId, roll: {type: attribute\|skill\|initiative\|extra\|action, ...}, secret? }` | GM ou owner | `chat:message` (rolagem com `characterId`) |
 | `character:use-item` | `{ characterId, itemId }` | GM ou owner | `character:updated` (se houve custo) + `chat:message` (`kind:"item"`); recurso insuficiente = ack erro, sem broadcast |
+| `compendium:list` | `{}` | todos | ack `CompendiumEntry[]` do sistema da sala (sem broadcast; §9.4) |
 | `chat:send` | `{ text }` | todos | `chat:message` (rolagem secreta só p/ GM + autor) |
 | `initiative:add` | `InitiativeEntry` sem `id` | GM | `initiative:updated` |
 | `initiative:update` | `{ id, ...campos }` | GM | `initiative:updated` |
@@ -205,38 +206,43 @@ apps/web/src/
   components/   Lobby, RoomPage (liga stores aos componentes), TopBar, Toolbar, VttCanvas,
                 TokenInspector, SidePanel, ChatTab, InitiativeTab, CharactersTab,
                 MapConfigModal, NicknamePrompt, Toasts, CharacterSheetDrawer (gaveta da ficha)
+  components/compendium/  CompendiumPalette (paleta flutuante), EntryPreview, DragGhost (arrasto)
   components/character/  seções da ficha: CharacterHeader, AttributesGrid, ResourcesBlock,
                 DerivedStatsBar, SkillsSection, ItemsSection, ModifiersSection, DetailsSection,
                 fields.tsx (inputs "commit on blur")
   store/        connection.ts (socket + emitAck), bindSocket.ts (broadcast → store),
                 room.ts, tokens.ts, chat.ts, initiative.ts, characters.ts, ui.ts (toasts),
-                tools.ts (ferramenta ativa, régua)
+                tools.ts (ferramenta ativa, régua), compendium.ts (entradas, paleta, arrasto)
   lib/          router.ts (2 rotas, sem lib), api.ts (HTTP), grid.ts (célula↔pixel, puro),
                 session.ts (localStorage), throttle.ts, useImage.ts, system.ts (useSystemDef), ids.ts,
-                useToolShortcuts.ts (V/H/R/Esc/espaço)
+                useToolShortcuts.ts (V/H/R/Esc/espaço), compendium.ts (regras de inserção, puro),
+                dropTargets.ts (alvos de soltura por data-drop-target)
 apps/server/src/
   index.ts, env.ts, db.ts
   http/         rooms.ts, upload.ts
   socket/       index.ts, types.ts, ack.ts (validação Zod + ack), room.ts, scene.ts,
-                token.ts, chat.ts, initiative.ts, character.ts, ruler.ts (efêmero)
+                token.ts, chat.ts, initiative.ts, character.ts, ruler.ts (efêmero), compendium.ts
   services/     serialize.ts (Prisma → shared), snapshot.ts, presence.ts,
                 initiativeState.ts, permissions.ts, chatCommands.ts, ids.ts,
                 characters.ts (Prisma ↔ Character, visibilidade, broadcast),
-                rolls.ts (rola, persiste e publica; usado pelo chat e pela ficha)
+                rolls.ts (rola, persiste e publica; usado pelo chat e pela ficha),
+                compendium.ts (sistema + sala via mergeCompendium; a sala ainda é um stub vazio)
 packages/shared/src/
   schemas/      (Zod, inclui payloads.ts e character.ts)  events.ts
   dice/         parser + roller, puro, sem I/O
   rules/        placeholders.ts, modifierTarget.ts (regex do target),
                 compute.ts (computeCharacter), rolls.ts (buildCharacterRoll), defaults.ts
   systems.ts    registro dos JSONs (getSystemDefinition)
+  compendium/   registro dos compêndios (subpath @tormenta-vtt/shared/compendium, só o servidor importa)
 packages/shared/systems/
   tormenta20.json
+  tormenta20/compendium/{classes,races,weapons,armor,spells,powers}.json
 ```
 
 ## 8. Estado da implementação
 
 Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a ficha básica (§3.6). Limitações conhecidas:
-- Ficha: sem compêndio de classes/raças (os valores do livro são digitados no item); deslocamento e sentidos da raça não alimentam `derived[]`; poderes de classe por nível ficam de fora. Consumíveis usam a mesma ativação de poderes/magias, mas a quantidade não é descontada ao usar.
+- Ficha: o compêndio (§9.4) tem só um seed pequeno (2 classes, 2 raças, 2 armas, 1 armadura; magias e poderes vazios) e alguns valores marcados `TODO` no JSON à espera do livro; o compêndio da sala (homebrew) só existe como interface. Deslocamento e sentidos da raça não alimentam `derived[]`; poderes de classe por nível ficam de fora. Consumíveis usam a mesma ativação de poderes/magias, mas a quantidade não é descontada ao usar.
 - `character:update` é um patch raso: editar um item reenvia a lista `items` inteira (fichas são pequenas; ok por ora).
 - Só existe UI para uma cena por sala (`scene:create`/`scene:activate` funcionam no servidor, sem botão no web).
 - `currentIndex`/`round` da iniciativa e a presença (`connected`) se perdem ao reiniciar o servidor.
@@ -249,6 +255,16 @@ Funcionalidades entregues depois do MVP, na ordem em que entraram. O §1 continu
 
 ### 9.1 Ficha de personagem
 Descrita em §3.6 (entrou em setembro/2026). Poderes e magias com ativação são a "fase 3" da ficha (`docs/plano-passo3.md`); classes e raças como itens, a "fase 4" (`docs/plano-passo4.md`).
+
+### 9.4 Compêndio
+Biblioteca de itens pré-definidos que o jogador puxa para a ficha (setembro/2026). Plano e decisões em `docs/plano-compendio.md`.
+
+- **Modelo**: `CompendiumEntry` (`packages/shared/src/schemas/compendium.ts`) = `CharacterItem` sem `id`: `{ id, name, kind, tags[], fields, actions? (sem id), activation?, save?, statBonuses?, slots?, price?, description?, page? }`. Inserir na ficha faz uma **cópia** (`entryToItem`, ids novos para item e ações), nunca um vínculo. Só mecânica: `description` fica vazia.
+- **Dados**: `packages/shared/systems/<sistema>/compendium/*.json`. `validateCompendiumEntry` confere cada entrada contra o JSON do sistema (tipo de item, campos e opções, ativação/resistência só nos tipos que têm, stats permitidos, perícias de ataque); um teste roda isso em todo arquivo. O registro (`src/compendium/index.ts`) fica no subpath `@tormenta-vtt/shared/compendium`, fora do barrel, para o web não empacotar os JSONs.
+- **Servidor**: `compendium:list` devolve `mergeCompendium([sistema, sala])`; a fonte da sala (homebrew do GM, prioridade maior, id repetido substitui) é um stub vazio até existir tela e tabela.
+- **Inserção** (`useCharacters.insertFromCompendium`, chamada por Enter, "+" e soltar): `checkInsert` lê `itemKinds[].maxCount` (2ª raça não é inserível; a paleta oferece "Substituir"); `buildInsertPatch` marca a primeira classe como inicial e aplica o `size` de um item com esse campo à ficha. Passa pelo `character:update` normal (otimista + ack). Escolhas pendentes seguem o fluxo de "faltam N escolhas".
+- **UI**: paleta flutuante por cima da ficha, só em modo edição: botão "Do compêndio" (já filtra pela aba ativa) ou Ctrl+Espaço. Busca sem acento/caixa por nome, tags e id; chips por tipo (multi-seleção); resultados agrupados por tipo; preview à direita com o resumo mecânico e quantas escolhas a ficha vai pedir. Setas navegam, Enter insere e fecha, Ctrl+Enter insere e mantém, Esc fecha, "+" na linha insere e mantém. Após inserir, a ficha troca para a aba do tipo e destaca o item por um instante.
+- **Arrastar e soltar**: pointer events (não HTML5 drag, por causa do Konva). Fantasma segue o cursor; a paleta fica translúcida e sem `pointer-events` para `elementFromPoint` achar a ficha, que ganha um halo; soltar na ficha insere e fecha a paleta, fora cancela, Esc cancela. `lib/dropTargets.ts` registra alvos por `data-drop-target` (`accepts`, `onDrop`); hoje só a ficha, preparado para o mapa aceitar entradas depois.
 
 ### 9.2 Barra de ferramentas e régua
 Descritas em §3.2: modos Selecionar / Mover mapa / Régua com atalhos, caixa de seleção, movimento em grupo e a régua efêmera (`ruler:update`).

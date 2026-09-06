@@ -1,7 +1,7 @@
 # Plano: compêndio (biblioteca de itens pré-definidos)
 
 > Biblioteca de classes, raças, armas, armaduras, magias e poderes que o jogador puxa para a ficha.
-> Escrito em 06/09/2026, antes da implementação. Status: **aguardando aprovação do dono do projeto**.
+> Escrito em 06/09/2026, antes da implementação. Status: **implementado** (7 commits, mesmo dia). Resumo em `docs/SPEC.md` §9.4.
 
 **Princípio:** uma entrada do compêndio é apenas um `CharacterItem` pré-preenchido, sem `id`. Inserir na ficha
 faz uma **cópia** (nunca um vínculo): gera ids novos para o item e suas ações e manda `character:update` com a
@@ -15,8 +15,8 @@ Regra de conteúdo: só dados mecânicos. `description` fica vazia por enquanto.
 1. **Formato da entrada.** `CompendiumEntry = { id, name, kind, tags[], fields, actions?, activation?, save?,
    description?, page? }`, validado por `CompendiumEntrySchema` (`packages/shared/src/schemas/compendium.ts`).
    As ações vêm **sem `id`** (`ActionSchema.omit({ id })`), porque o id nasce na inserção.
-   - Proposta de três campos opcionais a mais: `statBonuses`, `slots`, `price`. Sem `statBonuses` uma armadura
-     não dá Defesa nenhuma; espaços e preço são dados mecânicos do livro. (Dono decide.)
+   - Mais três campos opcionais, aprovados pelo dono: `statBonuses`, `slots`, `price`. Sem `statBonuses` uma
+     armadura não dá Defesa nenhuma; espaços e preço são dados mecânicos do livro.
 
 2. **Validação contra o sistema, não só contra o Zod.** `validateCompendiumEntry(def, entry)`
    (`packages/shared/src/rules/compendium.ts`) confere que `kind` existe em `itemKinds`, que cada chave de
@@ -46,8 +46,8 @@ Regra de conteúdo: só dados mecânicos. `description` fica vazia por enquanto.
 7. **Uma única função de inserção.** Enter, botão "+" e soltar chamam
    `useCharacters.insertFromCompendium(characterId, entryId, { replace? })`, que passa pelo `update` existente
    (otimista + ack + reversão de graça). As regras ficam em `apps/web/src/lib/compendium.ts` (puro, testável):
-   - `insertability(def, character, entry)` devolve `ok` ou o motivo ("Já existe uma raça: Anão"), lendo
-     `itemKinds[].maxCount`.
+   - `checkInsert(def, character, entry)` devolve `ok` ou o motivo ("A ficha já tem Raça: Anão") e o item a
+     substituir, lendo `itemKinds[].maxCount`.
    - `buildInsertPatch(def, character, entry, ids)`: classe marca `initial` (via `level.classes.initialField`) se
      for a primeira; raça substitui a atual e ajusta o `size` da ficha, como o editor de raça já faz.
    - Escolhas pendentes (Humano, perícias de classe) ficam como hoje: `pendingChoices` e o badge
@@ -94,16 +94,31 @@ Regra de conteúdo: só dados mecânicos. `description` fica vazia por enquanto.
 
 Cada commit termina com `make typecheck && make test` passando.
 
-## Seed inicial (a confirmar com o livro)
+## Decisões tomadas durante a implementação
 
-O dono passa os valores do livro. O que estiver marcado como incerto vira `TODO` no JSON em vez de valor
-inventado.
+- Soltar na ficha **fecha** a paleta (como Enter), para o jogador ver o item chegar com destaque; "+" e Ctrl+Enter
+  mantêm aberta para inserir vários.
+- Chips de tipo são multi-seleção; "todos" limpa. Abrir pela aba já deixa o chip daquele tipo marcado.
+- Linhas não inseríveis não são arrastáveis (cursor `not-allowed`); a troca de raça só acontece pelo botão
+  "Substituir" do preview, nunca por Enter ou arrasto.
+- A busca ignora acento e caixa e casa por nome, tags e id ("anao" acha "Anão").
+- Raça sem bônus à escolha precisa de `flexibleBonuses.count = 0` no JSON: o valor vazio do sistema é
+  `count: 1`, o que deixaria uma escolha pendente falsa.
+- `compendium:list` carrega sob demanda (primeira abertura da paleta) e o resultado fica em memória até sair
+  da sala.
+- Validado com o cenário CDP `C:\Temp\vtt-compendium.ps1` (botão, Ctrl+Espaço, Enter, Ctrl+Enter, 2ª raça +
+  Substituir, "+", Esc, arrasto para a ficha e para fora).
+
+## Seed inicial
+
+O dono corrigiu o Anão (CON +2, SAB +1, DES -1). Perícias à escolha de Guerreiro e Arcanista e preço/espaços
+das armas e da armadura ficaram com `TODO` no `$comment` do JSON, à espera do livro.
 
 | Entrada | Valores propostos | Certeza |
 |---|---|---|
 | Guerreiro | PV 20 no 1º nível, +5/nível, PM +3/nível. Perícias: Fortitude fixa; escolha 1 entre Luta/Pontaria; escolha 2 entre Adestramento, Atletismo, Cavalgar, Guerra, Iniciativa, Intimidação, Ofício, Percepção, Reflexos | alta nos números; lista de opções TODO |
 | Arcanista | PV 8, +2/nível, PM +6/nível. Misticismo e Vontade fixas; escolha 2 entre Atuação, Conhecimento, Diplomacia, Enganação, Guerra, Iniciativa, Intuição, Investigação, Nobreza, Ofício, Percepção | alta nos números; lista TODO |
-| Anão | FOR +2, CON +1, DES -1; tamanho Médio; deslocamento 6 m | alta |
+| Anão | CON +2, SAB +1, DES -1; tamanho Médio; deslocamento 6 m | confirmado pelo dono |
 | Humano | +1 em 3 atributos à escolha; 2 perícias à escolha | alta |
 | Espada longa | marcial, corpo a corpo, uma mão, dano 1d8 corte, crítico 19/×2, 1 espaço, T$ 15 | média (preço e espaços TODO) |
 | Arco curto | marcial, disparo, duas mãos, dano 1d6 perfuração, crítico ×3, 1 espaço, T$ 30 | média (preço TODO) |
