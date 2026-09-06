@@ -105,9 +105,10 @@ export function listModifierTargets(def: SystemDefinition): { value: string; lab
   for (const r of def.resources) out.push({ value: `resource.${r.key}.max`, label: `${r.label} (máx.)` });
   out.push({ value: "attack", label: "Ataque" });
   out.push({ value: "damage", label: "Dano" });
-  for (const s of def.skills.filter((s) => s.tags.includes("ataque"))) {
-    out.push({ value: `attack.${s.key}`, label: `Ataque (${s.label})` });
-    out.push({ value: `damage.${s.key}`, label: `Dano (${s.label})` });
+  for (const key of def.attackSkills) {
+    const label = def.skills.find((s) => s.key === key)?.label ?? key;
+    out.push({ value: `attack.${key}`, label: `Ataque (${label})` });
+    out.push({ value: `damage.${key}`, label: `Dano (${label})` });
   }
   return out;
 }

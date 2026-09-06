@@ -25,11 +25,23 @@ export function createDefaultItem(def: SystemDefinition, kind: string, id: strin
     else if (f.type === "boolean") fields[f.key] = false;
     else fields[f.key] = "";
   }
+  // Tipo "arma" no sentido genérico: declara o campo que decide o atributo do dano.
+  // Nasce com uma ação de ataque (primeira perícia de ataque) e uma de dano.
+  const isWeaponLike = def.damageAttribute !== undefined && kdef.fields.some((f) => f.key === def.damageAttribute?.field);
+  const attackSkill = def.attackSkills[0];
+  const actions =
+    isWeaponLike && attackSkill
+      ? [
+          { id: `${id}-atk`, label: "Ataque", kind: "attack", skill: attackSkill },
+          { id: `${id}-dmg`, label: "Dano", kind: "damage", formula: "1d6" },
+        ]
+      : [];
   return CharacterItemSchema.parse({
     id,
     kind,
     name: kdef.label,
     fields,
+    actions,
     activation: kdef.hasActivation ? {} : null,
   });
 }

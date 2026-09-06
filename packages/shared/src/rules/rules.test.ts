@@ -221,6 +221,8 @@ describe("defaults", () => {
     const w = createDefaultItem(def, "weapon", "w1");
     expect(w.fields).toMatchObject({ purpose: "melee", wield: "one_hand", proficiency: "simples", properties: "" });
     expect(w.activation).toBeNull();
+    expect(w.actions.map((a) => a.kind)).toEqual(["attack", "damage"]);
+    expect(createDefaultItem(def, "armor", "a1").actions).toEqual([]);
     expect(createDefaultItem(def, "spell", "s1").activation).not.toBeNull();
     expect(() => createDefaultItem(def, "nope", "x")).toThrow();
   });

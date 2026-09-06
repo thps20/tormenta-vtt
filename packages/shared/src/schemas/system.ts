@@ -219,6 +219,8 @@ export const SystemDefinitionSchema = z.object({
   itemKinds: z.array(ItemKindDefSchema).default([]),
   activation: ActivationDefSchema.default({}),
 
+  /** Perícias que podem ser usadas em ações de ataque (ex.: luta, pontaria). */
+  attackSkills: z.array(KeySchema).default([]),
   /** Bônus total de uma perícia (sem o dado). Contextuais: {attr} {trained} {sizeMod} {armorPenalty}. */
   skillTotal: FormulaSchema,
   /** Fórmulas nomeadas de rolagem. */
@@ -296,6 +298,9 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
 
   for (const skill of def.skills) {
     if (!attrKeys.has(skill.attribute)) fail(def, `perícia "${skill.key}" referencia atributo inexistente "${skill.attribute}"`);
+  }
+  for (const key of def.attackSkills) {
+    if (!skillKeys.has(key)) fail(def, `attackSkills referencia perícia inexistente "${key}"`);
   }
   for (const kind of def.itemKinds) {
     for (const stat of kind.statBonuses) {
