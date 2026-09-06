@@ -32,6 +32,15 @@ interface VttCanvasProps {
   linkableCharacters: Character[];
   onLinkCharacter: (tokenId: string, characterId: string | null) => void;
   onOpenCharacter: (characterId: string) => void;
+  /** Barra de vida por token (tokenBar do sistema, lida da ficha vinculada). */
+  tokenBars: Record<string, TokenBar>;
+}
+
+/** Atual/máximo do recurso que o sistema aponta como barra do token. */
+export interface TokenBar {
+  current: number;
+  max: number;
+  temp: number;
 }
 
 /** GM move tudo; jogador só o que possui (mesma regra do servidor). */
@@ -55,6 +64,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   linkableCharacters,
   onLinkCharacter,
   onOpenCharacter,
+  tokenBars,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -215,6 +225,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
             <TokenNode
               key={token.id}
               token={token}
+              bar={tokenBars[token.id] ?? null}
               draggable={canControl(me, token)}
               isSelected={token.id === selectedTokenId}
               isActiveTurn={token.id === activeTurnTokenId}
@@ -352,6 +363,7 @@ function findFreeSpot(
 
 interface TokenNodeProps {
   token: Token;
+  bar: TokenBar | null;
   draggable: boolean;
   isSelected: boolean;
   isActiveTurn: boolean;
@@ -362,12 +374,18 @@ interface TokenNodeProps {
   onTransformEnd: (node: Konva.Node) => void;
 }
 
-const TokenNode: React.FC<TokenNodeProps> = ({ token, draggable, isSelected, isActiveTurn, onSelect, onCursor, onDragMove, onDragEnd, onTransformEnd }) => {
+const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, isSelected, isActiveTurn, onSelect, onCursor, onDragMove, onDragEnd, onTransformEnd }) => {
   const image = useImage(assetUrl(token.imageUrl));
   const radius = Math.min(token.width, token.height) / 2;
   const cx = token.width / 2;
   const cy = token.height / 2;
   const highlight = isSelected || isActiveTurn;
+
+  // Barra de vida acima do token: verde > 50%, dourada > 25%, vermelha abaixo.
+  const barWidth = Math.max(52, token.width);
+  const barHeight = 5;
+  const barPercent = bar && bar.max > 0 ? Math.min(100, Math.max(0, (bar.current / bar.max) * 100)) : 0;
+  const barColor = barPercent > 50 ? "#10b981" : barPercent > 25 ? "#d4af37" : "#ef4444";
 
   return (
     <Group
@@ -416,6 +434,24 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, draggable, isSelected, isA
           <Circle x={cx} y={cy} radius={Math.max(1, radius - 4)} fill={token.color} opacity={0.16} />
           <Text x={0} y={cy - radius * 0.4} width={token.width} text={token.name.charAt(0).toUpperCase()} align="center" fontSize={radius * 0.8} fontFamily="serif" fontStyle="bold" fill="#e0e0e0" listening={false} />
         </>
+      )}
+
+      {bar && (
+        <Group x={cx - barWidth / 2} y={-12} listening={false}>
+          <Rect x={0} y={0} width={barWidth} height={barHeight} fill="#0c0c0c" stroke="#2d2417" strokeWidth={1} cornerRadius={2} />
+          <Rect x={0.5} y={0.5} width={Math.max(0, (barWidth - 1) * (barPercent / 100))} height={barHeight - 1} fill={barColor} cornerRadius={1.5} />
+          <Text
+            x={0}
+            y={-9}
+            width={barWidth}
+            text={`${bar.current}/${bar.max}${bar.temp > 0 ? ` +${bar.temp}` : ""}`}
+            align="center"
+            fontSize={8.5}
+            fontFamily="monospace"
+            fontStyle="bold"
+            fill="#a1a1aa"
+          />
+        </Group>
       )}
 
       {/* Nome abaixo do token (também serve para arrastar) */}

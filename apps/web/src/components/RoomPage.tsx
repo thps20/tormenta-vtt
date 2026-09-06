@@ -6,9 +6,10 @@ import { useChat } from "../store/chat";
 import { currentEntry, useInitiative } from "../store/initiative";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
 import { useSystemDef } from "../lib/system";
+import { computeCharacter } from "@tormenta-vtt/shared";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { TopBar } from "./TopBar";
-import { VttCanvas } from "./VttCanvas";
+import { VttCanvas, type TokenBar } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
 import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
 import { SidePanel, type SidePanelTab } from "./SidePanel";
@@ -105,6 +106,29 @@ function Table() {
   const linkCharacter = useTokens((s) => s.linkCharacter);
   const systemDef = useSystemDef();
 
+  // Barra de vida: para cada token vinculado a uma ficha visível, o atual/máximo
+  // do recurso apontado por tokenBar no JSON do sistema (computeCharacter dá o máximo).
+  const tokenBars = useMemo(() => {
+    const out: Record<string, TokenBar> = {};
+    const resourceKey = systemDef?.tokenBar;
+    if (!systemDef || !resourceKey) return out;
+    const barOf = new Map<string, TokenBar>();
+    for (const token of tokens) {
+      if (!token.characterId) continue;
+      const character = charById[token.characterId];
+      if (!character) continue;
+      let bar = barOf.get(character.id);
+      if (!bar) {
+        const computed = computeCharacter(systemDef, character);
+        const res = character.resources[resourceKey];
+        bar = { current: res?.current ?? 0, max: computed.resources[resourceKey]?.max ?? 0, temp: res?.temp ?? 0 };
+        barOf.set(character.id, bar);
+      }
+      out[token.id] = bar;
+    }
+    return out;
+  }, [systemDef, tokens, charById]);
+
   if (!room || !me) return null;
   const openChar = openCharacterId ? (charById[openCharacterId] ?? null) : null;
   const sheetOpen = openChar !== null || emptySheetOpen;
@@ -155,7 +179,12 @@ function Table() {
               activeTurnTokenId={activeTurnTokenId}
               selectedTokenId={selectedTokenId}
               focusRequest={focusRequest}
-              onSelectToken={selectToken}
+              onSelectToken={(tokenId) => {
+                selectToken(tokenId);
+                // Clique num token vinculado a uma ficha que eu vejo abre a ficha.
+                const characterId = tokenId ? byId[tokenId]?.characterId : null;
+                if (characterId && charById[characterId]) openCharacter(characterId);
+              }}
               onTokenMoveLive={moveLive}
               onTokenPatch={(patch) => void patchToken(patch)}
               onTokenCreate={(pos, size) => {
@@ -179,6 +208,7 @@ function Table() {
               linkableCharacters={linkableCharacters}
               onLinkCharacter={(tokenId, characterId) => void linkCharacter(tokenId, characterId)}
               onOpenCharacter={openCharacter}
+              tokenBars={tokenBars}
             />
           ) : (
             <Centered>
