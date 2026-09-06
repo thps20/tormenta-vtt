@@ -48,7 +48,8 @@ export type AckOf<E extends keyof ClientToServerEvents> = Parameters<Parameters<
  */
 export function emitAck<E extends keyof ClientToServerEvents>(event: E, payload: PayloadOf<E>): Promise<AckOf<E>> {
   return new Promise((resolve) => {
-    const emit = getSocket().emit as unknown as (ev: string, p: unknown, ack: (r: AckOf<E>) => void) => void;
-    emit(event, payload, resolve);
+    // Importante: chamar como método (socket.emit) para preservar o `this` do socket.
+    const socket = getSocket() as unknown as { emit: (ev: string, p: unknown, ack: (r: AckOf<E>) => void) => void };
+    socket.emit(event, payload, resolve);
   });
 }
