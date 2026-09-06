@@ -87,8 +87,10 @@ export const ChatTab: React.FC<ChatTabProps> = ({
           // 2. DICE ROLL MESSAGE (HIGHLIGHTED) - Elegant Dark
           if (msg.kind === 'roll' && msg.roll) {
             const roll = msg.roll;
+            // Crítico a partir de critThreshold (ataques com margem ampliada); padrão = 20 natural.
+            const critFrom = roll.critThreshold ?? 20;
             const isCritical =
-              roll.groups.some((g) => g.sides === 20 && g.rolls.includes(20));
+              roll.groups.some((g) => g.sides === 20 && g.rolls.some((r) => r >= critFrom));
             const isFumble =
               roll.groups.some((g) => g.sides === 20 && g.rolls.includes(1));
 

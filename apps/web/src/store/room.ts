@@ -5,6 +5,7 @@ import { emitAck, getSocket, type AckOf } from "./connection";
 import { useTokens } from "./tokens";
 import { useChat } from "./chat";
 import { useInitiative } from "./initiative";
+import { useCharacters } from "./characters";
 import { toast } from "./ui";
 
 export type JoinStatus =
@@ -95,6 +96,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useTokens.getState().setAll([]);
     useChat.getState().setAll([]);
     useInitiative.getState().setState(null);
+    useCharacters.getState().setAll([]);
     // Desconectar e reconectar é o jeito simples de sair das salas do Socket.io.
     const socket = getSocket();
     socket.disconnect();
@@ -106,6 +108,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useTokens.getState().setAll(snap.tokens);
     useChat.getState().setAll(snap.chat);
     useInitiative.getState().setState(snap.initiative);
+    useCharacters.getState().setAll(snap.characters);
   },
 
   upsertParticipant: (p) =>

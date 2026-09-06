@@ -4,6 +4,9 @@ import { selectActiveScene, useRoom } from "../store/room";
 import { sceneTokens, useTokens } from "../store/tokens";
 import { useChat } from "../store/chat";
 import { currentEntry, useInitiative } from "../store/initiative";
+import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
+import { useSystemDef } from "../lib/system";
+import { CharacterSheet } from "./sheet/CharacterSheet";
 import { TopBar } from "./TopBar";
 import { VttCanvas } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
@@ -87,7 +90,20 @@ function Table() {
   const updateEntry = useInitiative((s) => s.update);
   const removeEntry = useInitiative((s) => s.remove);
 
+  const charById = useCharacters((s) => s.byId);
+  const characters = useMemo(() => sortedCharacters(charById), [charById]);
+  const openCharacterId = useCharacters((s) => s.openId);
+  const openCharacter = useCharacters((s) => s.open);
+  const createCharacter = useCharacters((s) => s.create);
+  const updateCharacter = useCharacters((s) => s.update);
+  const deleteCharacter = useCharacters((s) => s.delete);
+  const rollCharacter = useCharacters((s) => s.roll);
+  const linkCharacter = useTokens((s) => s.linkCharacter);
+  const systemDef = useSystemDef();
+
   if (!room || !me) return null;
+  const openChar = openCharacterId ? (charById[openCharacterId] ?? null) : null;
+  const linkableCharacters = characters.filter((c) => canEditCharacter(me, c));
   const isGm = me.role === "gm";
   const activeTurnTokenId = currentEntry(initiative)?.tokenId ?? null;
 
@@ -145,6 +161,9 @@ function Table() {
                 }).then((created) => created && selectToken(created.id));
               }}
               onTokenDelete={(id) => void deleteToken(id)}
+              linkableCharacters={linkableCharacters}
+              onLinkCharacter={(tokenId, characterId) => void linkCharacter(tokenId, characterId)}
+              onOpenCharacter={openCharacter}
             />
           ) : (
             <Centered>
@@ -169,8 +188,26 @@ function Table() {
           onRemoveEntry={(id) => void removeEntry(id)}
           onSelectToken={focusToken}
           selectedTokenId={selectedTokenId}
+          me={me}
+          characters={characters}
+          onOpenCharacter={openCharacter}
+          onCreateCharacter={(payload) => void createCharacter(payload).then((c) => c && openCharacter(c.id))}
+          onDeleteCharacter={(id) => void deleteCharacter(id)}
         />
       </div>
+
+      {openChar && systemDef && (
+        <CharacterSheet
+          def={systemDef}
+          character={openChar}
+          participants={participants}
+          me={me}
+          canEdit={canEditCharacter(me, openChar)}
+          onPatch={(patch) => void updateCharacter(openChar.id, patch)}
+          onRoll={(request) => void rollCharacter(openChar.id, request)}
+          onClose={() => openCharacter(null)}
+        />
+      )}
 
       {isGm && scene && (
         <MapConfigModal isOpen={isMapConfigOpen} scene={scene} onSave={(r) => void handleSaveMapConfig(r)} onClose={() => setMapConfigOpen(false)} />

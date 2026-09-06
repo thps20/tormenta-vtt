@@ -185,12 +185,14 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 apps/web/src/
   App.tsx       escolhe a tela pela URL
   components/   Lobby, RoomPage (liga stores aos componentes), TopBar, VttCanvas,
-                TokenInspector, SidePanel, ChatTab, InitiativeTab, MapConfigModal,
-                NicknamePrompt, Toasts
+                TokenInspector, SidePanel, ChatTab, InitiativeTab, CharactersTab,
+                MapConfigModal, NicknamePrompt, Toasts
+  components/sheet/  CharacterSheet (modal), CharacterItems, CharacterModifiers,
+                fields.tsx (inputs "commit on blur")
   store/        connection.ts (socket + emitAck), bindSocket.ts (broadcast → store),
-                room.ts, tokens.ts, chat.ts, initiative.ts, ui.ts (toasts)
+                room.ts, tokens.ts, chat.ts, initiative.ts, characters.ts, ui.ts (toasts)
   lib/          router.ts (2 rotas, sem lib), api.ts (HTTP), grid.ts (célula↔pixel, puro),
-                session.ts (localStorage), throttle.ts, useImage.ts
+                session.ts (localStorage), throttle.ts, useImage.ts, system.ts (useSystemDef), ids.ts
 apps/server/src/
   index.ts, env.ts, db.ts
   http/         rooms.ts, upload.ts
@@ -212,7 +214,9 @@ packages/shared/systems/
 
 ## 8. Estado da implementação
 
-Todos os itens do MVP acima estão implementados (setembro/2026). Limitações conhecidas:
+Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a ficha básica (§3.6). Limitações conhecidas:
+- Ficha: poderes e magias existem como itens com campos, mas sem custo de PM, CD de resistência nem ativação na UI (fase 3). Classes e raças como itens, nível e PV/PM automáticos são a fase 4.
+- `character:update` é um patch raso: editar um item reenvia a lista `items` inteira (fichas são pequenas; ok por ora).
 - Só existe UI para uma cena por sala (`scene:create`/`scene:activate` funcionam no servidor, sem botão no web).
 - `currentIndex`/`round` da iniciativa e a presença (`connected`) se perdem ao reiniciar o servidor.
 - Uploads ficam em disco (`apps/server/uploads/`), sem limpeza de arquivos órfãos.

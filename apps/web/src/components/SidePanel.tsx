@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
-import { MessageSquare, Swords } from 'lucide-react';
+import { MessageSquare, Swords, Users } from 'lucide-react';
 import { ChatTab } from './ChatTab';
 import { InitiativeTab } from './InitiativeTab';
-import type { ChatMessage, InitiativeAddPayload, InitiativeState, InitiativeUpdatePayload, Participant, Token } from '@tormenta-vtt/shared';
+import { CharactersTab } from './CharactersTab';
+import type {
+  Character,
+  CharacterCreatePayload,
+  ChatMessage,
+  InitiativeAddPayload,
+  InitiativeState,
+  InitiativeUpdatePayload,
+  Participant,
+  Token,
+} from '@tormenta-vtt/shared';
 
 interface SidePanelProps {
   messages: ChatMessage[];
@@ -20,6 +30,12 @@ interface SidePanelProps {
   onRemoveEntry: (entryId: string) => void;
   onSelectToken: (tokenId: string) => void;
   selectedTokenId: string | null;
+  // Fichas
+  me: Participant;
+  characters: Character[];
+  onOpenCharacter: (characterId: string) => void;
+  onCreateCharacter: (payload: CharacterCreatePayload) => void;
+  onDeleteCharacter: (characterId: string) => void;
 }
 
 export const SidePanel: React.FC<SidePanelProps> = ({
@@ -38,8 +54,13 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   onRemoveEntry,
   onSelectToken,
   selectedTokenId,
+  me,
+  characters,
+  onOpenCharacter,
+  onCreateCharacter,
+  onDeleteCharacter,
 }) => {
-  const [activeTab, setActiveTab] = useState<'chat' | 'initiative'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'initiative' | 'characters'>('chat');
 
   return (
     <aside
@@ -91,6 +112,28 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             R{initiative?.round ?? 0}
           </span>
         </button>
+
+        <button
+          id="tab-btn-characters"
+          onClick={() => setActiveTab('characters')}
+          className={`flex-1 flex items-center justify-center gap-2 text-xs font-serif font-bold tracking-widest uppercase transition-all cursor-pointer ${
+            activeTab === 'characters'
+              ? 'border-b-2 border-[#d4af37] bg-[#222222] text-[#d4af37]'
+              : 'border-b border-[#2d2417] text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a1a]'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Fichas</span>
+          <span
+            className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+              activeTab === 'characters'
+                ? 'bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40'
+                : 'bg-zinc-800 text-zinc-500'
+            }`}
+          >
+            {characters.length}
+          </span>
+        </button>
       </div>
 
       {/* Tab Content Container */}
@@ -101,6 +144,15 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             participants={participants}
             currentUserId={currentUserId}
             onSendMessage={onSendMessage}
+          />
+        ) : activeTab === 'characters' ? (
+          <CharactersTab
+            characters={characters}
+            participants={participants}
+            me={me}
+            onOpen={onOpenCharacter}
+            onCreate={onCreateCharacter}
+            onDelete={onDeleteCharacter}
           />
         ) : (
           <InitiativeTab

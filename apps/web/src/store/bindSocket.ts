@@ -4,6 +4,7 @@ import { useRoom } from "./room";
 import { useTokens } from "./tokens";
 import { useChat } from "./chat";
 import { useInitiative } from "./initiative";
+import { useCharacters } from "./characters";
 import { toast } from "./ui";
 
 /**
@@ -34,6 +35,10 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("chat:message", (msg) => useChat.getState().append(msg));
 
   socket.on("initiative:updated", (state) => useInitiative.getState().setState(state));
+
+  socket.on("character:created", (c) => useCharacters.getState().upsert(c));
+  socket.on("character:updated", (c) => useCharacters.getState().upsert(c));
+  socket.on("character:deleted", ({ characterId }) => useCharacters.getState().remove(characterId));
 
   socket.on("server:error", ({ message }) => toast(message));
 }

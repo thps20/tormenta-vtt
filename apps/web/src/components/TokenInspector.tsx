@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
-import { Eye, EyeOff, ImagePlus, Trash2, User, X } from "lucide-react";
-import type { Participant, Token, TokenPatch } from "@tormenta-vtt/shared";
+import { BookOpen, Eye, EyeOff, ImagePlus, Trash2, User, X } from "lucide-react";
+import type { Character, Participant, Token, TokenPatch } from "@tormenta-vtt/shared";
 import { uploadImage } from "../lib/api";
 import { toast } from "../store/ui";
 
@@ -14,15 +14,32 @@ interface TokenInspectorProps {
   onPatch: (patch: TokenPatch) => void;
   onDelete: () => void;
   onClose: () => void;
+  /** Fichas que este usuário pode vincular (GM: todas; jogador: as suas). */
+  linkableCharacters: Character[];
+  onLinkCharacter: (characterId: string | null) => void;
+  onOpenCharacter: (characterId: string) => void;
 }
 
 /**
  * Painel do token selecionado. GM edita tudo (nome, cor, dono, visibilidade,
  * imagem); o dono pode apagar; os demais só leem.
  */
-export const TokenInspector: React.FC<TokenInspectorProps> = ({ token, participants, me, onPatch, onDelete, onClose }) => {
+export const TokenInspector: React.FC<TokenInspectorProps> = ({
+  token,
+  participants,
+  me,
+  onPatch,
+  onDelete,
+  onClose,
+  linkableCharacters,
+  onLinkCharacter,
+  onOpenCharacter,
+}) => {
   const isGm = me.role === "gm";
   const canDelete = isGm || token.ownerId === me.id;
+  const canLink = isGm || token.ownerId === me.id;
+  // Ficha vinculada que este usuário não vê (ex.: NPC do GM): mostra sem deixar trocar.
+  const linkedHidden = token.characterId !== null && !linkableCharacters.some((c) => c.id === token.characterId);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [name, setName] = useState(token.name);
@@ -105,6 +122,40 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({ token, participa
           ) : (
             <span className="text-zinc-300 text-[11px]">{ownerName}</span>
           )}
+        </Row>
+
+        <Row label="Ficha" icon={<BookOpen className="w-3.5 h-3.5 text-[#d4af37]" />}>
+          <div className="flex items-center gap-1 min-w-0">
+            {canLink ? (
+              <select
+                id="token-character-select"
+                value={linkedHidden ? "__hidden" : (token.characterId ?? "")}
+                onChange={(e) => onLinkCharacter(e.target.value || null)}
+                className="bg-[#141414] border border-[#2d2417] rounded px-1.5 py-0.5 text-[11px] text-zinc-200 focus:outline-none focus:border-[#d4af37] max-w-[120px]"
+              >
+                <option value="">Nenhuma</option>
+                {linkedHidden && (
+                  <option value="__hidden" disabled>
+                    (ficha do GM)
+                  </option>
+                )}
+                {linkableCharacters.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-zinc-300 text-[11px] truncate">
+                {token.characterId ? (linkableCharacters.find((c) => c.id === token.characterId)?.name ?? "(ficha do GM)") : "Nenhuma"}
+              </span>
+            )}
+            {token.characterId && !linkedHidden && (
+              <button onClick={() => onOpenCharacter(token.characterId!)} className="text-[10px] text-[#d4af37] hover:underline cursor-pointer shrink-0" title="Abrir ficha">
+                abrir
+              </button>
+            )}
+          </div>
         </Row>
 
         {isGm && (

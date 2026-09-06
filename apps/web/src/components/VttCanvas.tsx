@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Image as KonvaImage, Transformer } from "react-konva";
 import type Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
-import type { Participant, Scene, Token, TokenPatch } from "@tormenta-vtt/shared";
+import type { Character, Participant, Scene, Token, TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
 import { clampToMap, gridLines, snapToGrid } from "../lib/grid";
 import { useImage } from "../lib/useImage";
@@ -28,6 +28,10 @@ interface VttCanvasProps {
   /** GM: criar token no ponto (pixels do mapa) com o tamanho de uma célula. */
   onTokenCreate: (pos: { x: number; y: number }, size: number) => void;
   onTokenDelete: (tokenId: string) => void;
+  /** Fichas que o usuário pode vincular a um token (ver TokenInspector). */
+  linkableCharacters: Character[];
+  onLinkCharacter: (tokenId: string, characterId: string | null) => void;
+  onOpenCharacter: (characterId: string) => void;
 }
 
 /** GM move tudo; jogador só o que possui (mesma regra do servidor). */
@@ -48,6 +52,9 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   onTokenPatch,
   onTokenCreate,
   onTokenDelete,
+  linkableCharacters,
+  onLinkCharacter,
+  onOpenCharacter,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -302,6 +309,9 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
           onPatch={onTokenPatch}
           onDelete={() => onTokenDelete(selectedToken.id)}
           onClose={() => onSelectToken(null)}
+          linkableCharacters={linkableCharacters}
+          onLinkCharacter={(characterId) => onLinkCharacter(selectedToken.id, characterId)}
+          onOpenCharacter={onOpenCharacter}
         />
       )}
 

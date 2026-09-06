@@ -24,6 +24,8 @@ interface TokensState {
   patch: (patch: TokenPatch) => Promise<boolean>;
   create: (data: TokenCreate) => Promise<Token | null>;
   delete: (tokenId: string) => Promise<boolean>;
+  /** Vincula/desvincula uma ficha (otimista com reversão). */
+  linkCharacter: (tokenId: string, characterId: string | null) => Promise<boolean>;
 }
 
 /** Máx. ~30 emissões por segundo enquanto arrasta (SPEC §3.3). */
@@ -91,6 +93,19 @@ export const useTokens = create<TokensState>((set, get) => ({
     // O broadcast token:created também chega; o upsert é idempotente.
     get().upsert(res.data);
     return res.data;
+  },
+
+  linkCharacter: async (tokenId, characterId) => {
+    const previous = get().byId[tokenId];
+    if (!previous) return false;
+    set((s) => ({ byId: { ...s.byId, [tokenId]: { ...previous, characterId } } }));
+    const res = await emitAck("token:link-character", { tokenId, characterId });
+    if (!res.ok) {
+      set((s) => ({ byId: { ...s.byId, [tokenId]: previous } }));
+      toast(res.error);
+      return false;
+    }
+    return true;
   },
 
   delete: async (tokenId) => {
