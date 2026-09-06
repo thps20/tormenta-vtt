@@ -18,9 +18,18 @@ if (import.meta.env.DEV) {
     import("./store/chat"),
     import("./store/initiative"),
     import("./store/characters"),
-  ]).then(([c, r, t, ch, i, ca]) => {
+    import("./store/tools"),
+  ]).then(([c, r, t, ch, i, ca, tl]) => {
     Object.assign(window, {
-      __vtt: { useConnection: c.useConnection, useRoom: r.useRoom, useTokens: t.useTokens, useChat: ch.useChat, useInitiative: i.useInitiative, useCharacters: ca.useCharacters },
+      __vtt: {
+        useConnection: c.useConnection,
+        useRoom: r.useRoom,
+        useTokens: t.useTokens,
+        useChat: ch.useChat,
+        useInitiative: i.useInitiative,
+        useCharacters: ca.useCharacters,
+        useTools: tl.useTools,
+      },
     });
   });
 }

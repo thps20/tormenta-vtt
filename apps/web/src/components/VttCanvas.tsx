@@ -6,6 +6,7 @@ import type { Character, Participant, Scene, Token, TokenPatch } from "@tormenta
 import { assetUrl } from "../lib/api";
 import { clampToMap, gridLines, snapToGrid } from "../lib/grid";
 import { useImage } from "../lib/useImage";
+import type { ToolMode } from "../store/tools";
 import { TokenInspector } from "./TokenInspector";
 
 /** Tamanho padrão quando a cena ainda não tem mapa. */
@@ -13,6 +14,8 @@ export const DEFAULT_MAP = { width: 1600, height: 1100 };
 
 interface VttCanvasProps {
   scene: Scene;
+  /** Ferramenta em vigor (ver store/tools): decide quem responde ao arraste. */
+  mode: ToolMode;
   tokens: Token[];
   participants: Participant[];
   me: Participant;
@@ -43,6 +46,15 @@ export interface TokenBar {
   temp: number;
 }
 
+/** Texto de ajuda do canto superior direito, por ferramenta. */
+const MODE_HINTS: Record<ToolMode, string> = {
+  select: "Arraste tokens para mover • Espaço + arrastar = navegar • Scroll = zoom",
+  pan: "Arraste para navegar pelo mapa • Scroll = zoom",
+  ruler: "Clique e arraste para medir • Scroll = zoom",
+  fog: "Névoa: em breve",
+  draw: "Desenho: em breve",
+};
+
 /** Largura da borda do círculo do token (pixels do mapa). */
 const BODY_STROKE = 3;
 
@@ -58,6 +70,7 @@ export function canControl(me: Participant, token: Token): boolean {
 
 export const VttCanvas: React.FC<VttCanvasProps> = ({
   scene,
+  mode,
   tokens,
   participants,
   me,
@@ -222,23 +235,25 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     return g !== null && (target === g || g.isAncestorOf(target));
   };
 
-  /** Pan do mapa só quando o ponteiro NÃO está sobre um token, para o Stage não competir com o drag do token. */
+  /** Cursor conforme o modo; no modo Selecionar, "grab" sobre um token que posso mover. */
   const handleStageMouseMove = () => {
-    const stage = stageRef.current;
-    if (!stage || Konva.isDragging()) return; // no meio de um arraste não mexemos em nada
+    if (Konva.isDragging()) return; // no meio de um arraste não mexemos em nada
+    if (mode === "pan") return setCursor("grab");
+    if (mode !== "select") return setCursor("crosshair");
     const over = tokenAtPointer();
-    stage.draggable(over === null);
-    setCursor(over ? (canControl(me, over) ? "grab" : "default") : "crosshair");
+    setCursor(over && canControl(me, over) ? "grab" : "default");
   };
 
   /** Se o canvas de hit não reconheceu o token sob o ponteiro, repassa o mousedown ao Group para o Konva iniciar o drag dele. */
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (mode !== "select") return;
     const t = tokenAtPointer();
     if (!t || hitLandedOnToken(e.target, t.id)) return;
     tokenGroup(t.id)?.fire("mousedown", { evt: e.evt, pointerId: e.pointerId }, false);
   };
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (mode !== "select") return;
     const t = tokenAtPointer();
     if (t) {
       // Se o hit tivesse acertado, o Group já teria tratado o clique (e cancelado o bubble).
@@ -252,7 +267,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     <div
       ref={containerRef}
       id="vtt-canvas-container"
-      className="relative flex-1 h-full w-full bg-stone-950 overflow-hidden cursor-crosshair select-none"
+      className={`relative flex-1 h-full w-full bg-stone-950 overflow-hidden select-none ${mode === "pan" ? "cursor-grab" : mode === "select" ? "cursor-default" : "cursor-crosshair"}`}
     >
       <Stage
         ref={stageRef}
@@ -262,10 +277,16 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         scaleY={stageScale}
         x={stagePos.x}
         y={stagePos.y}
-        draggable
+        draggable={mode === "pan"}
         onWheel={handleWheel}
+        onDragStart={(e) => {
+          if (e.target === stageRef.current) setCursor("grabbing");
+        }}
         onDragEnd={(e) => {
-          if (e.target === stageRef.current) setStagePos({ x: e.target.x(), y: e.target.y() });
+          if (e.target === stageRef.current) {
+            setCursor("grab");
+            setStagePos({ x: e.target.x(), y: e.target.y() });
+          }
         }}
         onMouseMove={handleStageMouseMove}
         onMouseDown={handleStageMouseDown}
@@ -291,10 +312,10 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
               key={token.id}
               token={token}
               bar={tokenBars[token.id] ?? null}
-              draggable={canControl(me, token)}
+              draggable={mode === "select" && canControl(me, token)}
               isSelected={token.id === selectedTokenId}
               isActiveTurn={token.id === activeTurnTokenId}
-              onSelect={() => onSelectToken(token.id)}
+              onSelect={() => mode === "select" && onSelectToken(token.id)}
               onCursor={setCursor}
               onDragMove={(x, y) => onTokenMoveLive(token.id, x, y)}
               onDragEnd={(node) => {
@@ -394,7 +415,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
       {!selectedToken && (
       <div className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a1a]/95 border border-[#2d2417] text-[11px] text-zinc-400 shadow-xl pointer-events-none">
         <Info className="w-3.5 h-3.5 text-[#d4af37]" />
-        <span>Arraste tokens para mover • Arraste o fundo para navegar • Scroll = zoom</span>
+        <span>{MODE_HINTS[mode]}</span>
       </div>
       )}
     </div>

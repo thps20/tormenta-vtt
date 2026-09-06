@@ -6,9 +6,12 @@ import { useChat } from "../store/chat";
 import { currentEntry, useInitiative } from "../store/initiative";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
 import { useSystemDef } from "../lib/system";
+import { useToolShortcuts } from "../lib/useToolShortcuts";
+import { selectEffectiveMode, useTools } from "../store/tools";
 import { computeCharacter } from "@tormenta-vtt/shared";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { TopBar } from "./TopBar";
+import { Toolbar } from "./Toolbar";
 import { VttCanvas, type TokenBar } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
 import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
@@ -68,6 +71,12 @@ function Table() {
   const updateGrid = useRoom((s) => s.updateGrid);
   const [isMapConfigOpen, setMapConfigOpen] = useState(false);
   const [sidePanelTab, setSidePanelTab] = useState<SidePanelTab>("chat");
+
+  // Ferramenta ativa do canvas + atalhos de teclado (V/H/R/Esc/espaço).
+  const toolMode = useTools((s) => s.mode);
+  const effectiveMode = useTools(selectEffectiveMode);
+  const setToolMode = useTools((s) => s.setMode);
+  useToolShortcuts();
 
   // Seleciona o objeto estável (byId) e deriva a lista com useMemo: um seletor que
   // devolvesse um array novo a cada chamada faria o Zustand re-renderizar sem parar.
@@ -171,45 +180,49 @@ function Table() {
       <div className="flex-1 flex overflow-hidden relative">
         <main className="flex-1 h-full relative overflow-hidden">
           {scene ? (
-            <VttCanvas
-              scene={scene}
-              tokens={tokens}
-              participants={participants}
-              me={me}
-              activeTurnTokenId={activeTurnTokenId}
-              selectedTokenId={selectedTokenId}
-              focusRequest={focusRequest}
-              onSelectToken={(tokenId) => {
-                selectToken(tokenId);
-                // Clique num token vinculado a uma ficha que eu vejo abre a ficha.
-                const characterId = tokenId ? byId[tokenId]?.characterId : null;
-                if (characterId && charById[characterId]) openCharacter(characterId);
-              }}
-              onTokenMoveLive={moveLive}
-              onTokenPatch={(patch) => void patchToken(patch)}
-              onTokenCreate={(pos, size) => {
-                const n = tokens.length + 1;
-                void createToken({
-                  sceneId: scene.id,
-                  name: `Token ${n}`,
-                  imageUrl: null,
-                  x: pos.x,
-                  y: pos.y,
-                  width: size,
-                  height: size,
-                  rotation: 0,
-                  zIndex: n,
-                  visible: true,
-                  ownerId: null,
-                  color: TOKEN_COLORS[(n - 1) % TOKEN_COLORS.length] ?? "#e11d48",
-                }).then((created) => created && selectToken(created.id));
-              }}
-              onTokenDelete={(id) => void deleteToken(id)}
-              linkableCharacters={linkableCharacters}
-              onLinkCharacter={(tokenId, characterId) => void linkCharacter(tokenId, characterId)}
-              onOpenCharacter={openCharacter}
-              tokenBars={tokenBars}
-            />
+            <>
+              <VttCanvas
+                scene={scene}
+                mode={effectiveMode}
+                tokens={tokens}
+                participants={participants}
+                me={me}
+                activeTurnTokenId={activeTurnTokenId}
+                selectedTokenId={selectedTokenId}
+                focusRequest={focusRequest}
+                onSelectToken={(tokenId) => {
+                  selectToken(tokenId);
+                  // Clique num token vinculado a uma ficha que eu vejo abre a ficha.
+                  const characterId = tokenId ? byId[tokenId]?.characterId : null;
+                  if (characterId && charById[characterId]) openCharacter(characterId);
+                }}
+                onTokenMoveLive={moveLive}
+                onTokenPatch={(patch) => void patchToken(patch)}
+                onTokenCreate={(pos, size) => {
+                  const n = tokens.length + 1;
+                  void createToken({
+                    sceneId: scene.id,
+                    name: `Token ${n}`,
+                    imageUrl: null,
+                    x: pos.x,
+                    y: pos.y,
+                    width: size,
+                    height: size,
+                    rotation: 0,
+                    zIndex: n,
+                    visible: true,
+                    ownerId: null,
+                    color: TOKEN_COLORS[(n - 1) % TOKEN_COLORS.length] ?? "#e11d48",
+                  }).then((created) => created && selectToken(created.id));
+                }}
+                onTokenDelete={(id) => void deleteToken(id)}
+                linkableCharacters={linkableCharacters}
+                onLinkCharacter={(tokenId, characterId) => void linkCharacter(tokenId, characterId)}
+                onOpenCharacter={openCharacter}
+                tokenBars={tokenBars}
+              />
+              <Toolbar mode={toolMode} effectiveMode={effectiveMode} onChange={setToolMode} />
+            </>
           ) : (
             <Centered>
               <p className="text-zinc-500 text-sm">Nenhuma cena ativa.</p>
