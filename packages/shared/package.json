@@ -7,7 +7,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./systems/*": "./systems/*"
+    "./systems/*": "./systems/*",
+    "./compendium": "./src/compendium/index.ts"
   },
   "scripts": {
     "dev": "echo '[shared] nada para rodar em dev (consumido direto como fonte TS)'",

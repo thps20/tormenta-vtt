@@ -4,5 +4,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "systems/*.json"]
+  "include": ["src/**/*.ts", "systems/**/*.json"]
 }

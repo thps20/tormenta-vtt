@@ -1,0 +1,43 @@
+[
+  {
+    "$comment": "Só mecânica (OGL). levels/initial são preenchidos ao inserir na ficha. TODO: confirmar com o livro a lista de perícias à escolha.",
+    "id": "guerreiro",
+    "name": "Guerreiro",
+    "kind": "class",
+    "tags": ["combate"],
+    "fields": {
+      "hpInitial": 20,
+      "hpPerLevel": 5,
+      "mpPerLevel": 3,
+      "skillsGranted": {
+        "fixed": ["fortitude"],
+        "choices": [
+          { "count": 1, "from": ["luta", "pontaria"], "chosen": [] },
+          { "count": 2, "from": ["adestramento", "atletismo", "cavalgar", "guerra", "iniciativa", "intimidacao", "oficio", "percepcao", "reflexos"], "chosen": [] }
+        ]
+      },
+      "proficiencies": "Armas marciais, escudos e armaduras pesadas"
+    },
+    "page": null
+  },
+  {
+    "$comment": "TODO: confirmar com o livro a lista de perícias à escolha e as proficiências.",
+    "id": "arcanista",
+    "name": "Arcanista",
+    "kind": "class",
+    "tags": ["conjurador", "arcano"],
+    "fields": {
+      "hpInitial": 8,
+      "hpPerLevel": 2,
+      "mpPerLevel": 6,
+      "skillsGranted": {
+        "fixed": ["misticismo", "vontade"],
+        "choices": [
+          { "count": 2, "from": ["atuacao", "conhecimento", "diplomacia", "enganacao", "guerra", "iniciativa", "intuicao", "investigacao", "nobreza", "oficio", "percepcao"], "chosen": [] }
+        ]
+      },
+      "proficiencies": ""
+    },
+    "page": null
+  }
+]

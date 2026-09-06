@@ -1,0 +1,14 @@
+[
+  {
+    "$comment": "Leve: sem limite de atributo na Defesa (maxAttr omitido). TODO: confirmar preço e espaços com o livro.",
+    "id": "couro-batido",
+    "name": "Couro batido",
+    "kind": "armor",
+    "tags": ["leve"],
+    "fields": { "type": "light" },
+    "statBonuses": { "defense": 2, "armorPenalty": 0 },
+    "slots": 2,
+    "price": 20,
+    "page": null
+  }
+]

@@ -1,0 +1,34 @@
+[
+  {
+    "$comment": "flexibleBonuses com count 0 = sem bônus à escolha (sem isso a ficha pediria uma escolha).",
+    "id": "anao",
+    "name": "Anão",
+    "kind": "race",
+    "tags": [],
+    "fields": {
+      "attributeBonuses": { "con": 2, "sab": 1, "des": -1 },
+      "flexibleBonuses": { "amount": 0, "count": 0, "exclude": [], "chosen": [] },
+      "size": "medio",
+      "movement": 6,
+      "senses": "Visão no escuro",
+      "skillsGranted": { "fixed": [], "choices": [] }
+    },
+    "page": null
+  },
+  {
+    "$comment": "Versátil: só a opção de duas perícias está modelada (a alternativa 'uma perícia e um poder' fica para quando houver poderes no compêndio).",
+    "id": "humano",
+    "name": "Humano",
+    "kind": "race",
+    "tags": [],
+    "fields": {
+      "attributeBonuses": {},
+      "flexibleBonuses": { "amount": 1, "count": 3, "exclude": [], "chosen": [] },
+      "size": "medio",
+      "movement": 9,
+      "senses": "",
+      "skillsGranted": { "fixed": [], "choices": [{ "count": 2, "from": [], "chosen": [] }] }
+    },
+    "page": null
+  }
+]

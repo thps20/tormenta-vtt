@@ -1,0 +1,32 @@
+[
+  {
+    "$comment": "TODO: confirmar preço e espaços com o livro.",
+    "id": "espada-longa",
+    "name": "Espada longa",
+    "kind": "weapon",
+    "tags": ["marcial", "corpo a corpo", "uma mão"],
+    "fields": { "proficiency": "marcial", "purpose": "melee", "wield": "one_hand", "properties": "" },
+    "actions": [
+      { "label": "Ataque", "kind": "attack", "skill": "luta", "critRange": 19, "critMult": 2 },
+      { "label": "Dano", "kind": "damage", "formula": "1d8", "damageType": "corte" }
+    ],
+    "slots": 1,
+    "price": 15,
+    "page": null
+  },
+  {
+    "$comment": "Disparo: o dano não soma atributo (damageAttribute.map.ranged = null). TODO: confirmar preço e espaços.",
+    "id": "arco-curto",
+    "name": "Arco curto",
+    "kind": "weapon",
+    "tags": ["marcial", "disparo", "duas mãos"],
+    "fields": { "proficiency": "marcial", "purpose": "ranged", "wield": "two_hands", "properties": "" },
+    "actions": [
+      { "label": "Ataque", "kind": "attack", "skill": "pontaria", "critRange": 20, "critMult": 3 },
+      { "label": "Dano", "kind": "damage", "formula": "1d6", "damageType": "perfuracao" }
+    ],
+    "slots": 1,
+    "price": 30,
+    "page": null
+  }
+]
