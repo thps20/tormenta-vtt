@@ -3,7 +3,7 @@
 > Documento de referência. Analisa o sistema não oficial de Tormenta20 para Foundry VTT
 > (`~/projetos/foundry-tormenta20`, versão 1.5.015) **apenas como referência de modelagem de dados**
 > e propõe como estender `packages/shared` para cobrir ficha de personagem e itens.
-> As fases 1 e 2 da proposta estão implementadas (ver §3.6); o comportamento atual está em `SPEC.md` §3.6.
+> As fases 1, 2 e 3 da proposta estão implementadas (ver §3.6); o comportamento atual está em `SPEC.md` §3.6.
 > As seções 2 e 3 permanecem como registro da análise e da proposta original.
 
 Escopo da leitura no repositório do Foundry:
@@ -200,7 +200,7 @@ Fica de fora de propósito, por ser automação pesada ou Product Identity: Acti
 |---|---|---|
 | 1. Schema v2 + JSON + `computeCharacter` + modificadores | **feito** | `packages/shared/src/schemas/system.ts`, `systems/tormenta20.json`, `src/rules/` |
 | 2. Itens físicos com `statBonuses` e ações de ataque/dano ligadas ao chat | **feito** | `rules/rolls.ts`, `apps/server/src/socket/character.ts`, `apps/web/src/components/sheet/` |
-| 3. Poderes e magias com ativação, custo de PM e CD de resistência | pendente | tipos prontos (`ActivationSchema`, `SaveSchema`); falta UI e lógica |
+| 3. Poderes e magias com ativação, custo de PM e CD de resistência | **feito** | `rules/activation.ts`, `activation.*` no JSON, `character:use-item`, `ItemCardMessage` no chat; plano em `plano-passo3.md` |
 | 4. Classes e raças como itens alimentando nível e PV/PM | pendente | `ResourceDef.perLevel` e `level.source = "classes"` já existem no schema, ignorados por enquanto |
 
 Diferenças em relação à proposta original, todas para manter o código sem chave de Tormenta:
@@ -209,3 +209,4 @@ Diferenças em relação à proposta original, todas para manter o código sem c
 - Os placeholders contextuais (`{attr}`, `{trained}`, `{sizeMod}`, `{armorPenalty}`, `{skill}`, `{max}`) ficaram documentados no cabeçalho de `system.ts`; `validateSystemDefinition` confere todos os placeholders do JSON.
 - Sem `systemId` na ficha: a sala já tem o sistema.
 - Moedas: os valores de `ratio` em `currencies[]` foram preenchidos de memória e **precisam ser conferidos no livro**; hoje são só informativos.
+- Fase 3: em vez de `derived.dc` servir de CD para itens, o JSON tem `activation.saveDc` com `{saveAttr}`/`{saveBonus}`, porque o item pode trocar o atributo. O custo usa modificadores `resource.<key>.cost` (equivalente ao `custoPM` do Foundry) com piso `activation.minCost`. Execuções passivas são marcadas no JSON (`executions[].passive`), não por chave no código.

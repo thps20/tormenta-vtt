@@ -10,7 +10,7 @@ Arquitetura **agnóstica de sistema**: tudo que é regra (atributos, perícias, 
 
 **Fora do MVP** (explicitamente): login/contas, fog of war, medição de distância, áudio/vídeo, múltiplos mapas simultâneos, compêndio de magias/itens, automação avançada da ficha (classes e raças como itens, efeitos ativos, progressão por nível).
 
-A **ficha básica** (§3.6) entrou no escopo em setembro/2026: atributos, perícias, recursos, stats derivados, modificadores e itens físicos com ataque/dano ligados ao chat. Poderes e magias já existem nos tipos, mas a lógica de ativação (custo, CD) vem depois. Raciocínio e mapeamento em `docs/modelo-personagem.md`.
+A **ficha básica** (§3.6) entrou no escopo em setembro/2026: atributos, perícias, recursos, stats derivados, modificadores e itens físicos com ataque/dano ligados ao chat. Poderes e magias com ativação (custo de PM, CD de resistência, card no chat) entraram em seguida (fase 3). Raciocínio e mapeamento em `docs/modelo-personagem.md`; plano da fase 3 em `docs/plano-passo3.md`.
 
 ## 2. Papéis
 
@@ -56,7 +56,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Jogador (dono) só pode alterar `x, y, width, height, rotation`; o servidor ignora os demais campos do patch. Nome, cor, dono, visibilidade e imagem são só do GM (painel do token).
 
 ### 3.4 Chat e dados
-- Input único. Texto normal vira `ChatMessage{kind:"text"}`.
+- Input único. Texto normal vira `ChatMessage{kind:"text"}`. Outros tipos: `roll` (rolagem), `system` (aviso) e `item` (card de poder/magia usado pela ficha, ver §3.6).
 - Comandos:
   - `/r <fórmula> [# rótulo]` — rola, ex.: `/r 2d6+3`, `/r 1d20+5 # Ataque`.
   - `/gr <fórmula>` — rolagem secreta (só GM e autor veem).
@@ -91,8 +91,12 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Tudo que é regra vem do JSON do sistema (`SystemDefinitionSchema` v2): atributos, perícias (com tags, variantes como "Ofício" e flags de tamanho/armadura), recursos, stats derivados por fórmula (`derived[]`: Defesa, CD, carga...), tamanhos, tipos de dano, moedas, campos de traço, stats de equipamento (`equipStats`) e tipos de item com campos declarados (`itemKinds`).
 - A ficha guarda só **entradas**: base dos atributos, treinado/outros por perícia, atual/temporário/máximo digitado por recurso, overrides de derivados, modificadores, traços, moedas, itens. Os valores finais vêm de `computeCharacter(def, character)` (função pura em `packages/shared/src/rules/compute.ts`), que servidor e cliente rodam igual. O cliente usa só para exibir; o servidor é quem monta e rola.
 - **Modificador** = `{ target, value }` com `target` textual validado por regex (`attr.for`, `skill.luta`, `skill.*`, `skill[tag=ataque]`, `derived.defense`, `resource.pv.max`, `attack`, `attack.luta`, `damage`, `damage.pontaria`). Cobre bônus de poderes, condições e itens sem o código conhecer nenhuma chave.
-- **Item** = tipo (`kind` de `itemKinds`), campos do tipo (`fields`), `equipped`, `statBonuses` (ex.: armadura dá `defense`, `maxAttr`, `armorPenalty`; só contam equipados) e **ações**: `attack` (perícia + atributo alternativo + margem de crítico), `damage` (fórmula + atributo `auto` pela regra `damageAttribute` do sistema + tipo), `check` e `formula`. Blocos `activation` e `save` existem nos tipos para poderes/magias; a lógica de custo/CD é fase 3.
+- **Item** = tipo (`kind` de `itemKinds`), campos do tipo (`fields`), `equipped`, `statBonuses` (ex.: armadura dá `defense`, `maxAttr`, `armorPenalty`; só contam equipados) e **ações**: `attack` (perícia + atributo alternativo + margem de crítico), `damage` (fórmula + atributo `auto` pela regra `damageAttribute` do sistema + tipo), `check` e `formula`. Blocos `activation` e `save` guardam a ativação e o teste de resistência de poderes/magias/consumíveis.
 - `character:roll` monta a fórmula no servidor (`buildCharacterRoll`), rola e publica no chat como `ChatMessage{kind:"roll"}` com `characterId` e, em ataques, `critThreshold` (o chat destaca crítico a partir dele).
+- **Ativação** (poderes, magias, consumíveis): tudo vem de `activation` no JSON do sistema: `resource` (recurso descontado pelo custo; PM em T20), `minCost` (piso após modificadores; 1 em T20), `saveDc` (fórmula da CD, `10 + {halfLevel} + {saveAttr} + {saveBonus}`), `executions[].passive` (quais execuções são passivas) e `spellcastingLabel`. `itemKinds[].useLabel` dá o texto do botão ("Conjurar"/"Usar").
+  - `character:use-item` (GM ou dono): `buildItemUse` (`rules/activation.ts`) calcula o custo efetivo (base + modificadores `resource.<key>.cost`; base 0 continua 0; senão piso `minCost`), verifica o recurso (temporários gastos antes dos atuais), persiste a ficha (`character:updated`) e publica `ChatMessage{kind:"item"}` com um `ItemCard` denormalizado (nome, tipo e campos com rótulos, custo, execução/alcance/duração/alvo/área, efeito resumido, CD e as ações do item). Recurso insuficiente ou item passivo: ack `{ ok:false }` e nada é publicado.
+  - `{saveAttr}` é o atributo do `save.attribute` do item ou, se nulo, o `spellcastingAttribute` da ficha (editável no cabeçalho). Os botões do card no chat disparam `character:roll { type:"action" }` e só ficam ativos para GM ou dono da ficha.
+  - Na ficha, itens de tipos com `hasActivation` e execução não passiva ganham o botão de uso com o custo efetivo (vermelho se o recurso atual não cobre); passivos mostram só a descrição.
 - Permissões: GM vê e edita todas; jogador vê as fichas `kind = "pc"`, cria só para si e edita/rola só as que possui (`ownerId`). Fichas `npc` não vão para jogadores (`character:deleted` se uma PC virar NPC).
 - Vínculo com token: `token:link-character` (GM, ou dono do token que também é dono da ficha). Apagar a ficha desvincula os tokens (`token:updated` com `characterId = null`). Na mesa, clicar num token vinculado a uma ficha visível abre a ficha; o token mostra uma barra com o recurso apontado por `tokenBar` no JSON do sistema (atual/máximo da ficha, via `computeCharacter`).
 - UI: a ficha abre numa gaveta lateral (`CharacterSheetDrawer`) com modo visualização (clique rola) e modo edição. Jogador tem o botão "Meu personagem" na barra superior (estado vazio + "Criar personagem" se não tiver ficha); o GM tem "Fichas", com todas as fichas da sala.
@@ -118,7 +122,7 @@ Room 1───* InitiativeEntry ?──1 Token
 | **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON)` | `grid` é JSON para evoluir sem migration |
 | **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character` |
 | **Character** | `id, roomId, ownerId?, name, kind, data(JSON)` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration |
-| **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON)` | `roll` segue `DiceRollSchema` |
+| **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON)` | `roll` segue `DiceRollSchema`; `item` segue `ItemCardSchema` (kind `item`) |
 | **InitiativeEntry** | `id, roomId, tokenId?, name, value, tiebreak, visible` | `currentIndex` e `round` ficam em memória por sala (perdem-se ao reiniciar o servidor; aceitável no MVP) |
 | **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypes[], currencies[], traitFields[], equipStats[], itemKinds[], activation, skillTotal, rolls{}, damageAttribute, tokenBar, trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web |
 
@@ -148,6 +152,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `character:update` | `{ id, patch }` (patch raso de `CharacterDataSchema` + `name`, `ownerId`, `kind`) | GM ou owner (jogador não muda `ownerId`/`kind`) | `character:updated` |
 | `character:delete` | `{ characterId }` | GM ou owner | `character:deleted` + `token:updated` dos tokens desvinculados |
 | `character:roll` | `{ characterId, roll: {type: attribute\|skill\|initiative\|extra\|action, ...}, secret? }` | GM ou owner | `chat:message` (rolagem com `characterId`) |
+| `character:use-item` | `{ characterId, itemId }` | GM ou owner | `character:updated` (se houve custo) + `chat:message` (`kind:"item"`); recurso insuficiente = ack erro, sem broadcast |
 | `chat:send` | `{ text }` | todos | `chat:message` (rolagem secreta só p/ GM + autor) |
 | `initiative:add` | `InitiativeEntry` sem `id` | GM | `initiative:updated` |
 | `initiative:update` | `{ id, ...campos }` | GM | `initiative:updated` |
@@ -227,7 +232,7 @@ packages/shared/systems/
 ## 8. Estado da implementação
 
 Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a ficha básica (§3.6). Limitações conhecidas:
-- Ficha: poderes e magias existem como itens com campos, mas sem custo de PM, CD de resistência nem ativação na UI (fase 3). Classes e raças como itens, nível e PV/PM automáticos são a fase 4.
+- Ficha: classes e raças como itens, nível e PV/PM automáticos são a fase 4. Consumíveis usam a mesma ativação de poderes/magias, mas a quantidade não é descontada ao usar.
 - `character:update` é um patch raso: editar um item reenvia a lista `items` inteira (fichas são pequenas; ok por ora).
 - Só existe UI para uma cena por sala (`scene:create`/`scene:activate` funcionam no servidor, sem botão no web).
 - `currentIndex`/`round` da iniciativa e a presença (`connected`) se perdem ao reiniciar o servidor.
