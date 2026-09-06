@@ -22,6 +22,8 @@ import type {
   Participant,
   RoomJoinPayload,
   RoomPublic,
+  Ruler,
+  RulerUpdatePayload,
   Scene,
   SceneSetMapPayload,
   SceneUpdateGridPayload,
@@ -78,6 +80,10 @@ export interface ClientToServerEvents {
   /** Rola atributo/perícia/iniciativa/ação de item a partir da ficha; o servidor monta a fórmula e rola. */
   "character:roll": (payload: CharacterRollPayload, ack: Ack<ChatMessage>) => void;
 
+  // Régua (efêmera: só broadcast, nada vai ao banco)
+  /** Enviado com throttle enquanto o participante arrasta a régua; `ruler: null` ao soltar. */
+  "ruler:update": (payload: RulerUpdatePayload, ack: Ack) => void;
+
   // Chat + dados
   /** "/r <fórmula> [# rótulo]" rola; "/gr" rola em segredo (só GM + autor veem). */
   "chat:send": (payload: { text: string }, ack: Ack<ChatMessage>) => void;
@@ -113,6 +119,9 @@ export interface ServerToClientEvents {
 
   "initiative:updated": (state: InitiativeState) => void;
 
+  /** Régua de outro participante (o autor não recebe eco: já desenha a própria). ruler null = apagar. */
+  "ruler:updated": (p: { participantId: string; nickname: string; sceneId: string; ruler: Ruler | null }) => void;
+
   /** Erros não relacionados a um ack específico. */
   "server:error": (p: { message: string }) => void;
 }
@@ -122,4 +131,6 @@ export interface SocketData {
   roomId: string;
   participantId: string;
   role: "gm" | "player";
+  /** Guardado no join para eventos frequentes (régua) não consultarem o banco. */
+  nickname: string;
 }

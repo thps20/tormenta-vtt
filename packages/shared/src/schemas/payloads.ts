@@ -65,6 +65,18 @@ export const TokenDeleteSchema = z.object({ tokenId: IdSchema });
 export const TokenLinkCharacterSchema = z.object({ tokenId: IdSchema, characterId: IdSchema.nullable() });
 export type TokenLinkCharacterPayload = z.infer<typeof TokenLinkCharacterSchema>;
 
+// --- Régua (efêmera) -------------------------------------------------------
+
+/** Ponto em pixels do mapa. */
+const MapPointSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
+
+export const RulerSchema = z.object({ start: MapPointSchema, end: MapPointSchema });
+export type Ruler = z.infer<typeof RulerSchema>;
+
+/** Régua que o participante está desenhando; null = soltou (apagar). Nada é persistido. */
+export const RulerUpdateSchema = z.object({ sceneId: IdSchema, ruler: RulerSchema.nullable() });
+export type RulerUpdatePayload = z.infer<typeof RulerUpdateSchema>;
+
 // --- Ficha -----------------------------------------------------------------
 
 /** O servidor preenche os defaults do sistema (createDefaultCharacterData). */

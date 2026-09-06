@@ -5,6 +5,7 @@ import { registerTokenHandlers } from "./token.js";
 import { registerChatHandlers } from "./chat.js";
 import { registerInitiativeHandlers } from "./initiative.js";
 import { registerCharacterHandlers } from "./character.js";
+import { registerRulerHandlers } from "./ruler.js";
 import type { TypedServer } from "./types.js";
 
 /** Ponto único que liga todos os handlers de socket. */
@@ -15,6 +16,7 @@ export function registerSocketHandlers(io: TypedServer, log: FastifyBaseLogger):
     socket.data.roomId = "";
     socket.data.participantId = "";
     socket.data.role = "player";
+    socket.data.nickname = "";
 
     registerRoomHandlers(io, socket);
     registerSceneHandlers(io, socket);
@@ -22,6 +24,7 @@ export function registerSocketHandlers(io: TypedServer, log: FastifyBaseLogger):
     registerChatHandlers(io, socket);
     registerInitiativeHandlers(io, socket);
     registerCharacterHandlers(io, socket);
+    registerRulerHandlers(io, socket);
 
     socket.on("disconnect", (reason) => {
       log.info({ socketId: socket.id, reason }, "socket desconectado");

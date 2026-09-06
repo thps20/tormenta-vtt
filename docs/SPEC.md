@@ -147,6 +147,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `initiative:update` | `{ id, ...campos }` | GM | `initiative:updated` |
 | `initiative:remove` | `{ entryId }` | GM | `initiative:updated` |
 | `initiative:next` / `prev` / `reset` | `{}` | GM | `initiative:updated` |
+| `ruler:update` | `{ sceneId, ruler: { start, end } \| null }` (pixels do mapa) | todos | `ruler:updated` para os **outros** (efêmero: não persiste; `null` apaga) |
 
 ### Servidor → Cliente
 
@@ -161,6 +162,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `character:created` / `character:updated` | `Character` (jogadores só recebem `kind = "pc"`) |
 | `character:deleted` | `{ characterId }` |
 | `initiative:updated` | `InitiativeState` (estado completo, simples de sincronizar) |
+| `ruler:updated` | `{ participantId, nickname, sceneId, ruler \| null }` (régua de outro participante; sem eco ao autor) |
 | `server:error` | `{ message }` |
 
 ### HTTP (fora do socket)

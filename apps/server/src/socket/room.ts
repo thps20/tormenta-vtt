@@ -26,6 +26,7 @@ export function registerRoomHandlers(io: TypedServer, socket: TypedSocket): void
       socket.data.roomId = room.id;
       socket.data.participantId = me.id;
       socket.data.role = me.role;
+      socket.data.nickname = me.nickname;
 
       await socket.join([
         rooms.all(room.id),
