@@ -6,6 +6,7 @@ import { createDefaultCharacterData, createDefaultItem } from "./defaults.js";
 import { describeModifierTarget, listModifierTargets, parseModifierTarget, ModifierTargetSchema } from "./modifierTarget.js";
 import { collectPlaceholders, substitutePlaceholders, FormulaError } from "./placeholders.js";
 import { buildCharacterRoll, resolveCharacterFormula, RollBuildError } from "./rolls.js";
+import { buildItemUse, describeActivation, effectiveCost, isPassiveItem, ItemUseError, saveDcFor } from "./activation.js";
 
 const def = getSystemDefinition("tormenta20");
 
@@ -230,5 +231,118 @@ describe("defaults", () => {
     expect(createDefaultItem(def, "armor", "a1").actions).toEqual([]);
     expect(createDefaultItem(def, "spell", "s1").activation).not.toBeNull();
     expect(() => createDefaultItem(def, "nope", "x")).toThrow();
+  });
+});
+
+describe("activation (poderes e magias)", () => {
+  const fireball = CharacterItemSchema.parse({
+    id: "fireball",
+    kind: "spell",
+    name: "Bola de fogo",
+    description: "Explosão de chamas.",
+    fields: { circle: 2, school: "evocacao", type: "arcana" },
+    activation: { cost: 3, execution: "standard", range: { units: "medium" }, duration: { units: "instant" }, area: "esfera de 6 m", effect: "6d6 de fogo" },
+    save: { skill: "reflexos", text: "metade" },
+    actions: [{ id: "dmg", label: "Dano", kind: "damage", formula: "6d6", attribute: null, damageType: "fogo" }],
+  });
+  const passive = CharacterItemSchema.parse({ id: "tough", kind: "power", name: "Vigor", activation: { execution: "passive" } });
+  const free = CharacterItemSchema.parse({ id: "free", kind: "power", name: "Truque", activation: { cost: 0, execution: "free" } });
+
+  /** Ficha com PM e atributo de conjuração INT (2). */
+  const caster = (pm: Partial<{ current: number; temp: number }>, patch: Record<string, unknown> = {}) =>
+    ({
+      ...fixture({ spellcastingAttribute: "int", items: [fireball, passive, free], resources: { pm: { current: 10, temp: 0, maxOverride: 10, ...pm } }, ...patch }),
+      id: "c1",
+      roomId: "r1",
+      ownerId: null,
+      name: "Maga",
+      kind: "pc" as const,
+      createdAt: "2026-09-06T00:00:00.000Z",
+      updatedAt: "2026-09-06T00:00:00.000Z",
+    });
+  const costMod = (value: number) => ModifierSchema.parse({ id: "cm", target: "resource.pm.cost", value });
+
+  it("passivo = sem ativação ou execução marcada como passiva no sistema", () => {
+    expect(isPassiveItem(def, passive)).toBe(true);
+    expect(isPassiveItem(def, { activation: null })).toBe(true);
+    expect(isPassiveItem(def, fireball)).toBe(false);
+    expect(isPassiveItem(def, free)).toBe(false);
+  });
+
+  it("custo efetivo: modificador reduz, piso minCost, base 0 continua 0", () => {
+    const c = caster({});
+    expect(effectiveCost(def, c, fireball)).toBe(3);
+    expect(effectiveCost(def, { modifiers: [costMod(-1)] }, fireball)).toBe(2);
+    expect(effectiveCost(def, { modifiers: [costMod(+2)] }, fireball)).toBe(5);
+    // Redução grande bate no piso do JSON (1 PM), não em 0.
+    expect(effectiveCost(def, { modifiers: [costMod(-5)] }, fireball)).toBe(def.activation.minCost);
+    expect(def.activation.minCost).toBe(1);
+    // Habilidade gratuita não ganha custo nem por bônus nem por redução.
+    expect(effectiveCost(def, { modifiers: [costMod(-1)] }, free)).toBe(0);
+    expect(effectiveCost(def, { modifiers: [costMod(+2)] }, free)).toBe(0);
+    // Modificador desabilitado não conta.
+    expect(effectiveCost(def, { modifiers: [{ ...costMod(-1), enabled: false }] }, fireball)).toBe(3);
+  });
+
+  it("CD = 10 + meio nível + atributo de conjuração (ou o do item) + bônus", () => {
+    const c = caster({});
+    const computed = computeCharacter(def, c);
+    // nível 5 → meio nível 2; INT 2
+    expect(saveDcFor(def, computed, c, fireball)).toBe(14);
+    expect(saveDcFor(def, computed, c, { save: { ...fireball.save!, attribute: "sab" } })).toBe(13);
+    expect(saveDcFor(def, computed, c, { save: { ...fireball.save!, bonus: 2 } })).toBe(16);
+    expect(saveDcFor(def, computed, { spellcastingAttribute: null }, fireball)).toBe(12);
+    expect(saveDcFor(def, computed, c, { save: null })).toBeNull();
+  });
+
+  it("descreve a ativação com os rótulos do sistema", () => {
+    expect(describeActivation(def, fireball.activation!)).toEqual({ execution: "Padrão", duration: "Instantânea", range: "Médio (30 m)" });
+  });
+
+  it("buildItemUse desconta o recurso (temporários primeiro) e monta o card", () => {
+    const use = buildItemUse(def, caster({ current: 5, temp: 2 }), "fireball");
+    expect(use.cost).toBe(3);
+    expect(use.spend?.resourceKey).toBe("pm");
+    expect(use.spend?.resources.pm).toEqual({ current: 4, temp: 0, maxOverride: 10 });
+    expect(use.card).toMatchObject({
+      characterId: "c1",
+      characterName: "Maga",
+      itemName: "Bola de fogo",
+      kindLabel: "Magia",
+      cost: { abbr: "PM", amount: 3 },
+      execution: "Padrão",
+      range: "Médio (30 m)",
+      duration: "Instantânea",
+      area: "esfera de 6 m",
+      effect: "6d6 de fogo",
+      save: { skillLabel: "Reflexos", dc: 14, text: "metade" },
+      actions: [{ id: "dmg", label: "Dano", kind: "damage" }],
+    });
+    expect(use.card.fields).toEqual([
+      { label: "Círculo", value: "2" },
+      { label: "Escola", value: "Evocação" },
+      { label: "Tipo", value: "Arcana" },
+    ]);
+  });
+
+  it("custo com modificador é o que se desconta e aparece no card", () => {
+    const use = buildItemUse(def, caster({ current: 2 }, { modifiers: [costMod(-1)] }), "fireball");
+    expect(use.cost).toBe(2);
+    expect(use.spend?.resources.pm?.current).toBe(0);
+    expect(use.card.cost).toEqual({ abbr: "PM", amount: 2 });
+  });
+
+  it("recusa recurso insuficiente, item passivo e item inexistente", () => {
+    expect(() => buildItemUse(def, caster({ current: 2 }), "fireball")).toThrow(/PM insuficiente: precisa de 3, tem 2/);
+    expect(() => buildItemUse(def, caster({ current: 2 }), "tough")).toThrow(ItemUseError);
+    expect(() => buildItemUse(def, caster({}), "nope")).toThrow(ItemUseError);
+  });
+
+  it("item sem custo não desconta nada e o card vem sem custo", () => {
+    const use = buildItemUse(def, caster({ current: 0 }), "free");
+    expect(use.cost).toBe(0);
+    expect(use.spend).toBeNull();
+    expect(use.card.cost).toBeNull();
+    expect(use.card.save).toBeNull();
   });
 });

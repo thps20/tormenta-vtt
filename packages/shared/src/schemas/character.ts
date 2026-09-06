@@ -178,3 +178,31 @@ export const CharacterRollRequestSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("action"), itemId: IdSchema, actionId: IdSchema }),
 ]);
 export type CharacterRollRequest = z.infer<typeof CharacterRollRequestSchema>;
+
+/**
+ * Card publicado no chat quando um item ativo é usado (character:use-item).
+ * Denormalizado de propósito: guarda rótulos já resolvidos pelo JSON do sistema,
+ * então o histórico continua legível mesmo se o item mudar ou for apagado.
+ * `actions` só guarda ids: o botão no chat dispara character:roll { type: "action" }.
+ */
+export const ItemCardSchema = z.object({
+  characterId: IdSchema,
+  characterName: z.string().max(80),
+  itemId: IdSchema,
+  itemName: z.string().max(80),
+  kindLabel: z.string().max(40),
+  /** Campos do tipo com rótulo (ex.: "Círculo: 1", "Escola: Evocação"). */
+  fields: z.array(z.object({ label: z.string().max(40), value: z.string().max(200) })),
+  /** Custo efetivo já descontado; null = sem custo. */
+  cost: z.object({ abbr: z.string().max(6), amount: z.number().int().min(0) }).nullable(),
+  execution: z.string().max(60),
+  range: z.string().max(60),
+  duration: z.string().max(60),
+  target: z.string().max(200),
+  area: z.string().max(200),
+  effect: z.string().max(2000),
+  /** CD calculada (null quando o sistema não define saveDc). */
+  save: z.object({ skillLabel: z.string().max(40), dc: z.number().int().nullable(), text: z.string().max(500) }).nullable(),
+  actions: z.array(z.object({ id: IdSchema, label: z.string().max(60), kind: z.string().max(20) })),
+});
+export type ItemCard = z.infer<typeof ItemCardSchema>;
