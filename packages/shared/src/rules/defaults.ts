@@ -4,6 +4,7 @@
  */
 import { CharacterDataSchema, CharacterItemSchema, type CharacterData, type CharacterItem } from "../schemas/character.js";
 import type { SystemDefinition } from "../schemas/system.js";
+import { emptyFieldValue } from "./progression.js";
 
 export function createDefaultCharacterData(def: SystemDefinition): CharacterData {
   const attributes = Object.fromEntries(def.attributes.map((a) => [a.key, { base: a.default }]));
@@ -17,13 +18,9 @@ export function createDefaultCharacterData(def: SystemDefinition): CharacterData
 export function createDefaultItem(def: SystemDefinition, kind: string, id: string): CharacterItem {
   const kdef = def.itemKinds.find((k) => k.key === kind);
   if (!kdef) throw new Error(`Tipo de item desconhecido: ${kind}`);
-  const fields: Record<string, string | number | boolean> = {};
+  const fields: CharacterItem["fields"] = {};
   for (const f of kdef.fields) {
-    if (f.default !== undefined) fields[f.key] = f.default;
-    else if (f.type === "enum") fields[f.key] = f.options?.[0]?.key ?? "";
-    else if (f.type === "number") fields[f.key] = 0;
-    else if (f.type === "boolean") fields[f.key] = false;
-    else fields[f.key] = "";
+    fields[f.key] = f.default !== undefined ? f.default : emptyFieldValue(def, f);
   }
   // Tipo "arma" no sentido genérico: declara o campo que decide o atributo do dano.
   // Nasce com uma ação de ataque (primeira perícia de ataque) e uma de dano.

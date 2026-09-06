@@ -176,8 +176,11 @@ export type CharacterKind = z.infer<typeof CharacterKindSchema>;
 /** Conteúdo da coluna `data` + campos editáveis. */
 export const CharacterDataSchema = z.object({
   imageUrl: z.string().nullable().default(null),
+  /** Nível digitado. Ignorado quando as classes mandam (level.source = "classes", há classe e manualProgression = false). */
   level: z.number().int().min(0).default(1),
   xp: z.number().int().min(0).default(0),
+  /** true = ignora as classes: nível e máximos dos recursos voltam a ser digitados (level, maxOverride). */
+  manualProgression: z.boolean().default(false),
   attributes: z.record(KeySchema, z.object({ base: z.number().int() })).default({}),
   skills: z.record(SkillInstanceKeySchema, CharacterSkillSchema).default({}),
   resources: z.record(KeySchema, CharacterResourceSchema).default({}),

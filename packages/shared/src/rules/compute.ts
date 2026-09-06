@@ -5,8 +5,9 @@
  * exibir, o servidor para montar rolagens.
  *
  * Ordem (cada etapa só depende das anteriores):
- *   nível → modificadores → atributos → equip (itens equipados) → perícias
- *   → derivados → recursos.
+ *   classes → nível → modificadores (da ficha + dos itens) → atributos
+ *   → equip (itens equipados) → perícias (com as concedidas por itens)
+ *   → derivados → recursos (por nível de classe, quando as classes mandam).
  * Erros de fórmula não derrubam a ficha: viram `warnings` e o valor fica 0.
  */
 import { DiceParseError, evaluateConstant } from "../dice/index.js";
@@ -14,6 +15,7 @@ import type { Character, CharacterData, CharacterSkill } from "../schemas/charac
 import type { SizeDef, SkillDef, SystemDefinition } from "../schemas/system.js";
 import { FormulaError, substitutePlaceholders } from "./placeholders.js";
 import { parseModifierTarget, type ModifierTarget } from "./modifierTarget.js";
+import { itemModifiers, listClasses, perLevelMax, skillGrants, type ClassEntry, type ItemModifier } from "./progression.js";
 
 export interface ComputedSkill {
   key: string;
@@ -21,20 +23,34 @@ export interface ComputedSkill {
   /** Atributo efetivamente usado. */
   attribute: string;
   trained: boolean;
+  /** Id do item que concede o treino (null = marcado na ficha ou não treinada). */
+  grantedBy: string | null;
   /** false quando a perícia exige treino e o personagem não é treinado. */
   usable: boolean;
   total: number;
 }
 
+export interface ComputedResource {
+  max: number;
+  min: number;
+  /** Conta do máximo em texto quando veio das classes; null quando digitado ou por fórmula. */
+  detail: string | null;
+}
+
 export interface ComputedCharacter {
   level: number;
+  /** "classes" = nível e recursos por nível vêm dos itens de classe; "manual" = digitados. */
+  levelSource: "classes" | "manual";
+  classes: ClassEntry[];
   halfLevel: number;
   trainedBonus: number;
   attributes: Record<string, number>;
+  /** Modificadores gerados por itens ativos (raça etc.), já somados em `attributes`. */
+  itemModifiers: ItemModifier[];
   equip: Record<string, number>;
   skills: Record<string, ComputedSkill>;
   derived: Record<string, number>;
-  resources: Record<string, { max: number; min: number }>;
+  resources: Record<string, ComputedResource>;
   warnings: string[];
 }
 
@@ -127,11 +143,22 @@ export function computeCharacter(def: SystemDefinition, character: Character | C
   const warnings: string[] = [];
   const data: CharacterData = character;
 
-  // Nível. (level.source = "classes" chega na fase 4; por ora o valor é o digitado.)
-  const level = Math.max(0, Math.min(def.level.max, data.level));
+  // Classes e nível: as classes mandam quando o sistema diz, há ao menos uma e a ficha não está em modo manual.
+  const classes = listClasses(def, data);
+  const usesClasses = def.level.source === "classes" && classes.length > 0 && !data.manualProgression;
+  const rawLevel = usesClasses ? classes.reduce((acc, c) => acc + c.levels, 0) : data.level;
+  const level = Math.max(0, Math.min(def.level.max, rawLevel));
   const halfLevel = Math.floor(level / 2);
   const trainedBonus = trainedBonusFor(def, level);
-  const mods = parseModifiers(data);
+
+  // Modificadores da ficha + os gerados por itens ativos (raça, equipamento com bônus de atributo).
+  const fromItems = itemModifiers(def, data);
+  const mods: ParsedModifier[] = [...parseModifiers(data)];
+  for (const m of fromItems) {
+    const target = parseModifierTarget(m.target);
+    if (target) mods.push({ target, value: m.value });
+  }
+  const grants = skillGrants(def, data);
 
   // Atributos: base (ou default do sistema) + modificadores.
   const attributes: Record<string, number> = {};
@@ -148,7 +175,7 @@ export function computeCharacter(def: SystemDefinition, character: Character | C
   // entram conforme vão sendo calculados).
   const skills: Record<string, ComputedSkill> = {};
   const derived: Record<string, number> = {};
-  const resources: Record<string, { max: number; min: number }> = {};
+  const resources: Record<string, ComputedResource> = {};
   const resolveGlobal = (path: string): number | undefined => {
     if (path === "level") return level;
     if (path === "halfLevel") return halfLevel;
@@ -170,12 +197,15 @@ export function computeCharacter(def: SystemDefinition, character: Character | C
     if (!sdef) continue;
     const cs: CharacterSkill = data.skills[key] ?? { trained: false, other: 0, attribute: null };
     const attrKey = cs.attribute && attributes[cs.attribute] !== undefined ? cs.attribute : sdef.attribute;
+    // Treino marcado na ficha ou concedido por um item (classe, raça).
+    const grant = cs.trained ? undefined : grants.get(key);
+    const trained = cs.trained || grant !== undefined;
     const resolve = (path: string): number | undefined => {
       switch (path) {
         case "attr":
           return attributes[attrKey] ?? 0;
         case "trained":
-          return cs.trained ? trainedBonus : 0;
+          return trained ? trainedBonus : 0;
         case "sizeMod":
           return sdef.sizeModifier ? (size?.skillModifier ?? 0) : 0;
         case "armorPenalty":
@@ -197,8 +227,9 @@ export function computeCharacter(def: SystemDefinition, character: Character | C
       key,
       label: variant ? `${sdef.label} (${variant})` : sdef.label,
       attribute: attrKey,
-      trained: cs.trained,
-      usable: !sdef.trainedOnly || cs.trained,
+      trained,
+      grantedBy: grant?.itemId ?? null,
+      usable: !sdef.trainedOnly || trained,
       total: base + cs.other + bonus,
     };
   }
@@ -210,18 +241,40 @@ export function computeCharacter(def: SystemDefinition, character: Character | C
     derived[d.key] = base + sumModifiers(mods, (t) => t.kind === "derived" && t.key === d.key);
   }
 
-  // Recursos: máximo digitado ou por fórmula, + modificadores; mínimo por fórmula.
+  // Recursos: por nível de classe (quando as classes mandam e o recurso tem perLevel),
+  // senão máximo digitado ou por fórmula; + modificadores; mínimo por fórmula.
   for (const r of def.resources) {
     const cr = data.resources[r.key];
-    const baseMax = cr?.maxOverride ?? (r.maxFormula ? safeEval(r.maxFormula, resolveGlobal, `recurso ${r.key}`, warnings) : 0);
+    let baseMax: number;
+    let detail: string | null = null;
+    if (usesClasses && r.perLevel) {
+      const byLevel = perLevelMax(def, r, classes, data, attributes);
+      baseMax = byLevel.max;
+      detail = byLevel.detail;
+    } else {
+      baseMax = cr?.maxOverride ?? (r.maxFormula ? safeEval(r.maxFormula, resolveGlobal, `recurso ${r.key}`, warnings) : 0);
+    }
     const max = baseMax + sumModifiers(mods, (t) => t.kind === "resourceMax" && t.key === r.key);
     const min = r.minFormula
       ? safeEval(r.minFormula, (p) => (p === "max" ? max : resolveGlobal(p)), `recurso ${r.key} (mín.)`, warnings)
       : 0;
-    resources[r.key] = { max, min };
+    resources[r.key] = { max, min, detail };
   }
 
-  return { level, halfLevel, trainedBonus, attributes, equip, skills, derived, resources, warnings };
+  return {
+    level,
+    levelSource: usesClasses ? "classes" : "manual",
+    classes,
+    halfLevel,
+    trainedBonus,
+    attributes,
+    itemModifiers: fromItems,
+    equip,
+    skills,
+    derived,
+    resources,
+    warnings,
+  };
 }
 
 /** Resolvedor de placeholders globais a partir de uma ficha já computada (para /r no chat). */

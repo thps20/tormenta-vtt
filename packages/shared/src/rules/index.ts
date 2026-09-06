@@ -5,3 +5,4 @@ export * from "./rolls.js";
 export * from "./defaults.js";
 export * from "./measure.js";
 export * from "./activation.js";
+export * from "./progression.js";

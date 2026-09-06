@@ -7,6 +7,7 @@ import { describeModifierTarget, listModifierTargets, parseModifierTarget, Modif
 import { collectPlaceholders, substitutePlaceholders, FormulaError } from "./placeholders.js";
 import { buildCharacterRoll, resolveCharacterFormula, RollBuildError } from "./rolls.js";
 import { buildItemUse, describeActivation, effectiveCost, isPassiveItem, ItemUseError, saveDcFor, saveSkills } from "./activation.js";
+import { describeClasses, pendingChoices, validateCharacterItems } from "./progression.js";
 
 const def = getSystemDefinition("tormenta20");
 
@@ -146,7 +147,7 @@ describe("computeCharacter", () => {
     expect(c.skills.luta?.total).toBe(2 + 5 + 2 + 1 + 1);
     expect(c.skills.percepcao?.total).toBe(2 + 1 + 1);
     expect(c.derived.defense).toBe(12 + 3);
-    expect(c.resources.pv).toEqual({ max: 35, min: -17 });
+    expect(c.resources.pv).toEqual({ max: 35, min: -17, detail: null });
   });
 
   it("CD usa o atributo de conjuração da ficha; override de derivado substitui a fórmula", () => {
@@ -351,5 +352,169 @@ describe("activation (poderes e magias)", () => {
     expect(use.spend).toBeNull();
     expect(use.card.cost).toBeNull();
     expect(use.card.save).toBeNull();
+  });
+});
+
+// --- Fase 4: classes e raças ------------------------------------------------
+
+/** Item de classe com os campos numéricos do tormenta20.json (valores de teste, não do livro). */
+function classItem(id: string, name: string, levels: number, stats: { hpInitial: number; hpPerLevel: number; mpPerLevel: number }, extra: Record<string, unknown> = {}) {
+  return CharacterItemSchema.parse({
+    id,
+    kind: "class",
+    name,
+    fields: { levels, initial: false, ...stats, skillsGranted: { fixed: [], choices: [] }, proficiencies: "", ...extra },
+  });
+}
+const warrior = classItem("war", "Guerreiro", 3, { hpInitial: 20, hpPerLevel: 5, mpPerLevel: 3 }, { initial: true });
+const arcanist = classItem("arc", "Arcanista", 2, { hpInitial: 8, hpPerLevel: 2, mpPerLevel: 6 });
+
+const dwarf = CharacterItemSchema.parse({
+  id: "dwarf",
+  kind: "race",
+  name: "Anão",
+  fields: { attributeBonuses: { con: 2, sab: 1, des: -1 }, flexibleBonuses: { amount: 1, count: 0, exclude: [], chosen: [] }, size: "medio", movement: 6, senses: "", skillsGranted: { fixed: [], choices: [] } },
+});
+
+/** Ficha com CON 2 (o exemplo do pedido: Guerreiro 3 → 36 PV, 9 PM). */
+const con2 = { attributes: { for: { base: 3 }, des: { base: 2 }, con: { base: 2 }, int: { base: 2 }, sab: { base: 1 }, car: { base: 0 } } };
+
+describe("progressão por classes", () => {
+  it("Guerreiro 3 com CON 2: nível 3, 36 PV, 9 PM", () => {
+    const c = computeCharacter(def, fixture({ ...con2, items: [warrior] }));
+    expect(c.levelSource).toBe("classes");
+    expect(c.level).toBe(3);
+    expect(c.halfLevel).toBe(1);
+    expect(c.resources.pv?.max).toBe(36);
+    expect(c.resources.pm?.max).toBe(9);
+    expect(c.resources.pv?.detail).toBe("Guerreiro 3: (20 + 2) + 2 × (5 + 2) = 36");
+    expect(c.resources.pm?.detail).toBe("Guerreiro 3: 3 × 3 = 9");
+    expect(describeClasses(c.classes)).toBe("Guerreiro 3");
+  });
+
+  it("multiclasse soma nível, PV e PM por classe; só a inicial usa o PV do 1º nível", () => {
+    const c = computeCharacter(def, fixture({ ...con2, items: [warrior, arcanist] }));
+    expect(c.level).toBe(5);
+    expect(c.resources.pv?.max).toBe(36 + 2 * (2 + 2));
+    expect(c.resources.pm?.max).toBe(9 + 12);
+    expect(describeClasses(c.classes)).toBe("Guerreiro 3 / Arcanista 2");
+    expect(c.resources.pv?.detail).toContain("total 44");
+  });
+
+  it("sem classe marcada como inicial, a primeira da lista faz o papel", () => {
+    const noFlag = { ...warrior, fields: { ...warrior.fields, initial: false } };
+    const c = computeCharacter(def, fixture({ ...con2, items: [noFlag] }));
+    expect(c.classes[0]?.initial).toBe(true);
+    expect(c.resources.pv?.max).toBe(36);
+  });
+
+  it("piso de 1 PV por nível quando CON é muito negativa", () => {
+    const con = { attributes: { ...con2.attributes, con: { base: -3 } } };
+    const weak = classItem("w", "Frágil", 3, { hpInitial: 20, hpPerLevel: 2, mpPerLevel: 0 }, { initial: true });
+    const c = computeCharacter(def, fixture({ ...con, items: [weak] }));
+    expect(c.resources.pv?.max).toBe(17 + 1 + 1);
+    expect(c.resources.pv?.detail).toContain("mín. 1 por nível");
+  });
+
+  it("modificador resource.<key>.max e o mínimo continuam valendo", () => {
+    const mods = [ModifierSchema.parse({ id: "m", target: "resource.pv.max", value: 4 })];
+    const c = computeCharacter(def, fixture({ ...con2, items: [warrior], modifiers: mods }));
+    expect(c.resources.pv).toMatchObject({ max: 40, min: -20 });
+  });
+
+  it("ficha sem classe continua manual: nível digitado e maxOverride", () => {
+    const c = computeCharacter(def, fixture({ resources: { pv: { current: 10, temp: 0, maxOverride: 30 } } }));
+    expect(c.levelSource).toBe("manual");
+    expect(c.level).toBe(5);
+    expect(c.classes).toEqual([]);
+    expect(c.resources.pv).toEqual({ max: 30, min: -15, detail: null });
+  });
+
+  it("modo manual ignora as classes mesmo com item de classe", () => {
+    const c = computeCharacter(def, fixture({ ...con2, items: [warrior], manualProgression: true, resources: { pv: { current: 10, temp: 0, maxOverride: 30 } } }));
+    expect(c.levelSource).toBe("manual");
+    expect(c.level).toBe(5);
+    expect(c.resources.pv?.max).toBe(30);
+    expect(describeClasses(c.classes)).toBe("Guerreiro 3");
+  });
+
+  it("nível soma das classes respeita level.max", () => {
+    const big = classItem("b", "Épico", 30, { hpInitial: 1, hpPerLevel: 1, mpPerLevel: 0 });
+    expect(computeCharacter(def, fixture({ items: [big] })).level).toBe(def.level.max);
+  });
+});
+
+describe("raça e campos estruturados", () => {
+  it("bônus fixos da raça entram nos atributos como modificadores com origem no item", () => {
+    const c = computeCharacter(def, fixture({ items: [dwarf] }));
+    expect(c.attributes).toMatchObject({ con: 3, sab: 2, des: 1, for: 3 });
+    expect(c.itemModifiers).toEqual([
+      { itemId: "dwarf", itemName: "Anão", target: "attr.con", value: 2 },
+      { itemId: "dwarf", itemName: "Anão", target: "attr.sab", value: 1 },
+      { itemId: "dwarf", itemName: "Anão", target: "attr.des", value: -1 },
+    ]);
+    // Bônus de CON da raça entra no PV por nível.
+    expect(computeCharacter(def, fixture({ ...con2, items: [warrior, dwarf] })).resources.pv?.max).toBe(22 + 2 + 2 * (5 + 4));
+  });
+
+  it("remover a raça remove os bônus", () => {
+    const withRace = computeCharacter(def, fixture({ items: [dwarf] }));
+    const without = computeCharacter(def, fixture({ items: [] }));
+    expect(withRace.attributes.con).toBe(3);
+    expect(without.attributes.con).toBe(1);
+    expect(without.itemModifiers).toEqual([]);
+  });
+
+  it("bônus à escolha: só atributos válidos, fora de exclude e até count", () => {
+    const human = { ...dwarf, id: "human", name: "Humano", fields: { ...dwarf.fields, attributeBonuses: {}, flexibleBonuses: { amount: 1, count: 3, exclude: ["con"], chosen: ["for", "des", "con", "for", "int", "sab"] } } };
+    const c = computeCharacter(def, fixture({ items: [human] }));
+    expect(c.attributes).toMatchObject({ for: 4, des: 3, con: 1, int: 3, sab: 1 });
+    expect(pendingChoices(def, human)).toEqual([]);
+    const incomplete = { ...human, fields: { ...human.fields, flexibleBonuses: { amount: 1, count: 3, exclude: [], chosen: ["for"] } } };
+    expect(pendingChoices(def, incomplete)).toEqual([{ fieldKey: "flexibleBonuses", label: "Bônus à escolha", missing: 2 }]);
+  });
+
+  it("perícias concedidas: fixas e escolhidas dentro da lista, com origem no item", () => {
+    const grants = { fixed: ["fortitude"], choices: [{ count: 1, from: ["luta", "pontaria"], chosen: ["pontaria", "luta"] }, { count: 2, from: [], chosen: ["percepcao", "nope"] }] };
+    const item = { ...warrior, fields: { ...warrior.fields, skillsGranted: grants } };
+    const c = computeCharacter(def, fixture({ ...con2, items: [item] }));
+    expect(c.skills.fortitude).toMatchObject({ trained: true, grantedBy: "war", total: 1 + 2 + 2 });
+    expect(c.skills.pontaria).toMatchObject({ trained: true, grantedBy: "war" });
+    // "luta" já era treinada na ficha: fica marcada pela ficha, não pelo item.
+    expect(c.skills.luta).toMatchObject({ trained: true, grantedBy: null });
+    expect(c.skills.percepcao?.grantedBy).toBe("war");
+    expect(pendingChoices(def, item)).toEqual([{ fieldKey: "skillsGranted", label: "Perícias treinadas", missing: 1 }]);
+  });
+
+  it("item físico só aplica os campos estruturados quando equipado", () => {
+    const belt = CharacterItemSchema.parse({ id: "belt", kind: "gear", name: "Cinto", equipped: false, fields: { attributeBonuses: { for: 2 } } });
+    // "gear" não declara o campo, então nada acontece mesmo equipado: o efeito depende do tipo no JSON.
+    expect(computeCharacter(def, fixture({ items: [{ ...belt, equipped: true }] })).attributes.for).toBe(3);
+    const kindWithBonus = { ...def, itemKinds: def.itemKinds.map((k) => (k.key === "gear" ? { ...k, fields: [{ key: "attributeBonuses", label: "Atributos", type: "attributeBonuses" as const }] } : k)) };
+    expect(computeCharacter(kindWithBonus, fixture({ items: [belt] })).attributes.for).toBe(3);
+    expect(computeCharacter(kindWithBonus, fixture({ items: [{ ...belt, equipped: true }] })).attributes.for).toBe(5);
+  });
+
+  it("validateCharacterItems: limite por tipo e tipo desconhecido", () => {
+    expect(validateCharacterItems(def, fixture({ items: [dwarf] }))).toBeNull();
+    expect(validateCharacterItems(def, fixture({ items: [dwarf, { ...dwarf, id: "d2" }] }))).toMatch(/só pode ter 1 item do tipo Raça/);
+    expect(validateCharacterItems(def, fixture({ items: [{ ...dwarf, kind: "alien" }] }))).toMatch(/desconhecido/);
+  });
+
+  it("valores estruturados sobrevivem ao Zod da ficha", () => {
+    const parsed = CharacterItemSchema.parse({ id: "x", kind: "race", name: "X", fields: { a: {}, b: { fixed: [], choices: [] }, c: { amount: 1, count: 1, exclude: [], chosen: [] } } });
+    expect(parsed.fields).toEqual({ a: {}, b: { fixed: [], choices: [] }, c: { amount: 1, count: 1, exclude: [], chosen: [] } });
+    expect(CharacterItemSchema.safeParse({ id: "x", kind: "race", name: "X", fields: { a: { fixed: "nope" } } }).success).toBe(false);
+  });
+
+  it("createDefaultItem preenche os campos estruturados vazios", () => {
+    const race = createDefaultItem(def, "race", "r1");
+    expect(race.fields.attributeBonuses).toEqual({});
+    expect(race.fields.flexibleBonuses).toEqual({ amount: 1, count: 1, exclude: [], chosen: [] });
+    expect(race.fields.skillsGranted).toEqual({ fixed: [], choices: [] });
+    expect(race.fields.size).toBe("medio");
+    const cls = createDefaultItem(def, "class", "c1");
+    expect(cls.fields.levels).toBe(1);
+    expect(validateCharacterItems(def, fixture({ items: [race, cls] }))).toBeNull();
   });
 });
