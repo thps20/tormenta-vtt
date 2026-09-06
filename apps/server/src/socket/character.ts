@@ -11,6 +11,7 @@ import {
   buildItemUse,
   createDefaultCharacterData,
   getSystemDefinition,
+  validateCharacterItems,
   type SystemDefinition,
 } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
@@ -74,6 +75,9 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
 
       // Patch raso sobre os dados atuais; o Zod garante que o resultado é uma ficha válida.
       const merged = CharacterDataSchema.parse({ ...characterDataOf(current), ...dataPatch });
+      // Regras que dependem do sistema (tipo de item existente, no máximo 1 raça...).
+      const itemsError = validateCharacterItems(await requireSystem(ctx.roomId), merged);
+      if (itemsError) throw new HandlerError(itemsError);
       const updated = toCharacter(
         await prisma.character.update({
           where: { id },
