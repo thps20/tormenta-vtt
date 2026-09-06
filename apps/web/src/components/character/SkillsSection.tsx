@@ -108,7 +108,7 @@ export const SkillsSection: React.FC<SkillsSectionProps> = ({ def, character, co
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 max-h-72 overflow-y-auto pr-1">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isEditMode ? "" : "lg:grid-cols-3"} gap-1.5 max-h-72 overflow-y-auto pr-1`}>
         {visibleKeys.map((key) => {
           const sdef = skillDefFor(def, key);
           const c = computed.skills[key];
