@@ -110,6 +110,10 @@ export const CharacterRollSchema = z.object({
 });
 export type CharacterRollPayload = z.infer<typeof CharacterRollSchema>;
 
+/** Usa um item ativo (poder, magia): desconta o custo e publica o card no chat. */
+export const CharacterUseItemSchema = z.object({ characterId: IdSchema, itemId: IdSchema });
+export type CharacterUseItemPayload = z.infer<typeof CharacterUseItemSchema>;
+
 // --- Chat ------------------------------------------------------------------
 
 export const ChatSendSchema = z.object({ text: z.string().trim().min(1).max(2000) });

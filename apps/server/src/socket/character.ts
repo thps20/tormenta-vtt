@@ -4,8 +4,11 @@ import {
   CharacterDeleteSchema,
   CharacterRollSchema,
   CharacterUpdateSchema,
+  CharacterUseItemSchema,
+  ItemUseError,
   RollBuildError,
   buildCharacterRoll,
+  buildItemUse,
   createDefaultCharacterData,
   getSystemDefinition,
   type SystemDefinition,
@@ -20,7 +23,7 @@ import {
   toJson,
 } from "../services/characters.js";
 import { createRollMessage } from "../services/rolls.js";
-import { toToken } from "../services/serialize.js";
+import { toChatMessage, toToken } from "../services/serialize.js";
 import { guarded, HandlerError } from "./ack.js";
 import { broadcastToken } from "./token.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
@@ -121,6 +124,42 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
         critThreshold: built.critThreshold,
         allowNoDice: true,
       });
+    }),
+  );
+
+  socket.on(
+    "character:use-item",
+    guarded(socket, CharacterUseItemSchema, async ({ characterId, itemId }, ctx) => {
+      const me = await prisma.participant.findUnique({ where: { id: ctx.participantId } });
+      if (!me) throw new HandlerError("Participante não encontrado");
+      const character = toCharacter(await requireCharacter(characterId, ctx.roomId));
+      if (!canEditCharacter(ctx, character)) throw new HandlerError("Você não controla esta ficha");
+
+      const def = await requireSystem(ctx.roomId);
+      let use;
+      try {
+        use = buildItemUse(def, character, itemId);
+      } catch (err) {
+        // Recurso insuficiente / item passivo: o ack leva a mensagem e nada é publicado.
+        if (err instanceof ItemUseError) throw new HandlerError(err.message);
+        throw err;
+      }
+
+      // 1. Desconta o custo (se houver) e avisa a sala: a ficha muda antes do card aparecer.
+      if (use.spend) {
+        const data = CharacterDataSchema.parse({ ...characterDataOf(character), resources: use.spend.resources });
+        const updated = toCharacter(await prisma.character.update({ where: { id: characterId }, data: { data: toJson(data) } }));
+        broadcastCharacter(io, ctx.roomId, updated, "character:updated");
+      }
+
+      // 2. Publica o card. Público como uma rolagem normal (NPC do GM incluso).
+      const msg = toChatMessage(
+        await prisma.chatMessage.create({
+          data: { roomId: ctx.roomId, participantId: me.id, nickname: me.nickname, kind: "item", item: use.card },
+        }),
+      );
+      io.to(rooms.all(ctx.roomId)).emit("chat:message", msg);
+      return msg;
     }),
   );
 }

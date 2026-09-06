@@ -15,6 +15,7 @@ import type {
   CharacterCreatePayload,
   CharacterRollPayload,
   CharacterUpdatePayload,
+  CharacterUseItemPayload,
   ChatMessage,
   InitiativeAddPayload,
   InitiativeState,
@@ -79,6 +80,12 @@ export interface ClientToServerEvents {
   "character:delete": (payload: { characterId: string }, ack: Ack) => void;
   /** Rola atributo/perícia/iniciativa/ação de item a partir da ficha; o servidor monta a fórmula e rola. */
   "character:roll": (payload: CharacterRollPayload, ack: Ack<ChatMessage>) => void;
+  /**
+   * Usa um item ativo: o servidor desconta o custo do recurso de ativação do sistema
+   * (character:updated) e publica o card (chat:message kind "item"). Recurso
+   * insuficiente = ack { ok:false } e nada é publicado.
+   */
+  "character:use-item": (payload: CharacterUseItemPayload, ack: Ack<ChatMessage>) => void;
 
   // Régua (efêmera: só broadcast, nada vai ao banco)
   /** Enviado com throttle enquanto o participante arrasta a régua; `ruler: null` ao soltar. */

@@ -115,10 +115,12 @@ model ChatMessage {
   roomId        String
   participantId String
   nickname      String
-  kind          String   // "text" | "roll" | "system"
+  kind          String   // "text" | "roll" | "system" | "item"
   text          String?
   /// DiceRoll serializado (ver DiceRollSchema) quando kind == "roll".
   roll          Json?
+  /// ItemCard serializado (ver ItemCardSchema) quando kind == "item".
+  item          Json?
   createdAt     DateTime @default(now())
 
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { IdSchema } from "./common.js";
+import { ItemCardSchema } from "./character.js";
 
 /**
  * Resultado de um único grupo de dados dentro da fórmula.
@@ -44,10 +45,11 @@ export const ChatMessageSchema = z.object({
   roomId: IdSchema,
   participantId: IdSchema,
   nickname: z.string(),
-  /** Texto puro OU rolagem. */
-  kind: z.enum(["text", "roll", "system"]),
+  /** Texto puro, rolagem, aviso do sistema ou card de item usado (character:use-item). */
+  kind: z.enum(["text", "roll", "system", "item"]),
   text: z.string().max(2000).optional(),
   roll: DiceRollSchema.optional(),
+  item: ItemCardSchema.optional(),
   createdAt: z.string().datetime(),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
