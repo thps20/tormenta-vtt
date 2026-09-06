@@ -3,6 +3,8 @@ import { CloudFog, Hand, MousePointer2, Pencil, Ruler } from "lucide-react";
 import type { ToolMode } from "../store/tools";
 
 interface ToolbarProps {
+  /** GM vê a ferramenta Névoa; jogador só a lista básica. */
+  isGm: boolean;
   /** Modo escolhido pelo usuário (não o temporário do espaço). */
   mode: ToolMode;
   /** Modo em vigor (espaço segurado mostra "Mover mapa" aceso). */
@@ -25,13 +27,13 @@ const TOOLS: ToolDef[] = [
   { mode: "ruler", label: "Régua", shortcut: "R", Icon: Ruler },
 ];
 
-const FUTURE_TOOLS: ToolDef[] = [
-  { mode: "fog", label: "Névoa", shortcut: null, Icon: CloudFog, soon: true },
-  { mode: "draw", label: "Desenho", shortcut: null, Icon: Pencil, soon: true },
-];
+/** Só o GM: pintar a névoa (ver FogToolbar para os sub-modos). */
+const GM_TOOLS: ToolDef[] = [{ mode: "fog", label: "Névoa", shortcut: "F", Icon: CloudFog }];
+
+const FUTURE_TOOLS: ToolDef[] = [{ mode: "draw", label: "Desenho", shortcut: null, Icon: Pencil, soon: true }];
 
 /** Barra vertical de ferramentas do canvas (canto superior esquerdo da mesa). */
-export const Toolbar: React.FC<ToolbarProps> = ({ mode, effectiveMode, onChange }) => (
+export const Toolbar: React.FC<ToolbarProps> = ({ isGm, mode, effectiveMode, onChange }) => (
   <div
     id="vtt-toolbar"
     role="toolbar"
@@ -42,6 +44,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({ mode, effectiveMode, onChange 
       <ToolButton key={t.mode} tool={t} active={effectiveMode === t.mode} chosen={mode === t.mode} onClick={() => onChange(t.mode)} />
     ))}
     <div className="h-[1px] w-full bg-[#2d2417] my-0.5" />
+    {isGm &&
+      GM_TOOLS.map((t) => (
+        <ToolButton key={t.mode} tool={t} active={effectiveMode === t.mode} chosen={mode === t.mode} onClick={() => onChange(t.mode)} />
+      ))}
     {FUTURE_TOOLS.map((t) => (
       <ToolButton key={t.mode} tool={t} active={false} chosen={false} onClick={() => undefined} />
     ))}

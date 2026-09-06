@@ -12,6 +12,7 @@ import { computeCharacter } from "@tormenta-vtt/shared";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
+import { FogToolbar } from "./FogToolbar";
 import { VttCanvas, type TokenBar } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
 import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
@@ -81,6 +82,14 @@ function Table() {
   const remoteRulersById = useTools((s) => s.remoteRulers);
   const updateRuler = useTools((s) => s.updateRuler);
   const clearRuler = useTools((s) => s.clearRuler);
+  // Névoa (GM): sub-modo, forma e pincel ficam na store de ferramentas; a névoa em si é da cena.
+  const fogMode = useTools((s) => s.fogMode);
+  const fogShape = useTools((s) => s.fogShape);
+  const fogBrushSize = useTools((s) => s.fogBrushSize);
+  const setFogMode = useTools((s) => s.setFogMode);
+  const setFogShape = useTools((s) => s.setFogShape);
+  const setFogBrushSize = useTools((s) => s.setFogBrushSize);
+  const fogOp = useRoom((s) => s.fogOp);
   useToolShortcuts();
 
   // Seleciona o objeto estável (byId) e deriva a lista com useMemo: um seletor que
@@ -242,7 +251,20 @@ function Table() {
                 onOpenCharacter={openCharacter}
                 tokenBars={tokenBars}
               />
-              <Toolbar mode={toolMode} effectiveMode={effectiveMode} onChange={setToolMode} />
+              <Toolbar isGm={isGm} mode={toolMode} effectiveMode={effectiveMode} onChange={setToolMode} />
+              {isGm && toolMode === "fog" && (
+                <FogToolbar
+                  fog={scene.fog}
+                  grid={scene.grid}
+                  fogMode={fogMode}
+                  fogShape={fogShape}
+                  brushSize={fogBrushSize}
+                  onFogMode={setFogMode}
+                  onFogShape={setFogShape}
+                  onBrushSize={setFogBrushSize}
+                  onOp={(op) => void fogOp(op)}
+                />
+              )}
             </>
           ) : (
             <Centered>

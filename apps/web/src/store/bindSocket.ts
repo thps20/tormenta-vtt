@@ -32,6 +32,7 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
 
   socket.on("scene:created", (scene) => useRoom.getState().upsertScene(scene));
   socket.on("scene:updated", (scene) => useRoom.getState().upsertScene(scene));
+  socket.on("fog:updated", ({ sceneId, fog }) => useRoom.getState().applyFog(sceneId, fog));
 
   socket.on("token:created", (token) => useTokens.getState().upsert(token));
   socket.on("token:updated", (token) => useTokens.getState().upsert(token));

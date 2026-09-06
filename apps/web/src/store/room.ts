@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GridConfig, Participant, RoomPublic, RoomSnapshot, Scene } from "@tormenta-vtt/shared";
+import { applyFogOp, FOG_SHAPES_WARN, type FogConfig, type FogOp, type GridConfig, type Participant, type RoomPublic, type RoomSnapshot, type Scene } from "@tormenta-vtt/shared";
 import { getSessionToken, setLastNickname, setSessionToken, clearSessionToken } from "../lib/session";
 import { emitAck, getSocket, type AckOf } from "./connection";
 import { useTokens } from "./tokens";
@@ -39,10 +39,14 @@ interface RoomState {
   markDisconnected: (id: string) => void;
   upsertScene: (scene: Scene) => void;
   setActiveScene: (sceneId: string) => void;
+  /** fog:updated: substitui a névoa da cena pelo estado completo do servidor. */
+  applyFog: (sceneId: string, fog: FogConfig) => void;
 
   // Ações do GM
   setMap: (patch: { mapUrl: string | null; mapWidth: number | null; mapHeight: number | null }) => Promise<boolean>;
   updateGrid: (grid: Partial<GridConfig>) => Promise<boolean>;
+  /** Névoa da cena ativa: aplica a operação local (otimista), emite e reverte se o ack falhar. */
+  fogOp: (op: FogOp) => Promise<boolean>;
 }
 
 export const useRoom = create<RoomState>((set, get) => ({
@@ -131,6 +135,36 @@ export const useRoom = create<RoomState>((set, get) => ({
     // Tokens são da cena ativa: pede um snapshot novo.
     const last = get().lastJoin;
     if (last) void get().join(last);
+  },
+
+  applyFog: (sceneId, fog) => set((s) => ({ scenes: s.scenes.map((sc) => (sc.id === sceneId ? { ...sc, fog } : sc)) })),
+
+  fogOp: async (op) => {
+    const scene = selectActiveScene(get());
+    if (!scene) return false;
+    const previous = scene.fog;
+    // 1. otimista, com a mesma função pura que o servidor usa.
+    const local = applyFogOp(previous, op);
+    if (!local.ok) {
+      toast(local.error);
+      return false;
+    }
+    get().applyFog(scene.id, local.fog);
+    const count = local.fog.shapes.length;
+    // Aviso ao cruzar o limite "amarelo" e a cada 50 formas depois dele (o servidor recusa no limite duro).
+    if (op.type === "add" && count > FOG_SHAPES_WARN && (count - FOG_SHAPES_WARN - 1) % 50 === 0) {
+      toast(`A névoa já tem ${count} formas. Use "Revelar tudo" ou "Ocultar tudo" para recomeçar do zero.`, "info");
+    }
+    // 2. ack: o servidor devolve o estado que valeu (o broadcast fog:updated também chega; aplicar é idempotente).
+    const res = await emitAck("fog:update", { sceneId: scene.id, op });
+    if (!res.ok) {
+      // 3. reverte
+      get().applyFog(scene.id, previous);
+      toast(res.error);
+      return false;
+    }
+    get().applyFog(scene.id, res.data);
+    return true;
   },
 
   setMap: async (patch) => {

@@ -1,9 +1,8 @@
-import { FogUpdateSchema } from "@tormenta-vtt/shared";
+import { applyFogOp, FogUpdateSchema } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
-import { applyFogOp } from "../services/fog.js";
 import { toScene, toToken } from "../services/serialize.js";
 import { emitTokenToPlayers } from "../services/visibility.js";
-import { guarded } from "./ack.js";
+import { guarded, HandlerError } from "./ack.js";
 import { requireScene } from "./scene.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
@@ -18,7 +17,9 @@ export function registerFogHandlers(io: TypedServer, socket: TypedSocket): void 
     "fog:update",
     guarded(socket, FogUpdateSchema, async ({ sceneId, op }, ctx) => {
       const current = toScene(await requireScene(sceneId, ctx.roomId)).fog;
-      const fog = applyFogOp(current, op);
+      const applied = applyFogOp(current, op);
+      if (!applied.ok) throw new HandlerError(applied.error);
+      const fog = applied.fog;
       await prisma.scene.update({ where: { id: sceneId }, data: { fog } });
       io.to(rooms.all(ctx.roomId)).emit("fog:updated", { sceneId, fog });
 

@@ -66,7 +66,7 @@ const MODE_HINTS: Record<ToolMode, string> = {
   select: "Arraste tokens para mover • Espaço + arrastar = navegar • Scroll = zoom",
   pan: "Arraste para navegar pelo mapa • Scroll = zoom",
   ruler: "Clique e arraste para medir • Scroll = zoom",
-  fog: "Névoa: em breve",
+  fog: "Névoa: escolha Revelar/Ocultar e uma forma no painel • Scroll = zoom",
   draw: "Desenho: em breve",
 };
 

@@ -5,10 +5,18 @@ import { emitAck } from "./connection";
 
 /**
  * Ferramenta ativa no canvas (barra vertical à esquerda). Um modo por vez;
- * "fog" e "draw" já existem no tipo para a barra reservar o lugar, mas ainda
- * não fazem nada.
+ * "draw" já existe no tipo para a barra reservar o lugar, mas ainda não faz nada.
+ * "fog" é só do GM (ver useToolShortcuts e Toolbar).
  */
 export type ToolMode = "select" | "pan" | "ruler" | "fog" | "draw";
+
+/** Sub-modo da névoa: o que a forma desenhada faz. */
+export type FogToolMode = "reveal" | "hide";
+/** Forma que o GM desenha no modo Névoa. */
+export type FogToolShape = "brush" | "rect" | "polygon";
+
+export const FOG_BRUSH_MIN = 20;
+export const FOG_BRUSH_MAX = 600;
 
 /** Régua de outro participante, como chegou em ruler:updated. */
 export interface RemoteRuler {
@@ -28,7 +36,14 @@ interface ToolsState {
   ruler: Ruler | null;
   /** Réguas dos outros, por participante. */
   remoteRulers: Record<string, RemoteRuler>;
+  /** Modo Névoa (GM): revelar ou ocultar, com qual forma, e o diâmetro do pincel em pixels do mapa. */
+  fogMode: FogToolMode;
+  fogShape: FogToolShape;
+  fogBrushSize: number;
   setMode: (mode: ToolMode) => void;
+  setFogMode: (fogMode: FogToolMode) => void;
+  setFogShape: (fogShape: FogToolShape) => void;
+  setFogBrushSize: (size: number) => void;
   setSpaceHeld: (held: boolean) => void;
   cancel: () => void;
   /** Aplica local e emite com throttle (efêmero: sem ack, sem reverter). */
@@ -50,7 +65,13 @@ export const useTools = create<ToolsState>((set, get) => ({
   cancelNonce: 0,
   ruler: null,
   remoteRulers: {},
+  fogMode: "reveal",
+  fogShape: "brush",
+  fogBrushSize: 140,
   setMode: (mode) => set({ mode }),
+  setFogMode: (fogMode) => set({ fogMode }),
+  setFogShape: (fogShape) => set({ fogShape }),
+  setFogBrushSize: (size) => set({ fogBrushSize: Math.max(FOG_BRUSH_MIN, Math.min(FOG_BRUSH_MAX, Math.round(size))) }),
   setSpaceHeld: (spaceHeld) => set({ spaceHeld }),
   cancel: () => set((s) => ({ cancelNonce: s.cancelNonce + 1 })),
 
