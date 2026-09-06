@@ -8,6 +8,7 @@ import {
   isPassiveItem,
   RollBuildError,
   saveDcFor,
+  saveSkills,
   type Action,
   type Activation,
   type Character,
@@ -16,6 +17,7 @@ import {
   type CharacterRollRequest,
   type ComputedCharacter,
   type ItemKindDef,
+  type Save,
   type SystemDefinition,
 } from "@tormenta-vtt/shared";
 import { newId } from "../../lib/ids";
@@ -306,15 +308,17 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
       {expanded && (
         <div className="px-3 pb-3 pt-2 border-t border-[#231e17] text-xs space-y-2 bg-[#12110f]/50">
           {isEditMode ? (
-            <ItemEditor def={def} kind={kind} item={item} onPatch={onPatch} />
+            <ItemEditor def={def} character={character} kind={kind} item={item} onPatch={onPatch} />
           ) : (
             <>
               {/* Passivo: só a descrição. Ativo: bloco de ativação + resistência com a CD calculada. */}
               {!passive && item.activation && <ActivationView def={def} activation={item.activation} />}
               {!passive && item.save && (
-                <div className="text-[11px] text-zinc-400 font-mono flex items-center gap-2">
+                <div className="text-[11px] text-zinc-400 font-mono flex items-center gap-2 flex-wrap">
+                  <span>
+                    Resistência: <span className="text-zinc-200">{def.skills.find((s) => s.key === item.save?.skill)?.label ?? item.save.skill}</span>
+                  </span>
                   {saveDc !== null && <span className="px-1.5 py-0.5 rounded bg-[#2d2417] border border-[#d4af37]/40 text-[#d4af37] font-bold">CD {saveDc}</span>}
-                  <span>Resistência: {def.skills.find((s) => s.key === item.save?.skill)?.label ?? item.save.skill}</span>
                   {item.save.text && <span className="text-zinc-500 font-serif">— {item.save.text}</span>}
                 </div>
               )}
@@ -359,13 +363,21 @@ const ActivationView: React.FC<{ def: SystemDefinition; activation: Activation }
 
 interface ItemEditorProps {
   def: SystemDefinition;
+  character: Character;
   kind: ItemKindDef | undefined;
   item: CharacterItem;
   onPatch: (p: Partial<CharacterItem>) => void;
 }
 
-const ItemEditor: React.FC<ItemEditorProps> = ({ def, kind, item, onPatch }) => {
+const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onPatch }) => {
   const physical = kind?.physical ?? true;
+  // Resistência: perícias vêm da tag do sistema; atributo null = o de conjuração da ficha.
+  const saveSkillOptions = saveSkills(def).map((s) => ({ value: s.key, label: s.label }));
+  const spellcastingAbbr = def.attributes.find((a) => a.key === character.spellcastingAttribute)?.abbr;
+  const patchSave = (p: Partial<Save>) => {
+    const base: Save = item.save ?? { skill: saveSkillOptions[0]?.value ?? "", attribute: null, bonus: 0, text: "" };
+    onPatch({ save: { ...base, ...p } });
+  };
   const patchAction = (id: string, p: Partial<Action>) => onPatch({ actions: item.actions.map((a) => (a.id === id ? ({ ...a, ...p } as Action) : a)) });
   const patchActivation = (p: Partial<Activation>) => {
     const base: Activation = item.activation ?? { cost: 0, execution: "", duration: { units: "", value: 0 }, range: { units: "", value: 0 }, target: "", area: "", effect: "" };
@@ -463,6 +475,39 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, kind, item, onPatch }) => 
             </label>
           </div>
           <TextArea value={item.activation?.effect ?? ""} onCommit={(v) => patchActivation({ effect: v })} placeholder="Efeito" rows={2} />
+        </div>
+      )}
+
+      {kind?.hasSave && (
+        <div className="p-2 rounded bg-[#181613] border border-[#2d261c] space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-zinc-500">Resistência:</span>
+            {item.save ? (
+              <>
+                <Select value={item.save.skill} onChange={(skill) => patchSave({ skill })} options={saveSkillOptions} title="Perícia do teste de resistência" />
+                <Select
+                  value={item.save.attribute ?? ""}
+                  onChange={(v) => patchSave({ attribute: v || null })}
+                  options={[
+                    { value: "", label: `padrão: ${def.activation.spellcastingLabel.toLowerCase()}${spellcastingAbbr ? ` (${spellcastingAbbr})` : ""}` },
+                    ...def.attributes.map((a) => ({ value: a.key, label: a.abbr })),
+                  ]}
+                  title="Atributo que entra na CD (vazio = o de conjuração da ficha)"
+                />
+                <label className="flex items-center gap-1 text-zinc-400">
+                  bônus <NumInput value={item.save.bonus} onCommit={(v) => patchSave({ bonus: Math.round(v ?? 0) })} title="Bônus fixo na CD" />
+                </label>
+                <button onClick={() => onPatch({ save: null })} className={ghostBtn} title="Este item não exige teste de resistência">
+                  <Trash2 className="w-3 h-3" /> sem resistência
+                </button>
+              </>
+            ) : (
+              <button onClick={() => patchSave({})} className={ghostBtn} id={`btn-add-save-${item.id}`}>
+                <Plus className="w-3 h-3" /> exige teste de resistência
+              </button>
+            )}
+          </div>
+          {item.save && <TextInput value={item.save.text} onCommit={(text) => patchSave({ text })} placeholder="Efeito em caso de falha/sucesso (ex.: metade do dano)" className="w-full" maxLength={500} />}
         </div>
       )}
 

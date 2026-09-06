@@ -64,6 +64,11 @@ describe("validateSystemDefinition (integridade)", () => {
     expect(() => validateSystemDefinition(withPatch({ activation }))).toThrow(/activation.resource/);
   });
 
+  it("rejeita activation.saveSkillTag que nenhuma perícia usa", () => {
+    const activation = { ...(base.activation as Record<string, unknown>), saveSkillTag: "nope" };
+    expect(() => validateSystemDefinition(withPatch({ activation }))).toThrow(/saveSkillTag/);
+  });
+
   it("rejeita placeholder desconhecido em activation.saveDc (mas aceita os contextuais)", () => {
     const activation = { ...(base.activation as Record<string, unknown>), saveDc: "10 + {saveAttr} + {attr.zzz}" };
     expect(() => validateSystemDefinition(withPatch({ activation }))).toThrow(/activation.saveDc/);

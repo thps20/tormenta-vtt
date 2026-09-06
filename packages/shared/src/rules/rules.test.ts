@@ -6,7 +6,7 @@ import { createDefaultCharacterData, createDefaultItem } from "./defaults.js";
 import { describeModifierTarget, listModifierTargets, parseModifierTarget, ModifierTargetSchema } from "./modifierTarget.js";
 import { collectPlaceholders, substitutePlaceholders, FormulaError } from "./placeholders.js";
 import { buildCharacterRoll, resolveCharacterFormula, RollBuildError } from "./rolls.js";
-import { buildItemUse, describeActivation, effectiveCost, isPassiveItem, ItemUseError, saveDcFor } from "./activation.js";
+import { buildItemUse, describeActivation, effectiveCost, isPassiveItem, ItemUseError, saveDcFor, saveSkills } from "./activation.js";
 
 const def = getSystemDefinition("tormenta20");
 
@@ -293,6 +293,13 @@ describe("activation (poderes e magias)", () => {
     expect(saveDcFor(def, computed, c, { save: { ...fireball.save!, bonus: 2 } })).toBe(16);
     expect(saveDcFor(def, computed, { spellcastingAttribute: null }, fireball)).toBe(12);
     expect(saveDcFor(def, computed, c, { save: null })).toBeNull();
+  });
+
+  it("perícias de resistência vêm da tag declarada em activation.saveSkillTag", () => {
+    expect(saveSkills(def).map((s) => s.key)).toEqual(["fortitude", "reflexos", "vontade"]);
+    // Sem tag: todas as perícias fixas (sem variantes como Ofício).
+    const noTag = { ...def, activation: { ...def.activation, saveSkillTag: undefined } };
+    expect(saveSkills(noTag).length).toBe(def.skills.filter((s) => !s.variants).length);
   });
 
   it("descreve a ativação com os rótulos do sistema", () => {

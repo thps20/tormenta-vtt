@@ -219,6 +219,8 @@ export const ActivationDefSchema = z.object({
   saveDc: FormulaSchema.optional(),
   /** Rótulo do campo "atributo de conjuração" na ficha. */
   spellcastingLabel: z.string().min(1).max(40).default("Atributo de conjuração"),
+  /** Tag (skills[].tags) das perícias que servem de teste de resistência. Ausente = qualquer perícia. */
+  saveSkillTag: KeySchema.optional(),
 });
 export type ActivationDef = z.infer<typeof ActivationDefSchema>;
 
@@ -361,6 +363,9 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
   }
   if (def.activation.resource !== undefined && !resourceKeys.has(def.activation.resource)) {
     fail(def, `activation.resource referencia recurso inexistente "${def.activation.resource}"`);
+  }
+  if (def.activation.saveSkillTag !== undefined && !def.skills.some((s) => s.tags.includes(def.activation.saveSkillTag ?? ""))) {
+    fail(def, `activation.saveSkillTag "${def.activation.saveSkillTag}" não é tag de nenhuma perícia`);
   }
   for (const kind of def.itemKinds) {
     for (const stat of kind.statBonuses) {

@@ -9,7 +9,7 @@
  */
 import { DiceParseError, evaluateConstant } from "../dice/index.js";
 import type { Activation, Character, CharacterData, CharacterItem, CharacterResource, ItemCard } from "../schemas/character.js";
-import type { SystemDefinition } from "../schemas/system.js";
+import type { SkillDef, SystemDefinition } from "../schemas/system.js";
 import { computeCharacter, makeResolver, parseModifiers, sumModifiers, type ComputedCharacter } from "./compute.js";
 import { FormulaError, substitutePlaceholders } from "./placeholders.js";
 
@@ -18,6 +18,12 @@ export class ItemUseError extends Error {
     super(message);
     this.name = "ItemUseError";
   }
+}
+
+/** Perícias que podem ser teste de resistência (activation.saveSkillTag); sem tag, todas as fixas. */
+export function saveSkills(def: SystemDefinition): SkillDef[] {
+  const tag = def.activation.saveSkillTag;
+  return def.skills.filter((s) => !s.variants && (tag === undefined || s.tags.includes(tag)));
 }
 
 /** Passivo = sem bloco de ativação, ou execução marcada como passiva no sistema. */

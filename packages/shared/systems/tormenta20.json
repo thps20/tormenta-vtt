@@ -191,6 +191,7 @@
     "minCost": 1,
     "saveDc": "10 + {halfLevel} + {saveAttr} + {saveBonus}",
     "spellcastingLabel": "Atributo de conjuração",
+    "saveSkillTag": "resistencia",
     "executions": [
       { "key": "passive", "label": "Passiva", "passive": true }, { "key": "standard", "label": "Padrão" },
       { "key": "move", "label": "Movimento" }, { "key": "full", "label": "Completa" },
