@@ -1,6 +1,9 @@
 import { create } from "zustand";
-import type { Character, CharacterCreatePayload, CharacterPatch, CharacterRollRequest } from "@tormenta-vtt/shared";
+import type { Character, CharacterCreatePayload, CharacterPatch, CharacterRollRequest, SystemDefinition } from "@tormenta-vtt/shared";
+import { buildInsertPatch, checkInsert } from "../lib/compendium";
+import { newId } from "../lib/ids";
 import { emitAck } from "./connection";
+import { useCompendium } from "./compendium";
 import { toast } from "./ui";
 
 interface CharactersState {
@@ -27,6 +30,13 @@ interface CharactersState {
    * (character:updated) e publica o card (chat:message). Erro (ex.: PM insuficiente) vira toast.
    */
   useItem: (characterId: string, itemId: string) => Promise<boolean>;
+  /**
+   * Copia uma entrada do compêndio para a ficha (Enter, "+" e soltar chamam esta
+   * mesma função). `def` vem do componente para a store não depender da sala.
+   * `replace` confirma a troca de um item de tipo com limite (ex.: outra raça).
+   * Devolve o id do item novo, ou null se não inseriu (motivo vira toast).
+   */
+  insertFromCompendium: (def: SystemDefinition, characterId: string, entryId: string, opts?: { replace?: boolean }) => Promise<string | null>;
 }
 
 export const useCharacters = create<CharactersState>((set, get) => ({
@@ -95,6 +105,23 @@ export const useCharacters = create<CharactersState>((set, get) => ({
     const res = await emitAck("character:use-item", { characterId, itemId });
     if (!res.ok) toast(res.error);
     return res.ok;
+  },
+
+  insertFromCompendium: async (def, characterId, entryId, opts = {}) => {
+    const character = get().byId[characterId];
+    const entry = useCompendium.getState().entries.find((e) => e.id === entryId);
+    if (!character || !entry) return null;
+    const check = checkInsert(def, character, entry);
+    const replace = opts.replace ? check.replaces : null;
+    if (!check.ok && !replace) {
+      toast(check.reason ?? "Não é possível inserir este item");
+      return null;
+    }
+    const { item, patch } = buildInsertPatch(def, character, entry, newId, { replace });
+    const ok = await get().update(characterId, patch);
+    if (!ok) return null;
+    useCompendium.getState().markInserted(item.id, item.kind);
+    return item.id;
   },
 }));
 

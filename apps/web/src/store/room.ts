@@ -6,6 +6,7 @@ import { useTokens } from "./tokens";
 import { useChat } from "./chat";
 import { useInitiative } from "./initiative";
 import { useCharacters } from "./characters";
+import { useCompendium } from "./compendium";
 import { toast } from "./ui";
 
 export type JoinStatus =
@@ -101,6 +102,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useChat.getState().setAll([]);
     useInitiative.getState().setState(null);
     useCharacters.getState().setAll([]);
+    useCompendium.getState().reset();
     // Desconectar e reconectar é o jeito simples de sair das salas do Socket.io.
     const socket = getSocket();
     socket.disconnect();
