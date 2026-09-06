@@ -48,8 +48,15 @@
   ],
 
   "resources": [
-    { "key": "pv", "label": "Pontos de Vida", "abbr": "PV", "hasTemp": true, "minFormula": "-floor({max}/2)" },
-    { "key": "pm", "label": "Pontos de Mana", "abbr": "PM" }
+    {
+      "$comment": "PV = PV inicial da classe inicial + CON no 1º nível; + PV por nível + CON nos demais (mínimo 1 por nível). Multiclasse soma por classe.",
+      "key": "pv", "label": "Pontos de Vida", "abbr": "PV", "hasTemp": true, "minFormula": "-floor({max}/2)",
+      "perLevel": { "classField": "hpPerLevel", "firstLevelField": "hpInitial", "attribute": "con", "minPerLevel": 1 }
+    },
+    {
+      "key": "pm", "label": "Pontos de Mana", "abbr": "PM",
+      "perLevel": { "classField": "mpPerLevel" }
+    }
   ],
 
   "derived": [
@@ -61,9 +68,10 @@
   ],
 
   "level": {
-    "$comment": "source vira \"classes\" na fase 4, quando classes forem itens.",
+    "$comment": "Nível = soma dos níveis dos itens de classe. Ficha sem classe (ou em progressão manual) usa o nível digitado.",
     "max": 20,
-    "source": "manual",
+    "source": "classes",
+    "classes": { "kind": "class", "levelsField": "levels", "initialField": "initial" },
     "xpTable": [0, 1000, 3000, 6000, 10000, 15000, 21000, 28000, 36000, 45000, 55000, 66000, 78000, 91000, 105000, 120000, 136000, 153000, 171000, 190000]
   },
 
@@ -100,7 +108,6 @@
   ],
 
   "traitFields": [
-    { "key": "raca",      "label": "Raça" },
     { "key": "origem",    "label": "Origem" },
     { "key": "divindade", "label": "Divindade" },
     { "key": "tipo", "label": "Tipo de criatura", "type": "enum", "options": [
@@ -122,6 +129,31 @@
   ],
 
   "itemKinds": [
+    {
+      "$comment": "Classe: alimenta nível (levels), PV/PM (resources[].perLevel) e perícias treinadas. Sem compêndio: os valores vêm do livro, digitados.",
+      "key": "class", "label": "Classe", "physical": false,
+      "fields": [
+        { "key": "levels",        "label": "Níveis",          "type": "number",  "default": 1 },
+        { "key": "initial",       "label": "Classe inicial",  "type": "boolean", "default": false },
+        { "key": "hpInitial",     "label": "PV no 1º nível",  "type": "number",  "default": 0 },
+        { "key": "hpPerLevel",    "label": "PV por nível",    "type": "number",  "default": 0 },
+        { "key": "mpPerLevel",    "label": "PM por nível",    "type": "number",  "default": 0 },
+        { "key": "skillsGranted", "label": "Perícias treinadas", "type": "skillGrants" },
+        { "key": "proficiencies", "label": "Proficiências",   "type": "text" }
+      ]
+    },
+    {
+      "$comment": "Raça (no máximo 1): bônus fixos e à escolha em atributos, tamanho, perícias. Deslocamento e sentidos são só informativos por enquanto.",
+      "key": "race", "label": "Raça", "physical": false, "maxCount": 1,
+      "fields": [
+        { "key": "attributeBonuses", "label": "Atributos",        "type": "attributeBonuses" },
+        { "key": "flexibleBonuses",  "label": "Bônus à escolha",  "type": "attributeChoice" },
+        { "key": "size",             "label": "Tamanho",          "type": "size" },
+        { "key": "movement",         "label": "Deslocamento (m)", "type": "number", "default": 9 },
+        { "key": "senses",           "label": "Sentidos",         "type": "text" },
+        { "key": "skillsGranted",    "label": "Perícias treinadas", "type": "skillGrants" }
+      ]
+    },
     {
       "key": "weapon", "label": "Arma",
       "fields": [

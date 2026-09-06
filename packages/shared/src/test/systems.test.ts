@@ -80,6 +80,29 @@ describe("validateSystemDefinition (integridade)", () => {
     const damageAttribute = { field: "purpose", map: { voo: "for" } };
     expect(() => validateSystemDefinition(withPatch({ damageAttribute }))).toThrow(/opção "voo"/);
   });
+
+  it("level.source = classes exige level.classes apontando para campos reais", () => {
+    const level = base.level as Record<string, unknown>;
+    expect(() => validateSystemDefinition(withPatch({ level: { ...level, classes: undefined } }))).toThrow(/exige level.classes/);
+    expect(() => validateSystemDefinition(withPatch({ level: { ...level, classes: { kind: "nope", levelsField: "levels", initialField: "initial" } } }))).toThrow(/tipo de item inexistente/);
+    expect(() => validateSystemDefinition(withPatch({ level: { ...level, classes: { kind: "class", levelsField: "initial", initialField: "initial" } } }))).toThrow(/levelsField/);
+    expect(() => validateSystemDefinition(withPatch({ level: { ...level, classes: { kind: "class", levelsField: "levels", initialField: "levels" } } }))).toThrow(/initialField/);
+  });
+
+  it("rejeita perLevel apontando para campo ou atributo inexistente", () => {
+    const resources = structuredClone(base.resources as { key: string; perLevel?: Record<string, unknown> }[]);
+    const pv = resources.find((r) => r.key === "pv");
+    pv!.perLevel = { ...pv!.perLevel, classField: "proficiencies" };
+    expect(() => validateSystemDefinition(withPatch({ resources }))).toThrow(/classField/);
+    pv!.perLevel = { ...pv!.perLevel, classField: "hpPerLevel", attribute: "nope" };
+    expect(() => validateSystemDefinition(withPatch({ resources }))).toThrow(/perLevel.attribute/);
+  });
+
+  it("rejeita campo estruturado com default e campo size sem sizes[]", () => {
+    const itemKinds = [...(base.itemKinds as unknown[]), { key: "x", label: "X", fields: [{ key: "b", label: "B", type: "attributeBonuses", default: "" }] }];
+    expect(() => validateSystemDefinition(withPatch({ itemKinds }))).toThrow(/não aceita default/);
+    expect(() => validateSystemDefinition(withPatch({ sizes: [] }))).toThrow(/não declara sizes/);
+  });
 });
 
 describe("tormenta20.json", () => {
@@ -116,6 +139,14 @@ describe("tormenta20.json", () => {
     expect(def.activation.minCost).toBe(1);
     expect(def.activation.saveDc).toBeDefined();
     expect(def.activation.executions.some((e) => e.passive)).toBe(true);
+  });
+
+  it("nível vem das classes; PV e PM acumulam por nível de classe", () => {
+    expect(def.level.source).toBe("classes");
+    expect(def.level.classes?.kind).toBeDefined();
+    expect(def.itemKinds.some((k) => k.key === def.level.classes?.kind)).toBe(true);
+    expect(def.resources.filter((r) => r.perLevel).length).toBe(2);
+    expect(def.itemKinds.some((k) => k.maxCount === 1)).toBe(true);
   });
 
   it("declara Defesa como stat derivado e armadura como tipo de item com bônus de Defesa", () => {

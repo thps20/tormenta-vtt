@@ -85,16 +85,22 @@ export const ResourceDefSchema = z.object({
   /** Se true, a ficha tem um campo de pontos temporários. */
   hasTemp: z.boolean().default(false),
   /**
-   * Máximo acumulado por nível de classe (fase 4: classes como itens). Declarado
-   * já no schema para o JSON evoluir sem quebrar; computeCharacter ainda ignora.
+   * Máximo acumulado por nível de classe (itens do tipo level.classes.kind).
+   * Para cada classe: o 1º nível da classe inicial soma `firstLevelField`
+   * (ou `classField` se ausente); os demais somam `classField`; cada nível soma
+   * ainda o `attribute` e respeita o piso `minPerLevel`. Multiclasse soma tudo.
+   * Só vale quando a ficha tem classes e não está em progressão manual; senão
+   * cai em maxOverride/maxFormula.
    */
   perLevel: z
     .object({
-      /** Campo do item de classe com o valor por nível (ex.: "hpPerLevel"). */
+      /** Campo numérico do item de classe com o valor por nível (ex.: "hpPerLevel"). */
       classField: KeySchema,
+      /** Campo numérico com o valor do 1º nível da classe inicial (ex.: "hpInitial"). */
+      firstLevelField: KeySchema.optional(),
       /** Atributo somado por nível (ex.: CON para PV). */
       attribute: KeySchema.optional(),
-      firstLevelMultiplier: z.number().int().min(1).default(1),
+      /** Ganho mínimo por nível depois de somar o atributo (T20: 1 PV). */
       minPerLevel: z.number().int().optional(),
     })
     .optional(),
@@ -114,8 +120,22 @@ export type DerivedDef = z.infer<typeof DerivedDefSchema>;
 
 export const LevelDefSchema = z.object({
   max: z.number().int().min(1),
-  /** "manual" = digitado na ficha; "classes" = soma dos itens de classe (fase 4). */
+  /**
+   * "manual" = digitado na ficha; "classes" = soma dos itens de classe. Mesmo em
+   * "classes", uma ficha sem item de classe (ou em progressão manual) usa o nível digitado.
+   */
   source: z.enum(["manual", "classes"]).default("manual"),
+  /** Onde estão as classes quando source = "classes" (obrigatório nesse caso). */
+  classes: z
+    .object({
+      /** Tipo de item (itemKinds[].key) que representa uma classe. */
+      kind: KeySchema,
+      /** Campo numérico do item com os níveis naquela classe. */
+      levelsField: KeySchema,
+      /** Campo booleano que marca a classe inicial (1º nível usa perLevel.firstLevelField). */
+      initialField: KeySchema,
+    })
+    .optional(),
   /** XP acumulado necessário para cada nível (índice 0 = nível 1). */
   xpTable: z.array(z.number().int().min(0)).optional(),
 });
@@ -164,11 +184,24 @@ export const EquipStatDefSchema = z.object({
 });
 export type EquipStatDef = z.infer<typeof EquipStatDefSchema>;
 
+/**
+ * Tipos de campo de item. Os quatro últimos são estruturados e têm EFEITO na
+ * ficha enquanto o item está ativo (não físico, ou físico equipado):
+ *   attributeBonuses  { <attr>: n }                       → modificadores attr.<key> com origem no item
+ *   attributeChoice   { amount, count, exclude, chosen }  → +amount em cada atributo escolhido (até count)
+ *   skillGrants       { fixed, choices[{count, from, chosen}] } → perícias treinadas pelo item
+ *   size              chave de sizes[] (a UI aplica ao tamanho da ficha)
+ * Os valores seguem os schemas *ValueSchema em character.ts.
+ */
+export const ItemFieldTypeSchema = z.enum(["enum", "number", "boolean", "text", "attributeBonuses", "attributeChoice", "skillGrants", "size"]);
+export type ItemFieldType = z.infer<typeof ItemFieldTypeSchema>;
+
 export const ItemFieldDefSchema = z.object({
   key: KeySchema,
   label: z.string().min(1),
-  type: z.enum(["enum", "number", "boolean", "text"]),
+  type: ItemFieldTypeSchema,
   options: z.array(OptionDefSchema).optional(),
+  /** Só para enum/number/boolean/text; os estruturados nascem vazios. */
   default: z.union([z.string(), z.number(), z.boolean()]).optional(),
 });
 export type ItemFieldDef = z.infer<typeof ItemFieldDefSchema>;
@@ -188,6 +221,8 @@ export const ItemKindDefSchema = z.object({
   fields: z.array(ItemFieldDefSchema).default([]),
   /** Stats de equipStats que itens deste tipo podem fornecer quando equipados. */
   statBonuses: z.array(KeySchema).default([]),
+  /** Quantos itens deste tipo a ficha aceita (ex.: 1 raça). Ausente = sem limite. */
+  maxCount: z.number().int().min(1).optional(),
 });
 export type ItemKindDef = z.infer<typeof ItemKindDefSchema>;
 
@@ -371,9 +406,33 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
     for (const stat of kind.statBonuses) {
       if (!equipKeys.has(stat)) fail(def, `tipo de item "${kind.key}" referencia equipStat inexistente "${stat}"`);
     }
+    assertUnique(def, `campo de "${kind.key}"`, kind.fields.map((f) => f.key));
     for (const field of kind.fields) {
       if (field.type === "enum" && !field.options?.length) fail(def, `campo "${kind.key}.${field.key}" é enum sem options`);
+      const structured = !["enum", "number", "boolean", "text"].includes(field.type);
+      if (structured && field.default !== undefined) fail(def, `campo "${kind.key}.${field.key}" (${field.type}) não aceita default`);
+      if (field.type === "size" && def.sizes.length === 0) fail(def, `campo "${kind.key}.${field.key}" é size, mas o sistema não declara sizes[]`);
     }
+  }
+
+  // Classes: os ponteiros de level.classes e resources[].perLevel apontam para campos reais do tipo certo.
+  const fieldOf = (kindKey: string, fieldKey: string) => def.itemKinds.find((k) => k.key === kindKey)?.fields.find((f) => f.key === fieldKey);
+  if (def.level.source === "classes" && !def.level.classes) fail(def, `level.source = "classes" exige level.classes`);
+  if (def.level.classes) {
+    const { kind, levelsField, initialField } = def.level.classes;
+    if (!def.itemKinds.some((k) => k.key === kind)) fail(def, `level.classes.kind referencia tipo de item inexistente "${kind}"`);
+    if (fieldOf(kind, levelsField)?.type !== "number") fail(def, `level.classes.levelsField "${levelsField}" não é campo numérico de "${kind}"`);
+    if (fieldOf(kind, initialField)?.type !== "boolean") fail(def, `level.classes.initialField "${initialField}" não é campo booleano de "${kind}"`);
+  }
+  for (const r of def.resources) {
+    if (!r.perLevel) continue;
+    if (!def.level.classes) fail(def, `recurso "${r.key}" tem perLevel, mas o sistema não declara level.classes`);
+    const kind = def.level.classes.kind;
+    if (fieldOf(kind, r.perLevel.classField)?.type !== "number") fail(def, `recurso "${r.key}".perLevel.classField "${r.perLevel.classField}" não é campo numérico de "${kind}"`);
+    if (r.perLevel.firstLevelField !== undefined && fieldOf(kind, r.perLevel.firstLevelField)?.type !== "number") {
+      fail(def, `recurso "${r.key}".perLevel.firstLevelField "${r.perLevel.firstLevelField}" não é campo numérico de "${kind}"`);
+    }
+    if (r.perLevel.attribute !== undefined && !attrKeys.has(r.perLevel.attribute)) fail(def, `recurso "${r.key}".perLevel.attribute referencia atributo inexistente "${r.perLevel.attribute}"`);
   }
   if (def.damageAttribute) {
     const { field, map } = def.damageAttribute;

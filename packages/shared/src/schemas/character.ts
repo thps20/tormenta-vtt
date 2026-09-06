@@ -90,7 +90,45 @@ export const SaveSchema = z.object({
 });
 export type Save = z.infer<typeof SaveSchema>;
 
-export const ItemFieldValueSchema = z.union([z.string().max(500), z.number(), z.boolean()]);
+/**
+ * Valores dos campos estruturados de item (ItemFieldType em system.ts). Todas as
+ * chaves são obrigatórias e os objetos são estritos de propósito: como o valor
+ * de um campo é uma união, é a forma que diz qual tipo é.
+ */
+/** attributeBonuses: { con: 2, sab: 1, des: -1 }. */
+export const AttributeBonusesValueSchema = z.record(KeySchema, z.number().int());
+export type AttributeBonusesValue = z.infer<typeof AttributeBonusesValueSchema>;
+
+/** attributeChoice: +amount em `count` atributos diferentes, escolhidos em `chosen` (fora de `exclude`). */
+export const AttributeChoiceValueSchema = z
+  .object({
+    amount: z.number().int(),
+    count: z.number().int().min(0),
+    exclude: z.array(KeySchema),
+    chosen: z.array(KeySchema),
+  })
+  .strict();
+export type AttributeChoiceValue = z.infer<typeof AttributeChoiceValueSchema>;
+
+/** skillGrants: perícias treinadas fixas + grupos "escolha `count` de `from`" (`from` vazio = qualquer). */
+export const SkillGrantsValueSchema = z
+  .object({
+    fixed: z.array(SkillInstanceKeySchema),
+    choices: z.array(
+      z
+        .object({
+          count: z.number().int().min(1),
+          from: z.array(KeySchema),
+          chosen: z.array(SkillInstanceKeySchema),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type SkillGrantsValue = z.infer<typeof SkillGrantsValueSchema>;
+
+export const ItemFieldValueSchema = z.union([z.string().max(500), z.number(), z.boolean(), AttributeChoiceValueSchema, SkillGrantsValueSchema, AttributeBonusesValueSchema]);
+export type ItemFieldValue = z.infer<typeof ItemFieldValueSchema>;
 
 export const CharacterItemSchema = z.object({
   id: IdSchema,
