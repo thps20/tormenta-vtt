@@ -6,3 +6,4 @@ export * from "./dice.js";
 export * from "./initiative.js";
 export * from "./system.js";
 export * from "./payloads.js";
+export * from "./character.js";
