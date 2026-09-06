@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { AlertCircle, CheckCircle, ChevronDown, ChevronUp, Circle, Dices, Dna, Flame, GraduationCap, Package, Plus, Shield, Sparkles, Sword, Trash2, Wand2, Zap } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { AlertCircle, BookOpen, CheckCircle, ChevronDown, ChevronUp, Circle, Dices, Plus, Trash2, Zap } from "lucide-react";
 import {
   buildCharacterRoll,
   createDefaultItem,
@@ -23,6 +23,8 @@ import {
   type SystemDefinition,
 } from "@tormenta-vtt/shared";
 import { newId } from "../../lib/ids";
+import { useCompendium } from "../../store/compendium";
+import { kindIcon } from "./kindIcons";
 import { NumInput, Select, TextArea, TextInput, ghostBtn, smallBtn } from "./fields";
 import { AttributeBonusesEditor, AttributeChoiceField, SizeField, SkillGrantsField, summarizeField } from "./StructuredFields";
 
@@ -37,9 +39,6 @@ interface ItemsSectionProps {
   /** Usa um item ativo (custo + card no chat). */
   onUseItem: (itemId: string) => void;
 }
-
-/** Ícone por POSIÇÃO em itemKinds[] (o código não sabe o que é "classe" ou "arma"). */
-const KIND_ICONS = [GraduationCap, Dna, Sword, Shield, Package, Flame, Sparkles, Wand2];
 
 /** Tipos de campo com efeito na ficha (têm editor próprio e podem pedir escolha). */
 const STRUCTURED: ItemFieldDef["type"][] = ["attributeBonuses", "attributeChoice", "skillGrants", "size"];
@@ -88,6 +87,35 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, comp
   const [activeTab, setActiveTab] = useState<string>(def.itemKinds[0]?.key ?? "");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggleExpand = (id: string) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  const openCompendium = useCompendium((s) => s.open);
+  const lastInserted = useCompendium((s) => s.lastInserted);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  // Item inserido do compêndio: vai para a aba dele, rola até ele e destaca por um instante.
+  useEffect(() => {
+    if (!lastInserted) return;
+    setActiveTab(lastInserted.kind);
+    setHighlightId(lastInserted.itemId);
+    const raf = requestAnimationFrame(() => document.getElementById(`item-${lastInserted.itemId}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+    const t = setTimeout(() => setHighlightId(null), 1600);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t);
+    };
+  }, [lastInserted]);
+
+  // Ctrl+Espaço abre a paleta já filtrada pela aba ativa (só em modo edição).
+  useEffect(() => {
+    if (!isEditMode) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.code === "Space" && !useCompendium.getState().isOpen) {
+        e.preventDefault();
+        openCompendium(activeTab);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isEditMode, activeTab, openCompendium]);
 
   const items = character.items;
   const setItems = (next: CharacterItem[]) => onPatch({ items: next });
@@ -112,23 +140,30 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, comp
     <div className="p-4 bg-[#111] border-b border-[#2d2417]">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
         <h3 className="text-xs uppercase font-serif font-bold tracking-widest text-[#d4af37]">Equipamentos e habilidades</h3>
-        {isEditMode && currentKind && !atLimit && (
-          <button onClick={addItem} className={smallBtn} id="btn-add-item">
-            <Plus className="w-3.5 h-3.5" />
-            <span>Adicionar {currentKind.label}</span>
-          </button>
-        )}
-        {isEditMode && currentKind && atLimit && (
-          <span className="text-[11px] text-zinc-500 font-serif">
-            {currentKind.maxCount === 1 ? `Só 1 ${currentKind.label} por ficha` : `No máximo ${currentKind.maxCount} por ficha`}
-          </span>
+        {isEditMode && currentKind && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {atLimit ? (
+              <span className="text-[11px] text-zinc-500 font-serif">
+                {currentKind.maxCount === 1 ? `Só 1 ${currentKind.label} por ficha` : `No máximo ${currentKind.maxCount} por ficha`}
+              </span>
+            ) : (
+              <button onClick={addItem} className={smallBtn} id="btn-add-item">
+                <Plus className="w-3.5 h-3.5" />
+                <span>Adicionar {currentKind.label}</span>
+              </button>
+            )}
+            <button onClick={() => openCompendium(currentKind.key)} className={smallBtn} id="btn-open-compendium" title="Inserir do compêndio (Ctrl+Espaço)">
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Do compêndio</span>
+            </button>
+          </div>
         )}
       </div>
 
       {/* Abas por tipo de item */}
       <div className="flex items-center gap-1 overflow-x-auto pb-1.5 border-b border-[#242018] mb-3">
         {def.itemKinds.map((kind, index) => {
-          const Icon = KIND_ICONS[index % KIND_ICONS.length] ?? Package;
+          const Icon = kindIcon(index);
           const count = items.filter((i) => i.kind === kind.key).length;
           const isActive = activeTab === kind.key;
           return (
@@ -165,6 +200,7 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, comp
               canEdit={canEdit}
               isEditMode={isEditMode}
               expanded={expanded[item.id] ?? false}
+              highlighted={highlightId === item.id}
               onToggle={() => toggleExpand(item.id)}
               onPatch={(p, extra) => patchItem(item.id, p, extra)}
               onRemove={() => setItems(items.filter((i) => i.id !== item.id))}
@@ -189,6 +225,8 @@ interface ItemCardProps {
   canEdit: boolean;
   isEditMode: boolean;
   expanded: boolean;
+  /** Destaque breve (item recém-inserido do compêndio). */
+  highlighted: boolean;
   onToggle: () => void;
   /** `extra` = outras partes da ficha a mudar no mesmo patch (tamanho vindo da raça). */
   onPatch: (p: Partial<CharacterItem>, extra?: Omit<CharacterPatch, "items">) => void;
@@ -197,7 +235,7 @@ interface ItemCardProps {
   onUse: () => void;
 }
 
-const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, item, canEdit, isEditMode, expanded, onToggle, onPatch, onRemove, onRoll, onUse }) => {
+const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, item, canEdit, isEditMode, expanded, highlighted, onToggle, onPatch, onRemove, onRoll, onUse }) => {
   const physical = kind?.physical ?? true;
   const canRoll = canEdit && !isEditMode;
   // Escolhas (atributos flexíveis, perícias da classe) ficam visíveis fora do modo edição.
@@ -217,7 +255,7 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
   const saveDc = !passive && item.save ? saveDcFor(def, computed, character, item) : null;
 
   return (
-    <div className={`bg-[#161513] border rounded-lg transition-all ${item.equipped ? "border-[#d4af37]/60 shadow-[0_0_8px_rgba(212,175,55,0.1)]" : "border-[#292319]"}`}>
+    <div id={`item-${item.id}`} className={`bg-[#161513] border rounded-lg transition-all ${item.equipped ? "border-[#d4af37]/60 shadow-[0_0_8px_rgba(212,175,55,0.1)]" : "border-[#292319]"} ${highlighted ? "item-flash" : ""}`}>
       <div className="p-3 flex items-start justify-between gap-2">
         <div className="flex items-start gap-2.5 min-w-0">
           {physical && (

@@ -136,6 +136,7 @@ function Table() {
   const deleteCharacter = useCharacters((s) => s.delete);
   const rollCharacter = useCharacters((s) => s.roll);
   const useCharacterItem = useCharacters((s) => s.useItem);
+  const insertFromCompendium = useCharacters((s) => s.insertFromCompendium);
   const linkCharacter = useTokens((s) => s.linkCharacter);
   const systemDef = useSystemDef();
 
@@ -322,6 +323,7 @@ function Table() {
           onPatch={(patch) => openChar && void updateCharacter(openChar.id, patch)}
           onRoll={(request) => openChar && void rollCharacter(openChar.id, request)}
           onUseItem={(itemId) => openChar && void useCharacterItem(openChar.id, itemId)}
+          onInsertFromCompendium={(entryId, opts) => (openChar ? insertFromCompendium(systemDef, openChar.id, entryId, opts) : Promise.resolve(null))}
           onCreateMine={() => void createCharacter({ name: me.nickname, kind: "pc", ownerId: me.id }).then((c) => c && openCharacter(c.id))}
           onClose={() => openCharacter(null)}
         />

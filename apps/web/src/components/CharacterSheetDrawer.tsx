@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, UserPlus } from "lucide-react";
 import { computeCharacter, type Character, type CharacterPatch, type CharacterRollRequest, type Participant, type SystemDefinition } from "@tormenta-vtt/shared";
 import { CharacterHeader } from "./character/CharacterHeader";
@@ -9,6 +9,8 @@ import { SkillsSection } from "./character/SkillsSection";
 import { ItemsSection } from "./character/ItemsSection";
 import { ModifiersSection } from "./character/ModifiersSection";
 import { DetailsSection } from "./character/DetailsSection";
+import { CompendiumPalette } from "./compendium/CompendiumPalette";
+import { useCompendium } from "../store/compendium";
 
 export interface CharacterSheetDrawerProps {
   def: SystemDefinition;
@@ -21,6 +23,8 @@ export interface CharacterSheetDrawerProps {
   onRoll: (request: CharacterRollRequest) => void;
   /** Usa um item ativo (poder, magia): o servidor desconta o custo e publica o card. */
   onUseItem: (itemId: string) => void;
+  /** Copia uma entrada do compêndio para a ficha; devolve o id do item novo ou null. */
+  onInsertFromCompendium: (entryId: string, opts?: { replace?: boolean }) => Promise<string | null>;
   /** Estado vazio: cria a ficha do próprio jogador. */
   onCreateMine: () => void;
   onClose: () => void;
@@ -31,8 +35,15 @@ export interface CharacterSheetDrawerProps {
  * sistema; os valores finais vêm de computeCharacter (uma vez por render).
  * Modo visualização = rolagens rápidas; modo edição = inputs.
  */
-export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def, character, participants, me, canEdit, onPatch, onRoll, onUseItem, onCreateMine, onClose }) => {
+export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def, character, participants, me, canEdit, onPatch, onRoll, onUseItem, onInsertFromCompendium, onCreateMine, onClose }) => {
   const [isEditMode, setIsEditMode] = useState(false);
+  const compendiumOpen = useCompendium((s) => s.isOpen);
+  const closeCompendium = useCompendium((s) => s.close);
+  // A paleta só faz sentido editando; se a ficha sair do modo edição (ou fechar), ela fecha junto.
+  useEffect(() => {
+    if (!(isEditMode && canEdit)) closeCompendium();
+  }, [isEditMode, canEdit, closeCompendium]);
+  useEffect(() => () => closeCompendium(), [closeCompendium]);
   const computed = useMemo(() => (character ? computeCharacter(def, character) : null), [def, character]);
   // Quem não pode editar nunca fica em modo edição (ex.: jogador vendo a ficha de outro).
   const editing = isEditMode && canEdit;
@@ -83,6 +94,8 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
               </span>
               <span>{editing ? "Modo edição" : canEdit ? "Modo visualização (clique para rolar)" : "Somente leitura"}</span>
             </div>
+
+            {compendiumOpen && editing && <CompendiumPalette def={def} character={character} onInsert={onInsertFromCompendium} onClose={closeCompendium} />}
           </>
         ) : (
           <EmptyState onCreate={onCreateMine} onClose={onClose} />

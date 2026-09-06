@@ -54,3 +54,16 @@
 .drawer-slide-in {
   animation: drawer-slide-in 0.25s ease-out;
 }
+
+/* Item recém-inserido do compêndio: brilho dourado que some. */
+@keyframes item-flash {
+  0% {
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.9), 0 0 18px rgba(212, 175, 55, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0), 0 0 0 rgba(212, 175, 55, 0);
+  }
+}
+.item-flash {
+  animation: item-flash 1.5s ease-out;
+}
