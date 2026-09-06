@@ -3,8 +3,8 @@
 > Documento de referência. Analisa o sistema não oficial de Tormenta20 para Foundry VTT
 > (`~/projetos/foundry-tormenta20`, versão 1.5.015) **apenas como referência de modelagem de dados**
 > e propõe como estender `packages/shared` para cobrir ficha de personagem e itens.
-> Nada aqui está implementado. A ficha de personagem está fora do MVP descrito em `SPEC.md`;
-> ao implementar, o SPEC deve ser atualizado no mesmo commit.
+> As fases 1 e 2 da proposta estão implementadas (ver §3.6); o comportamento atual está em `SPEC.md` §3.6.
+> As seções 2 e 3 permanecem como registro da análise e da proposta original.
 
 Escopo da leitura no repositório do Foundry:
 
@@ -186,8 +186,26 @@ Uma função pura `computeCharacter(def, character)` no `shared` devolve `{ attr
 
 Fica de fora de propósito, por ser automação pesada ou Product Identity: Active Effects, melhorias e encantos de item, progressão por nível com escolhas, compêndios.
 
-### 3.5 Pontos em aberto (decisão do dono do projeto)
+### 3.5 Decisões tomadas (06/09/2026)
 
-- `Character` como um único `Json` no banco ou colunas separadas.
-- Formato do `target` dos modificadores (seletor textual como proposto ou objeto estruturado).
-- Se a fase 1 já inclui itens ou não.
+- `Character` no banco = colunas `id, roomId, ownerId, name, kind` + `data Json`, validado por Zod na entrada e na saída.
+- `target` dos modificadores = seletor textual validado por regex (`rules/modifierTarget.ts`).
+- Fases 1 e 2 implementadas juntas; 3 e 4 ficam para depois.
+- O tipo `Character` já cobre poderes, magias e ativação (`activation`, `save`), mesmo sem lógica.
+- O servidor continua a única fonte de rolagens; o cliente roda `computeCharacter` só para exibir.
+
+### 3.6 Estado da implementação
+
+| Fase | Estado | Onde |
+|---|---|---|
+| 1. Schema v2 + JSON + `computeCharacter` + modificadores | **feito** | `packages/shared/src/schemas/system.ts`, `systems/tormenta20.json`, `src/rules/` |
+| 2. Itens físicos com `statBonuses` e ações de ataque/dano ligadas ao chat | **feito** | `rules/rolls.ts`, `apps/server/src/socket/character.ts`, `apps/web/src/components/sheet/` |
+| 3. Poderes e magias com ativação, custo de PM e CD de resistência | pendente | tipos prontos (`ActivationSchema`, `SaveSchema`); falta UI e lógica |
+| 4. Classes e raças como itens alimentando nível e PV/PM | pendente | `ResourceDef.perLevel` e `level.source = "classes"` já existem no schema, ignorados por enquanto |
+
+Diferenças em relação à proposta original, todas para manter o código sem chave de Tormenta:
+- `equipStats[]` ganhou `aggregate` (`sum`/`min`/`max`) e `default`, para o limite de atributo da armadura pesada ser "sem limite" quando não há armadura.
+- `attackSkills[]` no JSON diz quais perícias servem para ataque (antes a UI teria de conhecer a tag `ataque`).
+- Os placeholders contextuais (`{attr}`, `{trained}`, `{sizeMod}`, `{armorPenalty}`, `{skill}`, `{max}`) ficaram documentados no cabeçalho de `system.ts`; `validateSystemDefinition` confere todos os placeholders do JSON.
+- Sem `systemId` na ficha: a sala já tem o sistema.
+- Moedas: os valores de `ratio` em `currencies[]` foram preenchidos de memória e **precisam ser conferidos no livro**; hoje são só informativos.
