@@ -16,19 +16,25 @@ interface ItemCardMessageProps {
   onRoll: (actionId: string) => void;
 }
 
+/** Marca de campo alterado por aprimoramento nesta conjuração. */
+const Enhanced: React.FC = () => <span className="ml-1 text-[9px] text-emerald-400/80 font-serif italic">(aprimorado)</span>;
+
 /**
  * Card de item usado (character:use-item). Tudo que aparece já veio pronto do
  * servidor com os rótulos do sistema (ItemCard é denormalizado); os botões só
  * disparam character:roll { type: "action" } pela ficha de origem.
  */
 export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card, isGm, isMe, time, canAct, onRoll }) => {
-  const meta: { label: string; value: string }[] = [];
-  if (card.execution) meta.push({ label: "Execução", value: card.execution });
-  if (card.range) meta.push({ label: "Alcance", value: card.range });
-  if (card.duration) meta.push({ label: "Duração", value: card.duration });
-  if (card.target) meta.push({ label: "Alvo", value: card.target });
-  if (card.area) meta.push({ label: "Área", value: card.area });
+  // `enhanced` diz quais campos um aprimoramento mudou nesta conjuração (cards antigos não têm).
+  const enhanced = new Set(card.enhanced ?? []);
+  const meta: { label: string; value: string; enhanced: boolean }[] = [];
+  if (card.execution) meta.push({ label: "Execução", value: card.execution, enhanced: false });
+  if (card.range) meta.push({ label: "Alcance", value: card.range, enhanced: enhanced.has("range") });
+  if (card.duration) meta.push({ label: "Duração", value: card.duration, enhanced: enhanced.has("duration") });
+  if (card.target) meta.push({ label: "Alvo", value: card.target, enhanced: enhanced.has("target") });
+  if (card.area) meta.push({ label: "Área", value: card.area, enhanced: enhanced.has("area") });
   const enhancements = card.enhancements ?? [];
+  const notes = enhancements.filter((e) => e.note);
 
   return (
     <div id={`chat-msg-${msg.id}`} className="p-3 rounded border bg-[#101418]/80 border-sky-900/50 shadow-inner">
@@ -72,8 +78,9 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
       {meta.length > 0 && (
         <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] font-mono text-zinc-400">
           {meta.map((m) => (
-            <div key={m.label} className="truncate" title={`${m.label}: ${m.value}`}>
+            <div key={m.label} className="truncate" title={`${m.label}: ${m.value}${m.enhanced ? " (aprimorado)" : ""}`}>
               <span className="text-zinc-600">{m.label}:</span> {m.value}
+              {m.enhanced && <Enhanced />}
             </div>
           ))}
         </div>
@@ -95,6 +102,17 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
         </div>
       )}
 
+      {/* Efeitos descritivos dos aprimoramentos (sem automação): em destaque, para o jogador aplicar à mão. */}
+      {notes.length > 0 && (
+        <div className="mt-2 rounded border border-amber-800/60 bg-amber-950/30 px-2 py-1.5 text-xs text-amber-100 font-serif leading-relaxed space-y-0.5" data-card-notes>
+          {notes.map((e) => (
+            <div key={e.id} className="whitespace-pre-wrap break-words">
+              <span className="font-bold text-amber-300">{e.label || e.id}:</span> {e.note}
+            </div>
+          ))}
+        </div>
+      )}
+
       {card.effect && <div className="mt-2 text-xs text-zinc-200 font-serif leading-relaxed whitespace-pre-wrap break-words">{card.effect}</div>}
 
       {/* CD de resistência */}
@@ -104,6 +122,7 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
             {card.save.dc !== null ? `CD ${card.save.dc}` : "CD —"}
           </span>
           <span className="text-zinc-300">{card.save.skillLabel}</span>
+          {enhanced.has("dc") && <Enhanced />}
           {card.save.text && <span className="text-zinc-500 font-serif truncate">({card.save.text})</span>}
         </div>
       )}
@@ -121,6 +140,7 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
             >
               <Dices className="w-3.5 h-3.5 text-[#d4af37]" />
               <span>{a.label}</span>
+              {a.kind === "attack" && enhanced.has("attack") && <Enhanced />}
               {/* Dano: parcelas com o selo do tipo; cards antigos não têm `damage` e mostram só a fórmula. */}
               {a.formula && <span className="font-mono font-bold text-amber-300 ml-0.5">({(a.damage ?? []).length > 0 ? <DamageFormula def={def} components={a.damage} /> : a.formula})</span>}
             </button>

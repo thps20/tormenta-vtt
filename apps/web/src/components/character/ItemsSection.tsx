@@ -21,6 +21,7 @@ import {
   type ComputedCharacter,
   type BuiltRoll,
   type EnhancementEffect,
+  type EnhancementEffectKind,
   type EnhancementUse,
   type ItemFieldDef,
   type ItemKindDef,
@@ -28,7 +29,7 @@ import {
   type SystemDefinition,
 } from "@tormenta-vtt/shared";
 import { PALETTE_SHORTCUT_LABEL, seeBook } from "../../lib/compendium";
-import { EFFECT_KIND_OPTIONS, describeEffect, effectForKind } from "../../lib/enhancements";
+import { describeEffect, effectForKind, effectKindOptions } from "../../lib/enhancements";
 import { newId } from "../../lib/ids";
 import { useCompendium } from "../../store/compendium";
 import { kindIcon } from "./kindIcons";
@@ -441,7 +442,7 @@ const EnhancementsView: React.FC<{ def: SystemDefinition; abbr: string; enhancem
           +{e.cost} {abbr}
           {e.repeatable ? " ×" : ""}
         </span>
-        {describeEffect(e) && <span className="shrink-0 px-1 rounded bg-amber-950/40 border border-amber-800/60 text-amber-300 font-mono text-[10px]">{describeEffect(e)}</span>}
+        {describeEffect(def, e) && <span className="shrink-0 px-1 rounded bg-amber-950/40 border border-amber-800/60 text-amber-300 font-mono text-[10px]">{describeEffect(def, e)}</span>}
         <EffectDamageType def={def} effect={enhancementEffect(e)} />
         <span className="text-zinc-300 font-serif">{e.label || <span className="text-zinc-600 italic">sem texto</span>}</span>
       </li>
@@ -700,21 +701,30 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onP
   );
 };
 
-/** Tipo e valor do efeito de um aprimoramento (dados "XdY" validados no commit; fórmula livre; tipo de dano do extra). */
+/** Dados "XdY" validados no commit (o schema não aceita outra coisa). */
+const DiceInput: React.FC<{ value: string; placeholder: string; title: string; onCommit: (dice: string) => void }> = ({ value, placeholder, title, onCommit }) => (
+  <TextInput value={value} onCommit={(dice) => DiceTermSchema.safeParse(dice.trim()).success && onCommit(dice.trim())} placeholder={placeholder} className="w-16 font-mono" maxLength={10} title={title} />
+);
+
+/** Unidade (do sistema) + valor opcional, para rangeSet/durationSet ("1 Dia", "Longo (90 m)"). */
+const UnitsInput: React.FC<{ units: { key: string; label: string }[]; value: { units: string; value?: number }; onChange: (v: { units: string; value?: number }) => void }> = ({ units, value, onChange }) => (
+  <>
+    <NumInput value={value.value ?? null} allowEmpty onCommit={(n) => onChange(n === null || n <= 0 ? { units: value.units } : { units: value.units, value: n })} placeholder="n" className="w-10" title="Valor (vazio = só a unidade)" />
+    <Select value={value.units} onChange={(units) => onChange({ ...value, units })} options={units.map((u) => ({ value: u.key, label: u.label }))} title="Unidade que substitui a do item" />
+  </>
+);
+
+/**
+ * Tipo e valor do efeito de um aprimoramento. Cada tipo tem os campos do seu
+ * schema; o select lista todos os tipos (effectKindOptions).
+ */
 const EnhancementEffectEditor: React.FC<{ def: SystemDefinition; effect: EnhancementEffect; onChange: (effect: EnhancementEffect | undefined) => void }> = ({ def, effect, onChange }) => (
-  <label className="flex items-center gap-1 text-zinc-400" title="O que muda no dano ao conjurar com este aprimoramento">
+  <label className="flex items-center gap-1 text-zinc-400" title="O que muda ao conjurar com este aprimoramento">
     efeito
-    <Select value={effect.kind} onChange={(kind) => onChange(effectForKind(kind as EnhancementEffect["kind"], effect))} options={EFFECT_KIND_OPTIONS} />
+    <Select value={effect.kind} onChange={(kind) => onChange(effectForKind(def, kind as EnhancementEffectKind, effect))} options={effectKindOptions(def)} />
     {effect.kind === "damageDiceAdd" && (
       <>
-        <TextInput
-          value={effect.dice}
-          onCommit={(dice) => DiceTermSchema.safeParse(dice.trim()).success && onChange({ ...effect, dice: dice.trim() })}
-          placeholder="1d6"
-          className="w-16 font-mono"
-          maxLength={10}
-          title="Dados somados ao dano por aplicação (ex.: 1d6)"
-        />
+        <DiceInput value={effect.dice} placeholder="1d6" title="Dados somados ao dano por aplicação (ex.: 1d6)" onCommit={(dice) => onChange({ ...effect, dice })} />
         {/* Sem tipo = herda o da ação (mesma parcela); com tipo = parcela separada ("+1d6 de dano de frio"). */}
         {def.damageTypes.length > 0 && (
           <Select
@@ -729,6 +739,15 @@ const EnhancementEffectEditor: React.FC<{ def: SystemDefinition; effect: Enhance
     {effect.kind === "damageSet" && (
       <TextInput value={effect.formula} onCommit={(formula) => formula.trim() && onChange({ kind: "damageSet", formula: formula.trim() })} placeholder="10d6" className="w-24 font-mono" maxLength={200} title="Fórmula que substitui os dados do dano" />
     )}
+    {effect.kind === "healDiceAdd" && <DiceInput value={effect.dice} placeholder="1d8" title="Dados somados à cura por aplicação (ex.: 1d8)" onCommit={(dice) => onChange({ kind: "healDiceAdd", dice })} />}
+    {(effect.kind === "dcAdd" || effect.kind === "attackBonusAdd") && (
+      <NumInput value={effect.value} onCommit={(v) => onChange({ kind: effect.kind, value: Math.trunc(v ?? 0) })} className="w-10" title={effect.kind === "dcAdd" ? "Somado à CD por aplicação" : "Somado ao ataque por aplicação"} />
+    )}
+    {effect.kind === "rangeSet" && <UnitsInput units={def.activation.rangeUnits} value={effect} onChange={(v) => onChange({ kind: "rangeSet", ...v })} />}
+    {effect.kind === "durationSet" && <UnitsInput units={def.activation.durationUnits} value={effect} onChange={(v) => onChange({ kind: "durationSet", ...v })} />}
+    {effect.kind === "areaSet" && <TextInput value={effect.text} onCommit={(text) => onChange({ kind: "areaSet", text: text.trim() })} placeholder="esfera de 6 m de raio" className="w-40" maxLength={200} title="Área que substitui a do item" />}
+    {effect.kind === "targetsAdd" && <NumInput value={effect.count} onCommit={(v) => onChange({ kind: "targetsAdd", count: Math.max(1, Math.trunc(v ?? 1)) })} className="w-10" title="Alvos a mais por aplicação" />}
+    {effect.kind === "text" && <TextInput value={effect.text} onCommit={(text) => onChange({ kind: "text", text: text.trim() })} placeholder="O que muda (sem automação)" className="flex-1 min-w-40" maxLength={1000} title="Texto em destaque no card do chat; o jogador aplica à mão" />}
   </label>
 );
 

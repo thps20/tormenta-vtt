@@ -97,9 +97,9 @@ export const EnhancementPicker: React.FC<EnhancementPickerProps> = ({ def, chara
                   +{e.cost} {abbr}
                   {e.repeatable && <span className="text-zinc-500 font-normal"> ×</span>}
                 </span>
-                {describeEffect(e) && (
+                {describeEffect(def, e) && (
                   <span className="mr-1.5 px-1 rounded bg-amber-950/40 border border-amber-800/60 text-amber-300 font-mono text-[10px]" title="Efeito aplicado ao dano ao conjurar">
-                    {describeEffect(e)}
+                    {describeEffect(def, e)}
                   </span>
                 )}
                 <EffectDamageType def={def} effect={enhancementEffect(e)} />{" "}
