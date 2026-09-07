@@ -106,7 +106,10 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                 isMe={isMe}
                 time={formatTime(msg.createdAt)}
                 canAct={canAct}
-                onRoll={(actionId) => onRollCharacter(card.characterId, { type: 'action', itemId: card.itemId, actionId })}
+                onRoll={(actionId) =>
+                  // Reenvia os aprimoramentos da conjuração: o servidor monta a fórmula com os efeitos escolhidos.
+                  onRollCharacter(card.characterId, { type: 'action', itemId: card.itemId, actionId, enhancements: (card.enhancements ?? []).map((e) => ({ id: e.id, times: e.times })) })
+                }
               />
             );
           }

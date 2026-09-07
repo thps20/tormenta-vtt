@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus, X, Zap } from "lucide-react";
 import { effectiveCost, resolveEnhancements, type Character, type CharacterItem, type EnhancementUse, type SystemDefinition } from "@tormenta-vtt/shared";
+import { describeEffect } from "../../lib/enhancements";
 
 interface EnhancementPickerProps {
   def: SystemDefinition;
@@ -95,6 +96,11 @@ export const EnhancementPicker: React.FC<EnhancementPickerProps> = ({ def, chara
                   +{e.cost} {abbr}
                   {e.repeatable && <span className="text-zinc-500 font-normal"> ×</span>}
                 </span>
+                {describeEffect(e) && (
+                  <span className="mr-1.5 px-1 rounded bg-amber-950/40 border border-amber-800/60 text-amber-300 font-mono text-[10px]" title="Efeito aplicado ao dano ao conjurar">
+                    {describeEffect(e)}
+                  </span>
+                )}
                 <span className="text-zinc-300 font-serif leading-snug line-clamp-2">{e.label || e.id}</span>
               </label>
             </li>

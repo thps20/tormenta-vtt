@@ -114,12 +114,23 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ msg, card, isG
               onClick={() => onRoll(a.id)}
               disabled={!canAct}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#221c14] hover:bg-[#33281b] border border-[#d4af37]/50 hover:border-[#d4af37] text-amber-100 text-xs font-serif font-semibold transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              title={canAct ? `Rolar ${a.label}` : "Só o GM ou o dono da ficha pode rolar"}
+              title={canAct ? `Rolar ${a.label}${a.formula ? `: ${a.formula}` : ""}${a.breakdown ? ` (${a.breakdown})` : ""}` : "Só o GM ou o dono da ficha pode rolar"}
             >
               <Dices className="w-3.5 h-3.5 text-[#d4af37]" />
               <span>{a.label}</span>
+              {a.formula && <span className="font-mono font-bold text-amber-300 ml-0.5">({a.formula})</span>}
             </button>
           ))}
+          {/* Decomposição do dano com os aprimoramentos (só quando algum efeito mudou a fórmula). */}
+          {card.actions.some((a) => a.breakdown) && (
+            <div className="w-full text-[10px] font-mono text-zinc-500" data-card-breakdown>
+              {card.actions.filter((a) => a.breakdown).map((a) => (
+                <div key={a.id}>
+                  <span className="text-zinc-600">{a.label}:</span> {a.breakdown}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -4,7 +4,9 @@ import {
   buildCharacterRoll,
   createDefaultItem,
   describeActivation,
+  DiceTermSchema,
   effectiveCost,
+  enhancementEffect,
   isPassiveItem,
   pendingChoices,
   RollBuildError,
@@ -17,6 +19,7 @@ import {
   type CharacterPatch,
   type CharacterRollRequest,
   type ComputedCharacter,
+  type EnhancementEffect,
   type EnhancementUse,
   type ItemFieldDef,
   type ItemKindDef,
@@ -24,6 +27,7 @@ import {
   type SystemDefinition,
 } from "@tormenta-vtt/shared";
 import { PALETTE_SHORTCUT_LABEL, seeBook } from "../../lib/compendium";
+import { EFFECT_KIND_OPTIONS, describeEffect, effectForKind } from "../../lib/enhancements";
 import { newId } from "../../lib/ids";
 import { useCompendium } from "../../store/compendium";
 import { kindIcon } from "./kindIcons";
@@ -430,6 +434,7 @@ const EnhancementsView: React.FC<{ abbr: string; enhancements: CharacterItem["en
           +{e.cost} {abbr}
           {e.repeatable ? " ×" : ""}
         </span>
+        {describeEffect(e) && <span className="shrink-0 px-1 rounded bg-amber-950/40 border border-amber-800/60 text-amber-300 font-mono text-[10px]">{describeEffect(e)}</span>}
         <span className="text-zinc-300 font-serif">{e.label || <span className="text-zinc-600 italic">sem texto</span>}</span>
       </li>
     ))}
@@ -625,6 +630,8 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onP
                 <input type="checkbox" checked={e.repeatable} onChange={(ev) => patchEnhancement(e.id, { repeatable: ev.target.checked })} className="accent-sky-500" />
                 repetível
               </label>
+              {/* Efeito mecânico: o importador só preenche por padrão estrito; o jogador completa aqui. */}
+              <EnhancementEffectEditor effect={enhancementEffect(e)} onChange={(effect) => patchEnhancement(e.id, { effect })} />
               <button onClick={() => onPatch({ enhancements: item.enhancements.filter((x) => x.id !== e.id) })} className="p-1 rounded text-zinc-500 hover:text-red-400 cursor-pointer" title="Remover aprimoramento">
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -684,6 +691,27 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onP
     </div>
   );
 };
+
+/** Tipo e valor do efeito de um aprimoramento (dados "XdY" validados no commit; fórmula livre). */
+const EnhancementEffectEditor: React.FC<{ effect: EnhancementEffect; onChange: (effect: EnhancementEffect | undefined) => void }> = ({ effect, onChange }) => (
+  <label className="flex items-center gap-1 text-zinc-400" title="O que muda no dano ao conjurar com este aprimoramento">
+    efeito
+    <Select value={effect.kind} onChange={(kind) => onChange(effectForKind(kind as EnhancementEffect["kind"], effect))} options={EFFECT_KIND_OPTIONS} />
+    {effect.kind === "damageDiceAdd" && (
+      <TextInput
+        value={effect.dice}
+        onCommit={(dice) => DiceTermSchema.safeParse(dice.trim()).success && onChange({ kind: "damageDiceAdd", dice: dice.trim() })}
+        placeholder="1d6"
+        className="w-16 font-mono"
+        maxLength={10}
+        title="Dados somados ao dano por aplicação (ex.: 1d6)"
+      />
+    )}
+    {effect.kind === "damageSet" && (
+      <TextInput value={effect.formula} onCommit={(formula) => formula.trim() && onChange({ kind: "damageSet", formula: formula.trim() })} placeholder="10d6" className="w-24 font-mono" maxLength={200} title="Fórmula que substitui os dados do dano" />
+    )}
+  </label>
+);
 
 interface ActionRowProps {
   def: SystemDefinition;
