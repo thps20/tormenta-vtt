@@ -133,7 +133,7 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
 
   socket.on(
     "character:use-item",
-    guarded(socket, CharacterUseItemSchema, async ({ characterId, itemId }, ctx) => {
+    guarded(socket, CharacterUseItemSchema, async ({ characterId, itemId, enhancements }, ctx) => {
       const me = await prisma.participant.findUnique({ where: { id: ctx.participantId } });
       if (!me) throw new HandlerError("Participante não encontrado");
       const character = toCharacter(await requireCharacter(characterId, ctx.roomId));
@@ -142,9 +142,10 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
       const def = await requireSystem(ctx.roomId);
       let use;
       try {
-        use = buildItemUse(def, character, itemId);
+        // A escolha de aprimoramentos é validada contra o item e cobrada no custo total (regras no shared).
+        use = buildItemUse(def, character, itemId, enhancements);
       } catch (err) {
-        // Recurso insuficiente / item passivo: o ack leva a mensagem e nada é publicado.
+        // Recurso insuficiente / item passivo / aprimoramento inválido: o ack leva a mensagem e nada é publicado.
         if (err instanceof ItemUseError) throw new HandlerError(err.message);
         throw err;
       }
