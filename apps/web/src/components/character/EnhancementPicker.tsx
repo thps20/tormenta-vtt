@@ -1,8 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus, X, Zap } from "lucide-react";
-import { effectiveCost, enhancementEffect, resolveEnhancements, type Character, type CharacterItem, type EnhancementUse, type SystemDefinition } from "@tormenta-vtt/shared";
-import { describeEffect } from "../../lib/enhancements";
-import { EffectDamageType } from "../DamageTypeBadge";
+import {
+  buildCharacterRoll,
+  effectiveCost,
+  enhancementEffect,
+  resolveEnhancements,
+  RollBuildError,
+  type BuiltRoll,
+  type Character,
+  type CharacterItem,
+  type EnhancementUse,
+  type SystemDefinition,
+} from "@tormenta-vtt/shared";
+import { describeEffect, isManualEffect } from "../../lib/enhancements";
+import { DamageFormula, EffectDamageType } from "../DamageTypeBadge";
 
 interface EnhancementPickerProps {
   def: SystemDefinition;
@@ -17,9 +28,10 @@ interface EnhancementPickerProps {
 
 /**
  * Popover de escolha de aprimoramentos ao usar um item. Cada linha é um checkbox
- * (ou contador, se repetível); o custo total é recalculado ao vivo pelas mesmas
- * funções do shared que o servidor usa (fórmula do sistema + modificadores + piso),
- * então o número do botão é o que será descontado.
+ * (ou contador, se repetível) com um selo do que a automação fará (verde) ou
+ * "efeito manual" (cinza); o custo total e as fórmulas de dano/ataque são
+ * recalculados ao vivo pelas mesmas funções do shared que o servidor usa, então
+ * o que aparece no rodapé é o que será descontado e rolado.
  */
 export const EnhancementPicker: React.FC<EnhancementPickerProps> = ({ def, character, item, useLabel, onCast, onClose }) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -54,6 +66,23 @@ export const EnhancementPicker: React.FC<EnhancementPickerProps> = ({ def, chara
   const insufficient = costResource !== undefined && total > available;
 
   const setCount = (id: string, value: number) => setTimes((prev) => ({ ...prev, [id]: Math.max(0, value) }));
+
+  // Fórmulas de dano/cura e ataque com a escolha atual (null = não dá para montar, ex.: dois damageSet).
+  const previews = useMemo(
+    () =>
+      item.actions
+        .filter((a) => a.kind === "damage" || a.kind === "attack")
+        .map((a) => {
+          let built: BuiltRoll | null = null;
+          try {
+            built = buildCharacterRoll(def, character, { type: "action", itemId: item.id, actionId: a.id, enhancements: selection });
+          } catch (err) {
+            if (!(err instanceof RollBuildError)) throw err;
+          }
+          return { id: a.id, label: a.label, built };
+        }),
+    [def, character, item, selection],
+  );
 
   return (
     <div
@@ -97,8 +126,13 @@ export const EnhancementPicker: React.FC<EnhancementPickerProps> = ({ def, chara
                   +{e.cost} {abbr}
                   {e.repeatable && <span className="text-zinc-500 font-normal"> ×</span>}
                 </span>
-                {describeEffect(def, e) && (
-                  <span className="mr-1.5 px-1 rounded bg-amber-950/40 border border-amber-800/60 text-amber-300 font-mono text-[10px]" title="Efeito aplicado ao dano ao conjurar">
+                {/* Selo: verde = a automação aplica ao conjurar; cinza = só custo/descritivo, o jogador aplica à mão. */}
+                {isManualEffect(e) ? (
+                  <span className="mr-1.5 px-1 rounded bg-zinc-800/60 border border-zinc-700 text-zinc-400 font-mono text-[10px]" title={enhancementEffect(e).kind === "text" ? "Descritivo: aparece em destaque no card, sem automação" : "Só custo: nada é aplicado automaticamente"} data-effect="manual">
+                    efeito manual
+                  </span>
+                ) : (
+                  <span className="mr-1.5 px-1 rounded bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 font-mono text-[10px]" title="Aplicado automaticamente ao conjurar" data-effect="auto">
                     {describeEffect(def, e)}
                   </span>
                 )}
@@ -109,6 +143,22 @@ export const EnhancementPicker: React.FC<EnhancementPickerProps> = ({ def, chara
           );
         })}
       </ul>
+
+      {/* Fórmulas ao vivo: parcelas de dano com o selo do tipo; ataque só a fórmula. */}
+      {previews.length > 0 && (
+        <div className="px-3 py-1.5 border-t border-sky-900/50 text-[10px] font-mono text-zinc-400 space-y-0.5" data-enhancement-preview>
+          {previews.map((p) => (
+            <div key={p.id} className="truncate" title={p.built?.breakdown ?? undefined}>
+              <span className="text-zinc-600">{p.label}:</span>{" "}
+              {p.built ? (
+                <span className="text-amber-200">{p.built.damage && p.built.damage.length > 0 ? <DamageFormula def={def} components={p.built.damage} /> : p.built.formula}</span>
+              ) : (
+                <span className="text-red-300">escolha inválida</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="px-3 py-2 border-t border-sky-900/50 flex items-center justify-between gap-2 flex-wrap">
         <span className={`font-mono ${insufficient ? "text-red-300" : "text-zinc-400"}`} id={`enhancement-total-${item.id}`} title="Custo total com modificadores; o que será descontado">
