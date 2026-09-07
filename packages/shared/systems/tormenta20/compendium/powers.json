@@ -11852,7 +11852,11 @@
         {
           "id": "e1",
           "cost": 0,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "healDiceAdd",
+            "dice": "1d6"
+          }
         }
       ],
       "page": 130
@@ -12670,7 +12674,11 @@
         {
           "id": "e1",
           "cost": 1,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "healDiceAdd",
+            "dice": "1d6"
+          }
         }
       ],
       "page": 45

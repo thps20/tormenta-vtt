@@ -35,7 +35,11 @@
         {
           "id": "e1",
           "cost": 1,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         },
         {
           "id": "e2",
@@ -77,7 +81,11 @@
       "enhancements": [
         {
           "id": "e1",
-          "cost": 1
+          "cost": 1,
+          "effect": {
+            "kind": "rangeSet",
+            "units": "medium"
+          }
         },
         {
           "id": "e2",
@@ -86,7 +94,11 @@
         {
           "id": "e3",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         },
         {
           "id": "e4",
@@ -374,7 +386,11 @@
         {
           "id": "e1",
           "cost": 1,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         },
         {
           "id": "e2",
@@ -425,7 +441,11 @@
         {
           "id": "e1",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         },
         {
           "id": "e2",
@@ -931,7 +951,12 @@
         },
         {
           "id": "e3",
-          "cost": 2
+          "cost": 2,
+          "effect": {
+            "kind": "durationSet",
+            "units": "day",
+            "value": 1
+          }
         }
       ],
       "page": 181
@@ -1172,7 +1197,11 @@
         {
           "id": "e4",
           "cost": 3,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         }
       ],
       "page": 182
@@ -1986,7 +2015,11 @@
         {
           "id": "e2",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         }
       ],
       "save": {
@@ -2030,7 +2063,11 @@
       "enhancements": [
         {
           "id": "e1",
-          "cost": 1
+          "cost": 1,
+          "effect": {
+            "kind": "rangeSet",
+            "units": "short"
+          }
         },
         {
           "id": "e2",
@@ -2226,7 +2263,11 @@
         {
           "id": "e1",
           "cost": 1,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         },
         {
           "id": "e2",
@@ -2948,7 +2989,11 @@
         {
           "id": "e3",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         },
         {
           "id": "e4",
@@ -3007,7 +3052,11 @@
         {
           "id": "e2",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         }
       ],
       "save": {
@@ -3257,7 +3306,11 @@
         },
         {
           "id": "e3",
-          "cost": 2
+          "cost": 2,
+          "effect": {
+            "kind": "rangeSet",
+            "units": "short"
+          }
         },
         {
           "id": "e4",
@@ -3939,7 +3992,12 @@
         },
         {
           "id": "e2",
-          "cost": 4
+          "cost": 4,
+          "effect": {
+            "kind": "durationSet",
+            "units": "day",
+            "value": 1
+          }
         }
       ],
       "page": 192
@@ -4304,7 +4362,12 @@
         },
         {
           "id": "e3",
-          "cost": 3
+          "cost": 3,
+          "effect": {
+            "kind": "durationSet",
+            "units": "day",
+            "value": 1
+          }
         },
         {
           "id": "e4",
@@ -4931,7 +4994,11 @@
         },
         {
           "id": "e3",
-          "cost": 2
+          "cost": 2,
+          "effect": {
+            "kind": "durationSet",
+            "units": "sustained"
+          }
         },
         {
           "id": "e4",
@@ -5095,7 +5162,11 @@
         {
           "id": "e2",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         },
         {
           "id": "e3",
@@ -5446,7 +5517,11 @@
         {
           "id": "e1",
           "cost": 1,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         }
       ],
       "save": {
@@ -5680,7 +5755,11 @@
         {
           "id": "e1",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         },
         {
           "id": "e2",
@@ -5766,7 +5845,12 @@
         },
         {
           "id": "e2",
-          "cost": 2
+          "cost": 2,
+          "effect": {
+            "kind": "durationSet",
+            "units": "day",
+            "value": 1
+          }
         },
         {
           "id": "e3",
@@ -6774,7 +6858,12 @@
         },
         {
           "id": "e2",
-          "cost": 4
+          "cost": 4,
+          "effect": {
+            "kind": "durationSet",
+            "units": "day",
+            "value": 1
+          }
         },
         {
           "id": "e3",
@@ -7022,7 +7111,12 @@
         },
         {
           "id": "e2",
-          "cost": 10
+          "cost": 10,
+          "effect": {
+            "kind": "durationSet",
+            "units": "day",
+            "value": 1
+          }
         }
       ],
       "page": 201
@@ -8112,7 +8206,11 @@
       "enhancements": [
         {
           "id": "e1",
-          "cost": 1
+          "cost": 1,
+          "effect": {
+            "kind": "rangeSet",
+            "units": "medium"
+          }
         },
         {
           "id": "e2",
@@ -8125,7 +8223,11 @@
         },
         {
           "id": "e4",
-          "cost": 3
+          "cost": 3,
+          "effect": {
+            "kind": "rangeSet",
+            "units": "long"
+          }
         }
       ],
       "page": 205
@@ -8964,7 +9066,11 @@
         {
           "id": "e1",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         },
         {
           "id": "e2",
@@ -9172,7 +9278,11 @@
         {
           "id": "e1",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 5
+          }
         },
         {
           "id": "e2",
@@ -9239,7 +9349,11 @@
         },
         {
           "id": "e6",
-          "cost": 3
+          "cost": 3,
+          "effect": {
+            "kind": "areaSet",
+            "text": "cilindro com 90m de raio e 90m de altura"
+          }
         }
       ],
       "page": 208
@@ -9603,7 +9717,11 @@
         {
           "id": "e2",
           "cost": 1,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "targetsAdd",
+            "count": 1
+          }
         },
         {
           "id": "e3",
@@ -10021,7 +10139,12 @@
         },
         {
           "id": "e2",
-          "cost": 2
+          "cost": 2,
+          "effect": {
+            "kind": "durationSet",
+            "units": "day",
+            "value": 1
+          }
         },
         {
           "id": "e3",

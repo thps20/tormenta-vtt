@@ -227,7 +227,9 @@ class Report {
     );
     lines.push("");
     const kinds = [...this.effectsByKind.entries()].sort().map(([k, n]) => `${n} \`${k}\``).join(", ") || "nenhum";
-    lines.push(`Efeito mecânico preenchido só quando o texto inteiro casa um padrão estrito ("aumenta o dano em +XdY", "+XdY de dano", "muda o dano para XdY"): ${kinds}. Os demais ficam como só custo e estão listados por categoria no fim deste relatório.`);
+    lines.push(
+      `Efeito mecânico preenchido só quando o texto inteiro casa um padrão estrito ("aumenta o dano em +XdY", "+XdY de dano", "muda o dano para XdY", "aumenta a cura em +XdY", "aumenta a CD em +N", "muda o alcance para <unidade>", "muda a duração para [N] <unidade>", "muda a área para <texto>", "aumenta o número de alvos em +N"): ${kinds}. Frases compostas ("muda o alcance para médio e a duração para cena") e os demais ficam como só custo e estão listados por categoria no fim deste relatório.`,
+    );
     lines.push("");
     lines.push("Efeitos ativos (`effects[]` com `changes`) são ignorados de propósito; só a contagem:");
     lines.push("");
@@ -852,40 +854,90 @@ export interface UnknownDamageType {
   unknownType: string;
 }
 
+/** Rótulo → chave, para tipos de dano e unidades de alcance/duração do sistema (null = não existe). */
+export interface EffectResolvers {
+  damageTypeKey: (label: string) => string | null;
+  rangeUnitKey: (label: string) => string | null;
+  durationUnitKey: (label: string) => string | null;
+}
+const NO_RESOLVERS: EffectResolvers = { damageTypeKey: () => null, rangeUnitKey: () => null, durationUnitKey: () => null };
+
 /**
  * Efeito mecânico a partir do texto, SÓ quando a frase inteira casa um padrão
  * estrito. Qualquer outra frase devolve null (vai para o relatório): nunca inferir.
- * "+4d6 de dano de frio" / "aumenta o dano em +2d6 de fogo" preenchem `damageType`
- * (rótulo → chave via `damageTypeKey`); tipo desconhecido devolve { unknownType }.
+ * Padrões (ponto final opcional; frases compostas "muda X e Y" não casam):
+ *   "aumenta o dano em +XdY [de <tipo>]", "+XdY de dano [de <tipo>]" → damageDiceAdd
+ *     (rótulo → chave via damageTypeKey; tipo desconhecido devolve { unknownType })
+ *   "muda o dano para XdY"                                            → damageSet
+ *   "aumenta a cura em +XdY", "+XdY de cura"                         → healDiceAdd
+ *   "aumenta a CD em +N"                                              → dcAdd
+ *   "muda o alcance para <unidade>"                                   → rangeSet
+ *   "muda a duração para <unidade>" / "para N <unidade>[s]"           → durationSet
+ *   "muda a área para <texto>"                                        → areaSet
+ *   "aumenta o número/a quantidade de alvos em +N", "+N alvo(s)"      → targetsAdd
+ * attackBonusAdd e text nunca são preenchidos aqui.
  */
-export function parseEnhancementEffect(text: string, damageTypeKey: (label: string) => string | null = () => null): EnhancementEffect | UnknownDamageType | null {
-  const t = text.trim().replace(/\s+/g, " ").toLowerCase();
+export function parseEnhancementEffect(text: string, resolvers: EffectResolvers = NO_RESOLVERS): EnhancementEffect | UnknownDamageType | null {
+  const original = text.trim().replace(/\s+/g, " ");
+  const t = original.toLowerCase();
   const add = /^aumenta o dano em \+?(\d+d\d+)(?: de ([\p{L}]+))?[.;]?$/u.exec(t) ?? /^\+?(\d+d\d+) de dano(?: de ([\p{L}]+))?[.;]?$/u.exec(t);
   if (add?.[1]) {
     const typeLabel = add[2];
     if (typeLabel === undefined) return { kind: "damageDiceAdd", dice: add[1] };
-    const key = damageTypeKey(typeLabel);
+    const key = resolvers.damageTypeKey(typeLabel);
     return key ? { kind: "damageDiceAdd", dice: add[1], damageType: key } : { unknownType: typeLabel };
   }
   const set = /^muda o dano para (\d+d\d+)[.;]?$/.exec(t);
   if (set?.[1]) return { kind: "damageSet", formula: set[1] };
+  const heal = /^aumenta a cura em \+?(\d+d\d+)[.;]?$/.exec(t) ?? /^\+?(\d+d\d+) de cura[.;]?$/.exec(t);
+  if (heal?.[1]) return { kind: "healDiceAdd", dice: heal[1] };
+  const dc = /^aumenta a cd em \+?(\d+)[.;]?$/.exec(t);
+  if (dc?.[1]) return { kind: "dcAdd", value: Number(dc[1]) };
+  const range = /^muda o alcance para ([\p{L}]+)[.;]?$/u.exec(t);
+  if (range?.[1]) {
+    const units = resolvers.rangeUnitKey(range[1]);
+    return units ? { kind: "rangeSet", units } : null;
+  }
+  const duration = /^muda a duração para (?:(\d+) )?([\p{L}]+)[.;]?$/u.exec(t);
+  if (duration?.[2]) {
+    const label = duration[2];
+    const value = duration[1] !== undefined ? Number(duration[1]) : undefined;
+    // "2 rodadas": aceita o plural do rótulo quando há valor.
+    const units = resolvers.durationUnitKey(label) ?? (value !== undefined && label.endsWith("s") ? resolvers.durationUnitKey(label.slice(0, -1)) : null);
+    if (!units) return null;
+    return value !== undefined ? { kind: "durationSet", units, value } : { kind: "durationSet", units };
+  }
+  // Área é texto livre (mantém a caixa original): uma frase só, sem outra cláusula ("... e o alvo para ...").
+  const area = /^muda a área para ([^.;]+)[.;]?$/iu.exec(original);
+  if (area?.[1] && !/\be (o|a|os|as) /i.test(area[1])) return { kind: "areaSet", text: area[1].trim().slice(0, 200) };
+  const targets = /^aumenta (?:o número|a quantidade) de alvos em \+?(\d+)[.;]?$/u.exec(t) ?? /^\+(\d+) alvos?[.;]?$/.exec(t);
+  if (targets?.[1] && Number(targets[1]) >= 1) return { kind: "targetsAdd", count: Number(targets[1]) };
   return null;
 }
 
-/** Chave de tipo de dano a partir do rótulo ou da própria chave, sem acento/caixa ("Frio", "frio" → "frio"). */
-function damageTypeKeyResolver(def: SystemDefinition): (label: string) => string | null {
+/** Chave a partir do rótulo ou da própria chave, sem acento/caixa ("Frio", "frio" → "frio"). */
+function optionKeyResolver(options: { key: string; label: string }[]): (label: string) => string | null {
   const byLabel = new Map<string, string>();
-  for (const d of def.damageTypes) {
-    byLabel.set(normalize(d.label), d.key);
-    byLabel.set(normalize(d.key), d.key);
+  for (const o of options) {
+    byLabel.set(normalize(o.label), o.key);
+    byLabel.set(normalize(o.key), o.key);
+    // "Curto (9 m)" também casa só "curto".
+    const short = normalize(o.label).replace(/\s*\(.*\)$/, "");
+    if (!byLabel.has(short)) byLabel.set(short, o.key);
   }
   return (label) => byLabel.get(normalize(label)) ?? null;
+}
+
+function effectResolvers(def: SystemDefinition): EffectResolvers {
+  return { damageTypeKey: optionKeyResolver(def.damageTypes), rangeUnitKey: optionKeyResolver(def.activation.rangeUnits), durationUnitKey: optionKeyResolver(def.activation.durationUnits) };
 }
 
 /** Categoria do relatório para um aprimoramento sem efeito (primeira que casar). */
 function noEffectCategory(text: string): string {
   const t = normalize(text);
   if (/\bdano\b/.test(t)) return "dano fora do padrão";
+  if (/\bcura\b/.test(t)) return "cura fora do padrão";
+  if (/\bcd\b/.test(t)) return "CD";
   if (/\balvos?\b/.test(t)) return "alvo adicional";
   if (/\balcance\b/.test(t)) return "alcance";
   if (/\bduracao\b/.test(t)) return "duração";
@@ -907,7 +959,7 @@ interface ExtractedEnhancements {
  * checkbox "Múltiplas Aplicações" (repetível). Em magia, custo vazio é o
  * Truque, que é outra regra (custo total 0): fica só na descrição.
  */
-function extractEnhancements(doc: FoundryDoc, id: string, kind: string, report: Report, unknownEntities: Set<string>, damageTypeKey: (label: string) => string | null): ExtractedEnhancements {
+function extractEnhancements(doc: FoundryDoc, id: string, kind: string, report: Report, unknownEntities: Set<string>, resolvers: EffectResolvers): ExtractedEnhancements {
   const list: ExtractedEnhancements["list"] = [];
   const texts = new Map<string, string>();
   const lines: string[] = [];
@@ -941,7 +993,7 @@ function extractEnhancements(doc: FoundryDoc, id: string, kind: string, report: 
     }
     if (flags.aumenta === undefined) report.todo("aprimoramento: sem a flag de múltiplas aplicações (gravado como não repetível)", id, `"${text.slice(0, 80)}"`);
     const enhId = `e${list.length + 1}`;
-    const parsed = parseEnhancementEffect(text, damageTypeKey);
+    const parsed = parseEnhancementEffect(text, resolvers);
     let mech: EnhancementEffect | null = null;
     if (parsed && "unknownType" in parsed) {
       // O texto nomeia um tipo que o sistema não tem: fica só custo e vira pendência (não é "sem padrão").
@@ -1003,7 +1055,7 @@ function main(): void {
   const def = getSystemDefinition(opts.systemId);
   const report = new Report();
   const converter = new Converter(def, report);
-  const damageTypeKey = damageTypeKeyResolver(def);
+  const resolvers = effectResolvers(def);
   const outDir = compendiumDir(opts.systemId);
   if (!existsSync(outDir)) throw new Error(`Pasta do compêndio não existe: ${outDir}`);
   const scriptsDir = dirname(fileURLToPath(import.meta.url));
@@ -1066,7 +1118,7 @@ function main(): void {
     drafts.set(kind, list);
 
     // Aprimoramentos só em tipos com bloco de ativação (o schema recusa nos outros).
-    const enhancements = converter.kind(kind).hasActivation ? extractEnhancements(doc, id, kind, report, unknownEntities, damageTypeKey) : null;
+    const enhancements = converter.kind(kind).hasActivation ? extractEnhancements(doc, id, kind, report, unknownEntities, resolvers) : null;
     if (enhancements && enhancements.list.length > 0) draft.enhancements = enhancements.list.map((e) => ({ ...e, label: "" }));
 
     if (opts.withDescriptions) {
