@@ -20,10 +20,10 @@ export const EFFECT_KIND_OPTIONS: { value: EnhancementEffect["kind"]; label: str
   { value: "damageSet", label: "dano = fórmula" },
 ];
 
-/** Efeito ao trocar o tipo no editor: mantém o valor quando o tipo é o mesmo, senão começa vazio. */
+/** Efeito ao trocar o tipo no editor: mantém o valor quando o tipo é o mesmo, senão começa com "1d6" (o schema não aceita vazio). */
 export function effectForKind(kind: EnhancementEffect["kind"], current: EnhancementEffect): EnhancementEffect | undefined {
   if (kind === current.kind) return current;
   if (kind === "costOnly") return undefined;
   if (kind === "damageDiceAdd") return { kind, dice: "1d6" };
-  return { kind, formula: "" };
+  return { kind, formula: "1d6" };
 }
