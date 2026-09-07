@@ -1,43 +1,497 @@
-[
-  {
-    "$comment": "Só mecânica (OGL). levels/initial são preenchidos ao inserir na ficha. TODO: confirmar com o livro a lista de perícias à escolha.",
-    "id": "guerreiro",
-    "name": "Guerreiro",
-    "kind": "class",
-    "tags": ["combate"],
-    "fields": {
-      "hpInitial": 20,
-      "hpPerLevel": 5,
-      "mpPerLevel": 3,
-      "skillsGranted": {
-        "fixed": ["fortitude"],
-        "choices": [
-          { "count": 1, "from": ["luta", "pontaria"], "chosen": [] },
-          { "count": 2, "from": ["adestramento", "atletismo", "cavalgar", "guerra", "iniciativa", "intimidacao", "oficio", "percepcao", "reflexos"], "chosen": [] }
-        ]
-      },
-      "proficiencies": "Armas marciais, escudos e armaduras pesadas"
+{
+  "$generated": "Gerado por scripts/import-foundry-compendium.ts a partir dos packs do Foundry. Não edite à mão: use custom.json (tem precedência por id).",
+  "entries": [
+    {
+      "id": "barbaro",
+      "name": "Bárbaro",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.FiMbJLurhpstUxu1",
+      "fields": {
+        "hpInitial": 24,
+        "hpPerLevel": 6,
+        "mpPerLevel": 3,
+        "skillsGranted": {
+          "fixed": [
+            "fortitude",
+            "luta"
+          ],
+          "choices": [
+            {
+              "count": 4,
+              "from": [
+                "adestramento",
+                "atletismo",
+                "cavalgar",
+                "iniciativa",
+                "intimidacao",
+                "oficio",
+                "percepcao",
+                "pontaria",
+                "sobrevivencia",
+                "vontade"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
     },
-    "page": null
-  },
-  {
-    "$comment": "TODO: confirmar com o livro a lista de perícias à escolha e as proficiências.",
-    "id": "arcanista",
-    "name": "Arcanista",
-    "kind": "class",
-    "tags": ["conjurador", "arcano"],
-    "fields": {
-      "hpInitial": 8,
-      "hpPerLevel": 2,
-      "mpPerLevel": 6,
-      "skillsGranted": {
-        "fixed": ["misticismo", "vontade"],
-        "choices": [
-          { "count": 2, "from": ["atuacao", "conhecimento", "diplomacia", "enganacao", "guerra", "iniciativa", "intuicao", "investigacao", "nobreza", "oficio", "percepcao"], "chosen": [] }
-        ]
-      },
-      "proficiencies": ""
+    {
+      "id": "bardo",
+      "name": "Bardo",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.u3fr3IOtTXmsk2BT",
+      "fields": {
+        "hpInitial": 12,
+        "hpPerLevel": 3,
+        "mpPerLevel": 4,
+        "skillsGranted": {
+          "fixed": [
+            "atuacao",
+            "reflexos"
+          ],
+          "choices": [
+            {
+              "count": 6,
+              "from": [
+                "acrobacia",
+                "cavalgar",
+                "conhecimento",
+                "diplomacia",
+                "enganacao",
+                "furtividade",
+                "iniciativa",
+                "intuicao",
+                "investigacao",
+                "jogatina",
+                "ladinagem",
+                "luta",
+                "misticismo",
+                "nobreza",
+                "percepcao",
+                "pontaria",
+                "vontade"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
     },
-    "page": null
-  }
-]
+    {
+      "id": "bucaneiro",
+      "name": "Bucaneiro",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.uvMolF7vcMs0KbQl",
+      "fields": {
+        "hpInitial": 16,
+        "hpPerLevel": 4,
+        "mpPerLevel": 3,
+        "skillsGranted": {
+          "fixed": [
+            "reflexos"
+          ],
+          "choices": [
+            {
+              "count": 1,
+              "from": [
+                "luta",
+                "pontaria"
+              ],
+              "chosen": []
+            },
+            {
+              "count": 4,
+              "from": [
+                "acrobacia",
+                "atletismo",
+                "atuacao",
+                "enganacao",
+                "fortitude",
+                "furtividade",
+                "iniciativa",
+                "intimidacao",
+                "jogatina",
+                "luta",
+                "oficio",
+                "percepcao",
+                "pilotagem",
+                "pontaria"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
+    },
+    {
+      "id": "cacador",
+      "name": "Caçador",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.xwI9ItqovNe5RMdF",
+      "fields": {
+        "hpInitial": 16,
+        "hpPerLevel": 4,
+        "mpPerLevel": 4,
+        "skillsGranted": {
+          "fixed": [
+            "sobrevivencia"
+          ],
+          "choices": [
+            {
+              "count": 1,
+              "from": [
+                "luta",
+                "pontaria"
+              ],
+              "chosen": []
+            },
+            {
+              "count": 6,
+              "from": [
+                "adestramento",
+                "atletismo",
+                "cavalgar",
+                "cura",
+                "fortitude",
+                "furtividade",
+                "iniciativa",
+                "investigacao",
+                "luta",
+                "oficio",
+                "percepcao",
+                "pontaria",
+                "reflexos"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
+    },
+    {
+      "id": "cavaleiro",
+      "name": "Cavaleiro",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.fzTv6gS1qu4lpstx",
+      "fields": {
+        "hpInitial": 20,
+        "hpPerLevel": 5,
+        "mpPerLevel": 3,
+        "skillsGranted": {
+          "fixed": [
+            "fortitude",
+            "luta"
+          ],
+          "choices": [
+            {
+              "count": 2,
+              "from": [
+                "adestramento",
+                "atletismo",
+                "cavalgar",
+                "diplomacia",
+                "guerra",
+                "iniciativa",
+                "intimidacao",
+                "nobreza",
+                "percepcao",
+                "vontade"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
+    },
+    {
+      "id": "clerigo",
+      "name": "Clérigo",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.EnHy1teosvZmcp4D",
+      "fields": {
+        "hpInitial": 16,
+        "hpPerLevel": 4,
+        "mpPerLevel": 5,
+        "skillsGranted": {
+          "fixed": [
+            "religiao",
+            "vontade"
+          ],
+          "choices": [
+            {
+              "count": 2,
+              "from": [
+                "conhecimento",
+                "cura",
+                "diplomacia",
+                "fortitude",
+                "iniciativa",
+                "intuicao",
+                "luta",
+                "misticismo",
+                "nobreza",
+                "oficio",
+                "percepcao"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
+    },
+    {
+      "id": "druida",
+      "name": "Druida",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.ROLLbOHDe9gWNazQ",
+      "fields": {
+        "hpInitial": 16,
+        "hpPerLevel": 4,
+        "mpPerLevel": 4,
+        "skillsGranted": {
+          "fixed": [
+            "sobrevivencia",
+            "vontade"
+          ],
+          "choices": [
+            {
+              "count": 4,
+              "from": [
+                "adestramento",
+                "atletismo",
+                "cavalgar",
+                "conhecimento",
+                "cura",
+                "fortitude",
+                "iniciativa",
+                "intuicao",
+                "luta",
+                "misticismo",
+                "oficio",
+                "percepcao",
+                "religiao"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
+    },
+    {
+      "id": "inventor",
+      "name": "Inventor",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.WAyBowpFRVKRr0mq",
+      "fields": {
+        "hpInitial": 12,
+        "hpPerLevel": 3,
+        "mpPerLevel": 4,
+        "skillsGranted": {
+          "fixed": [
+            "oficio",
+            "vontade"
+          ],
+          "choices": [
+            {
+              "count": 4,
+              "from": [
+                "conhecimento",
+                "cura",
+                "diplomacia",
+                "fortitude",
+                "iniciativa",
+                "investigacao",
+                "luta",
+                "misticismo",
+                "oficio",
+                "pilotagem",
+                "percepcao",
+                "pontaria"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
+    },
+    {
+      "id": "ladino",
+      "name": "Ladino",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.hBx9rVg3XGQ5wsd1",
+      "fields": {
+        "hpInitial": 12,
+        "hpPerLevel": 3,
+        "mpPerLevel": 4,
+        "skillsGranted": {
+          "fixed": [
+            "ladinagem",
+            "reflexos"
+          ],
+          "choices": [
+            {
+              "count": 8,
+              "from": [
+                "acrobacia",
+                "atletismo",
+                "atuacao",
+                "cavalgar",
+                "conhecimento",
+                "diplomacia",
+                "enganacao",
+                "furtividade",
+                "iniciativa",
+                "intimidacao",
+                "intuicao",
+                "investigacao",
+                "jogatina",
+                "luta",
+                "oficio",
+                "percepcao",
+                "pilotagem",
+                "pontaria"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
+    },
+    {
+      "id": "lutador",
+      "name": "Lutador",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.pBABExUf8ATkRnHM",
+      "fields": {
+        "hpInitial": 20,
+        "hpPerLevel": 5,
+        "mpPerLevel": 3,
+        "skillsGranted": {
+          "fixed": [
+            "fortitude",
+            "luta"
+          ],
+          "choices": [
+            {
+              "count": 4,
+              "from": [
+                "acrobacia",
+                "adestramento",
+                "atletismo",
+                "enganacao",
+                "furtividade",
+                "iniciativa",
+                "intimidacao",
+                "oficio",
+                "percepcao",
+                "pontaria",
+                "reflexos"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
+    },
+    {
+      "id": "nobre",
+      "name": "Nobre",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.kg8tLXlPNJSlwWcc",
+      "fields": {
+        "hpInitial": 16,
+        "hpPerLevel": 4,
+        "mpPerLevel": 4,
+        "skillsGranted": {
+          "fixed": [
+            "vontade"
+          ],
+          "choices": [
+            {
+              "count": 1,
+              "from": [
+                "diplomacia",
+                "intimidacao"
+              ],
+              "chosen": []
+            },
+            {
+              "count": 4,
+              "from": [
+                "adestramento",
+                "atuacao",
+                "cavalgar",
+                "conhecimento",
+                "diplomacia",
+                "enganacao",
+                "fortitude",
+                "guerra",
+                "iniciativa",
+                "intimidacao",
+                "intuicao",
+                "investigacao",
+                "jogatina",
+                "luta",
+                "nobreza",
+                "oficio",
+                "percepcao",
+                "pontaria"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
+    },
+    {
+      "id": "paladino",
+      "name": "Paladino",
+      "kind": "class",
+      "$source": "Compendium.tormenta20.classes.Item.VnjstNLqk1lgxsEn",
+      "fields": {
+        "hpInitial": 20,
+        "hpPerLevel": 5,
+        "mpPerLevel": 3,
+        "skillsGranted": {
+          "fixed": [
+            "luta",
+            "vontade"
+          ],
+          "choices": [
+            {
+              "count": 2,
+              "from": [
+                "adestramento",
+                "atletismo",
+                "cavalgar",
+                "cura",
+                "diplomacia",
+                "fortitude",
+                "guerra",
+                "iniciativa",
+                "intuicao",
+                "nobreza",
+                "percepcao",
+                "religiao"
+              ],
+              "chosen": []
+            }
+          ]
+        },
+        "proficiencies": ""
+      }
+    }
+  ]
+}

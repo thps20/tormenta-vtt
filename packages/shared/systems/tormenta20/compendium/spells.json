@@ -1,1 +1,7515 @@
-[]
+{
+  "$generated": "Gerado por scripts/import-foundry-compendium.ts a partir dos packs do Foundry. Não edite à mão: use custom.json (tem precedência por id).",
+  "entries": [
+    {
+      "id": "abencoar-alimentos",
+      "name": "Abençoar Alimentos",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.ZzDo9khqHDty1iDV",
+      "tags": [
+        "divina",
+        "transmutação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "transmutacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "Alimento para 1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 184
+    },
+    {
+      "id": "acalmar-animal",
+      "name": "Acalmar Animal",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.mQeWRsFwBWENaVeD",
+      "tags": [
+        "divina",
+        "encantamento",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "encantamento",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 animal",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 178
+    },
+    {
+      "id": "adaga-mental",
+      "name": "Adaga Mental",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.xfYTGGsdd81Pa0AN",
+      "tags": [
+        "arcana",
+        "encantamento",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "encantamento",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d6",
+          "attribute": null,
+          "damageType": "psiquico",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 184
+    },
+    {
+      "id": "alarme",
+      "name": "Alarme",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.kgD9swQEhzwDC1tb",
+      "tags": [
+        "arcana",
+        "abjuração",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "abjuracao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "Esfera de 9m de raio",
+        "effect": ""
+      },
+      "page": 178
+    },
+    {
+      "id": "aliado-animal",
+      "name": "Aliado Animal",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.sG4l65MMEA2JtHLq",
+      "tags": [
+        "divina",
+        "encantamento",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "encantamento",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 animal prestativo",
+        "area": "",
+        "effect": ""
+      },
+      "page": 178
+    },
+    {
+      "id": "alterar-destino",
+      "name": "Alterar Destino",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.G918QZzj9ln4mpMn",
+      "tags": [
+        "arcana",
+        "abjuração",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "abjuracao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "reaction",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 179
+    },
+    {
+      "id": "alterar-memoria",
+      "name": "Alterar Memória",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.t7gd203PbRh3HfgS",
+      "tags": [
+        "arcana",
+        "encantamento",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "encantamento",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 179
+    },
+    {
+      "id": "alterar-tamanho",
+      "name": "Alterar Tamanho",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.wXiJf2x05HqH5B6P",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 objeto",
+        "area": "",
+        "effect": ""
+      },
+      "page": 179
+    },
+    {
+      "id": "amarras-etereas",
+      "name": "Amarras Etéreas",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Cs46oTuzFnIuqFN3",
+      "tags": [
+        "arcana",
+        "convocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos anula"
+      },
+      "page": 197
+    },
+    {
+      "id": "amedrontar",
+      "name": "Amedrontar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.m14TgW19d1JTBz8U",
+      "tags": [
+        "arcana",
+        "necromancia",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "necromancia",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 animal ou humanoide",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 179
+    },
+    {
+      "id": "ancora-dimensional",
+      "name": "Âncora Dimensional",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.6KC8s8eUUKYCremp",
+      "tags": [
+        "arcana",
+        "abjuração",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "abjuracao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura ou objeto",
+        "area": "",
+        "effect": ""
+      },
+      "page": 179
+    },
+    {
+      "id": "animar-objetos",
+      "name": "Animar Objetos",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.1Yf9b8BviLCLISMc",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "Até 8 objetos Minúsculos ou Pequenos, 4 objetos Médios, 2 objetos Grandes ou 1 objeto Enorme",
+        "area": "",
+        "effect": ""
+      },
+      "page": 179
+    },
+    {
+      "id": "anular-a-luz",
+      "name": "Anular a Luz",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Ih5qBTlgQyY2WhiS",
+      "tags": [
+        "divina",
+        "necromancia",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "necromancia",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Enjoado",
+          "kind": "formula",
+          "formula": "1d4"
+        }
+      ],
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera de 6m de raio",
+        "effect": ""
+      },
+      "page": 180
+    },
+    {
+      "id": "aparencia-perfeita",
+      "name": "Aparência Perfeita",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Yzvo9SdSZX94PPNl",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 180
+    },
+    {
+      "id": "aprisionamento",
+      "name": "Aprisionamento",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.uQKtqFd7ciS8zTRD",
+      "tags": [
+        "arcana",
+        "abjuração",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "abjuracao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "full",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 180
+    },
+    {
+      "id": "area-escorregadia",
+      "name": "Área Escorregadia",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.nJsZgECVcjg9jwCz",
+      "tags": [
+        "arcana",
+        "convocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "ou",
+        "area": "Quadrado de 3m ou 1 objeto",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos (veja texto)"
+      },
+      "page": 180
+    },
+    {
+      "id": "arma-espiritual",
+      "name": "Arma Espiritual",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.oyIcPlsAaASUEJpT",
+      "tags": [
+        "divina",
+        "convocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "convocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d6",
+          "attribute": null,
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 180
+    },
+    {
+      "id": "arma-magica",
+      "name": "Arma Mágica",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.YDxLaaDhfXOkSfnF",
+      "tags": [
+        "universal",
+        "transmutação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "transmutacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 arma empunhada",
+        "area": "",
+        "effect": ""
+      },
+      "page": 181
+    },
+    {
+      "id": "armadura-arcana",
+      "name": "Armadura Arcana",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.vUsntyToyQl1TuFZ",
+      "tags": [
+        "arcana",
+        "abjuração",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "abjuracao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 181
+    },
+    {
+      "id": "armamento-da-natureza",
+      "name": "Armamento da Natureza",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.mG617USsDrhcj6Tk",
+      "tags": [
+        "divina",
+        "transmutação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "transmutacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 arma (veja texto)",
+        "area": "",
+        "effect": ""
+      },
+      "page": 181
+    },
+    {
+      "id": "assassino-fantasmagorico",
+      "name": "Assassino Fantasmagórico",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.8YsQpGGbp1JVXx99",
+      "tags": [
+        "arcana",
+        "necromancia",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "necromancia",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "trevas",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 181
+    },
+    {
+      "id": "augurio",
+      "name": "Augúrio",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.GuHLeMskEm21WzFv",
+      "tags": [
+        "divina",
+        "adivinhação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "adivinhacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "full",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 187
+    },
+    {
+      "id": "aura-divina",
+      "name": "Aura Divina",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.mp25mjirts0eMdlQ",
+      "tags": [
+        "divina",
+        "abjuração",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 9m de raio",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 182
+    },
+    {
+      "id": "aviso",
+      "name": "Aviso",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.kTzPm7Dy3UqZNli8",
+      "tags": [
+        "universal",
+        "adivinhação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "adivinhacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "move",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 182
+    },
+    {
+      "id": "banimento",
+      "name": "Banimento",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.3SNxSEugumuMaksq",
+      "tags": [
+        "divina",
+        "abjuração",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "special",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 182
+    },
+    {
+      "id": "barragem-elemental",
+      "name": "Barragem Elemental",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.s6QK5uGb7SBlVXMp",
+      "tags": [
+        "arcana",
+        "evocação",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Ácido (Ácido)",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "acido",
+          "bonus": 0
+        },
+        {
+          "label": "Ácido (Eletricidade)",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "eletricidade",
+          "bonus": 0
+        },
+        {
+          "label": "Ácido (Fogo)",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        },
+        {
+          "label": "Ácido (Frio)",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "frio",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "4 esferas elementais"
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos parcial"
+      },
+      "page": 182
+    },
+    {
+      "id": "bencao",
+      "name": "Bênção",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.OTsBw84Ci2IKPStn",
+      "tags": [
+        "divina",
+        "encantamento",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "encantamento",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "Aliados",
+        "area": "",
+        "effect": ""
+      },
+      "page": 182
+    },
+    {
+      "id": "bola-de-fogo",
+      "name": "Bola de Fogo",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.gcjCsjzpk2OtClSt",
+      "tags": [
+        "arcana",
+        "evocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 6m de raio",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz à metade"
+      },
+      "page": 182
+    },
+    {
+      "id": "buraco-negro",
+      "name": "Buraco Negro",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.WrXV3FSwTkh5Hgtc",
+      "tags": [
+        "universal",
+        "abjuração",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "abjuracao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "full",
+        "duration": {
+          "units": "round",
+          "value": 3
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "Buraco Negro"
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude parcial"
+      },
+      "page": 182
+    },
+    {
+      "id": "caminhos-da-natureza",
+      "name": "Caminhos da Natureza",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.8F0FVSRN1dAIrTwj",
+      "tags": [
+        "divina",
+        "convocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "convocacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "criaturas escolhidas",
+        "area": "",
+        "effect": ""
+      },
+      "page": 183
+    },
+    {
+      "id": "campo-antimagia",
+      "name": "Campo Antimagia",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.U2WEs5vlnx0kwSIb",
+      "tags": [
+        "arcana",
+        "abjuração",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "abjuracao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 183
+    },
+    {
+      "id": "campo-de-forca",
+      "name": "Campo de Força",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.BmiLj15LQW7f76j8",
+      "tags": [
+        "arcana",
+        "abjuração",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "abjuracao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Pontos de Vida Temporários",
+          "kind": "damage",
+          "formula": "30",
+          "attribute": null,
+          "damageType": null,
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 183
+    },
+    {
+      "id": "camuflagem-ilusoria",
+      "name": "Camuflagem Ilusória",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.fQ3D9t4VPsVjLbz1",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 183
+    },
+    {
+      "id": "chuva-de-meteoros",
+      "name": "Chuva de Meteoros",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.I7if4gOoxqXhdjcK",
+      "tags": [
+        "arcana",
+        "convocação",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano (Fogo)",
+          "kind": "damage",
+          "formula": "15d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        },
+        {
+          "label": "Dano (Impacto)",
+          "kind": "damage",
+          "formula": "15d6",
+          "attribute": null,
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 15,
+        "execution": "full",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "quadrado com 18m de lado",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos parcial"
+      },
+      "page": 178
+    },
+    {
+      "id": "circulo-da-justica",
+      "name": "Círculo da Justiça",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Rf5JM994mdEuYBMS",
+      "tags": [
+        "divina",
+        "abjuração",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "full",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "cubo com 9m de lado;",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 183
+    },
+    {
+      "id": "circulo-da-restauracao",
+      "name": "Círculo da Restauração",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Djvr450TjZJWCB2h",
+      "tags": [
+        "divina",
+        "evocação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Cura",
+          "kind": "damage",
+          "formula": "3d8+3",
+          "attribute": null,
+          "damageType": "cura",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "round",
+          "value": 5
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera de 3m de raio",
+        "effect": ""
+      },
+      "page": 186
+    },
+    {
+      "id": "colera-do-deus-sol",
+      "name": "Cólera do Deus-Sol",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.esdCmrww2lzzzFlh",
+      "tags": [
+        "divina",
+        "evocação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "10d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        },
+        {
+          "label": "Dano Mortos Vivos",
+          "kind": "damage",
+          "formula": "10d8",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        },
+        {
+          "label": "Rodadas Cego",
+          "kind": "formula",
+          "formula": "1d4"
+        }
+      ],
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 5
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 6m de raio",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos Parcial"
+      },
+      "page": 186
+    },
+    {
+      "id": "coluna-de-chamas",
+      "name": "Coluna de Chamas",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.2SmpEwV7DibaAd6t",
+      "tags": [
+        "divina",
+        "evocação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano (Fogo)",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        },
+        {
+          "label": "Dano (Luz)",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "luz",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "cilindro com 3m de raio e 30m de altura",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz à metade"
+      },
+      "page": 184
+    },
+    {
+      "id": "comando",
+      "name": "Comando",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.rjB5WyNkH0eInOGW",
+      "tags": [
+        "divina",
+        "encantamento",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "encantamento",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "round",
+          "value": 1
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 humanóide",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 184
+    },
+    {
+      "id": "compreensao",
+      "name": "Compreensão",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.eXSBd4j6jFuwbKIc",
+      "tags": [
+        "universal",
+        "adivinhação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "adivinhacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura ou texto",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula (veja descrição)"
+      },
+      "page": 184
+    },
+    {
+      "id": "comunhao-com-a-natureza",
+      "name": "Comunhão com a Natureza",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.8byp1gCfdXtmae6D",
+      "tags": [
+        "divina",
+        "adivinhação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "adivinhacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "full",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 184
+    },
+    {
+      "id": "conceder-milagre",
+      "name": "Conceder Milagre",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.ZwM3J3oEjFz8cCt0",
+      "tags": [
+        "divina",
+        "encantamento",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "encantamento",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 186
+    },
+    {
+      "id": "concentracao-de-combate",
+      "name": "Concentração de Combate",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.lAsj1NrA2J6GbvDi",
+      "tags": [
+        "arcana",
+        "adivinhação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "adivinhacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "free",
+        "duration": {
+          "units": "round",
+          "value": 1
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 185
+    },
+    {
+      "id": "condicao",
+      "name": "Condição",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.1vuNzDBJlqRDs5CC",
+      "tags": [
+        "divina",
+        "adivinhação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "adivinhacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "até 5 criaturas",
+        "area": "",
+        "effect": ""
+      },
+      "page": 185
+    },
+    {
+      "id": "conjurar-elemental",
+      "name": "Conjurar Elemental",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.JctewV5T9iIwOD8b",
+      "tags": [
+        "arcana",
+        "convocação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "full",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "parceiro elemental"
+      },
+      "page": 195
+    },
+    {
+      "id": "conjurar-monstro",
+      "name": "Conjurar Monstro",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.X89YrsleSF5Ulsa1",
+      "tags": [
+        "arcana",
+        "convocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "full",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "1 criatura conjurada"
+      },
+      "page": 185
+    },
+    {
+      "id": "conjurar-mortos-vivos",
+      "name": "Conjurar Mortos-Vivos",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.5ZjS4bVvSxWNpBL9",
+      "tags": [
+        "universal",
+        "necromancia",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "necromancia",
+        "type": "universal"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6+2",
+          "attribute": null,
+          "damageType": "trevas",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "full",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "6 mortos-vivos"
+      },
+      "page": 186
+    },
+    {
+      "id": "consagrar",
+      "name": "Consagrar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.uAomjSrbq2JpCcz0",
+      "tags": [
+        "divina",
+        "evocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 9m de raio",
+        "effect": ""
+      },
+      "page": 186
+    },
+    {
+      "id": "contato-extraplanar",
+      "name": "Contato Extraplanar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.p6sWgQAgMD5Kp6EF",
+      "tags": [
+        "arcana",
+        "adivinhação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "adivinhacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "full",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 186
+    },
+    {
+      "id": "controlar-a-gravidade",
+      "name": "Controlar a Gravidade",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.vAC1umkrWgM6aRPI",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "cubo de 12m de lado",
+        "effect": ""
+      },
+      "page": 186
+    },
+    {
+      "id": "controlar-agua",
+      "name": "Controlar Água",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.6CV9kikfAZs1R1uk",
+      "tags": [
+        "divina",
+        "transmutação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "transmutacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "10d8",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 30m de raio",
+        "effect": ""
+      },
+      "page": 186
+    },
+    {
+      "id": "controlar-ar",
+      "name": "Controlar Ar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.u3H3ie8CbzrmlBM9",
+      "tags": [
+        "divina",
+        "transmutação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "transmutacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "varia",
+        "effect": ""
+      }
+    },
+    {
+      "id": "controlar-fogo",
+      "name": "Controlar Fogo",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.84SnbqMykNJVofQ6",
+      "tags": [
+        "divina",
+        "evocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "veja texto",
+        "area": "",
+        "effect": ""
+      },
+      "page": 187
+    },
+    {
+      "id": "controlar-madeira",
+      "name": "Controlar Madeira",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.gUp6Pm0Bf4WTUcSA",
+      "tags": [
+        "divina",
+        "transmutação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "transmutacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "1objeto de madeira grande ou menor",
+        "area": "",
+        "effect": ""
+      },
+      "page": 187
+    },
+    {
+      "id": "controlar-o-clima",
+      "name": "Controlar o Clima",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.GSFSVe8XGZbzQ2H6",
+      "tags": [
+        "divina",
+        "transmutação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "transmutacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "full",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "special",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 2km de raio",
+        "effect": ""
+      },
+      "page": 187
+    },
+    {
+      "id": "controlar-o-tempo",
+      "name": "Controlar o Tempo",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.dlRCSddITrSwAdtc",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "veja texto",
+        "area": "",
+        "effect": ""
+      },
+      "page": 187
+    },
+    {
+      "id": "controlar-plantas",
+      "name": "Controlar Plantas",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.sSUOYxFZVrthYvfn",
+      "tags": [
+        "divina",
+        "transmutação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "transmutacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "quadrado com 9m de lado",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos anula"
+      },
+      "page": 188
+    },
+    {
+      "id": "controlar-terra",
+      "name": "Controlar Terra",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Zi46sKpwydfQdIJt",
+      "tags": [
+        "divina",
+        "transmutação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "transmutacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "9 cubos com 1,5m de lado",
+        "effect": ""
+      },
+      "page": 188
+    },
+    {
+      "id": "convocacao-instantanea",
+      "name": "Convocação Instantânea",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.ZzibqJnR2Cd0efWX",
+      "tags": [
+        "arcana",
+        "convocação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "special",
+          "value": 0
+        },
+        "target": "1 objeto de 2 espaços",
+        "area": "",
+        "effect": ""
+      },
+      "page": 188
+    },
+    {
+      "id": "cranio-voador",
+      "name": "Crânio Voador",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.CgK2xhGbfCc6BkWy",
+      "tags": [
+        "arcana",
+        "necromancia",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "necromancia",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "4d8+4",
+          "attribute": null,
+          "damageType": "trevas",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude reduz à metade"
+      },
+      "page": 188
+    },
+    {
+      "id": "criar-elementos",
+      "name": "Criar Elementos",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.vvVVqYlYER6WpqhM",
+      "tags": [
+        "divina",
+        "convocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "convocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano (Objeto de água ou terra)",
+          "kind": "damage",
+          "formula": "2d4",
+          "attribute": null,
+          "damageType": "impacto",
+          "bonus": 0
+        },
+        {
+          "label": "Dano de Fogo",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "elemento escolhido"
+      },
+      "page": 188
+    },
+    {
+      "id": "criar-ilusao",
+      "name": "Criar Ilusão",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.q6jHyHSI2hWrZGE9",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "ilusão que se estende a até 4 cubos de 1,5m"
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade desacredita"
+      },
+      "page": 189
+    },
+    {
+      "id": "cupula-de-repulsao",
+      "name": "Cúpula de Repulsão",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.DM4WIu4ilHbqjAlu",
+      "tags": [
+        "divina",
+        "abjuração",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade Anula"
+      },
+      "page": 189
+    },
+    {
+      "id": "curar-ferimentos",
+      "name": "Curar Ferimentos",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.soVAGPRWQmKxOrPm",
+      "tags": [
+        "divina",
+        "evocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Cura",
+          "kind": "damage",
+          "formula": "2d8+2",
+          "attribute": null,
+          "damageType": "cura",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 189
+    },
+    {
+      "id": "deflagracao-de-mana",
+      "name": "Deflagração de Mana",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Bi0qxZaqWT0O2wBh",
+      "tags": [
+        "arcana",
+        "evocação",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "150",
+          "attribute": null,
+          "damageType": "essencia",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 15,
+        "execution": "full",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera de 15m de raio",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude parcial"
+      },
+      "page": 189
+    },
+    {
+      "id": "desejo",
+      "name": "Desejo",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.JS4oSL4XZDUusUaS",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "full",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "special",
+          "value": 0
+        },
+        "target": "veja texto",
+        "area": "",
+        "effect": ""
+      },
+      "page": 190
+    },
+    {
+      "id": "desespero-esmagador",
+      "name": "Desespero Esmagador",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.u2Yo7BCg7xOrQJyF",
+      "tags": [
+        "arcana",
+        "encantamento",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "encantamento",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "Cone de 6m",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 190
+    },
+    {
+      "id": "desintegrar",
+      "name": "Desintegrar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.oFPOvZqHlPTyj4XD",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "10d12",
+          "attribute": null,
+          "damageType": "essencia",
+          "bonus": 0
+        },
+        {
+          "label": "Dano parcial",
+          "kind": "damage",
+          "formula": "2d12",
+          "attribute": null,
+          "damageType": "essencia",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "1 criatura ou objeto",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude parcial"
+      },
+      "page": 190
+    },
+    {
+      "id": "despedacar",
+      "name": "Despedaçar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.I177NeKSwiAn8vz5",
+      "tags": [
+        "divina",
+        "evocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8+2",
+          "attribute": null,
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura ou objeto mundano pequeno",
+        "area": "",
+        "effect": ""
+      },
+      "page": 190
+    },
+    {
+      "id": "despertar-consciencia",
+      "name": "Despertar Consciência",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.sw6TTkiY2ycfZefD",
+      "tags": [
+        "divina",
+        "encantamento",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "encantamento",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "full",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 animal ou planta",
+        "area": "",
+        "effect": ""
+      },
+      "page": 190
+    },
+    {
+      "id": "detectar-ameacas",
+      "name": "Detectar Ameaças",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.H7tJCAL2UNJ8QLPN",
+      "tags": [
+        "divina",
+        "adivinhação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "adivinhacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "Esfera de 18m de raio",
+        "effect": ""
+      },
+      "page": 196
+    },
+    {
+      "id": "dificultar-deteccao",
+      "name": "Dificultar Detecção",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.9XKOzJxNtF5dPH6B",
+      "tags": [
+        "arcana",
+        "abjuração",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "abjuracao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura ou objeto",
+        "area": "",
+        "effect": ""
+      },
+      "page": 190
+    },
+    {
+      "id": "disfarce-ilusorio",
+      "name": "Disfarce Ilusório",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.19donXyns0pliwj9",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade desacredita"
+      },
+      "page": 191
+    },
+    {
+      "id": "dispersar-as-trevas",
+      "name": "Dispersar as Trevas",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.UIQajfvegC0ptC7O",
+      "tags": [
+        "divina",
+        "evocação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "Esfera de 6m de raio",
+        "effect": ""
+      },
+      "page": 199
+    },
+    {
+      "id": "dissipar-magia",
+      "name": "Dissipar Magia",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.rfTGYwrXLjcIAIP5",
+      "tags": [
+        "universal",
+        "abjuração",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "abjuracao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "1 criatura ou 1 objeto mágico",
+        "area": "ou esfera com 3m de raio",
+        "effect": ""
+      },
+      "page": 191
+    },
+    {
+      "id": "duplicata-ilusoria",
+      "name": "Duplicata Ilusória",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.zlHOKjfs1K3L6xGI",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "cópia ilusória"
+      },
+      "page": 191
+    },
+    {
+      "id": "enfeiticar",
+      "name": "Enfeitiçar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.lJYJQFhk5oai46Ty",
+      "tags": [
+        "arcana",
+        "encantamento",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "encantamento",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 humanóide",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 191
+    },
+    {
+      "id": "engenho-de-mana",
+      "name": "Engenho de Mana",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.BbPDW78AmxKBMhHS",
+      "tags": [
+        "divina",
+        "abjuração",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "disco de energia com 1,5m de diâmetro"
+      },
+      "page": 192
+    },
+    {
+      "id": "enxame-de-pestes",
+      "name": "Enxame de Pestes",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.0s9EEKvVnPbFwS1t",
+      "tags": [
+        "divina",
+        "convocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "convocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d12",
+          "attribute": null,
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "full",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "1 enxame Médio (quadrado de 1,5m)"
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude reduz à metade"
+      },
+      "page": 192
+    },
+    {
+      "id": "enxame-rubro",
+      "name": "Enxame Rubro",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.K2VH0rr4Qw6OqQjA",
+      "tags": [
+        "arcana",
+        "convocação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "4d12",
+          "attribute": null,
+          "damageType": "acido",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "1 enxame Grande (quadrado de 3m);"
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz à metade"
+      },
+      "page": 192
+    },
+    {
+      "id": "erupcao-glacial",
+      "name": "Erupção Glacial",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.FYoig9D5AWpvNOHu",
+      "tags": [
+        "arcana",
+        "evocação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano (Corte)",
+          "kind": "damage",
+          "formula": "4d6",
+          "attribute": null,
+          "damageType": "corte",
+          "bonus": 0
+        },
+        {
+          "label": "Dano (Frio)",
+          "kind": "damage",
+          "formula": "4d6",
+          "attribute": null,
+          "damageType": "frio",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "quadrado de 6m de lado",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Relfexos parcial"
+      },
+      "page": 192
+    },
+    {
+      "id": "escudo-da-fe",
+      "name": "Escudo da Fé",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.XJoWTcH8zVtHc2xa",
+      "tags": [
+        "divina",
+        "abjuração",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "reaction",
+        "duration": {
+          "units": "turn",
+          "value": 1
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 192
+    },
+    {
+      "id": "esculpir-sons",
+      "name": "Esculpir Sons",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Lo49R4kuZV1bZHr4",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "1 criatura ou objeto",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 192
+    },
+    {
+      "id": "escuridao",
+      "name": "Escuridão",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Bt364TPpNUI1QVPP",
+      "tags": [
+        "universal",
+        "necromancia",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "necromancia",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 objeto",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula (veja texto)"
+      },
+      "page": 193
+    },
+    {
+      "id": "explosao-caleidoscopica",
+      "name": "Explosão Caleidoscópica",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.xujhDNzdQOOdWoTo",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 6m de raio",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude parcial"
+      },
+      "page": 193
+    },
+    {
+      "id": "explosao-de-chamas",
+      "name": "Explosão de Chamas",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.PXR8dRhDk8Z0mtck",
+      "tags": [
+        "arcana",
+        "evocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "Cone de 6m",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz à metade"
+      },
+      "page": 193
+    },
+    {
+      "id": "ferver-sangue",
+      "name": "Ferver Sangue",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.tVxVarpB0GaAoCp5",
+      "tags": [
+        "arcana",
+        "necromancia",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "necromancia",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "4d8",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude parcial"
+      },
+      "page": 195
+    },
+    {
+      "id": "fisico-divino",
+      "name": "Físico Divino",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.cgJPXzVbOQLjyXfe",
+      "tags": [
+        "divina",
+        "transmutação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "transmutacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 193
+    },
+    {
+      "id": "flecha-acida",
+      "name": "Flecha Ácida",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.C2TqT4GXlsNiJPxb",
+      "tags": [
+        "arcana",
+        "evocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "4d6",
+          "attribute": null,
+          "damageType": "acido",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "1 criatura ou objeto",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos parcial"
+      },
+      "page": 193
+    },
+    {
+      "id": "forma-eterea",
+      "name": "Forma Etérea",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.wbPt3fdyHUpdZoLF",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "full",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 193
+    },
+    {
+      "id": "furia-do-panteao",
+      "name": "Fúria do Panteão",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.KjCLKthxu8uKSOlh",
+      "tags": [
+        "divina",
+        "evocação",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano (Frio)",
+          "kind": "damage",
+          "formula": "10d6",
+          "attribute": null,
+          "damageType": "frio",
+          "bonus": 0
+        },
+        {
+          "label": "Dano (Eletricidade)",
+          "kind": "damage",
+          "formula": "10d8",
+          "attribute": null,
+          "damageType": "eletricidade",
+          "bonus": 0
+        },
+        {
+          "label": "Dano (Corte)",
+          "kind": "damage",
+          "formula": "5d6",
+          "attribute": null,
+          "damageType": "corte",
+          "bonus": 0
+        },
+        {
+          "label": "Dano (Fogo)",
+          "kind": "damage",
+          "formula": "5d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        },
+        {
+          "label": "Dano (Impacto)",
+          "kind": "damage",
+          "formula": "10d6",
+          "attribute": null,
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 15,
+        "execution": "full",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "cubo de 90m",
+        "effect": ""
+      },
+      "page": 196
+    },
+    {
+      "id": "globo-da-verdade",
+      "name": "Globo da Verdade",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.LbRCMfcaEQr6BAyN",
+      "tags": [
+        "divina",
+        "adivinhação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "adivinhacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "1 globo"
+      },
+      "page": 194
+    },
+    {
+      "id": "globo-de-invulnerabilidade",
+      "name": "Globo de Invulnerabilidade",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.CuGpzSLGUTtD7TLq",
+      "tags": [
+        "arcana",
+        "abjuração",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "abjuracao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 196
+    },
+    {
+      "id": "guardiao-divino",
+      "name": "Guardião Divino",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.RsT4ntlPaT0TrGEW",
+      "tags": [
+        "divina",
+        "convocação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "convocacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "elemental de luz invocado"
+      },
+      "page": 196
+    },
+    {
+      "id": "heroismo",
+      "name": "Heroísmo",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.irVr5pJiREIGsiUe",
+      "tags": [
+        "divina",
+        "encantamento",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "encantamento",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 196
+    },
+    {
+      "id": "hipnotismo",
+      "name": "Hipnotismo",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.N1xVfw9A8TiYeLae",
+      "tags": [
+        "arcana",
+        "encantamento",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "encantamento",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 animal ou humanoide",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 194
+    },
+    {
+      "id": "ilusao-lacerante",
+      "name": "Ilusão Lacerante",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.61DlFBtjlb6uFRhj",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "3d6",
+          "attribute": null,
+          "damageType": "psiquico",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "cubo de 9m",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 195
+    },
+    {
+      "id": "imagem-espelhada",
+      "name": "Imagem Espelhada",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.secWy6zyYamo3Xnx",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 195
+    },
+    {
+      "id": "imobilizar",
+      "name": "Imobilizar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.vwpjRRdyR0iHI1TH",
+      "tags": [
+        "universal",
+        "encantamento",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "encantamento",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 humanóide ou animal",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 195
+    },
+    {
+      "id": "infligir-ferimentos",
+      "name": "Infligir Ferimentos",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.AQaBKvwWmWE4vmu3",
+      "tags": [
+        "divina",
+        "necromancia",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "necromancia",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d8+2",
+          "attribute": null,
+          "damageType": "trevas",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude reduz à metade"
+      },
+      "page": 195
+    },
+    {
+      "id": "intervencao-divina",
+      "name": "Intervenção Divina",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.dYUHQDlIZVNclE02",
+      "tags": [
+        "divina",
+        "convocação",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "convocacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "full",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "special",
+          "value": 0
+        },
+        "target": "veja texto",
+        "area": "",
+        "effect": ""
+      },
+      "page": 195
+    },
+    {
+      "id": "invisibilidade",
+      "name": "Invisibilidade",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.A3RFvVgOvODWHtvc",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "free",
+        "duration": {
+          "units": "round",
+          "value": 1
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 195
+    },
+    {
+      "id": "invulnerabilidade",
+      "name": "Invulnerabilidade",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.9WTrSfbFIsZDFYKV",
+      "tags": [
+        "universal",
+        "abjuração",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "abjuracao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 195
+    },
+    {
+      "id": "lagrimas-da-deusa-da-magia",
+      "name": "Lágrimas da Deusa da Magia",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.yw8aypIy198lFNCE",
+      "tags": [
+        "divina",
+        "abjuração",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 196
+    },
+    {
+      "id": "lanca-ignea",
+      "name": "Lança Ígnea",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.RzK5XmyDjKEYWel5",
+      "tags": [
+        "arcana",
+        "evocação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano (Fogo)",
+          "kind": "damage",
+          "formula": "4d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        },
+        {
+          "label": "Dano (Perfuração)",
+          "kind": "damage",
+          "formula": "4d6",
+          "attribute": null,
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos parcial"
+      },
+      "page": 196
+    },
+    {
+      "id": "legiao",
+      "name": "Legião",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.PS9AQUuhxRBnUeS4",
+      "tags": [
+        "arcana",
+        "encantamento",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "encantamento",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "até 10 criaturas na área",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 196
+    },
+    {
+      "id": "lendas-e-historias",
+      "name": "Lendas e Histórias",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.tQAIfnReI9DV014V",
+      "tags": [
+        "universal",
+        "adivinhação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "adivinhacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 craitura, objeto ou local",
+        "area": "",
+        "effect": ""
+      },
+      "page": 196
+    },
+    {
+      "id": "leque-cromatico",
+      "name": "Leque Cromático",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.g48EeeYhek5Wh5Ll",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "cone de 4,5m",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 196
+    },
+    {
+      "id": "libertacao",
+      "name": "Libertação",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.ELDmNrdpN7g8M3iJ",
+      "tags": [
+        "universal",
+        "abjuração",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "abjuracao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 196
+    },
+    {
+      "id": "ligacao-sombria",
+      "name": "Ligação Sombria",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.hJ7eYMyWFf0i1jBn",
+      "tags": [
+        "divina",
+        "necromancia",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "necromancia",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude anula"
+      },
+      "page": 196
+    },
+    {
+      "id": "ligacao-telepatica",
+      "name": "Ligação Telepática",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.fOtHLMKZGMFEgSsT",
+      "tags": [
+        "arcana",
+        "adivinhação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "adivinhacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "2 criaturas voluntárias",
+        "area": "",
+        "effect": ""
+      },
+      "page": 197
+    },
+    {
+      "id": "localizacao",
+      "name": "Localização",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.KrorBYV7KV7jIC5c",
+      "tags": [
+        "arcana",
+        "adivinhação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "adivinhacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 90m de raio",
+        "effect": ""
+      },
+      "page": 197
+    },
+    {
+      "id": "luz",
+      "name": "Luz",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.eJcIYwz9CthoWZs4",
+      "tags": [
+        "universal",
+        "evocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "evocacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 objeto",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula (veja texto)"
+      },
+      "page": 197
+    },
+    {
+      "id": "manto-de-sombras",
+      "name": "Manto de Sombras",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.iHOlYjBeNhqDVYbQ",
+      "tags": [
+        "universal",
+        "ilusão",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "ilusao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 197
+    },
+    {
+      "id": "manto-do-cruzado",
+      "name": "Manto do Cruzado",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.hyrMxy1zmRDWJbmB",
+      "tags": [
+        "divina",
+        "evocação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "vocẽ",
+        "area": "",
+        "effect": ""
+      },
+      "page": 197
+    },
+    {
+      "id": "mao-poderosa",
+      "name": "Mão Poderosa",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.FW1NLpibuEisXYw4",
+      "tags": [
+        "arcana",
+        "convocação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d6+12",
+          "attribute": null,
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "mão gigante de energia"
+      },
+      "page": 197
+    },
+    {
+      "id": "mapear",
+      "name": "Mapear",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.rttQq9tufgLj1I8j",
+      "tags": [
+        "arcana",
+        "adivinhação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "adivinhacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "superfície ou objeto plano, como uma mesa ou pergaminho",
+        "area": "",
+        "effect": ""
+      },
+      "page": 197
+    },
+    {
+      "id": "marca-da-obediencia",
+      "name": "Marca da Obediência",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.6wASxSXLtFzQcy8V",
+      "tags": [
+        "universal",
+        "encantamento",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "encantamento",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 198
+    },
+    {
+      "id": "marionete",
+      "name": "Marionete",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.9rWi1y1QSjogLEyj",
+      "tags": [
+        "arcana",
+        "encantamento",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "encantamento",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude anula"
+      },
+      "page": 198
+    },
+    {
+      "id": "mata-dragao",
+      "name": "Mata-Dragão",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.vyc0fQ9bSefwjZ0H",
+      "tags": [
+        "arcana",
+        "evocação",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "20d12",
+          "attribute": null,
+          "damageType": "essencia",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 15,
+        "execution": "special",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "cone de 30m",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz à metade"
+      },
+      "page": 198
+    },
+    {
+      "id": "mente-divina",
+      "name": "Mente Divina",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.L14jqsUhL7vvpmDM",
+      "tags": [
+        "divina",
+        "adivinhação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "adivinhacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 198
+    },
+    {
+      "id": "metamorfose",
+      "name": "Metamorfose",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Mv8Lzi5PEklOW36c",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 204
+    },
+    {
+      "id": "miasma-mefitico",
+      "name": "Miasma Mefítico",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.bs3SycPD7ENusrfH",
+      "tags": [
+        "divina",
+        "necromancia",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "necromancia",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "5d6",
+          "attribute": null,
+          "damageType": "acido",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "nuvem com 6m de raio",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude (veja texto)"
+      },
+      "page": 199
+    },
+    {
+      "id": "miragem",
+      "name": "Miragem",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.1SjsOe7nMbo8LfOk",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "cubo de até 90m de lado",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade desacredita"
+      },
+      "page": 199
+    },
+    {
+      "id": "missao-divina",
+      "name": "Missão Divina",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.9Dw4t70KSmIOWiDg",
+      "tags": [
+        "divina",
+        "encantamento",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "encantamento",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula (veja texto)"
+      },
+      "page": 205
+    },
+    {
+      "id": "montaria-arcana",
+      "name": "Montaria Arcana",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.z9cFTeixJ1wt1HyE",
+      "tags": [
+        "arcana",
+        "convocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "criatura conjurada"
+      },
+      "page": 199
+    },
+    {
+      "id": "muralha-de-ossos",
+      "name": "Muralha de Ossos",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.L3m9nPlKK8xe3u7a",
+      "tags": [
+        "universal",
+        "necromancia",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "necromancia",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "muro de ossos"
+      },
+      "page": 199
+    },
+    {
+      "id": "muralha-elemental",
+      "name": "Muralha Elemental",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.VqsjzRkQ9nA11XRD",
+      "tags": [
+        "arcana",
+        "evocação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "muralha de energia"
+      },
+      "page": 200
+    },
+    {
+      "id": "nevoa",
+      "name": "Névoa",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.atEVWEfDYu76wyCO",
+      "tags": [
+        "universal",
+        "convocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "convocacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "nuvem com 6m de raio e 6m de altura"
+      },
+      "page": 200
+    },
+    {
+      "id": "oracao",
+      "name": "Oração",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.VtD27Z068vl78qH3",
+      "tags": [
+        "divina",
+        "encantamento",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "encantamento",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "todas as criaturas (veja texto)",
+        "area": "",
+        "effect": ""
+      },
+      "page": 200
+    },
+    {
+      "id": "orientacao",
+      "name": "Orientação",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.dvq8aLolbWGm7E2Z",
+      "tags": [
+        "divina",
+        "adivinhação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "adivinhacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "round",
+          "value": 1
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 200
+    },
+    {
+      "id": "palavra-primordial",
+      "name": "Palavra Primordial",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.eB2JWvyIseIiSfR2",
+      "tags": [
+        "universal",
+        "encantamento",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "encantamento",
+        "type": "universal"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "10d8",
+          "attribute": null,
+          "damageType": null,
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura com menos níveis que você",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 200
+    },
+    {
+      "id": "pele-de-pedra",
+      "name": "Pele de Pedra",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.ji7Bn9t7lk8zyNN1",
+      "tags": [
+        "universal",
+        "transmutação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "transmutacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 201
+    },
+    {
+      "id": "perdicao",
+      "name": "Perdição",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.ByYEiPmpotMg83gQ",
+      "tags": [
+        "divina",
+        "necromancia",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "necromancia",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "Criaturas Escolhidas",
+        "area": "",
+        "effect": ""
+      },
+      "page": 201
+    },
+    {
+      "id": "poeira-da-podridao",
+      "name": "Poeira da Podridão",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Ebl1IOvc8Brfm4Qd",
+      "tags": [
+        "divina",
+        "necromancia",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "necromancia",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d8+8",
+          "attribute": null,
+          "damageType": "trevas",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "nuvem com 6m de raio",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude (veja texto)"
+      },
+      "page": 201
+    },
+    {
+      "id": "possessao",
+      "name": "Possessão",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.C2fW1eekiQZF0kMj",
+      "tags": [
+        "arcana",
+        "encantamento",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "encantamento",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anual"
+      },
+      "page": 201
+    },
+    {
+      "id": "potencia-divina",
+      "name": "Potência Divina",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.MbArAZo487Yb3hdl",
+      "tags": [
+        "divina",
+        "transmutação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "transmutacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 201
+    },
+    {
+      "id": "premonicao",
+      "name": "Premonição",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.CaQDFJoEehP9jYQs",
+      "tags": [
+        "divina",
+        "adivinhação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "adivinhacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 201
+    },
+    {
+      "id": "preparacao-de-batalha",
+      "name": "Preparação de Batalha",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.oMhqpjjWQzvHdIlc",
+      "tags": [
+        "universal",
+        "convocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "convocacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "até dois itens que você possua, entre armas, armaduras e escudos",
+        "area": "",
+        "effect": ""
+      },
+      "page": 16
+    },
+    {
+      "id": "primor-atletico",
+      "name": "Primor Atlético",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.k8E2gbV1NwkI0ehs",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 201
+    },
+    {
+      "id": "profanar",
+      "name": "Profanar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.tJI1ESr2Mcxtx95L",
+      "tags": [
+        "divina",
+        "necromancia",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "necromancia",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 9m de raio",
+        "effect": ""
+      },
+      "page": 202
+    },
+    {
+      "id": "projetar-consciencia",
+      "name": "Projetar Consciência",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.LCW7DDP9CfY22wna",
+      "tags": [
+        "divina",
+        "adivinhação",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "adivinhacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "special",
+          "value": 0
+        },
+        "target": "local ou criatura conhecidos",
+        "area": "",
+        "effect": ""
+      },
+      "page": 202
+    },
+    {
+      "id": "protecao-contra-magia",
+      "name": "Proteção Contra Magia",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.ARdiXHO8x1k8X3ni",
+      "tags": [
+        "divina",
+        "abjuração",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      }
+    },
+    {
+      "id": "protecao-divina",
+      "name": "Proteção Divina",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.zfFIZLWoyI32pMfl",
+      "tags": [
+        "divina",
+        "abjuração",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 202
+    },
+    {
+      "id": "purificacao",
+      "name": "Purificação",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.m9jubp5PK3j2nCFC",
+      "tags": [
+        "divina",
+        "evocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 202
+    },
+    {
+      "id": "queda-suave",
+      "name": "Queda Suave",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.9A5LyhPsCrdowfcL",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "reaction",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura ou objeto com até 200kg",
+        "area": "",
+        "effect": ""
+      },
+      "page": 202
+    },
+    {
+      "id": "raio-do-enfraquecimento",
+      "name": "Raio do Enfraquecimento",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.hikpz9g3jwJoTcRZ",
+      "tags": [
+        "arcana",
+        "necromancia",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "necromancia",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude parcial"
+      },
+      "page": 202
+    },
+    {
+      "id": "raio-polar",
+      "name": "Raio Polar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.KQTBh5aVCqDUSpvr",
+      "tags": [
+        "arcana",
+        "evocação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "10d8",
+          "attribute": null,
+          "damageType": "frio",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude parcial"
+      },
+      "page": 203
+    },
+    {
+      "id": "raio-solar",
+      "name": "Raio Solar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.wzEx37udhiSSTeFD",
+      "tags": [
+        "divina",
+        "evocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "4d8",
+          "attribute": null,
+          "damageType": "luz",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "linha",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos (veja texto)"
+      },
+      "page": 203
+    },
+    {
+      "id": "reanimacao-impura",
+      "name": "Reanimação Impura",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.YkWiMqxvNrmHi1Hv",
+      "tags": [
+        "divina",
+        "necromancia",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "necromancia",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "full",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 203
+    },
+    {
+      "id": "refugio",
+      "name": "Refúgio",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.FWtt8quRlKs3OTYF",
+      "tags": [
+        "arcana",
+        "abjuração",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "abjuracao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "full",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "domo com 6m de raio"
+      },
+      "page": 203
+    },
+    {
+      "id": "relampago",
+      "name": "Relâmpago",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.BfYpxjs0NeqhAs8q",
+      "tags": [
+        "arcana",
+        "evocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "eletricidade",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "linha",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz à metade"
+      },
+      "page": 203
+    },
+    {
+      "id": "relampago-flamejante",
+      "name": "Relâmpago Flamejante",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.nTGtbkxrFRRY7fXc",
+      "tags": [
+        "arcana",
+        "evocação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano de Fogo/Elétrico (Fogo)",
+          "kind": "damage",
+          "formula": "10d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        },
+        {
+          "label": "Dano de Fogo/Elétrico (Eletricidade)",
+          "kind": "damage",
+          "formula": "10d6",
+          "attribute": null,
+          "damageType": "eletricidade",
+          "bonus": 0
+        },
+        {
+          "label": "Dano Misto",
+          "kind": "damage",
+          "formula": "20d12",
+          "attribute": null,
+          "damageType": "normal",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 10,
+        "execution": "special",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "bolas de fogo e relâmpagos"
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz à metade"
+      },
+      "page": 203
+    },
+    {
+      "id": "requiem",
+      "name": "Réquiem",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.bjjhaGHKPoTOKtyT",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "full",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "criaturas escolhidas",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 204
+    },
+    {
+      "id": "resistencia-a-energia",
+      "name": "Resistência à Energia",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.EAGwUyfcL1WRGtuC",
+      "tags": [
+        "universal",
+        "abjuração",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "abjuracao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 204
+    },
+    {
+      "id": "rogar-maldicao",
+      "name": "Rogar Maldição",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.fmGirvluTr0RMZvE",
+      "tags": [
+        "divina",
+        "necromancia",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "necromancia",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude anula"
+      },
+      "page": 204
+    },
+    {
+      "id": "roubar-a-alma",
+      "name": "Roubar a Alma",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.1FwWFYSkeLd7QBs4",
+      "tags": [
+        "divina",
+        "necromancia",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "necromancia",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "permanent",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 204
+    },
+    {
+      "id": "runa-de-protecao",
+      "name": "Runa de Proteção",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Sbf50YYcbKCXA3CI",
+      "tags": [
+        "universal",
+        "abjuração",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "abjuracao",
+        "type": "universal"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "acido",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "special",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "uma área com 6m de raio",
+        "area": "",
+        "effect": ""
+      },
+      "page": 205
+    },
+    {
+      "id": "salto-dimensional",
+      "name": "Salto Dimensional",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.FxAlmaFR7sYRJD5z",
+      "tags": [
+        "arcana",
+        "convocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 205
+    },
+    {
+      "id": "santuario",
+      "name": "Santuário",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.5APvTaz3tKZPdNda",
+      "tags": [
+        "divina",
+        "abjuração",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 205
+    },
+    {
+      "id": "segunda-chance",
+      "name": "Segunda Chance",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.lGxJ1sVeGzOrEBjP",
+      "tags": [
+        "divina",
+        "evocação",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Cura",
+          "kind": "damage",
+          "formula": "200",
+          "attribute": null,
+          "damageType": "cura",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 205
+    },
+    {
+      "id": "selo-de-mana",
+      "name": "Selo de Mana",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.m93YbVqNnWphT8cp",
+      "tags": [
+        "universal",
+        "encantamento",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "encantamento",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade Parcial"
+      },
+      "page": 205
+    },
+    {
+      "id": "semiplano",
+      "name": "Semiplano",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.xFlTNVAkliPUlDta",
+      "tags": [
+        "arcana",
+        "convocação",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "full",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "semiplano com 30m de lado"
+      },
+      "page": 205
+    },
+    {
+      "id": "servo-divino",
+      "name": "Servo Divino",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.iHW9iWhl7DYu3ggt",
+      "tags": [
+        "divina",
+        "convocação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "convocacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "criatura conjurada"
+      },
+      "page": 205
+    },
+    {
+      "id": "servo-morto-vivo",
+      "name": "Servo Morto-Vivo",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.CmdKoggK1dreuNpP",
+      "tags": [
+        "universal",
+        "necromancia",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "necromancia",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "full",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 cadáver",
+        "area": "",
+        "effect": ""
+      },
+      "page": 206
+    },
+    {
+      "id": "servos-invisiveis",
+      "name": "Servos Invisíveis",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.wwMqDi0m8o2Jnhw5",
+      "tags": [
+        "arcana",
+        "convocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "criaturas conjuradas"
+      },
+      "page": 206
+    },
+    {
+      "id": "seta-infalivel",
+      "name": "Seta Infalível",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.W3wssZ36rMtbMPaA",
+      "tags": [
+        "arcana",
+        "evocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "dano",
+          "kind": "damage",
+          "formula": "2d4+2",
+          "attribute": null,
+          "damageType": "essencia",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "até 2 criaturas",
+        "area": "",
+        "effect": ""
+      },
+      "page": 206
+    },
+    {
+      "id": "silencio",
+      "name": "Silêncio",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.BARP1eYpbiSBa83C",
+      "tags": [
+        "divina",
+        "ilusão",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "ilusao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 6m de raio",
+        "effect": ""
+      },
+      "page": 206
+    },
+    {
+      "id": "soco-do-mestre",
+      "name": "Soco do Mestre",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.LqKnynFepm4ICynP",
+      "tags": [
+        "divina",
+        "convocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "convocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "4d6",
+          "attribute": "for",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude parcial"
+      },
+      "page": 206
+    },
+    {
+      "id": "sombra-assassina",
+      "name": "Sombra Assassina",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.6AMMtiyLKSidZrpA",
+      "tags": [
+        "arcana",
+        "ilusão",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "ilusao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 204
+    },
+    {
+      "id": "sonho",
+      "name": "Sonho",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.u8Drz7nb84o5LIKG",
+      "tags": [
+        "arcana",
+        "adivinhação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "adivinhacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "0",
+          "attribute": null,
+          "damageType": "trevas",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 10,
+        "execution": "special",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "special",
+          "value": 0
+        },
+        "target": "1 criatura viva",
+        "area": "",
+        "effect": ""
+      },
+      "page": 207
+    },
+    {
+      "id": "sono",
+      "name": "Sono",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.vTVcrCjSdnOmcIyi",
+      "tags": [
+        "arcana",
+        "encantamento",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "encantamento",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 humanoide",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 207
+    },
+    {
+      "id": "sopro-da-salvacao",
+      "name": "Sopro da Salvação",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Gj6RiMUjgLaYrWux",
+      "tags": [
+        "divina",
+        "evocação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "actions": [
+        {
+          "label": "Cura",
+          "kind": "damage",
+          "formula": "2d8+4",
+          "attribute": null,
+          "damageType": "cura",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "cone de 9m",
+        "effect": ""
+      },
+      "page": 207
+    },
+    {
+      "id": "sopro-das-uivantes",
+      "name": "Sopro das Uivantes",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.LFz30FCDJrLJwSrW",
+      "tags": [
+        "arcana",
+        "evocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "4d6",
+          "attribute": null,
+          "damageType": "frio",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "cone de 9m",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude parcial"
+      },
+      "page": 207
+    },
+    {
+      "id": "suporte-ambiental",
+      "name": "Suporte Ambiental",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.f5swL7i71uhFJ8UE",
+      "tags": [
+        "divina",
+        "abjuração",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 207
+    },
+    {
+      "id": "sussurros-insanos",
+      "name": "Sussurros Insanos",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.s9z7z8KtujpICCZw",
+      "tags": [
+        "arcana",
+        "encantamento",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "encantamento",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 humanoide",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 207
+    },
+    {
+      "id": "talho-invisivel",
+      "name": "Talho Invisível",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.9ApArOLIFHb2gcyx",
+      "tags": [
+        "arcana",
+        "evocação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "10d8",
+          "attribute": null,
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "",
+        "area": "cone de 9m",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude parcial"
+      },
+      "page": 207
+    },
+    {
+      "id": "teia",
+      "name": "Teia",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.tMZhHyjssqzaEe1L",
+      "tags": [
+        "arcana",
+        "convocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "cubo com 6m de lado",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos anula"
+      },
+      "page": 208
+    },
+    {
+      "id": "telecinesia",
+      "name": "Telecinésia",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.UhiM7pMNk3HfWNKP",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "veja texto;",
+        "area": "",
+        "effect": ""
+      },
+      "page": 208
+    },
+    {
+      "id": "teletransporte",
+      "name": "Teletransporte",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.ZUQneRqpDjJKRO5n",
+      "tags": [
+        "arcana",
+        "convocação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "convocacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "até 5 criaturas voluntárias",
+        "area": "",
+        "effect": ""
+      },
+      "page": 208
+    },
+    {
+      "id": "tempestade-divina",
+      "name": "Tempestade Divina",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.veCfW87hsFWhz59h",
+      "tags": [
+        "divina",
+        "evocação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "full",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "cilindro com 15m de raio e 15m de altura",
+        "effect": ""
+      },
+      "page": 208
+    },
+    {
+      "id": "tentaculos-de-trevas",
+      "name": "Tentáculos de Trevas",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.IYB0YK1zLune1fs0",
+      "tags": [
+        "arcana",
+        "necromancia",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "necromancia",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Manobra Agarrar",
+          "kind": "check",
+          "skill": "misticismo",
+          "bonus": 0
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "4d6",
+          "attribute": null,
+          "damageType": "trevas",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 6m de raio",
+        "effect": ""
+      },
+      "page": 209
+    },
+    {
+      "id": "terremoto",
+      "name": "Terremoto",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.bTYmLsNGfcg4pFzu",
+      "tags": [
+        "divina",
+        "evocação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "evocacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "standard",
+        "duration": {
+          "units": "round",
+          "value": 1
+        },
+        "range": {
+          "units": "long",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 30m de raio",
+        "effect": ""
+      },
+      "page": 209
+    },
+    {
+      "id": "toque-chocante",
+      "name": "Toque Chocante",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Q2zkHtJ1h5o725IR",
+      "tags": [
+        "arcana",
+        "evocação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "evocacao",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d8+2",
+          "attribute": null,
+          "damageType": "eletricidade",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude reduz à metade"
+      },
+      "page": 209
+    },
+    {
+      "id": "toque-da-morte",
+      "name": "Toque da Morte",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.rQ44Cz2gJdt86jFL",
+      "tags": [
+        "universal",
+        "necromancia",
+        "5º círculo"
+      ],
+      "fields": {
+        "circle": 5,
+        "school": "necromancia",
+        "type": "universal"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "10d8",
+          "attribute": null,
+          "damageType": "trevas",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 15,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 209
+    },
+    {
+      "id": "toque-vampirico",
+      "name": "Toque Vampírico",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.6KvwDBikOdbzhRGv",
+      "tags": [
+        "arcana",
+        "necromancia",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "necromancia",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "trevas",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "fortitude",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Fortitude reduz à metade"
+      },
+      "page": 209
+    },
+    {
+      "id": "tranca-arcana",
+      "name": "Tranca Arcana",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.PjNZfjmSHwQJJqZ9",
+      "tags": [
+        "arcana",
+        "abjuração",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "abjuracao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "permanent",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 objeto Grande ou menor",
+        "area": "",
+        "effect": ""
+      },
+      "page": 209
+    },
+    {
+      "id": "tranquilidade",
+      "name": "Tranquilidade",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.wuqyoslFlYe2zgCp",
+      "tags": [
+        "divina",
+        "encantamento",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "encantamento",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 animal ou humanóide",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "page": 210
+    },
+    {
+      "id": "transformacao-de-guerra",
+      "name": "Transformação de Guerra",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.RLBhyAnxLXWj8thK",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 210
+    },
+    {
+      "id": "transmutar-objetos",
+      "name": "Transmutar Objetos",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.T1fJO9LOyBxtBBDN",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "matéria-prima, como madeira, rochas, ossos",
+        "area": "",
+        "effect": ""
+      },
+      "page": 210
+    },
+    {
+      "id": "velocidade",
+      "name": "Velocidade",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.XWEJNZMs6Wb9uUHF",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "page": 210
+    },
+    {
+      "id": "vestimenta-da-fe",
+      "name": "Vestimenta da Fé",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.MBX0tXnozRSrgnvx",
+      "tags": [
+        "divina",
+        "abjuração",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "abjuracao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 armadura, escudo ou vestimenta",
+        "area": "",
+        "effect": ""
+      },
+      "page": 210
+    },
+    {
+      "id": "viagem-arborea",
+      "name": "Viagem Arbórea",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.niuOSuCZnUd6sR8p",
+      "tags": [
+        "divina",
+        "convocação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "convocacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "full",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 210
+    },
+    {
+      "id": "viagem-planar",
+      "name": "Viagem Planar",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.3rR4d2fWU6uIqVNv",
+      "tags": [
+        "universal",
+        "convocação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "convocacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "full",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "pessoal",
+        "area": "",
+        "effect": ""
+      },
+      "page": 211
+    },
+    {
+      "id": "videncia",
+      "name": "Vidência",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.y0AkIvcwBstmPcpX",
+      "tags": [
+        "universal",
+        "adivinhação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "adivinhacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "full",
+        "duration": {
+          "units": "sustained",
+          "value": 0
+        },
+        "range": {
+          "units": "special",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "page": 211
+    },
+    {
+      "id": "visao-da-verdade",
+      "name": "Visão da Verdade",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.h98JyQAldmgexmzR",
+      "tags": [
+        "universal",
+        "adivinhação",
+        "4º círculo"
+      ],
+      "fields": {
+        "circle": 4,
+        "school": "adivinhacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 10,
+        "execution": "move",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 211
+    },
+    {
+      "id": "visao-mistica",
+      "name": "Visão Mística",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.GDlkTth7oEnb5d0Y",
+      "tags": [
+        "universal",
+        "adivinhação",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "adivinhacao",
+        "type": "universal"
+      },
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 211
+    },
+    {
+      "id": "vitalidade-fantasma",
+      "name": "Vitalidade Fantasma",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.505PykOz1CmG2CU3",
+      "tags": [
+        "arcana",
+        "necromancia",
+        "1º círculo"
+      ],
+      "fields": {
+        "circle": 1,
+        "school": "necromancia",
+        "type": "arcana"
+      },
+      "actions": [
+        {
+          "label": "Pontos de Vida Temporários",
+          "kind": "damage",
+          "formula": "2d10",
+          "attribute": null,
+          "damageType": null,
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 1,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 211
+    },
+    {
+      "id": "voo",
+      "name": "Voo",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.Mp0Mk82uyRUOBIPs",
+      "tags": [
+        "arcana",
+        "transmutação",
+        "3º círculo"
+      ],
+      "fields": {
+        "circle": 3,
+        "school": "transmutacao",
+        "type": "arcana"
+      },
+      "activation": {
+        "cost": 6,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 211
+    },
+    {
+      "id": "voz-divina",
+      "name": "Voz Divina",
+      "kind": "spell",
+      "$source": "Compendium.tormenta20.magias.Item.ahIU6trHt6MuMTS7",
+      "tags": [
+        "divina",
+        "adivinhação",
+        "2º círculo"
+      ],
+      "fields": {
+        "circle": 2,
+        "school": "adivinhacao",
+        "type": "divina"
+      },
+      "activation": {
+        "cost": 3,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "você",
+        "area": "",
+        "effect": ""
+      },
+      "page": 211
+    }
+  ]
+}

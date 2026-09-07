@@ -1,0 +1,1960 @@
+{
+  "$generated": "Gerado por scripts/import-foundry-compendium.ts a partir dos packs do Foundry. Não edite à mão: use custom.json (tem precedência por id).",
+  "entries": [
+    {
+      "id": "alaude-eletrico",
+      "name": "Alaude Elétrico",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.aCDhJObN0BaoP9cR",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 27000
+    },
+    {
+      "id": "alaude-elfico",
+      "name": "Alaúde Élfico",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.DlRSy7UHhSCKv3uk",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 300,
+      "page": 158
+    },
+    {
+      "id": "alforge",
+      "name": "Alforge",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.bsAV5yfFFBOJjMWw",
+      "tags": [
+        "tesouro",
+        "animal"
+      ],
+      "price": 30,
+      "page": 162
+    },
+    {
+      "id": "algemas",
+      "name": "Algemas",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.lkNT2EjekhRIb5vt",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "slots": 1,
+      "price": 15,
+      "page": 155
+    },
+    {
+      "id": "amuleto-da-robustez",
+      "name": "Amuleto da Robustez",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.WAObGl5rjxba8J8s",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 25500,
+      "page": 342
+    },
+    {
+      "id": "andrajos-de-aldeao",
+      "name": "Andrajos de Aldeão",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.QI4K4c7dDG99PEt9",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 1,
+      "page": 159
+    },
+    {
+      "id": "anel-da-energia",
+      "name": "Anel da Energia",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.eAsClXIWZNoFXiqW",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 21000,
+      "page": 342
+    },
+    {
+      "id": "anel-da-liberdade",
+      "name": "Anel da Liberdade",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.sAFkdfHvHDqyZlZl",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 60000,
+      "page": 342
+    },
+    {
+      "id": "anel-da-protecao",
+      "name": "Anel da Proteção",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.n2GhiAzdK2Fv0atk",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 9000,
+      "page": 342
+    },
+    {
+      "id": "anel-da-regeneracao",
+      "name": "Anel da Regeneração",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.lMOzFa02WRFQrfnA",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 150000,
+      "page": 342
+    },
+    {
+      "id": "anel-da-vitalidade",
+      "name": "Anel da Vitalidade",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.BPnw00NblhjMIwm0",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 21000,
+      "page": 342
+    },
+    {
+      "id": "anel-de-invisibilidade",
+      "name": "Anel de Invisibilidade",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.quofrh3DWIAAjHAI",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 21000,
+      "page": 342
+    },
+    {
+      "id": "anel-de-sinete",
+      "name": "Anel de sinete",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.WRGRaGbu7LKhyVpZ",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 91
+    },
+    {
+      "id": "anel-de-telecinesia",
+      "name": "Anel de Telecinesia",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.HvaItUlAcCtEUUPc",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 10500,
+      "page": 342
+    },
+    {
+      "id": "anel-do-escudo-mental",
+      "name": "Anel do Escudo Mental",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.eOt8kUx5MUnGAiLB",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 9000,
+      "page": 342
+    },
+    {
+      "id": "anel-do-sustento",
+      "name": "Anel do Sustento",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.XWrD4ro0POzaimEr",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 3000,
+      "page": 342
+    },
+    {
+      "id": "anel-refletor",
+      "name": "Anel Refletor",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.M4E3uPL5jOZn9xjy",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 51000,
+      "page": 342
+    },
+    {
+      "id": "animal-comum",
+      "name": "Animal Comum",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.YsZ9tRVQjPQOBdYx",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 90
+    },
+    {
+      "id": "animal-de-estimacao",
+      "name": "Animal de Estimação",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.dSa6SuhQGcQ407Wj",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 93
+    },
+    {
+      "id": "animal-urbano",
+      "name": "Animal Urbano",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.dkfaboJqs4Q1yh6i",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 93
+    },
+    {
+      "id": "apito",
+      "name": "Apito",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.34fxMzAB529DbF96",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 91
+    },
+    {
+      "id": "arpeu",
+      "name": "Arpéu",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.xWtEdEMCARSWH93X",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "slots": 1,
+      "price": 5,
+      "page": 155
+    },
+    {
+      "id": "avental",
+      "name": "Avental",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.z0J8QGLzEsHt9Luf",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 94
+    },
+    {
+      "id": "bainha-magica",
+      "name": "Bainha Mágica",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.OAOvHNSqcpDL6UA5",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 3000,
+      "page": 342
+    },
+    {
+      "id": "balao-goblin",
+      "name": "Balão Goblin",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.bMUmINEzRpeHUs4J",
+      "tags": [
+        "tesouro",
+        "veículo"
+      ],
+      "price": 200,
+      "page": 163
+    },
+    {
+      "id": "bandana",
+      "name": "Bandana",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.uW6vX3p8G168OxUq",
+      "tags": [
+        "traje",
+        "item de origem"
+      ],
+      "slots": 1,
+      "price": 5,
+      "page": 159
+    },
+    {
+      "id": "bandoleira-de-pocoes",
+      "name": "Bandoleira de Poções",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.MXbMLLc2MxQwENbh",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 20,
+      "page": 155
+    },
+    {
+      "id": "barraca",
+      "name": "Barraca",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.k9mpsAd6FWQjqYpB",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "slots": 1,
+      "price": 10,
+      "page": 155
+    },
+    {
+      "id": "bola-de-cristal",
+      "name": "Bola de Cristal",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.NQhYZu63b2iFZfv4",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 10500,
+      "page": 342
+    },
+    {
+      "id": "bolsa-de-po",
+      "name": "Bolsa de Pó",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.KncQ047S2f8rBvK2",
+      "tags": [
+        "esotérico"
+      ],
+      "slots": 1,
+      "price": 300,
+      "page": 159
+    },
+    {
+      "id": "botas-aladas",
+      "name": "Botas Aladas",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.56TGgR3gpMyWTVq2",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 15000,
+      "page": 342
+    },
+    {
+      "id": "botas-reforcadas",
+      "name": "Botas Reforçadas",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.v0pLpRxMPgWR4OUQ",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 20,
+      "page": 159
+    },
+    {
+      "id": "botas-velozes",
+      "name": "Botas Velozes",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.PihGn7sFqQLTc7IC",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 25500,
+      "page": 342
+    },
+    {
+      "id": "bracadeiras-do-arqueiro",
+      "name": "Braçadeiras do Arqueiro",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.asJJmcBkZ5TP6Mnp",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 21000,
+      "page": 342
+    },
+    {
+      "id": "braceletes-de-bronze",
+      "name": "Braceletes de Bronze",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.VBjVXrxkC1a7P2t3",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 16500,
+      "page": 342
+    },
+    {
+      "id": "braceletes-de-ouro",
+      "name": "Braceletes de Ouro",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.eWqbWJ4vZUyEIVLF",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 64500,
+      "page": 342
+    },
+    {
+      "id": "brincos-da-paz",
+      "name": "Brincos da Paz",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.Fbdu5n9CAaiknpAS",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 21000,
+      "page": 343
+    },
+    {
+      "id": "brincos-da-sagacidade",
+      "name": "Brincos da Sagacidade",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.5L8PBHcigod9Qav1",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 4500,
+      "page": 342
+    },
+    {
+      "id": "camisa-bufante",
+      "name": "Camisa Bufante",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.KnKvwLyvuko20Huj",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 25,
+      "page": 159
+    },
+    {
+      "id": "caneca",
+      "name": "Caneca",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.nWvPmSgkwxKY05Sm",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 94
+    },
+    {
+      "id": "canoa",
+      "name": "Canoa",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.xBDLAT1D6cJp3Xgv",
+      "tags": [
+        "tesouro",
+        "veículo"
+      ],
+      "price": 50,
+      "page": 163
+    },
+    {
+      "id": "capa-esvoacante",
+      "name": "Capa Esvoaçante",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.oZlDoq0HxOucTgGK",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 25,
+      "page": 159
+    },
+    {
+      "id": "capa-pesada",
+      "name": "Capa Pesada",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.Lg7f8MCtGHrgslx1",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 15,
+      "page": 159
+    },
+    {
+      "id": "carroca",
+      "name": "Carroça",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.9AshEQWx8xIxDXj2",
+      "tags": [
+        "tesouro",
+        "veículo"
+      ],
+      "price": 30,
+      "page": 163
+    },
+    {
+      "id": "carruagem",
+      "name": "Carruagem",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.LhaPpB6EoYJAoor7",
+      "tags": [
+        "tesouro",
+        "veículo"
+      ],
+      "price": 200,
+      "page": 163
+    },
+    {
+      "id": "casaco-longo",
+      "name": "Casaco Longo",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.WA5FyTfRnOcGZVHU",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 20,
+      "page": 159
+    },
+    {
+      "id": "caveira-maldita",
+      "name": "Caveira Maldita",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.UncHq3oaHPx2AuPx",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 10500,
+      "page": 343
+    },
+    {
+      "id": "cetro-elemental",
+      "name": "Cetro Elemental",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.Ye9upc42yVz6pHwH",
+      "tags": [
+        "esotérico"
+      ],
+      "slots": 1,
+      "price": 750,
+      "page": 160
+    },
+    {
+      "id": "chapeu-arcano",
+      "name": "Chapéu Arcano",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.oT1tZGBnQuUkJmUJ",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 50,
+      "page": 159
+    },
+    {
+      "id": "chapeu-do-disfarce",
+      "name": "Chapéu do Disfarce",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.Mba9KnxNivmpuJhy",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 6000,
+      "page": 343
+    },
+    {
+      "id": "cinto-da-forca-do-gigante",
+      "name": "Cinto da Força do Gigante",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.PBfThK5WWVbIY0iP",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 25500,
+      "page": 343
+    },
+    {
+      "id": "cinto-do-campeao",
+      "name": "Cinto do Campeão",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.402QJlcWzp7gaZYo",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 51000,
+      "page": 343
+    },
+    {
+      "id": "colar-guardiao",
+      "name": "Colar Guardião",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.AJEwZYS6iJvqdQlr",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 51000,
+      "page": 343
+    },
+    {
+      "id": "colecao-de-livros",
+      "name": "Coleção de Livros",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.jhJviQkVaDYk28yY",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 75,
+      "page": 158
+    },
+    {
+      "id": "corda-10m",
+      "name": "Corda (10m)",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.zhN019SNUiYzz3aU",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "slots": 1,
+      "price": 1,
+      "page": 155
+    },
+    {
+      "id": "corda-da-escalada",
+      "name": "Corda da Escalada",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.gwR3rksYtoGjOu6g",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 3000,
+      "page": 343
+    },
+    {
+      "id": "coroa-majestosa",
+      "name": "Coroa Majestosa",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.Yiw7Y6JtQm81gJt1",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 25500,
+      "page": 344
+    },
+    {
+      "id": "costela-de-lich",
+      "name": "Costela de Lich",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.hJSIRtVZKM0fmDb5",
+      "tags": [
+        "esotérico"
+      ],
+      "slots": 1,
+      "price": 300,
+      "page": 160
+    },
+    {
+      "id": "couro-de-basilisco",
+      "name": "Couro de basilisco",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.2OiY2cZ1mLmJ9mQe",
+      "tags": [
+        "tesouro"
+      ],
+      "slots": 1,
+      "price": 1000,
+      "page": 293
+    },
+    {
+      "id": "dedo-de-ente",
+      "name": "Dedo de Ente",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.sfz1xDfvqgLcXQeV",
+      "tags": [
+        "esotérico"
+      ],
+      "slots": 1,
+      "price": 200,
+      "page": 160
+    },
+    {
+      "id": "elmo-do-teletransporte",
+      "name": "Elmo do Teletransporte",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.SNw2I6JAd0ukMx8B",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 30000,
+      "page": 344
+    },
+    {
+      "id": "enfeite-de-elmo",
+      "name": "Enfeite de Elmo",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.jxCpE9ebnpdwKLP0",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 15,
+      "page": 159
+    },
+    {
+      "id": "engrenagens",
+      "name": "Engrenagens",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.0rmobUebP6LxbNV3",
+      "tags": [
+        "tesouro"
+      ],
+      "slots": 1,
+      "price": 1000,
+      "page": 296
+    },
+    {
+      "id": "equipamento-de-viagem",
+      "name": "Equipamento de Viagem",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.j0io05hClsF3OR26",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 10,
+      "page": 158
+    },
+    {
+      "id": "espelho",
+      "name": "Espelho",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.o5AfIxUf49F8UHv4",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "slots": 1,
+      "price": 10,
+      "page": 155
+    },
+    {
+      "id": "espelho-da-oposicao",
+      "name": "Espelho da Oposição",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.xasIzkosQaQ0Ln3Y",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 75000,
+      "page": 344
+    },
+    {
+      "id": "espelho-do-aprisionamento",
+      "name": "Espelho do Aprisionamento",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.KcDQ91RPuDgistWJ",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 150000,
+      "page": 344
+    },
+    {
+      "id": "espinho-de-manticora",
+      "name": "Espinho de Mantícora",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.3i3lkiwxfMxyWO31",
+      "tags": [
+        "tesouro"
+      ],
+      "price": 150,
+      "page": 287
+    },
+    {
+      "id": "estatueta-animista",
+      "name": "Estatueta Animista",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.LN0jEKvCz1Rb3bOo",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 51000,
+      "page": 344
+    },
+    {
+      "id": "estojo-de-disfarces",
+      "name": "Estojo de Disfarces",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.7d9rOIGNdGSTnXUG",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 50,
+      "page": 158
+    },
+    {
+      "id": "estola-da-serenidade",
+      "name": "Estola da Serenidade",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.wVnn7FGD0t0BU11O",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 25500,
+      "page": 344
+    },
+    {
+      "id": "faixas-do-pugilista",
+      "name": "Faixas do Pugilista",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.JqiWjXlU9pdOZTeb",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 21000,
+      "page": 344
+    },
+    {
+      "id": "farrapos-de-ermitao",
+      "name": "Farrapos de Ermitão",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.NaAzX8LMFw2Sk8qE",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 1,
+      "page": 159
+    },
+    {
+      "id": "ferraduras-da-velocidade",
+      "name": "Ferraduras da Velocidade",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.THhPyfQnEvjY7b4w",
+      "tags": [
+        "tesouro",
+        "mágico"
+      ],
+      "price": 3000,
+      "page": 344
+    },
+    {
+      "id": "flauta-fantasma",
+      "name": "Flauta Fantasma",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.qokba90bQZ9F5RBQ",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 6000,
+      "page": 344
+    },
+    {
+      "id": "flauta-mistica",
+      "name": "Flauta Mística",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.48AZOSnlc4gRYffv",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 150,
+      "page": 158
+    },
+    {
+      "id": "garrafa-da-fumaca-eterna",
+      "name": "Garrafa da Fumaça Eterna",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.suaTBu6MQmlEMxqB",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 3000,
+      "page": 344
+    },
+    {
+      "id": "garras-de-ganchador",
+      "name": "Garras de Ganchador",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.eJwWHgv9w45LKc0g",
+      "tags": [
+        "tesouro"
+      ],
+      "slots": 1,
+      "price": 500,
+      "page": 308
+    },
+    {
+      "id": "gazua",
+      "name": "Gazua",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.Wjpiz1Um7NkFXPDa",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 5,
+      "page": 158
+    },
+    {
+      "id": "gema-da-luminosidade",
+      "name": "Gema da Luminosidade",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.2ulfzRqI448ZZ04i",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 3000,
+      "page": 344
+    },
+    {
+      "id": "gema-da-telepatia",
+      "name": "Gema da Telepatia",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.OtW7whLVNzm2utSb",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 30000,
+      "page": 344
+    },
+    {
+      "id": "gema-elemental",
+      "name": "Gema Elemental",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.ClsAwXF91HUeKnPb",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 30000,
+      "page": 344
+    },
+    {
+      "id": "gemas-preciosas",
+      "name": "Gemas preciosas",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.mtYCAxyyPgevtFvX",
+      "tags": [
+        "tesouro"
+      ],
+      "price": 100,
+      "page": 93
+    },
+    {
+      "id": "gorro-de-ervas",
+      "name": "Gorro de Ervas",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.vfgEloFPf9c65ui9",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 75,
+      "page": 159
+    },
+    {
+      "id": "grimorio",
+      "name": "Grimório",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.GdndveyKyp8dbM3I",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "page": 37
+    },
+    {
+      "id": "insignia-de-milicia",
+      "name": "Insígnia de milícia",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.ynFEILQg1LJQ4Zmm",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 91
+    },
+    {
+      "id": "insignia-do-exercito",
+      "name": "Insígnia do exército",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.FOat9pnq9RNt0ThW",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 94
+    },
+    {
+      "id": "instrumento-musical",
+      "name": "Instrumento Musical",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.7GHJtYRc9uVb5l7q",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 35,
+      "page": 158
+    },
+    {
+      "id": "instrumento-musical-exotico",
+      "name": "Instrumento musical exótico",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.3HxySPDqYzqwf9UD",
+      "tags": [
+        "ferramenta",
+        "item de origem"
+      ],
+      "page": 90
+    },
+    {
+      "id": "instrumentos-de-oficio",
+      "name": "Instrumentos de Ofício",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.mMPUi2VjdE3rNGkg",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 30,
+      "page": 158
+    },
+    {
+      "id": "item-admirador",
+      "name": "Item Admirador",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.0yzCqLRmvb6rOcOI",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 90
+    },
+    {
+      "id": "item-estrangeiro",
+      "name": "Item estrangeiro",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.6zy7ZAb2GvdKD8Qw",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 94
+    },
+    {
+      "id": "joia-de-familia",
+      "name": "Joia de família",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.XBqfTkg4n5Qnj6Le",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "price": 300,
+      "page": 86
+    },
+    {
+      "id": "joia-falsificada",
+      "name": "Joia falsificada",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.jMyQyuL38JtOcqvY",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 88
+    },
+    {
+      "id": "lampiao",
+      "name": "Lampião",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.hSNkEKLoTHuywNya",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "slots": 1,
+      "price": 7,
+      "page": 155
+    },
+    {
+      "id": "lanterna-da-revelacao",
+      "name": "Lanterna da Revelação",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.01uzk8l2pN2tDIfq",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 6000,
+      "page": 344
+    },
+    {
+      "id": "livro-formulas",
+      "name": "Livro Formulas",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.sHyeL1d46x5Hmw7y",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "page": 70
+    },
+    {
+      "id": "luneta",
+      "name": "Luneta",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.DIGKu51vzwEm60Rz",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 100,
+      "page": 158
+    },
+    {
+      "id": "luva-de-ferro",
+      "name": "Luva de Ferro",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.JcJuBJzPEoVuboMp",
+      "tags": [
+        "esotérico"
+      ],
+      "slots": 1,
+      "price": 150,
+      "page": 160
+    },
+    {
+      "id": "luva-de-pelica",
+      "name": "Luva de Pelica",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.7F1CRKWOqkzn4a1u",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 5,
+      "page": 159
+    },
+    {
+      "id": "luvas-da-delicadeza",
+      "name": "Luvas da Delicadeza",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.ES395oS9Gazb7wJA",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 4500,
+      "page": 344
+    },
+    {
+      "id": "maleta-de-medicamentos",
+      "name": "Maleta de Medicamentos",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.MJkN9zjZCSzauSy4",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 50,
+      "page": 158
+    },
+    {
+      "id": "manopla",
+      "name": "Manopla",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.bsKUfUMnqIXt4dGl",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 10,
+      "page": 159
+    },
+    {
+      "id": "manoplas-da-forca-do-ogro",
+      "name": "Manoplas da Força do Ogro",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.kd0YD9KZOz0tpBBA",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 4500,
+      "page": 344
+    },
+    {
+      "id": "manto-camuflado",
+      "name": "Manto Camuflado",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.FMnT2iyH7mRPChuN",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 12,
+      "page": 159
+    },
+    {
+      "id": "manto-cerimonial",
+      "name": "Manto cerimonial",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.y7N3CVY9eZmSEIj6",
+      "tags": [
+        "tesouro"
+      ],
+      "page": 91
+    },
+    {
+      "id": "manto-da-aranha",
+      "name": "Manto da Aranha",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.UUHcUX4NovvA4h1C",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 21000,
+      "page": 344
+    },
+    {
+      "id": "manto-da-resistencia",
+      "name": "Manto da Resistência",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.zPxlM4MNoKihGsDn",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 4500,
+      "page": 344
+    },
+    {
+      "id": "manto-do-fascinio",
+      "name": "Manto do Fascínio",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.VBaB5hQmTMj1YcMD",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 4500,
+      "page": 344
+    },
+    {
+      "id": "manto-do-morcego",
+      "name": "Manto do Morcego",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.qEhhSwNSZmOAh8k4",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 25500,
+      "page": 344
+    },
+    {
+      "id": "manto-eclesiastico",
+      "name": "Manto Eclesiástico",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.ZtzSpOyjFyUrPRPk",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 20,
+      "page": 159
+    },
+    {
+      "id": "manto-elfico",
+      "name": "Manto Élfico",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.NvLnwQwZQlImALJq",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 3000,
+      "page": 345
+    },
+    {
+      "id": "manual-da-saude-corporal",
+      "name": "Manual da Saúde Corporal",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.goKcWiXKZdwMlXqn",
+      "tags": [
+        "tesouro",
+        "mágico"
+      ],
+      "price": 30000,
+      "page": 345
+    },
+    {
+      "id": "manual-do-bom-exercicio",
+      "name": "Manual do Bom Exercício",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.dxsoRAc3W1CaQMQE",
+      "tags": [
+        "tesouro",
+        "mágico"
+      ],
+      "price": 30000,
+      "page": 345
+    },
+    {
+      "id": "manual-dos-movimentos-precisos",
+      "name": "Manual dos Movimentos Precisos",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.MSPF3mDfZ4Od4eDh",
+      "tags": [
+        "tesouro",
+        "mágico"
+      ],
+      "price": 30000,
+      "page": 345
+    },
+    {
+      "id": "medalhao-da-deusa-da-vida",
+      "name": "Medalhão da deusa da vida",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.sP4Nlz0cFAjxbzg5",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 30000,
+      "page": 345
+    },
+    {
+      "id": "medalhao-de-prata",
+      "name": "Medalhão de Prata",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.IBVMrbj1fVsSu6a9",
+      "tags": [
+        "esotérico"
+      ],
+      "slots": 1,
+      "price": 750,
+      "page": 160
+    },
+    {
+      "id": "mochila",
+      "name": "Mochila",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.aEa1jA74DcgjMdlC",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "price": 2,
+      "page": 155
+    },
+    {
+      "id": "mochila-de-aventureiro",
+      "name": "Mochila de Aventureiro",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.pteAAJNAkuo7C2Uv",
+      "tags": [
+        "traje",
+        "aventura"
+      ],
+      "price": 50,
+      "page": 155
+    },
+    {
+      "id": "mochila-de-carga",
+      "name": "Mochila de Carga",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.rIxUZtwLHeEfggsD",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "price": 3000,
+      "page": 345
+    },
+    {
+      "id": "odre",
+      "name": "Odre",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.tfn3Pvgp2qQBz6ZP",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "slots": 0.5,
+      "price": 1
+    },
+    {
+      "id": "orbe-cristalina",
+      "name": "Orbe Cristalina",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.kc5hodyP1AIeDJnv",
+      "tags": [
+        "esotérico"
+      ],
+      "slots": 1,
+      "price": 750,
+      "page": 160
+    },
+    {
+      "id": "orbe-das-tempestades",
+      "name": "Orbe das Tempestades",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.oMZO36ZBHsOykHb0",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 97500,
+      "page": 345
+    },
+    {
+      "id": "organizador-de-pergaminhos",
+      "name": "Organizador de Pergaminhos",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.xSbZylg3KpduPDBE",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 25,
+      "page": 155
+    },
+    {
+      "id": "ovo-de-grifo",
+      "name": "ovo de grifo",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.zOrrkTtIpzf5BTyV",
+      "tags": [
+        "tesouro"
+      ],
+      "price": 2500,
+      "page": 292
+    },
+    {
+      "id": "panela",
+      "name": "Panela",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.N4U5odsI1LYIa1YP",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 94
+    },
+    {
+      "id": "pano-sujo",
+      "name": "Pano sujo",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.irmf9iIGjG2z6bZF",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 94
+    },
+    {
+      "id": "pe-de-cabra",
+      "name": "Pé de cabra",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.0QLhtTZeNl25J8sg",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "slots": 1,
+      "price": 2,
+      "page": 155
+    },
+    {
+      "id": "pingente-da-saude",
+      "name": "Pingente da Saúde",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.RJYF7ocMNcZqOm4j",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 9000,
+      "page": 345
+    },
+    {
+      "id": "pingente-da-sensatez",
+      "name": "Pingente da Sensatez",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.gLUFfRX1CAtvtQPr",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 4500,
+      "page": 345
+    },
+    {
+      "id": "pulseiras-da-celeridade",
+      "name": "Pulseiras da Celeridade",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.vHpWMHosmAzPmMIV",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 25500,
+      "page": 345
+    },
+    {
+      "id": "robe-do-arquimago",
+      "name": "Robe do Arquimago",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.IvIBlYuZS6Sn5cE6",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 90000,
+      "page": 345
+    },
+    {
+      "id": "robe-mistico",
+      "name": "Robe Místico",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.9N8VfunVqsaPKISr",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 50,
+      "page": 159
+    },
+    {
+      "id": "saco-de-dormir",
+      "name": "Saco de Dormir",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.ohZXRVN8Ji4Z1uSm",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "slots": 1,
+      "price": 1,
+      "page": 155
+    },
+    {
+      "id": "sapatos-de-camurca",
+      "name": "Sapatos de Camurça",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.GykbrJ2G6IpBNJ5k",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 8,
+      "page": 159
+    },
+    {
+      "id": "sela",
+      "name": "Sela",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.1ZF7UB1MesD7ca8A",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 20,
+      "page": 158
+    },
+    {
+      "id": "simbolo-abencoado",
+      "name": "Símbolo Abençoado",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.PymQTrvR91CIsUlW",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 21000,
+      "page": 345
+    },
+    {
+      "id": "simbolo-sagrado",
+      "name": "Símbolo Sagrado",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.GN5S9awu41thdvCn",
+      "tags": [
+        "traje",
+        "aventura"
+      ],
+      "slots": 1,
+      "price": 5,
+      "page": 157
+    },
+    {
+      "id": "tabardo",
+      "name": "Tabardo",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.w04ErUI4RPrDP9ax",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 10,
+      "page": 159
+    },
+    {
+      "id": "tambor-das-profundezas",
+      "name": "Tambor das Profundezas",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.J376sbiNq6ZscU8t",
+      "tags": [
+        "ferramenta"
+      ],
+      "slots": 1,
+      "price": 80,
+      "page": 158
+    },
+    {
+      "id": "tapete-voador",
+      "name": "Tapete Voador",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.xvnLFzKVvqZPFOSM",
+      "tags": [
+        "tesouro",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 60000,
+      "page": 345
+    },
+    {
+      "id": "tatuagem",
+      "name": "Tatuagem",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.U46WyhdXk6LSjCps",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 88
+    },
+    {
+      "id": "tiara-da-sapiencia",
+      "name": "Tiara da Sapiência",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.vcHZCbjaAe7Ttd1Q",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 25500,
+      "page": 345
+    },
+    {
+      "id": "tomo-da-compreensao",
+      "name": "Tomo da Compreensão",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.z8YmxSob2luUuWeM",
+      "tags": [
+        "tesouro",
+        "mágico"
+      ],
+      "price": 30000,
+      "page": 345
+    },
+    {
+      "id": "tomo-da-lideranca-e-influencia",
+      "name": "Tomo da Liderança e Influência",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.ylIVTOBIvhJggWhE",
+      "tags": [
+        "tesouro",
+        "mágico"
+      ],
+      "price": 30000,
+      "page": 345
+    },
+    {
+      "id": "tomo-dos-grandes-pensamentos",
+      "name": "Tomo dos Grandes Pensamentos",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.PWx9hBiySNNchHbA",
+      "tags": [
+        "tesouro",
+        "mágico"
+      ],
+      "price": 30000,
+      "page": 345
+    },
+    {
+      "id": "tomo-hermetico",
+      "name": "Tomo Hermético",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.kVham9N70h6WyqW4",
+      "tags": [
+        "esotérico"
+      ],
+      "slots": 1,
+      "price": 1500,
+      "page": 160
+    },
+    {
+      "id": "torque-do-vigor",
+      "name": "Torque do Vigor",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.rCji6G4Jys9QYjXh",
+      "tags": [
+        "acessório",
+        "mágico"
+      ],
+      "slots": 1,
+      "price": 4500,
+      "page": 345
+    },
+    {
+      "id": "traje-da-corte",
+      "name": "Traje da corte",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.JwWMw9SpTVXSVIBp",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 100,
+      "page": 159
+    },
+    {
+      "id": "traje-de-artista",
+      "name": "Traje de artista",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.LZnkuFNUft6uf8aO",
+      "tags": [
+        "tesouro"
+      ]
+    },
+    {
+      "id": "traje-de-sacerdote",
+      "name": "Traje de sacerdote",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.7WaWtssy7ROODAEX",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "page": 85
+    },
+    {
+      "id": "traje-de-viajante",
+      "name": "Traje de viajante",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.5S1fxBo6Z5KXuMTC",
+      "tags": [
+        "traje"
+      ],
+      "price": 10,
+      "page": 159
+    },
+    {
+      "id": "traje-estrangeiro",
+      "name": "Traje estrangeiro",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.0JbdprQmQxxwHVzJ",
+      "tags": [
+        "traje"
+      ],
+      "page": 90
+    },
+    {
+      "id": "tres-bolas-coloridas-para-malabarismo",
+      "name": "Três bolas coloridas para malabarismo",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.ikiyOP1h4nm4m9M2",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 90
+    },
+    {
+      "id": "uniforme-militar",
+      "name": "Uniforme militar",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.PWrI3tRiTMYo7Qs7",
+      "tags": [
+        "tesouro",
+        "item de origem"
+      ],
+      "page": 94
+    },
+    {
+      "id": "vara-de-madeira-3m",
+      "name": "Vara de madeira (3m)",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.iLBmT2s4tuCfvT8R",
+      "tags": [
+        "tesouro",
+        "aventura"
+      ],
+      "slots": 1,
+      "price": 0.2,
+      "page": 157
+    },
+    {
+      "id": "varinha-arcana",
+      "name": "Varinha Arcana",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.wPChv8ymcWkPofWu",
+      "tags": [
+        "esotérico"
+      ],
+      "slots": 1,
+      "price": 100,
+      "page": 160
+    },
+    {
+      "id": "vassoura-voadora",
+      "name": "Vassoura Voadora",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.lH4WuC99PGlKzRgc",
+      "tags": [
+        "tesouro",
+        "mágico"
+      ],
+      "price": 21000,
+      "page": 345
+    },
+    {
+      "id": "veleiro",
+      "name": "Veleiro",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.xjnUNsRa82ZBlG8L",
+      "tags": [
+        "tesouro",
+        "veículo"
+      ],
+      "price": 10000,
+      "page": 163
+    },
+    {
+      "id": "veste-de-seda",
+      "name": "Veste de Seda",
+      "kind": "gear",
+      "$source": "Compendium.tormenta20.equipamentos.Item.xp0RnbT05IAeH8cg",
+      "tags": [
+        "traje"
+      ],
+      "slots": 1,
+      "price": 25,
+      "page": 159
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 {
   "name": "tormenta-vtt",
   "private": true,
+  "type": "module",
   "version": "0.1.0",
   "packageManager": "pnpm@10.34.5",
   "engines": {
@@ -10,11 +11,15 @@
     "dev": "pnpm -r --parallel --stream run dev",
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
-    "typecheck": "pnpm -r run typecheck",
-    "lint": "pnpm -r run lint"
+    "typecheck": "pnpm -r run typecheck && tsc -p scripts/tsconfig.json --noEmit",
+    "lint": "pnpm -r run lint",
+    "import:compendium": "tsx scripts/import-foundry-compendium.ts"
   },
   "devDependencies": {
-    "typescript": "^5.6.0"
+    "@types/node": "^22.20.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.6.0",
+    "yaml": "^2.9.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

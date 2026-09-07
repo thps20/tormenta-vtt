@@ -1,34 +1,414 @@
-[
-  {
-    "$comment": "flexibleBonuses com count 0 = sem bônus à escolha (sem isso a ficha pediria uma escolha).",
-    "id": "anao",
-    "name": "Anão",
-    "kind": "race",
-    "tags": [],
-    "fields": {
-      "attributeBonuses": { "con": 2, "sab": 1, "des": -1 },
-      "flexibleBonuses": { "amount": 0, "count": 0, "exclude": [], "chosen": [] },
-      "size": "medio",
-      "movement": 6,
-      "senses": "Visão no escuro",
-      "skillsGranted": { "fixed": [], "choices": [] }
+{
+  "$generated": "Gerado por scripts/import-foundry-compendium.ts a partir dos packs do Foundry. Não edite à mão: use custom.json (tem precedência por id).",
+  "entries": [
+    {
+      "id": "aggelus",
+      "name": "Aggelus",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.guBAxwQ5PEo5GRZv",
+      "fields": {
+        "attributeBonuses": {
+          "sab": 2,
+          "car": 1
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
     },
-    "page": null
-  },
-  {
-    "$comment": "Versátil: só a opção de duas perícias está modelada (a alternativa 'uma perícia e um poder' fica para quando houver poderes no compêndio).",
-    "id": "humano",
-    "name": "Humano",
-    "kind": "race",
-    "tags": [],
-    "fields": {
-      "attributeBonuses": {},
-      "flexibleBonuses": { "amount": 1, "count": 3, "exclude": [], "chosen": [] },
-      "size": "medio",
-      "movement": 9,
-      "senses": "",
-      "skillsGranted": { "fixed": [], "choices": [{ "count": 2, "from": [], "chosen": [] }] }
+    {
+      "id": "dahllan",
+      "name": "Dahllan",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.BAX0RUhauH7Sqve2",
+      "fields": {
+        "attributeBonuses": {
+          "des": 1,
+          "int": -1,
+          "sab": 2
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
     },
-    "page": null
-  }
-]
+    {
+      "id": "elfo",
+      "name": "Elfo",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.VprQ9XynfS5PqoMF",
+      "fields": {
+        "attributeBonuses": {
+          "des": 1,
+          "con": -1,
+          "int": 2
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 12,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "goblin",
+      "name": "Goblin",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.tQjWUELysKCrcvTY",
+      "fields": {
+        "attributeBonuses": {
+          "des": 2,
+          "int": 1,
+          "car": -1
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "golem",
+      "name": "Golem",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.ZQLzvEIDXT2gDZH7",
+      "fields": {
+        "attributeBonuses": {
+          "for": 2,
+          "con": 1,
+          "car": -1
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "pequeno",
+        "movement": 6,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "hynne",
+      "name": "Hynne",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.JINhPmx3z5lzsdhQ",
+      "fields": {
+        "attributeBonuses": {
+          "for": -1,
+          "des": 2,
+          "car": 1
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "pequeno",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "kliren",
+      "name": "Kliren",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.wMJ1gB4FmwlO5fzT",
+      "fields": {
+        "attributeBonuses": {
+          "for": -1,
+          "int": 2,
+          "car": 1
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "lefou",
+      "name": "Lefou",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.p6ZCIHj598crw4AB",
+      "fields": {
+        "attributeBonuses": {
+          "car": -1
+        },
+        "flexibleBonuses": {
+          "amount": 1,
+          "count": 3,
+          "exclude": [
+            "car"
+          ],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "medusa",
+      "name": "Medusa",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.VE84T4jYnYicLEma",
+      "fields": {
+        "attributeBonuses": {
+          "des": 2,
+          "car": 1
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "minotauro",
+      "name": "Minotauro",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.UknA6Hsp6YvqPuuA",
+      "fields": {
+        "attributeBonuses": {
+          "for": 2,
+          "des": 1,
+          "sab": -1
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "osteon",
+      "name": "Osteon",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.DBhFX1NX1wzTNqa5",
+      "fields": {
+        "attributeBonuses": {
+          "con": -1
+        },
+        "flexibleBonuses": {
+          "amount": 1,
+          "count": 3,
+          "exclude": [
+            "con"
+          ],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "qareen",
+      "name": "Qareen",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.lQHYUeHcQL6cdRPs",
+      "fields": {
+        "attributeBonuses": {
+          "int": 1,
+          "sab": -1,
+          "car": 2
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "sereia-tritao",
+      "name": "Sereia/Tritão",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.MzhbNJT2lmwsLukS",
+      "fields": {
+        "attributeBonuses": {},
+        "flexibleBonuses": {
+          "amount": 1,
+          "count": 3,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "silfide",
+      "name": "Sílfide",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.sviyQ98Ng0xPb5mk",
+      "fields": {
+        "attributeBonuses": {
+          "for": -2,
+          "des": 1,
+          "car": 2
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "minusculo",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "sulfure",
+      "name": "Sulfure",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.wCIvIV5iXDfmsLQY",
+      "fields": {
+        "attributeBonuses": {
+          "des": 2,
+          "int": 1
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    },
+    {
+      "id": "trog",
+      "name": "Trog",
+      "kind": "race",
+      "$source": "Compendium.tormenta20.racas.Item.sbKTQCQbVmuNCP15",
+      "fields": {
+        "attributeBonuses": {
+          "for": 1,
+          "con": 2,
+          "int": -1
+        },
+        "flexibleBonuses": {
+          "amount": 0,
+          "count": 0,
+          "exclude": [],
+          "chosen": []
+        },
+        "size": "medio",
+        "movement": 9,
+        "senses": "",
+        "skillsGranted": {
+          "fixed": [],
+          "choices": []
+        }
+      }
+    }
+  ]
+}

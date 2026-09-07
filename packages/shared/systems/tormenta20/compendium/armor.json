@@ -1,14 +1,474 @@
-[
-  {
-    "$comment": "Leve: sem limite de atributo na Defesa (maxAttr omitido). TODO: confirmar preço e espaços com o livro.",
-    "id": "couro-batido",
-    "name": "Couro batido",
-    "kind": "armor",
-    "tags": ["leve"],
-    "fields": { "type": "light" },
-    "statBonuses": { "defense": 2, "armorPenalty": 0 },
-    "slots": 2,
-    "price": 20,
-    "page": null
-  }
-]
+{
+  "$generated": "Gerado por scripts/import-foundry-compendium.ts a partir dos packs do Foundry. Não edite à mão: use custom.json (tem precedência por id).",
+  "entries": [
+    {
+      "id": "armadura-acolchoada",
+      "name": "Armadura acolchoada",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos.Item.1YPU63ssevbZjxzw",
+      "tags": [
+        "leve"
+      ],
+      "fields": {
+        "type": "light"
+      },
+      "statBonuses": {
+        "defense": 1,
+        "armorPenalty": 0
+      },
+      "slots": 2,
+      "price": 5,
+      "page": 154
+    },
+    {
+      "id": "armadura-completa",
+      "name": "Armadura completa",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos.Item.CTeeKAq8zZlaJTpA",
+      "tags": [
+        "pesada"
+      ],
+      "fields": {
+        "type": "heavy"
+      },
+      "statBonuses": {
+        "defense": 10,
+        "armorPenalty": -5
+      },
+      "slots": 5,
+      "price": 3000,
+      "page": 154
+    },
+    {
+      "id": "armadura-da-luz",
+      "name": "Armadura da Luz",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.cwlpIzSBlx11nMmi",
+      "tags": [
+        "pesada",
+        "mágico"
+      ],
+      "fields": {
+        "type": "heavy"
+      },
+      "statBonuses": {
+        "defense": 10,
+        "armorPenalty": -6
+      },
+      "slots": 5,
+      "price": 150000,
+      "page": 340
+    },
+    {
+      "id": "armadura-de-couro",
+      "name": "Armadura de couro",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos.Item.Yz49Gs97dQw2emgU",
+      "tags": [
+        "leve"
+      ],
+      "fields": {
+        "type": "light"
+      },
+      "statBonuses": {
+        "defense": 2,
+        "armorPenalty": 0
+      },
+      "slots": 2,
+      "price": 20,
+      "page": 154
+    },
+    {
+      "id": "baluarte-anao",
+      "name": "Baluarte Anão",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.AUDPOjclJNiX4Xlm",
+      "tags": [
+        "pesada",
+        "mágico"
+      ],
+      "fields": {
+        "type": "heavy"
+      },
+      "statBonuses": {
+        "defense": 10,
+        "armorPenalty": -6
+      },
+      "slots": 5,
+      "price": 50000,
+      "page": 340
+    },
+    {
+      "id": "brunea",
+      "name": "Brunea",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos.Item.0Zlo3JJpJsaZwyNS",
+      "tags": [
+        "pesada"
+      ],
+      "fields": {
+        "type": "heavy"
+      },
+      "statBonuses": {
+        "defense": 5,
+        "armorPenalty": -2
+      },
+      "slots": 5,
+      "price": 50,
+      "page": 154
+    },
+    {
+      "id": "carapaca-demoniaca",
+      "name": "Carapaça Demoníaca",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.R5crK6nqk3zwOjiz",
+      "tags": [
+        "pesada",
+        "mágico"
+      ],
+      "fields": {
+        "type": "heavy"
+      },
+      "statBonuses": {
+        "defense": 10,
+        "armorPenalty": -6
+      },
+      "slots": 5,
+      "price": 63000,
+      "page": 340
+    },
+    {
+      "id": "cota-de-malha",
+      "name": "Cota de malha",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos.Item.wvwi8zPSP8mRx7LO",
+      "tags": [
+        "pesada"
+      ],
+      "fields": {
+        "type": "heavy"
+      },
+      "statBonuses": {
+        "defense": 6,
+        "armorPenalty": -2
+      },
+      "slots": 5,
+      "price": 150,
+      "page": 154
+    },
+    {
+      "id": "cota-elfica",
+      "name": "Cota Élfica",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.s3q5ZBqb0BoRpeSq",
+      "tags": [
+        "leve",
+        "mágico"
+      ],
+      "fields": {
+        "type": "light"
+      },
+      "statBonuses": {
+        "defense": 6,
+        "armorPenalty": 0
+      },
+      "slots": 5,
+      "price": 30000,
+      "page": 340
+    },
+    {
+      "id": "couraca",
+      "name": "Couraça",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos.Item.JVB4JAaxPjf0PFFN",
+      "tags": [
+        "leve"
+      ],
+      "fields": {
+        "type": "light"
+      },
+      "statBonuses": {
+        "defense": 5,
+        "armorPenalty": -4
+      },
+      "slots": 2,
+      "price": 500,
+      "page": 154
+    },
+    {
+      "id": "couraca-do-comando",
+      "name": "Couraça do Comando",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.MGQyoR2Jm9Db6sP2",
+      "tags": [
+        "leve",
+        "mágico"
+      ],
+      "fields": {
+        "type": "light"
+      },
+      "statBonuses": {
+        "defense": 5,
+        "armorPenalty": -4
+      },
+      "slots": 2,
+      "price": 45000,
+      "page": 340
+    },
+    {
+      "id": "couro-de-monstro",
+      "name": "Couro de Monstro",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.GIW26oN36GYT1UNX",
+      "tags": [
+        "leve",
+        "mágico"
+      ],
+      "fields": {
+        "type": "light"
+      },
+      "statBonuses": {
+        "defense": 4,
+        "armorPenalty": -3
+      },
+      "slots": 2,
+      "price": 36000,
+      "page": 340
+    },
+    {
+      "id": "escudo-do-conjurador",
+      "name": "Escudo do Conjurador",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.34ZGhD61vaoBYaZD",
+      "tags": [
+        "escudo",
+        "mágico"
+      ],
+      "fields": {
+        "type": "shield"
+      },
+      "statBonuses": {
+        "defense": 1,
+        "armorPenalty": -1
+      },
+      "slots": 1,
+      "price": 45000,
+      "page": 340
+    },
+    {
+      "id": "escudo-do-deus-sol",
+      "name": "Escudo do Deus-Sol",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.kWyrsaHHLRoujCLC",
+      "tags": [
+        "escudo",
+        "mágico"
+      ],
+      "fields": {
+        "type": "shield"
+      },
+      "statBonuses": {
+        "defense": 2,
+        "armorPenalty": -2
+      },
+      "slots": 2,
+      "price": 140000,
+      "page": 340
+    },
+    {
+      "id": "escudo-do-eclipse",
+      "name": "Escudo do Eclipse",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.Z6LZT0QE6N1XrJ5u",
+      "tags": [
+        "escudo",
+        "mágico"
+      ],
+      "fields": {
+        "type": "shield"
+      },
+      "statBonuses": {
+        "defense": 2,
+        "armorPenalty": -2
+      },
+      "slots": 2,
+      "price": 70000,
+      "page": 340
+    },
+    {
+      "id": "escudo-do-leao",
+      "name": "Escudo do Leão",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.kAGIu4l3y638MMUv",
+      "tags": [
+        "escudo",
+        "mágico"
+      ],
+      "fields": {
+        "type": "shield"
+      },
+      "statBonuses": {
+        "defense": 2,
+        "armorPenalty": -2
+      },
+      "slots": 2,
+      "price": 50000,
+      "page": 340
+    },
+    {
+      "id": "escudo-espinhoso",
+      "name": "Escudo Espinhoso",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.bdKVwpmbKOOjF7gO",
+      "tags": [
+        "escudo",
+        "mágico"
+      ],
+      "fields": {
+        "type": "shield"
+      },
+      "statBonuses": {
+        "defense": 2,
+        "armorPenalty": -2
+      },
+      "slots": 2,
+      "price": 50000,
+      "page": 340
+    },
+    {
+      "id": "escudo-leve",
+      "name": "Escudo leve",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos.Item.0w1vZm2RGM40opxT",
+      "tags": [
+        "escudo"
+      ],
+      "fields": {
+        "type": "shield"
+      },
+      "statBonuses": {
+        "defense": 1,
+        "armorPenalty": -1
+      },
+      "slots": 1,
+      "price": 5,
+      "page": 154
+    },
+    {
+      "id": "escudo-pesado",
+      "name": "Escudo pesado",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos.Item.1yGTB9tyXXSaN1wS",
+      "tags": [
+        "escudo"
+      ],
+      "fields": {
+        "type": "shield"
+      },
+      "statBonuses": {
+        "defense": 2,
+        "armorPenalty": -2
+      },
+      "slots": 2,
+      "price": 15,
+      "page": 154
+    },
+    {
+      "id": "gibao-de-peles",
+      "name": "Gibão de peles",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos.Item.JKt9XIXTwuIjMbLD",
+      "tags": [
+        "leve"
+      ],
+      "fields": {
+        "type": "light"
+      },
+      "statBonuses": {
+        "defense": 4,
+        "armorPenalty": -3
+      },
+      "slots": 2,
+      "price": 25,
+      "page": 154
+    },
+    {
+      "id": "loriga-do-centuriao",
+      "name": "Loriga do Centurião",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.Ki19ctJh88ucznGW",
+      "tags": [
+        "pesada",
+        "mágico"
+      ],
+      "fields": {
+        "type": "heavy"
+      },
+      "statBonuses": {
+        "defense": 7,
+        "armorPenalty": -3
+      },
+      "slots": 5,
+      "price": 45000,
+      "page": 340
+    },
+    {
+      "id": "loriga-segmentada",
+      "name": "Loriga segmentada",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos.Item.kuaSYghrOnRFa1Om",
+      "tags": [
+        "pesada"
+      ],
+      "fields": {
+        "type": "heavy"
+      },
+      "statBonuses": {
+        "defense": 7,
+        "armorPenalty": -3
+      },
+      "slots": 5,
+      "price": 250,
+      "page": 154
+    },
+    {
+      "id": "manto-da-noite",
+      "name": "Manto da Noite",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.BfZoAqLXeM2mBUfi",
+      "tags": [
+        "leve",
+        "mágico"
+      ],
+      "fields": {
+        "type": "light"
+      },
+      "statBonuses": {
+        "defense": 3,
+        "armorPenalty": -1
+      },
+      "slots": 2,
+      "price": 45000,
+      "page": 340
+    },
+    {
+      "id": "meia-armadura",
+      "name": "Meia armadura",
+      "kind": "armor",
+      "$source": "Compendium.tormenta20.equipamentos.Item.nFV1X6lQbAhbocA6",
+      "tags": [
+        "pesada"
+      ],
+      "fields": {
+        "type": "heavy"
+      },
+      "statBonuses": {
+        "defense": 8,
+        "armorPenalty": -4
+      },
+      "slots": 5,
+      "price": 600,
+      "page": 154
+    }
+  ]
+}

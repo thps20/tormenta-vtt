@@ -1,0 +1,237 @@
+[
+  {
+    "$comment": "Só mecânica (OGL). levels/initial são preenchidos ao inserir na ficha. TODO: confirmar com o livro a lista de perícias à escolha.",
+    "id": "guerreiro",
+    "name": "Guerreiro",
+    "kind": "class",
+    "tags": [
+      "combate"
+    ],
+    "fields": {
+      "hpInitial": 20,
+      "hpPerLevel": 5,
+      "mpPerLevel": 3,
+      "skillsGranted": {
+        "fixed": [
+          "fortitude"
+        ],
+        "choices": [
+          {
+            "count": 1,
+            "from": [
+              "luta",
+              "pontaria"
+            ],
+            "chosen": []
+          },
+          {
+            "count": 2,
+            "from": [
+              "adestramento",
+              "atletismo",
+              "cavalgar",
+              "guerra",
+              "iniciativa",
+              "intimidacao",
+              "oficio",
+              "percepcao",
+              "reflexos"
+            ],
+            "chosen": []
+          }
+        ]
+      },
+      "proficiencies": "Armas marciais, escudos e armaduras pesadas"
+    },
+    "page": null
+  },
+  {
+    "$comment": "TODO: confirmar com o livro a lista de perícias à escolha e as proficiências.",
+    "id": "arcanista",
+    "name": "Arcanista",
+    "kind": "class",
+    "tags": [
+      "conjurador",
+      "arcano"
+    ],
+    "fields": {
+      "hpInitial": 8,
+      "hpPerLevel": 2,
+      "mpPerLevel": 6,
+      "skillsGranted": {
+        "fixed": [
+          "misticismo",
+          "vontade"
+        ],
+        "choices": [
+          {
+            "count": 2,
+            "from": [
+              "atuacao",
+              "conhecimento",
+              "diplomacia",
+              "enganacao",
+              "guerra",
+              "iniciativa",
+              "intuicao",
+              "investigacao",
+              "nobreza",
+              "oficio",
+              "percepcao"
+            ],
+            "chosen": []
+          }
+        ]
+      },
+      "proficiencies": ""
+    },
+    "page": null
+  },
+  {
+    "$comment": "flexibleBonuses com count 0 = sem bônus à escolha (sem isso a ficha pediria uma escolha).",
+    "id": "anao",
+    "name": "Anão",
+    "kind": "race",
+    "tags": [],
+    "fields": {
+      "attributeBonuses": {
+        "con": 2,
+        "sab": 1,
+        "des": -1
+      },
+      "flexibleBonuses": {
+        "amount": 0,
+        "count": 0,
+        "exclude": [],
+        "chosen": []
+      },
+      "size": "medio",
+      "movement": 6,
+      "senses": "Visão no escuro",
+      "skillsGranted": {
+        "fixed": [],
+        "choices": []
+      }
+    },
+    "page": null
+  },
+  {
+    "$comment": "Versátil: só a opção de duas perícias está modelada (a alternativa 'uma perícia e um poder' fica para quando houver poderes no compêndio).",
+    "id": "humano",
+    "name": "Humano",
+    "kind": "race",
+    "tags": [],
+    "fields": {
+      "attributeBonuses": {},
+      "flexibleBonuses": {
+        "amount": 1,
+        "count": 3,
+        "exclude": [],
+        "chosen": []
+      },
+      "size": "medio",
+      "movement": 9,
+      "senses": "",
+      "skillsGranted": {
+        "fixed": [],
+        "choices": [
+          {
+            "count": 2,
+            "from": [],
+            "chosen": []
+          }
+        ]
+      }
+    },
+    "page": null
+  },
+  {
+    "$comment": "TODO: confirmar preço e espaços com o livro.",
+    "id": "espada-longa",
+    "name": "Espada longa",
+    "kind": "weapon",
+    "tags": [
+      "marcial",
+      "corpo a corpo",
+      "uma mão"
+    ],
+    "fields": {
+      "proficiency": "marcial",
+      "purpose": "melee",
+      "wield": "one_hand",
+      "properties": ""
+    },
+    "actions": [
+      {
+        "label": "Ataque",
+        "kind": "attack",
+        "skill": "luta",
+        "critRange": 19,
+        "critMult": 2
+      },
+      {
+        "label": "Dano",
+        "kind": "damage",
+        "formula": "1d8",
+        "damageType": "corte"
+      }
+    ],
+    "slots": 1,
+    "price": 15,
+    "page": null
+  },
+  {
+    "$comment": "Disparo: o dano não soma atributo (damageAttribute.map.ranged = null). TODO: confirmar preço e espaços.",
+    "id": "arco-curto",
+    "name": "Arco curto",
+    "kind": "weapon",
+    "tags": [
+      "marcial",
+      "disparo",
+      "duas mãos"
+    ],
+    "fields": {
+      "proficiency": "marcial",
+      "purpose": "ranged",
+      "wield": "two_hands",
+      "properties": ""
+    },
+    "actions": [
+      {
+        "label": "Ataque",
+        "kind": "attack",
+        "skill": "pontaria",
+        "critRange": 20,
+        "critMult": 3
+      },
+      {
+        "label": "Dano",
+        "kind": "damage",
+        "formula": "1d6",
+        "damageType": "perfuracao"
+      }
+    ],
+    "slots": 1,
+    "price": 30,
+    "page": null
+  },
+  {
+    "$comment": "Leve: sem limite de atributo na Defesa (maxAttr omitido). TODO: confirmar preço e espaços com o livro.",
+    "id": "couro-batido",
+    "name": "Couro batido",
+    "kind": "armor",
+    "tags": [
+      "leve"
+    ],
+    "fields": {
+      "type": "light"
+    },
+    "statBonuses": {
+      "defense": 2,
+      "armorPenalty": 0
+    },
+    "slots": 2,
+    "price": 20,
+    "page": null
+  }
+]

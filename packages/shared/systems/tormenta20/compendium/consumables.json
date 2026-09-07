@@ -1,0 +1,2392 @@
+{
+  "$generated": "Gerado por scripts/import-foundry-compendium.ts a partir dos packs do Foundry. Não edite à mão: use custom.json (tem precedência por id).",
+  "entries": [
+    {
+      "id": "acido",
+      "name": "Ácido",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.8xfLuPry0uNNnYfz",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d4",
+          "attribute": null,
+          "damageType": "acido",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": "2d4"
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz a metade"
+      },
+      "slots": 0.5,
+      "price": 10,
+      "page": 160
+    },
+    {
+      "id": "aco-rubi",
+      "name": "Aço-Rubi",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.uh2znrkRMO7MXXh0",
+      "tags": [
+        "material"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 1,
+      "price": 6000,
+      "page": 166
+    },
+    {
+      "id": "adamante",
+      "name": "Adamante",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.0DIcCwZesZEcEcYa",
+      "tags": [
+        "material"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 1,
+      "price": 18000,
+      "page": 166
+    },
+    {
+      "id": "agua-benta",
+      "name": "Água benta",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.labWwyXiXHl7JvE0",
+      "tags": [
+        "alquímico",
+        "aventura"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d10",
+          "attribute": null,
+          "damageType": "luz",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz a metade"
+      },
+      "slots": 0.5,
+      "price": 10,
+      "page": 155
+    },
+    {
+      "id": "azagaia-dos-relampagos",
+      "name": "Azagaia dos Relâmpagos",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.0gjHApA2kZhUpeBc",
+      "tags": [
+        "munição",
+        "mágico"
+      ],
+      "fields": {
+        "type": "municao"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "eletricidade",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "Linha",
+        "effect": "6d6"
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz à metade"
+      }
+    },
+    {
+      "id": "baga-de-fogo",
+      "name": "Baga-de-Fogo",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.MT4QgnaAwWgr4pet",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 15,
+      "page": 161
+    },
+    {
+      "id": "balas",
+      "name": "Balas",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.3kWjlkSaIAiYa4lm",
+      "tags": [
+        "munição"
+      ],
+      "fields": {
+        "type": "municao"
+      },
+      "slots": 0.05,
+      "price": 20,
+      "page": 151
+    },
+    {
+      "id": "balsamo-restaurador",
+      "name": "Bálsamo restaurador",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.26L5Yr66Qmiu02oY",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d4",
+          "attribute": null,
+          "damageType": "cura",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "full",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 10,
+      "page": 160
+    },
+    {
+      "id": "batata-ambiciosa",
+      "name": "Batata Ambiciosa",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.GkIO0G6YH5VjXNIK",
+      "tags": [
+        "alimentação"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 0.5,
+      "price": 2,
+      "page": 162
+    },
+    {
+      "id": "bebida-comum",
+      "name": "Bebida comum",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.LN1hEeqOJSk16gky",
+      "tags": [
+        "alimentação"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 0.5,
+      "price": 0.1,
+      "page": 162
+    },
+    {
+      "id": "beladona",
+      "name": "Beladona",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.5D42HnDgEirhlxS5",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 1500,
+      "page": 161
+    },
+    {
+      "id": "bomba",
+      "name": "Bomba",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.tvG1l6hpNOc7XnP8",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "full",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "explosão 3m",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz à metade"
+      },
+      "slots": 0.5,
+      "price": 50,
+      "page": 160
+    },
+    {
+      "id": "bomba-de-fumaca",
+      "name": "Bomba de Fumaça",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.jChv6jdqw0QvRFaW",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "full",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera 6m",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "page": 20
+    },
+    {
+      "id": "bruma-sonolenta",
+      "name": "Bruma Sonolenta",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.bOB6wziZ6QSoP5Gc",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 150,
+      "page": 161
+    },
+    {
+      "id": "cicuta",
+      "name": "Cicuta",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.AR9UuAfq1S79LCKu",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Extrato de Lótus Negra",
+          "kind": "damage",
+          "formula": "1d12",
+          "attribute": null,
+          "damageType": null,
+          "bonus": 0
+        }
+      ],
+      "slots": 0.5,
+      "price": 60,
+      "page": 161
+    },
+    {
+      "id": "componentes-materiais",
+      "name": "Componentes Materiais",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.1ULCNXv41TES3Dkv",
+      "tags": [
+        "material"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 0.005,
+      "price": 5,
+      "page": 224
+    },
+    {
+      "id": "cosmetico",
+      "name": "Cosmético",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.QmgdY2V0DgK55myC",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 160
+    },
+    {
+      "id": "couro-de-dragao",
+      "name": "Couro de Dragão",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.DW3ObnlHoKVffcrS",
+      "tags": [
+        "material"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 1,
+      "page": 311
+    },
+    {
+      "id": "dente-de-dragao",
+      "name": "Dente-de-Dragão",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.JgHtHH40AcZqCRg1",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 161
+    },
+    {
+      "id": "elixir-do-amor",
+      "name": "Elixir do Amor",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.TUR3IVhQCWFXc04T",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 100,
+      "page": 160
+    },
+    {
+      "id": "essencia-abissal",
+      "name": "Essência Abissal",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.wvhGMjj9dIItdm7P",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 150,
+      "page": 161
+    },
+    {
+      "id": "essencia-de-mana",
+      "name": "Essência de mana",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.JC6bm2uh4g7oaGge",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d4",
+          "attribute": null,
+          "damageType": null,
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 50,
+      "page": 160
+    },
+    {
+      "id": "essencia-de-sombra",
+      "name": "Essência de Sombra",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.efp33Oq12RykdKSC",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 100,
+      "page": 161
+    },
+    {
+      "id": "flechas",
+      "name": "Flechas",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.UI59UM7vpFaHRc18",
+      "tags": [
+        "munição"
+      ],
+      "fields": {
+        "type": "municao"
+      },
+      "slots": 0.05,
+      "price": 1,
+      "page": 151
+    },
+    {
+      "id": "fogo-alquimico",
+      "name": "Fogo alquímico",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.bqvXc1d8etuqgOTy",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz o dano à metade e evita as chamas"
+      },
+      "slots": 0.5,
+      "price": 10,
+      "page": 160
+    },
+    {
+      "id": "gelo-eterno",
+      "name": "Gelo eterno",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.aiANlquiTcxxKaix",
+      "tags": [
+        "material"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 1,
+      "price": 3000,
+      "page": 166
+    },
+    {
+      "id": "gorad-quente",
+      "name": "Gorad Quente",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.MdkgD1o9m4WHNZJs",
+      "tags": [
+        "alimentação"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 0.5,
+      "price": 18,
+      "page": 162
+    },
+    {
+      "id": "granada-de-area-escorregadia",
+      "name": "Granada de Área Escorregadia",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.XgRYUChRMmaCzVdw",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "Quadrado de 3m ou 1 objeto",
+        "effect": "ou"
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos (veja texto)"
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 180
+    },
+    {
+      "id": "granada-de-bola-de-fogo",
+      "name": "Granada de Bola de Fogo",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.okK7ZXnCohxFizUe",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "6d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 6m de raio",
+        "effect": "6d6"
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz à metade"
+      },
+      "slots": 0.5,
+      "price": 270,
+      "page": 182
+    },
+    {
+      "id": "granada-de-bola-de-fogo-10d6",
+      "name": "Granada de Bola de Fogo (10d6)",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.uujNCTQJR9CjJg2N",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "10d6",
+          "attribute": null,
+          "damageType": "fogo",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "medium",
+          "value": 0
+        },
+        "target": "",
+        "area": "esfera com 6m de raio",
+        "effect": "10d6"
+      },
+      "save": {
+        "skill": "reflexos",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Reflexos reduz à metade"
+      },
+      "slots": 0.5,
+      "price": 1470,
+      "page": 182
+    },
+    {
+      "id": "granada-de-nevoa",
+      "name": "Granada de Névoa",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.m8Iw8iH1H0OkWeYj",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "",
+        "area": "nuvem com 6m de raio e 6m de altura",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 200
+    },
+    {
+      "id": "liquen-lilas",
+      "name": "Líquen Lilás",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.y9YQu2wxYDpMEDtU",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 15,
+      "page": 161
+    },
+    {
+      "id": "macarrao-de-mineiro",
+      "name": "Macarrão de Mineiro",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.qOJQpsOhHltX2BUZ",
+      "tags": [
+        "alimentação"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 0.5,
+      "price": 6,
+      "page": 162
+    },
+    {
+      "id": "madeira-negra",
+      "name": "Madeira negra",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.BLWTKPBK6oRPeAoJ",
+      "tags": [
+        "material"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 1,
+      "price": 1500,
+      "page": 167
+    },
+    {
+      "id": "materia-vermelha",
+      "name": "Matéria Vermelha",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.O6UJ3fQ979bCzXIT",
+      "tags": [
+        "material"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 1,
+      "price": 18000,
+      "page": 167
+    },
+    {
+      "id": "mitral",
+      "name": "Mitral",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.xhMlNmtwTZtRnw3f",
+      "tags": [
+        "material"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 1,
+      "price": 12000,
+      "page": 167
+    },
+    {
+      "id": "musgo-purpura",
+      "name": "Musgo Púrpura",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.ucdl25Utxqgj0F7y",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 15,
+      "page": 161
+    },
+    {
+      "id": "nevoa-toxica",
+      "name": "Névoa Tóxica",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.rVf3avjsoKoSn5q3",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d12",
+          "attribute": null,
+          "damageType": null,
+          "bonus": 0
+        }
+      ],
+      "slots": 0.5,
+      "price": 30,
+      "page": 161
+    },
+    {
+      "id": "oleo",
+      "name": "Óleo",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.cfAj21utrVii8t7h",
+      "tags": [
+        "material",
+        "aventura"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 0.5,
+      "price": 0.1,
+      "page": 155
+    },
+    {
+      "id": "oleo-de-abencoar-alimentos",
+      "name": "Óleo de Abençoar Alimentos",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.5sxPQieeeYZYbJAZ",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 178
+    },
+    {
+      "id": "oleo-de-alterar-tamanho",
+      "name": "Óleo de Alterar Tamanho",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.RYMxcUZXKLWCCSff",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "day",
+          "value": 1
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 objeto",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade"
+      },
+      "slots": 0.5,
+      "price": 270,
+      "page": 179
+    },
+    {
+      "id": "oleo-de-arma-magica",
+      "name": "Óleo de Arma Mágica",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.lUvXanXBUKxGOd2M",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 arma",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 181
+    },
+    {
+      "id": "oleo-de-arma-magica-3",
+      "name": "Óleo de Arma Mágica (+3)",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.6olGswsHYsq8aiGw",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 arma",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 750,
+      "page": 181
+    },
+    {
+      "id": "oleo-de-armamento-da-natureza",
+      "name": "Óleo de Armamento da Natureza",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.28yPkXVQIVmlfF3W",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "1 arma (veja texto)",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 270,
+      "page": 181
+    },
+    {
+      "id": "oleo-de-escuridao",
+      "name": "Óleo de Escuridão",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.cF4QKw8RShT0h7O7",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 alvo",
+        "area": "6m de raio",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula (veja texto)"
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 193
+    },
+    {
+      "id": "oleo-de-luz",
+      "name": "Óleo de Luz",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.izCFE9JWjDxcDShN",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "short",
+          "value": 0
+        },
+        "target": "1 objeto",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula (veja texto)"
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 197
+    },
+    {
+      "id": "oleo-de-tranca-arcana",
+      "name": "Óleo de Tranca Arcana",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.ffDA6IdF1QAMWu8L",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 objeto Grande ou menor",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 209
+    },
+    {
+      "id": "oleo-de-vestimenta-da-fe",
+      "name": "Óleo de Vestimenta da Fé",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.4oSYUfK8BYgEP2Ep",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 270,
+      "page": 210
+    },
+    {
+      "id": "ossos-de-monstro",
+      "name": "Ossos de Monstro",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.h01YOTRjSBEUROhl",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 15,
+      "page": 161
+    },
+    {
+      "id": "peconha-comum",
+      "name": "Peçonha Comum",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.V8YwNH55UVO1jo74",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d12",
+          "attribute": null,
+          "damageType": null,
+          "bonus": 0
+        }
+      ],
+      "slots": 0.5,
+      "price": 15,
+      "page": 161
+    },
+    {
+      "id": "peconha-concentrada",
+      "name": "Peçonha Concentrada",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.kmbfQJLBekZl3cNM",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d12",
+          "attribute": null,
+          "damageType": null,
+          "bonus": 0
+        }
+      ],
+      "slots": 0.5,
+      "price": 90,
+      "page": 162
+    },
+    {
+      "id": "peconha-potente",
+      "name": "Peçonha Potente",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.eei0UxgEGZ0rzqy4",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d12",
+          "attribute": null,
+          "damageType": null,
+          "bonus": 0
+        }
+      ],
+      "slots": 0.5,
+      "price": 600,
+      "page": 162
+    },
+    {
+      "id": "pedras",
+      "name": "Pedras",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.GTZWWQYHPxR6hZqb",
+      "tags": [
+        "munição"
+      ],
+      "fields": {
+        "type": "municao"
+      },
+      "slots": 0.05,
+      "price": 0.5,
+      "page": 151
+    },
+    {
+      "id": "po-de-cristal",
+      "name": "Pó de Cristal",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.izefGkhnkOKfJSaW",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 161
+    },
+    {
+      "id": "po-de-giz",
+      "name": "Pó de Giz",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.I0xIilNtrZfINE8A",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 161
+    },
+    {
+      "id": "po-de-lich",
+      "name": "Pó de Lich",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.vWFPY6WKfjpZ1zZR",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "4d12",
+          "attribute": null,
+          "damageType": null,
+          "bonus": 0
+        }
+      ],
+      "slots": 0.5,
+      "price": 3000,
+      "page": 162
+    },
+    {
+      "id": "po-do-desaparecimento",
+      "name": "Pó do Desaparecimento",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.HDF3MD75NSn5MHic",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 100,
+      "page": 160
+    },
+    {
+      "id": "pocao-de-aparencia-perfeita",
+      "name": "Poção de Aparência Perfeita",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.ZYU4TTCb2Eod8CyD",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 270,
+      "page": 180
+    },
+    {
+      "id": "pocao-de-camuflagem-ilusoria",
+      "name": "Poção de Camuflagem Ilusória",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.5SnRRfXhW6BiJ5h0",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "slots": 0.5,
+      "price": 270,
+      "page": 183
+    },
+    {
+      "id": "pocao-de-compreensao",
+      "name": "Poção de Compreensão",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.ApeazL6hVnTroAOz",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura ou texto",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula (veja descrição)."
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 184
+    },
+    {
+      "id": "pocao-de-concentracao-de-combate-cena",
+      "name": "Poção de Concentração de Combate (cena)",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.02q1pu5Oyj3LtvZx",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 270
+    },
+    {
+      "id": "pocao-de-curar-ferimentos-11d8-11-pv",
+      "name": "Poção de Curar Ferimentos (11d8+11 PV)",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.stCPViFywNCL5EsG",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "11d8+11",
+          "attribute": null,
+          "damageType": "cura",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": "11d8+11"
+      },
+      "slots": 0.5,
+      "price": 3000,
+      "page": 189
+    },
+    {
+      "id": "pocao-de-curar-ferimentos-2d8-2-pv",
+      "name": "Poção de Curar Ferimentos (2d8+2 PV)",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.TrQw6O1ebgl4AGvY",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d8+2",
+          "attribute": null,
+          "damageType": "cura",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": "2d8+2"
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 189
+    },
+    {
+      "id": "pocao-de-curar-ferimentos-4d8-4-pv",
+      "name": "Poção de Curar Ferimentos (4d8+4 PV)",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.yuDsiJccSfFOTmsR",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "4d8+4",
+          "attribute": null,
+          "damageType": "cura",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": "2d8+2"
+      },
+      "slots": 0.5,
+      "price": 270,
+      "page": 189
+    },
+    {
+      "id": "pocao-de-curar-ferimentos-7d8-7-pv",
+      "name": "Poção de Curar Ferimentos (7d8+7 PV)",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.q32Ve67NR8AOyNmq",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "7d8+7",
+          "attribute": null,
+          "damageType": "cura",
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": "2d8+2"
+      },
+      "slots": 0.5,
+      "price": 1080,
+      "page": 189
+    },
+    {
+      "id": "pocao-de-disfarce-ilusorio",
+      "name": "Poção de Disfarce Ilusório",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.9FkEtT2rpDxBZmEQ",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "Você",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade desacredita"
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 191
+    },
+    {
+      "id": "pocao-de-enfeiticar",
+      "name": "Poção de Enfeitiçar",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.fFpSZAPGZDUVJNOG",
+      "tags": [
+        "munição"
+      ],
+      "fields": {
+        "type": "municao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "self",
+          "value": 0
+        },
+        "target": "1 humanoide",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade anula"
+      },
+      "price": 30
+    },
+    {
+      "id": "pocao-de-escudo-da-fe-cena",
+      "name": "Poção de Escudo da Fé (cena)",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.cLTZXcoMq9C8oNpB",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 30
+    },
+    {
+      "id": "pocao-de-fisico-divino",
+      "name": "Poção de Físico Divino",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.hjvqA8b5pxriWBRh",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 270
+    },
+    {
+      "id": "pocao-de-fisico-divino-3-atributos",
+      "name": "Poção de Físico Divino (3 atributos)",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.LkTy80bVtw0jegr3",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 1080
+    },
+    {
+      "id": "pocao-de-invisibilidade-cena",
+      "name": "Poção de Invisibilidade (cena)",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.gaMgO0yUZEGM13XG",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 1080
+    },
+    {
+      "id": "pocao-de-mente-divina",
+      "name": "Poção de Mente Divina",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.8MZOwDXGchwZ0Jkp",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 270
+    },
+    {
+      "id": "pocao-de-metamorfose",
+      "name": "Poção de Metamorfose",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.Rfqa9MsOHuXLMg9D",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 270
+    },
+    {
+      "id": "pocao-de-primor-atletico",
+      "name": "Poção de Primor Atlético",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.A4wH7EMrKzOtlt3Q",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 201
+    },
+    {
+      "id": "pocao-de-protecao-divina",
+      "name": "Poção de Proteção Divina",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.ldhWaTsXkntJuUtU",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 202
+    },
+    {
+      "id": "pocao-de-purificacao",
+      "name": "Poção de Purificação",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.8zETItgIUrQgW0ck",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 270,
+      "page": 202
+    },
+    {
+      "id": "pocao-de-resistencia-a-energia",
+      "name": "Poção de Resistência a Energia",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.WrtZs4ql74DKHLKm",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 204
+    },
+    {
+      "id": "pocao-de-sono",
+      "name": "Poção de Sono",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.vjRcygbwo7vx4gOG",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura de ND 2 ou menor",
+        "area": "",
+        "effect": ""
+      },
+      "save": {
+        "skill": "vontade",
+        "attribute": null,
+        "bonus": 0,
+        "text": "Vontade parcial"
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 207
+    },
+    {
+      "id": "pocao-de-suporte-ambiental",
+      "name": "Poção de Suporte Ambiental",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.YrcnZsYGhSYovuVN",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "special",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "1 criatura",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 207
+    },
+    {
+      "id": "pocao-de-velocidade",
+      "name": "Poção de Velocidade",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.7MWQRNmlsHSYPZT1",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 270
+    },
+    {
+      "id": "pocao-de-visao-mistica",
+      "name": "Poção de Visão Mística",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.wAbbICpd57DcDV9s",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 30
+    },
+    {
+      "id": "pocao-de-vitalidade-fantasma",
+      "name": "Poção de Vitalidade Fantasma",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.LnW6eVQyg7hhefHt",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d8",
+          "attribute": null,
+          "damageType": null,
+          "bonus": 0
+        }
+      ],
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "instant",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": "2d8"
+      },
+      "slots": 0.5,
+      "price": 30
+    },
+    {
+      "id": "pocao-de-voz-divina",
+      "name": "Poção de Voz Divina",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.pocoes.Item.denQPHbRznsXm0uy",
+      "tags": [
+        "poção"
+      ],
+      "fields": {
+        "type": "pocao"
+      },
+      "activation": {
+        "cost": 0,
+        "execution": "standard",
+        "duration": {
+          "units": "scene",
+          "value": 0
+        },
+        "range": {
+          "units": "touch",
+          "value": 0
+        },
+        "target": "",
+        "area": "",
+        "effect": ""
+      },
+      "slots": 0.5,
+      "price": 270
+    },
+    {
+      "id": "prato-do-aventureiro",
+      "name": "Prato do Aventureiro",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.VkHOL4wIzEeetYW7",
+      "tags": [
+        "alimentação"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 0.5,
+      "price": 1,
+      "page": 162
+    },
+    {
+      "id": "racao-de-viagem",
+      "name": "Ração de viagem",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.idPweKe7ZWln7xQf",
+      "tags": [
+        "alimentação"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 0.5,
+      "price": 0.5,
+      "page": 162
+    },
+    {
+      "id": "ramo-verdejante",
+      "name": "Ramo Verdejante",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.w79bnyKbahOGaY1h",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      }
+    },
+    {
+      "id": "refeicao-comum",
+      "name": "Refeição comum",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.MKVXiFMW6z5HBC1Z",
+      "tags": [
+        "alimentação"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 0.5,
+      "price": 0.3,
+      "page": 162
+    },
+    {
+      "id": "riso-do-louco",
+      "name": "Riso do Louco",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.NsULSsz7FpJiBIZO",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 150,
+      "page": 162
+    },
+    {
+      "id": "saco-de-sal",
+      "name": "Saco de Sal",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.j250fWNvySzrUnsg",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 15,
+      "page": 161
+    },
+    {
+      "id": "seixo-de-ambar",
+      "name": "Seixo de Âmbar",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.I572hTLEprNdCPab",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 30,
+      "page": 161
+    },
+    {
+      "id": "sopa-de-peixe",
+      "name": "Sopa de Peixe",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.fv6c3O5CXphtXilA",
+      "tags": [
+        "alimentação"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 0.5,
+      "price": 1,
+      "page": 162
+    },
+    {
+      "id": "terra-de-cemiterio",
+      "name": "Terra de Cemitério",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.ZTL25EsE31e1WcTG",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "price": 15,
+      "page": 161
+    },
+    {
+      "id": "tocha",
+      "name": "Tocha",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.ujmPaJ9SNjtVnfLB",
+      "tags": [
+        "material",
+        "aventura"
+      ],
+      "fields": {
+        "type": "outro"
+      },
+      "slots": 1,
+      "price": 0.1,
+      "page": 157
+    },
+    {
+      "id": "veneno-de-aranha-gigante",
+      "name": "Veneno de aranha gigante",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.t6KNqLZXkb5VHN71",
+      "tags": [
+        "alquímico"
+      ],
+      "fields": {
+        "type": "alquimico"
+      },
+      "slots": 0.5,
+      "page": 287
+    },
+    {
+      "id": "virotes",
+      "name": "Virotes",
+      "kind": "consumable",
+      "$source": "Compendium.tormenta20.equipamentos.Item.pG2mhXPGveTdGuDG",
+      "tags": [
+        "munição"
+      ],
+      "fields": {
+        "type": "municao"
+      },
+      "slots": 0.05,
+      "price": 2,
+      "page": 151
+    }
+  ]
+}

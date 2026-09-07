@@ -1,32 +1,2470 @@
-[
-  {
-    "$comment": "TODO: confirmar preço e espaços com o livro.",
-    "id": "espada-longa",
-    "name": "Espada longa",
-    "kind": "weapon",
-    "tags": ["marcial", "corpo a corpo", "uma mão"],
-    "fields": { "proficiency": "marcial", "purpose": "melee", "wield": "one_hand", "properties": "" },
-    "actions": [
-      { "label": "Ataque", "kind": "attack", "skill": "luta", "critRange": 19, "critMult": 2 },
-      { "label": "Dano", "kind": "damage", "formula": "1d8", "damageType": "corte" }
-    ],
-    "slots": 1,
-    "price": 15,
-    "page": null
-  },
-  {
-    "$comment": "Disparo: o dano não soma atributo (damageAttribute.map.ranged = null). TODO: confirmar preço e espaços.",
-    "id": "arco-curto",
-    "name": "Arco curto",
-    "kind": "weapon",
-    "tags": ["marcial", "disparo", "duas mãos"],
-    "fields": { "proficiency": "marcial", "purpose": "ranged", "wield": "two_hands", "properties": "" },
-    "actions": [
-      { "label": "Ataque", "kind": "attack", "skill": "pontaria", "critRange": 20, "critMult": 3 },
-      { "label": "Dano", "kind": "damage", "formula": "1d6", "damageType": "perfuracao" }
-    ],
-    "slots": 1,
-    "price": 30,
-    "page": null
-  }
-]
+{
+  "$generated": "Gerado por scripts/import-foundry-compendium.ts a partir dos packs do Foundry. Não edite à mão: use custom.json (tem precedência por id).",
+  "entries": [
+    {
+      "id": "adaga",
+      "name": "Adaga",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.XuObO7LzBBNoIsGv",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "leve"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "light",
+        "properties": "arremesso, leve, alcance curto (9 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d4",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 2,
+      "page": 146
+    },
+    {
+      "id": "alabarda",
+      "name": "Alabarda",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.p7MZK1XnNPSXxbmy",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "alongada, duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d10",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 10,
+      "page": 146
+    },
+    {
+      "id": "alfange",
+      "name": "Alfange",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.zdzrCLMsiO2LJYiS",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 18,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d4",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 75,
+      "page": 146
+    },
+    {
+      "id": "arco-do-juramento",
+      "name": "Arco do Juramento",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.7IScjaBQPp3StNbd",
+      "tags": [
+        "marcial",
+        "disparo",
+        "duas mãos",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "ranged",
+        "wield": "two_hands",
+        "properties": "ataque à distância, duas mãos, munição, alcance médio (30 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "pontaria",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 25600
+    },
+    {
+      "id": "arco-do-poder",
+      "name": "Arco do Poder",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.dL1mC5IMyt8nniom",
+      "tags": [
+        "marcial",
+        "disparo",
+        "duas mãos",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "ranged",
+        "wield": "two_hands",
+        "properties": "ataque à distância, duas mãos, munição, alcance médio (30 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "pontaria",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "3d8+2",
+          "attribute": "auto",
+          "damageType": "essencia",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 90000,
+      "page": 336
+    },
+    {
+      "id": "arco-longo",
+      "name": "Arco longo",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.B1hiWU8eEI1NHwcv",
+      "tags": [
+        "marcial",
+        "disparo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "ranged",
+        "wield": "two_hands",
+        "properties": "ataque à distância, munição, duas mãos, alcance médio (30 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "pontaria",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 100,
+      "page": 146
+    },
+    {
+      "id": "ataque-desarmado",
+      "name": "Ataque desarmado",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.NFepeG0ojjq3Xggs",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "leve"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "light",
+        "properties": "leve"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d3",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "page": 143
+    },
+    {
+      "id": "avalanche",
+      "name": "Avalanche",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.JWcrwkfQSIVnD9SR",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "duas mãos",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d12",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 140000,
+      "page": 337
+    },
+    {
+      "id": "azagaia",
+      "name": "Azagaia",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.7KL4b6CtfUP0rFqi",
+      "tags": [
+        "simples",
+        "arremesso",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "thrown",
+        "wield": "one_hand",
+        "properties": "arremesso, ataque à distância, munição, alcance médio (30 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "pontaria",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 1,
+      "page": 146
+    },
+    {
+      "id": "besta-explosiva",
+      "name": "Besta Explosiva",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.iFaZtyir56zrjir9",
+      "tags": [
+        "marcial",
+        "disparo",
+        "duas mãos",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "ranged",
+        "wield": "two_hands",
+        "properties": "ataque à distância, duas mãos, munição"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d12",
+          "attribute": null,
+          "damageType": "perfuracao",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "besta-leve",
+      "name": "Besta leve",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.dUtNefh57IswhzOr",
+      "tags": [
+        "simples",
+        "disparo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "ranged",
+        "wield": "two_hands",
+        "properties": "ataque à distância, duas mãos, munição, alcance médio (30 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "pontaria",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": null,
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 35,
+      "page": 146
+    },
+    {
+      "id": "besta-pesada",
+      "name": "Besta pesada",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.iYY0Jr19T5ERm43G",
+      "tags": [
+        "marcial",
+        "disparo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "ranged",
+        "wield": "two_hands",
+        "properties": "ataque à distância, duas mãos, munição, alcance médio (30 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "pontaria",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d12",
+          "attribute": null,
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 50,
+      "page": 146
+    },
+    {
+      "id": "bordao",
+      "name": "Bordão",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.HyJBwTLK0vY5F1Vp",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "dupla, duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "page": 147
+    },
+    {
+      "id": "cajado-arcano",
+      "name": "Cajado Arcano",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.zMPMfyFBoeQGSwPR",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "dupla, duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 1000,
+      "page": 160
+    },
+    {
+      "id": "cajado-da-destruicao",
+      "name": "Cajado da Destruição",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.02lvsZmWSfVanJi0",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "cajado-da-vida",
+      "name": "Cajado da Vida",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.TlNcV8TJ62EXQMm8",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "cajado-de-batalha",
+      "name": "Cajado de batalha",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.YSeDHrsCHQBtD2jP",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "dupla, duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 10,
+      "page": 16
+    },
+    {
+      "id": "cajado-do-poder",
+      "name": "Cajado do Poder",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.LtG3azBFsLf4OkV1",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "chicote",
+      "name": "Chicote",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.j9gfVNTufgCPJ2AN",
+      "tags": [
+        "exótica",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "exotica",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": "ágil, versátil"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d3",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 2,
+      "page": 147
+    },
+    {
+      "id": "cimitarra",
+      "name": "Cimitarra",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.y6IKZPxsQebq1AkW",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": "ágil"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 18,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 15,
+      "page": 147
+    },
+    {
+      "id": "clava",
+      "name": "Clava",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.JUlyA7UGoTGdXkCP",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "page": 147
+    },
+    {
+      "id": "corrente-de-espinhos",
+      "name": "Corrente de espinhos",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.sbeOrX6B3VZIuQcL",
+      "tags": [
+        "exótica",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "exotica",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": "ágil, dupla, versátil"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d4",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 25,
+      "page": 147
+    },
+    {
+      "id": "escudo-leve-arma",
+      "name": "Escudo leve (Arma)",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.WJnmboPa3OLBPk6i",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "leve"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "light",
+        "properties": "leve"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d4",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "page": 152
+    },
+    {
+      "id": "escudo-pesado-arma",
+      "name": "Escudo pesado (Arma)",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.w5MOK5PvKvRjH9pM",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": null,
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "page": 152
+    },
+    {
+      "id": "espada-baronial",
+      "name": "Espada Baronial",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.zKL5mWuHBsXAm4Fy",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 1,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 1
+        }
+      ]
+    },
+    {
+      "id": "espada-bastarda",
+      "name": "Espada bastarda",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.Vl8EoLKtzI7wyT1V",
+      "tags": [
+        "exótica",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "exotica",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": "adaptável"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d10",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 35,
+      "page": 147
+    },
+    {
+      "id": "espada-curta",
+      "name": "Espada curta",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.boM5sIgADaFaQ3xG",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "leve"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "light",
+        "properties": "leve"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 10,
+      "page": 148
+    },
+    {
+      "id": "espada-sortuda",
+      "name": "Espada Sortuda",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.ykRLVOsNEnypuNUA",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "ferramenta-agricola",
+      "name": "Ferramenta agrícola",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.yGPbdsEqxwHuP5UD",
+      "tags": [
+        "simples",
+        "arremesso",
+        "uma mão",
+        "item de origem"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "thrown",
+        "wield": "one_hand",
+        "properties": "arremesso"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": null,
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "price": 2,
+      "page": 90
+    },
+    {
+      "id": "ferramenta-pesada",
+      "name": "Ferramenta pesada",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.FX43nQcWjWrhuhPt",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "uma mão",
+        "item de origem"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": null,
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 12,
+      "page": 89
+    },
+    {
+      "id": "florete",
+      "name": "Florete",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.r3tlhprPUh8qHesx",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": "ágil"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 18,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 20,
+      "page": 148
+    },
+    {
+      "id": "florete-fugaz",
+      "name": "Florete Fugaz",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.NGJkBqxukaxF9jza",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": "ágil"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 18,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "foice",
+      "name": "Foice",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.NN09gZa79LpQdBqK",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "leve"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "light",
+        "properties": "leve"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 4,
+      "page": 148
+    },
+    {
+      "id": "funda",
+      "name": "Funda",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.DjqrTflaHyUetx0k",
+      "tags": [
+        "simples",
+        "disparo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "ranged",
+        "wield": "one_hand",
+        "properties": "ataque à distância, munição, alcance médio (30 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "pontaria",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d4",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "page": 148
+    },
+    {
+      "id": "gadanho",
+      "name": "Gadanho",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.qTYbTAG5ABiuZD0o",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 4
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d4",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 18,
+      "page": 148
+    },
+    {
+      "id": "katana",
+      "name": "Katana",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.Flif0uZZpMv1qcQw",
+      "tags": [
+        "exótica",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "exotica",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": "adaptável, ágil"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 100,
+      "page": 148
+    },
+    {
+      "id": "lamina-da-luz",
+      "name": "Lâmina da Luz",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.7ZSpOEZBMbT3aVsO",
+      "tags": [
+        "exótica",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "exotica",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d10",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "lanca",
+      "name": "Lança",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.vaCe85lpdH10teLi",
+      "tags": [
+        "simples",
+        "arremesso",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "thrown",
+        "wield": "one_hand",
+        "properties": "arremesso, alcance curto (9 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 2,
+      "page": 148
+    },
+    {
+      "id": "lanca-animalesca",
+      "name": "Lança Animalesca",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.uUp6qw8AnoR6igO1",
+      "tags": [
+        "simples",
+        "arremesso",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "thrown",
+        "wield": "one_hand",
+        "properties": "arremesso"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "lanca-montada",
+      "name": "Lança montada",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.HZyncQBfcntF9cF1",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 10,
+      "page": 148
+    },
+    {
+      "id": "lingua-do-deserto",
+      "name": "Língua do Deserto",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.tZZb0i0i1eg3E6BJ",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": "ágil"
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": null,
+          "damageType": "corte",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "maca",
+      "name": "Maça",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.FYDbB42HXoTetKnT",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 12,
+      "page": 149
+    },
+    {
+      "id": "maca-de-guerra",
+      "name": "Maça de guerra",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.nv2dOJuba2y2O5TE",
+      "tags": [
+        "exótica",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "exotica",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": -2,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d12",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 25,
+      "page": 23
+    },
+    {
+      "id": "maca-do-terror",
+      "name": "Maça do Terror",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.jhdwYNYHEozyC6wy",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "machadinha",
+      "name": "Machadinha",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.EiWBTKrxf7NqpZoK",
+      "tags": [
+        "marcial",
+        "corpo a corpo / arremesso",
+        "leve"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee_thrown",
+        "wield": "light",
+        "properties": "arremesso, leve, alcance curto (9 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 6,
+      "page": 149
+    },
+    {
+      "id": "machado-anao",
+      "name": "Machado anão",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.xXK2IqgRyxPdhdmQ",
+      "tags": [
+        "exótica",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "exotica",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d10",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 30,
+      "page": 149
+    },
+    {
+      "id": "machado-de-batalha",
+      "name": "Machado de batalha",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.v5HYdRxOsBcnXATP",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 10,
+      "page": 149
+    },
+    {
+      "id": "machado-de-guerra",
+      "name": "Machado de guerra",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.P4MW0Ezhmya6Hm89",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d12",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 20,
+      "page": 149
+    },
+    {
+      "id": "machado-silvestre",
+      "name": "Machado Silvestre",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.8tAO6PDX7s5DJOiN",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "machado-taurico",
+      "name": "Machado táurico",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.INnoDDDGvmHKvnlM",
+      "tags": [
+        "exótica",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "exotica",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": -2,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d8",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 50,
+      "page": 149
+    },
+    {
+      "id": "mangual",
+      "name": "Mangual",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.k4aGem7SrVRtJ9tO",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": "versátil"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 8,
+      "page": 149
+    },
+    {
+      "id": "marreta",
+      "name": "Marreta",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.kMw93XFDUxZChyYN",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "3d4",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 20,
+      "page": 149
+    },
+    {
+      "id": "martelo-de-carne",
+      "name": "Martelo de carne",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.1Wwm1hksFzkzB82S",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "uma mão",
+        "item de origem"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": null,
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "page": 94
+    },
+    {
+      "id": "martelo-de-guerra",
+      "name": "Martelo de guerra",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.VxjPnjvWAKkpjMLE",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 12,
+      "page": 149
+    },
+    {
+      "id": "martelo-dos-anoes",
+      "name": "Martelo dos Anões",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.nqrXpjRujHTalKhC",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 20,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "montante",
+      "name": "Montante",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.fohj08MaFfvVAo40",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d6",
+          "attribute": "auto",
+          "damageType": "corte",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 50,
+      "page": 150
+    },
+    {
+      "id": "mosquete",
+      "name": "Mosquete",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.UCovm0cenCi7hgvf",
+      "tags": [
+        "arma de fogo",
+        "disparo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "fogo",
+        "purpose": "ranged",
+        "wield": "two_hands",
+        "properties": "ataque à distância, duas mãos, munição, alcance médio (30 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "pontaria",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 19,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d8",
+          "attribute": null,
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 500,
+      "page": 150
+    },
+    {
+      "id": "picareta",
+      "name": "Picareta",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.nsTbFWXERXChuTS4",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 4
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 8,
+      "page": 150
+    },
+    {
+      "id": "pique",
+      "name": "Pique",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.O1sws1dJsnFQBxpR",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "alongada, duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "price": 2,
+      "page": 150
+    },
+    {
+      "id": "pistola",
+      "name": "Pistola",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.TILlgOKqyS3Ps4le",
+      "tags": [
+        "arma de fogo",
+        "disparo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "fogo",
+        "purpose": "ranged",
+        "wield": "one_hand",
+        "properties": "ataque à distância, munição, alcance curto (9 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "pontaria",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 19,
+          "critMult": 3
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "2d6",
+          "attribute": null,
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 250,
+      "page": 150
+    },
+    {
+      "id": "punhal-traicoeiro",
+      "name": "Punhal Traiçoeiro",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.1ZXiPXFQmdWUr51u",
+      "tags": [
+        "simples",
+        "arremesso",
+        "leve",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "thrown",
+        "wield": "light",
+        "properties": "arremesso, leve"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 2,
+          "critRange": 19,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d4",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 2
+        }
+      ]
+    },
+    {
+      "id": "rede",
+      "name": "Rede",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.d7ghPf8u43lS2KL6",
+      "tags": [
+        "exótica",
+        "disparo",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "exotica",
+        "purpose": "ranged",
+        "wield": "one_hand",
+        "properties": "ataque à distância, alcance curto (9 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "pontaria",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        }
+      ],
+      "slots": 1,
+      "price": 20,
+      "page": 150
+    },
+    {
+      "id": "rolo-de-macarrao",
+      "name": "Rolo de macarrão",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.XcSLRivuLbQJOGo4",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "uma mão",
+        "item de origem"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d6",
+          "attribute": null,
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "page": 94
+    },
+    {
+      "id": "tacape",
+      "name": "Tacape",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.fRe995zLI8GOydRo",
+      "tags": [
+        "simples",
+        "corpo a corpo",
+        "duas mãos"
+      ],
+      "fields": {
+        "proficiency": "simples",
+        "purpose": "melee",
+        "wield": "two_hands",
+        "properties": "duas mãos"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d10",
+          "attribute": "auto",
+          "damageType": "impacto",
+          "bonus": 0
+        }
+      ],
+      "slots": 2,
+      "page": 150
+    },
+    {
+      "id": "tridente",
+      "name": "Tridente",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos.Item.SlLNgSGJaWZfiDtx",
+      "tags": [
+        "marcial",
+        "arremesso",
+        "uma mão"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "thrown",
+        "wield": "one_hand",
+        "properties": "versátil, alcance curto (9 m)"
+      },
+      "actions": [
+        {
+          "label": "Ataque",
+          "kind": "attack",
+          "skill": "luta",
+          "attributeOverride": null,
+          "bonus": 0,
+          "critRange": 20,
+          "critMult": 2
+        },
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": "auto",
+          "damageType": "perfuracao",
+          "bonus": 0
+        }
+      ],
+      "slots": 1,
+      "price": 15,
+      "page": 150
+    },
+    {
+      "id": "vingadora-sagrada",
+      "name": "Vingadora Sagrada",
+      "kind": "weapon",
+      "$source": "Compendium.tormenta20.equipamentos-magicos.Item.8BBFvJdLe3sCiX8f",
+      "tags": [
+        "marcial",
+        "corpo a corpo",
+        "uma mão",
+        "mágico"
+      ],
+      "fields": {
+        "proficiency": "marcial",
+        "purpose": "melee",
+        "wield": "one_hand",
+        "properties": ""
+      },
+      "actions": [
+        {
+          "label": "Dano",
+          "kind": "damage",
+          "formula": "1d8",
+          "attribute": null,
+          "damageType": "impacto",
+          "bonus": 7
+        }
+      ]
+    }
+  ]
+}

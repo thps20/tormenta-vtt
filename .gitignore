@@ -9,3 +9,6 @@ coverage/
 apps/server/uploads/
 .turbo/
 .tools/
+
+# Descrições do compêndio importadas do Foundry (texto do livro, fica fora do repositório)
+*.local.json
