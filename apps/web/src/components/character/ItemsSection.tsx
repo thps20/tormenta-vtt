@@ -485,6 +485,9 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onP
     onPatch({ save: { ...base, ...p } });
   };
   const patchAction = (id: string, p: Partial<Action>) => onPatch({ actions: item.actions.map((a) => (a.id === id ? ({ ...a, ...p } as Action) : a)) });
+  const patchEnhancement = (id: string, p: Partial<CharacterItem["enhancements"][number]>) =>
+    onPatch({ enhancements: item.enhancements.map((e) => (e.id === id ? { ...e, ...p } : e)) });
+  const costAbbr = def.activation.resource ? (def.resources.find((r) => r.key === def.activation.resource)?.abbr ?? "") : "";
   const patchActivation = (p: Partial<Activation>) => {
     const base: Activation = item.activation ?? { cost: 0, execution: "", duration: { units: "", value: 0 }, range: { units: "", value: 0 }, target: "", area: "", effect: "" };
     onPatch({ activation: { ...base, ...p } });
@@ -594,6 +597,39 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onP
             </label>
           </div>
           <TextArea value={item.activation?.effect ?? ""} onCommit={(v) => patchActivation({ effect: v })} placeholder="Efeito" rows={2} />
+        </div>
+      )}
+
+      {/* Aprimoramentos: só quando o sistema define a fórmula do custo total (activation.enhancementCost). */}
+      {kind?.hasActivation && def.activation.enhancementCost !== undefined && (
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-zinc-500">Aprimoramentos</span>
+            <button
+              onClick={() => onPatch({ enhancements: [...item.enhancements, { id: newId(), label: "", cost: 1, repeatable: false }] })}
+              className={ghostBtn}
+              id={`btn-add-enhancement-${item.id}`}
+              title="Opção paga a mais ao usar (ex.: +2 PM: aumenta o dano em +1d6)"
+            >
+              <Plus className="w-3 h-3" /> aprimoramento
+            </button>
+          </div>
+          {item.enhancements.map((e) => (
+            <div key={e.id} className="flex flex-wrap items-center gap-1.5 pl-2 border-l-2 border-sky-900/60" data-enhancement-row={e.id}>
+              <label className="flex items-center gap-1 text-zinc-400">
+                +<NumInput value={e.cost} onCommit={(v) => patchEnhancement(e.id, { cost: Math.max(0, Math.floor(v ?? 0)) })} title="Custo extra" />
+                {costAbbr}
+              </label>
+              <TextInput value={e.label} onCommit={(label) => patchEnhancement(e.id, { label: label.trim() })} placeholder="Texto do aprimoramento" className="flex-1 min-w-40" maxLength={1000} />
+              <label className="flex items-center gap-1 text-zinc-400 cursor-pointer" title="Pode ser aplicado mais de uma vez (o custo multiplica)">
+                <input type="checkbox" checked={e.repeatable} onChange={(ev) => patchEnhancement(e.id, { repeatable: ev.target.checked })} className="accent-sky-500" />
+                repetível
+              </label>
+              <button onClick={() => onPatch({ enhancements: item.enhancements.filter((x) => x.id !== e.id) })} className="p-1 rounded text-zinc-500 hover:text-red-400 cursor-pointer" title="Remover aprimoramento">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
