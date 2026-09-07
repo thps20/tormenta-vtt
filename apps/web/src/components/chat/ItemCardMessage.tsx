@@ -25,6 +25,7 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ msg, card, isG
   if (card.duration) meta.push({ label: "Duração", value: card.duration });
   if (card.target) meta.push({ label: "Alvo", value: card.target });
   if (card.area) meta.push({ label: "Área", value: card.area });
+  const enhancements = card.enhancements ?? [];
 
   return (
     <div id={`chat-msg-${msg.id}`} className="p-3 rounded border bg-[#101418]/80 border-sky-900/50 shadow-inner">
@@ -71,6 +72,22 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ msg, card, isG
             <div key={m.label} className="truncate" title={`${m.label}: ${m.value}`}>
               <span className="text-zinc-600">{m.label}:</span> {m.value}
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* Aprimoramentos usados (cards antigos no banco não têm o campo). */}
+      {enhancements.length > 0 && (
+        <div className="mt-2 flex items-center gap-1.5 flex-wrap text-[10px] font-serif" data-card-enhancements>
+          <span className="text-zinc-500 uppercase tracking-wider text-[9px]">Aprimoramentos</span>
+          {enhancements.map((e) => (
+            <span key={e.id} className="bg-sky-950/40 border border-sky-800/60 px-1.5 py-0.5 rounded text-sky-100" title={e.label}>
+              <span className="font-mono font-bold text-sky-300">
+                +{e.cost}
+                {e.times > 1 ? ` ×${e.times}` : ""}
+              </span>{" "}
+              {e.label || e.id}
+            </span>
           ))}
         </div>
       )}

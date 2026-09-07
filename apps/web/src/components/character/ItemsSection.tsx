@@ -17,6 +17,7 @@ import {
   type CharacterPatch,
   type CharacterRollRequest,
   type ComputedCharacter,
+  type EnhancementUse,
   type ItemFieldDef,
   type ItemKindDef,
   type Save,
@@ -26,6 +27,7 @@ import { PALETTE_SHORTCUT_LABEL, seeBook } from "../../lib/compendium";
 import { newId } from "../../lib/ids";
 import { useCompendium } from "../../store/compendium";
 import { kindIcon } from "./kindIcons";
+import { EnhancementPicker } from "./EnhancementPicker";
 import { NumInput, Select, TextArea, TextInput, ghostBtn, smallBtn } from "./fields";
 import { AttributeBonusesEditor, AttributeChoiceField, SizeField, SkillGrantsField, summarizeField } from "./StructuredFields";
 
@@ -37,8 +39,8 @@ interface ItemsSectionProps {
   isEditMode: boolean;
   onPatch: (patch: CharacterPatch) => void;
   onRoll: (request: CharacterRollRequest) => void;
-  /** Usa um item ativo (custo + card no chat). */
-  onUseItem: (itemId: string) => void;
+  /** Usa um item ativo (custo + card no chat); `enhancements` = aprimoramentos escolhidos no popover. */
+  onUseItem: (itemId: string, enhancements: EnhancementUse[]) => void;
   /** Aba (tipo de item) ativa; fica no drawer para o atalho da paleta abrir já filtrado. */
   activeTab: string;
   onActiveTabChange: (kind: string) => void;
@@ -195,7 +197,7 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, comp
               onPatch={(p, extra) => patchItem(item.id, p, extra)}
               onRemove={() => setItems(items.filter((i) => i.id !== item.id))}
               onRoll={(actionId) => onRoll({ type: "action", itemId: item.id, actionId })}
-              onUse={() => onUseItem(item.id)}
+              onUse={(enhancements) => onUseItem(item.id, enhancements)}
             />
           ))}
         </div>
@@ -222,7 +224,7 @@ interface ItemCardProps {
   onPatch: (p: Partial<CharacterItem>, extra?: Omit<CharacterPatch, "items">) => void;
   onRemove: () => void;
   onRoll: (actionId: string) => void;
-  onUse: () => void;
+  onUse: (enhancements: EnhancementUse[]) => void;
 }
 
 const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, item, canEdit, isEditMode, expanded, highlighted, onToggle, onPatch, onRemove, onRoll, onUse }) => {
@@ -243,6 +245,13 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
   const available = costResource ? (character.resources[costResource.key]?.current ?? 0) + (character.resources[costResource.key]?.temp ?? 0) : 0;
   const insufficient = cost > 0 && costResource !== undefined && available < cost;
   const saveDc = !passive && item.save ? saveDcFor(def, computed, character, item) : null;
+  // Com aprimoramentos (e sistema com a fórmula), o botão abre o popover de escolha; senão usa direto.
+  const hasEnhancements = usable && item.enhancements.length > 0 && def.activation.enhancementCost !== undefined;
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const use = (enhancements: EnhancementUse[]) => {
+    setPickerOpen(false);
+    onUse(enhancements);
+  };
 
   return (
     <div id={`item-${item.id}`} className={`bg-[#161513] border rounded-lg transition-all ${item.equipped ? "border-[#d4af37]/60 shadow-[0_0_8px_rgba(212,175,55,0.1)]" : "border-[#292319]"} ${highlighted ? "item-flash" : ""}`}>
@@ -319,27 +328,33 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
       {!isEditMode && (usable || item.actions.length > 0) && (
         <div className="px-3 pb-2.5 flex items-center gap-2 flex-wrap">
           {usable && (
-            <button
-              onClick={onUse}
-              disabled={!canRoll}
-              id={`btn-use-item-${item.id}`}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-serif font-bold transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                insufficient
-                  ? "bg-red-950/40 hover:bg-red-950/60 border-red-800/70 hover:border-red-500 text-red-200"
-                  : "bg-[#14202a] hover:bg-[#1b2c3a] border-sky-700/60 hover:border-sky-400 text-sky-100"
-              }`}
-              title={
-                insufficient
-                  ? `${costResource?.abbr ?? "Recurso"} insuficiente: precisa de ${cost}, tem ${available}`
-                  : cost > 0
-                    ? `${kind?.useLabel ?? "Usar"} (custa ${cost} ${costResource?.abbr ?? ""})`
-                    : kind?.useLabel ?? "Usar"
-              }
-            >
-              <Zap className={`w-3.5 h-3.5 ${insufficient ? "text-red-400" : "text-sky-300"}`} />
-              <span>{kind?.useLabel ?? "Usar"}</span>
-              {cost > 0 && <span className="font-mono ml-0.5">({cost} {costResource?.abbr ?? ""})</span>}
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => (hasEnhancements ? setPickerOpen((v) => !v) : use([]))}
+                disabled={!canRoll}
+                id={`btn-use-item-${item.id}`}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-serif font-bold transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                  insufficient
+                    ? "bg-red-950/40 hover:bg-red-950/60 border-red-800/70 hover:border-red-500 text-red-200"
+                    : "bg-[#14202a] hover:bg-[#1b2c3a] border-sky-700/60 hover:border-sky-400 text-sky-100"
+                }`}
+                title={
+                  insufficient
+                    ? `${costResource?.abbr ?? "Recurso"} insuficiente: precisa de ${cost}, tem ${available}`
+                    : cost > 0
+                      ? `${kind?.useLabel ?? "Usar"} (custa ${cost} ${costResource?.abbr ?? ""})`
+                      : kind?.useLabel ?? "Usar"
+                }
+              >
+                <Zap className={`w-3.5 h-3.5 ${insufficient ? "text-red-400" : "text-sky-300"}`} />
+                <span>{kind?.useLabel ?? "Usar"}</span>
+                {cost > 0 && <span className="font-mono ml-0.5">({cost} {costResource?.abbr ?? ""})</span>}
+                {hasEnhancements && <ChevronDown className="w-3 h-3 opacity-70" />}
+              </button>
+              {pickerOpen && hasEnhancements && (
+                <EnhancementPicker def={def} character={character} item={item} useLabel={kind?.useLabel ?? "Usar"} onCast={use} onClose={() => setPickerOpen(false)} />
+              )}
+            </div>
           )}
           {item.actions.map((act) => {
             const formula = previewFormula(def, character, item.id, act.id);
@@ -381,6 +396,7 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
             <>
               {/* Passivo: só a descrição. Ativo: bloco de ativação + resistência com a CD calculada. */}
               {!passive && item.activation && <ActivationView def={def} activation={item.activation} />}
+              {!passive && item.enhancements.length > 0 && <EnhancementsView abbr={costResource?.abbr ?? ""} enhancements={item.enhancements} />}
               {!passive && item.save && (
                 <div className="text-[11px] text-zinc-400 font-mono flex items-center gap-2 flex-wrap">
                   <span>
@@ -404,6 +420,21 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
 };
 
 // --- Ativação (poderes, magias, consumíveis) --------------------------------
+
+/** Lista dos aprimoramentos do item (fora do modo edição). "×" marca os repetíveis. */
+const EnhancementsView: React.FC<{ abbr: string; enhancements: CharacterItem["enhancements"] }> = ({ abbr, enhancements }) => (
+  <ul className="p-2 rounded bg-[#181613] border border-[#2d261c] space-y-0.5 text-[11px]">
+    {enhancements.map((e) => (
+      <li key={e.id} className="flex gap-1.5">
+        <span className="font-mono font-bold text-sky-300 shrink-0" title={e.repeatable ? "Pode ser aplicado mais de uma vez" : undefined}>
+          +{e.cost} {abbr}
+          {e.repeatable ? " ×" : ""}
+        </span>
+        <span className="text-zinc-300 font-serif">{e.label || <span className="text-zinc-600 italic">sem texto</span>}</span>
+      </li>
+    ))}
+  </ul>
+);
 
 const ActivationView: React.FC<{ def: SystemDefinition; activation: Activation }> = ({ def, activation }) => {
   const a = activation;

@@ -322,7 +322,7 @@ function Table() {
           canEdit={openChar !== null && canEditCharacter(me, openChar)}
           onPatch={(patch) => openChar && void updateCharacter(openChar.id, patch)}
           onRoll={(request) => openChar && void rollCharacter(openChar.id, request)}
-          onUseItem={(itemId) => openChar && void useCharacterItem(openChar.id, itemId)}
+          onUseItem={(itemId, enhancements) => openChar && void useCharacterItem(openChar.id, itemId, enhancements)}
           onInsertFromCompendium={(entryId, opts) => (openChar ? insertFromCompendium(systemDef, openChar.id, entryId, opts) : Promise.resolve(null))}
           onCreateMine={() => void createCharacter({ name: me.nickname, kind: "pc", ownerId: me.id }).then((c) => c && openCharacter(c.id))}
           onClose={() => openCharacter(null)}

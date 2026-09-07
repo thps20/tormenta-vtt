@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, UserPlus } from "lucide-react";
-import { computeCharacter, type Character, type CharacterPatch, type CharacterRollRequest, type Participant, type SystemDefinition } from "@tormenta-vtt/shared";
+import { computeCharacter, type Character, type CharacterPatch, type CharacterRollRequest, type EnhancementUse, type Participant, type SystemDefinition } from "@tormenta-vtt/shared";
 import { CharacterHeader } from "./character/CharacterHeader";
 import { AttributesGrid } from "./character/AttributesGrid";
 import { ResourcesBlock } from "./character/ResourcesBlock";
@@ -29,7 +29,7 @@ export interface CharacterSheetDrawerProps {
   onPatch: (patch: CharacterPatch) => void;
   onRoll: (request: CharacterRollRequest) => void;
   /** Usa um item ativo (poder, magia): o servidor desconta o custo e publica o card. */
-  onUseItem: (itemId: string) => void;
+  onUseItem: (itemId: string, enhancements: EnhancementUse[]) => void;
   /** Copia uma entrada do compêndio para a ficha; devolve o id do item novo ou null. */
   onInsertFromCompendium: (entryId: string, opts?: { replace?: boolean }) => Promise<string | null>;
   /** Estado vazio: cria a ficha do próprio jogador. */
