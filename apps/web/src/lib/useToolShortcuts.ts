@@ -1,18 +1,13 @@
 import { useEffect } from "react";
 import { selectIsGm, useRoom } from "../store/room";
 import { useTools, type ToolMode } from "../store/tools";
+import { isTyping } from "./isTyping";
 
 /** Tecla → modo. Letras em minúsculo; comparamos com e.key.toLowerCase(). */
 const KEY_TO_MODE: Record<string, ToolMode> = { v: "select", h: "pan", r: "ruler", f: "fog" };
 
 /** Modos que só o GM pode ativar. */
 const GM_ONLY_MODES = new Set<ToolMode>(["fog"]);
-
-/** Foco em campo de texto: as teclas são para digitar, não para trocar de ferramenta. */
-function isTyping(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable;
-}
 
 /**
  * Atalhos globais da barra de ferramentas: V/H/R/F trocam o modo (F só para o GM),

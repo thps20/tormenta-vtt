@@ -22,6 +22,7 @@ import {
   type Save,
   type SystemDefinition,
 } from "@tormenta-vtt/shared";
+import { PALETTE_SHORTCUT_LABEL } from "../../lib/compendium";
 import { newId } from "../../lib/ids";
 import { useCompendium } from "../../store/compendium";
 import { kindIcon } from "./kindIcons";
@@ -38,6 +39,9 @@ interface ItemsSectionProps {
   onRoll: (request: CharacterRollRequest) => void;
   /** Usa um item ativo (custo + card no chat). */
   onUseItem: (itemId: string) => void;
+  /** Aba (tipo de item) ativa; fica no drawer para o atalho da paleta abrir já filtrado. */
+  activeTab: string;
+  onActiveTabChange: (kind: string) => void;
 }
 
 /** Tipos de campo com efeito na ficha (têm editor próprio e podem pedir escolha). */
@@ -83,8 +87,7 @@ const optionLabel = (options: { key: string; label: string }[] | undefined, key:
  * Itens da ficha em abas por tipo (itemKinds[] do sistema). Os campos, stats de
  * equipamento e enumerações de ativação vêm todos do JSON, nunca do código.
  */
-export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, computed, canEdit, isEditMode, onPatch, onRoll, onUseItem }) => {
-  const [activeTab, setActiveTab] = useState<string>(def.itemKinds[0]?.key ?? "");
+export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, computed, canEdit, isEditMode, onPatch, onRoll, onUseItem, activeTab, onActiveTabChange: setActiveTab }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggleExpand = (id: string) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   const openCompendium = useCompendium((s) => s.open);
@@ -102,20 +105,7 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, comp
       cancelAnimationFrame(raf);
       clearTimeout(t);
     };
-  }, [lastInserted]);
-
-  // Ctrl+Espaço abre a paleta já filtrada pela aba ativa (só em modo edição).
-  useEffect(() => {
-    if (!isEditMode) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.code === "Space" && !useCompendium.getState().isOpen) {
-        e.preventDefault();
-        openCompendium(activeTab);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isEditMode, activeTab, openCompendium]);
+  }, [lastInserted, setActiveTab]);
 
   const items = character.items;
   const setItems = (next: CharacterItem[]) => onPatch({ items: next });
@@ -152,7 +142,7 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, comp
                 <span>Adicionar {currentKind.label}</span>
               </button>
             )}
-            <button onClick={() => openCompendium(currentKind.key)} className={smallBtn} id="btn-open-compendium" title="Inserir do compêndio (Ctrl+Espaço)">
+            <button onClick={() => openCompendium(currentKind.key)} className={smallBtn} id="btn-open-compendium" title={`Inserir do compêndio (${PALETTE_SHORTCUT_LABEL})`}>
               <BookOpen className="w-3.5 h-3.5" />
               <span>Do compêndio</span>
             </button>

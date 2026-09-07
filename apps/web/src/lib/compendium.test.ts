@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CharacterDataSchema, CompendiumEntrySchema, createDefaultCharacterData, getSystemDefinition, type Character, type CompendiumEntry } from "@tormenta-vtt/shared";
-import { buildInsertPatch, checkInsert, matchesQuery } from "./compendium";
+import { buildInsertPatch, checkInsert, isOpenPaletteShortcut, matchesQuery, type ShortcutKey } from "./compendium";
 
 const def = getSystemDefinition("tormenta20");
 
@@ -69,5 +69,31 @@ describe("matchesQuery", () => {
     expect(matchesQuery(sword, "marcial longa")).toBe(true);
     expect(matchesQuery(sword, "arco")).toBe(false);
     expect(matchesQuery(sword, "")).toBe(true);
+  });
+});
+
+describe("isOpenPaletteShortcut", () => {
+  const key = (patch: Partial<ShortcutKey>): ShortcutKey => ({ key: "", code: "", ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, ...patch });
+  const space = { key: " ", code: "Space" };
+
+  it("Ctrl+Espaço e Cmd+Espaço abrem, mesmo digitando num campo", () => {
+    expect(isOpenPaletteShortcut(key({ ...space, ctrlKey: true }), false)).toBe(true);
+    expect(isOpenPaletteShortcut(key({ ...space, metaKey: true }), true)).toBe(true);
+  });
+
+  it("Ctrl+Shift+Espaço abre (alternativa para o Brave)", () => {
+    expect(isOpenPaletteShortcut(key({ ...space, ctrlKey: true, shiftKey: true }), false)).toBe(true);
+  });
+
+  it("espaço sem modificador ou com Alt não abre", () => {
+    expect(isOpenPaletteShortcut(key(space), false)).toBe(false);
+    expect(isOpenPaletteShortcut(key({ ...space, ctrlKey: true, altKey: true }), false)).toBe(false);
+  });
+
+  it('"/" abre só fora de campos de texto e sem Ctrl/Cmd; Shift é ignorado', () => {
+    expect(isOpenPaletteShortcut(key({ key: "/", code: "Slash" }), false)).toBe(true);
+    expect(isOpenPaletteShortcut(key({ key: "/", code: "Digit7", shiftKey: true }), false)).toBe(true);
+    expect(isOpenPaletteShortcut(key({ key: "/", code: "Slash" }), true)).toBe(false);
+    expect(isOpenPaletteShortcut(key({ key: "/", code: "Slash", ctrlKey: true }), false)).toBe(false);
   });
 });

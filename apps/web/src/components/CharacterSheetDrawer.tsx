@@ -12,7 +12,9 @@ import { DetailsSection } from "./character/DetailsSection";
 import { CompendiumPalette } from "./compendium/CompendiumPalette";
 import { DragGhost } from "./compendium/DragGhost";
 import { useCompendium } from "../store/compendium";
+import { isOpenPaletteShortcut } from "../lib/compendium";
 import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
+import { isTyping } from "../lib/isTyping";
 
 /** Id do alvo de soltura da ficha (lib/dropTargets). */
 const SHEET_DROP_TARGET = "character-sheet";
@@ -42,13 +44,32 @@ export interface CharacterSheetDrawerProps {
  */
 export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def, character, participants, me, canEdit, onPatch, onRoll, onUseItem, onInsertFromCompendium, onCreateMine, onClose }) => {
   const [isEditMode, setIsEditMode] = useState(false);
+  /** Aba de itens ativa: vive aqui para o atalho da paleta abrir já filtrado por ela. */
+  const [activeItemTab, setActiveItemTab] = useState<string>(def.itemKinds[0]?.key ?? "");
   const compendiumOpen = useCompendium((s) => s.isOpen);
+  const openCompendium = useCompendium((s) => s.open);
   const closeCompendium = useCompendium((s) => s.close);
   // A paleta só faz sentido editando; se a ficha sair do modo edição (ou fechar), ela fecha junto.
   useEffect(() => {
     if (!(isEditMode && canEdit)) closeCompendium();
   }, [isEditMode, canEdit, closeCompendium]);
   useEffect(() => () => closeCompendium(), [closeCompendium]);
+
+  // Atalho da paleta (Ctrl+Espaço, Ctrl+Shift+Espaço ou "/"): listener da janela, em fase de
+  // captura, montado pelo drawer só em modo edição. Assim vale com o foco em qualquer ponto da
+  // ficha (não só num input) e roda antes de outros handlers da página. preventDefault evita
+  // o "busca rápida" do navegador no "/" e a rolagem/pan da página no espaço.
+  const hasCharacter = character !== null;
+  useEffect(() => {
+    if (!(isEditMode && canEdit && hasCharacter)) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat || !isOpenPaletteShortcut(e, isTyping(e.target))) return;
+      e.preventDefault();
+      if (!useCompendium.getState().isOpen) openCompendium(activeItemTab);
+    };
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [isEditMode, canEdit, hasCharacter, activeItemTab, openCompendium]);
 
   // A ficha inteira é zona de soltura para entradas do compêndio (soltar = inserir e fechar a paleta).
   const dragOverSheet = useCompendium((s) => s.drag?.targetId === SHEET_DROP_TARGET);
@@ -103,7 +124,18 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
               <ResourcesBlock def={def} character={character} computed={computed} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} />
               <DerivedStatsBar def={def} character={character} computed={computed} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} onRoll={onRoll} />
               <SkillsSection def={def} character={character} computed={computed} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} onRoll={onRoll} />
-              <ItemsSection def={def} character={character} computed={computed} canEdit={canEdit} isEditMode={editing} onPatch={onPatch} onRoll={onRoll} onUseItem={onUseItem} />
+              <ItemsSection
+                def={def}
+                character={character}
+                computed={computed}
+                canEdit={canEdit}
+                isEditMode={editing}
+                onPatch={onPatch}
+                onRoll={onRoll}
+                onUseItem={onUseItem}
+                activeTab={activeItemTab}
+                onActiveTabChange={setActiveItemTab}
+              />
               <ModifiersSection def={def} character={character} computed={computed} canEdit={canEdit} onPatch={onPatch} />
               <DetailsSection def={def} character={character} isEditMode={editing} onPatch={onPatch} />
             </div>

@@ -77,3 +77,29 @@ function normalize(text: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
+
+/** Texto do atalho para tooltips (o botão "Do compêndio"). */
+export const PALETTE_SHORTCUT_LABEL = "Ctrl+Espaço, Ctrl+Shift+Espaço ou /";
+
+/** Subconjunto de KeyboardEvent que o atalho olha (facilita testar sem DOM). */
+export interface ShortcutKey {
+  key: string;
+  code: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}
+
+/**
+ * Decide se a tecla abre a paleta: Ctrl+Espaço (ou Cmd no Mac), Ctrl+Shift+Espaço
+ * (alternativa porque o Brave às vezes engole Ctrl+Espaço) ou "/" sozinho quando o
+ * foco não está num campo de texto (`typing`). Shift é ignorado no "/" porque em
+ * alguns layouts a barra exige Shift.
+ */
+export function isOpenPaletteShortcut(e: ShortcutKey, typing: boolean): boolean {
+  if (e.altKey) return false;
+  const isSpace = e.code === "Space" || e.key === " ";
+  if ((e.ctrlKey || e.metaKey) && isSpace) return true;
+  return e.key === "/" && !e.ctrlKey && !e.metaKey && !typing;
+}
