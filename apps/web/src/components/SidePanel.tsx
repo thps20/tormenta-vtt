@@ -155,6 +155,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             participants={participants}
             me={me}
             characters={characters}
+            tokens={tokens}
             onSendMessage={onSendMessage}
             onRollCharacter={onRollCharacter}
           />

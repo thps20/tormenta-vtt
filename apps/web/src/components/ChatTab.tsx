@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Dices, Scroll, ShieldAlert } from 'lucide-react';
-import type { Character, CharacterRollRequest, ChatMessage, Participant } from '@tormenta-vtt/shared';
+import type { Character, CharacterRollRequest, ChatMessage, Participant, Token } from '@tormenta-vtt/shared';
 import { canEditCharacter } from '../store/characters';
+import { useChat } from '../store/chat';
 import { useSystemDef } from '../lib/system';
+import { ApplyDamageButton } from './chat/ApplyDamageButton';
 import { ItemCardMessage } from './chat/ItemCardMessage';
 import { DamageFormula, DamageTypeBadge } from './DamageTypeBadge';
 
@@ -10,8 +12,10 @@ interface ChatTabProps {
   messages: ChatMessage[];
   participants: Participant[];
   me: Participant;
-  /** Fichas visíveis: decide se os botões do card de item ficam ativos. */
+  /** Fichas visíveis: decide se os botões do card de item ficam ativos, e o PV de tokens vinculados no seletor de "Aplicar". */
   characters: Character[];
+  /** Tokens da cena atual: alvos possíveis do "Aplicar" num card de dano/cura. */
+  tokens: Token[];
   onSendMessage: (text: string) => void;
   onRollCharacter: (characterId: string, request: CharacterRollRequest) => void;
 }
@@ -21,12 +25,14 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   participants,
   me,
   characters,
+  tokens,
   onSendMessage,
   onRollCharacter,
 }) => {
   const currentUserId = me.id;
   // Sistema da sala: só para pintar os selos de tipo de dano (null fora de sala = selos neutros).
   const def = useSystemDef();
+  const applyDamage = useChat((s) => s.applyDamage);
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -226,6 +232,36 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                     </span>
                   </div>
                 </div>
+
+                {(damage || roll.applied.length > 0) && (
+                  <div className="mt-2 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between gap-2 flex-wrap" data-apply-damage>
+                    <ApplyDamageButton
+                      messageId={msg.id}
+                      roll={roll}
+                      tokens={tokens}
+                      characters={characters}
+                      participants={participants}
+                      def={def}
+                      me={me}
+                      onApply={applyDamage}
+                    />
+                    {roll.applied.length > 0 && (
+                      <span className="text-[10px] font-mono text-zinc-500" data-applied-log>
+                        Aplicado:{' '}
+                        {roll.applied.map((a, i) => (
+                          <React.Fragment key={i}>
+                            {i > 0 && ', '}
+                            <span className={a.amount < 0 ? 'text-red-400' : 'text-emerald-400'}>
+                              {a.tokenName} {a.amount >= 0 ? '+' : '−'}
+                              {Math.abs(a.amount)}
+                            </span>
+                            {a.multiplier && a.multiplier !== '1' && ` (${a.multiplier === '0.5' ? '½' : `×${a.multiplier}`})`}
+                          </React.Fragment>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {roll.secret && (
                   <div className="mt-2 pt-1.5 border-t border-zinc-800/60 flex items-center gap-1 text-[10px] text-[#d4af37]/80 font-mono">
