@@ -33,6 +33,7 @@ export type OptionDef = z.infer<typeof OptionDefSchema>;
  *   {skill}                                    em skillCheck / attack (perícia da ação)
  *   {max}                                      em resources[].minFormula
  *   {saveAttr} {saveBonus}                     em activation.saveDc (atributo e bônus do save do item)
+ *   {base} {enhancements}                      em activation.enhancementCost (custo base do item e Σ custo×vezes dos aprimoramentos)
  * O resultado após substituição deve ser uma fórmula válida para o parser em dice/.
  */
 export const FormulaSchema = z.string().min(1);
@@ -252,6 +253,13 @@ export const ActivationDefSchema = z.object({
    * {saveBonus} (save.bonus). Ausente = sem CD calculada.
    */
   saveDc: FormulaSchema.optional(),
+  /**
+   * Custo de um uso COM aprimoramentos, antes dos modificadores e do piso.
+   * Contextuais: {base} (activation.cost do item) e {enhancements} (soma de
+   * custo × vezes dos aprimoramentos escolhidos). Ausente = o sistema não tem
+   * aprimoramentos: a ficha não oferece a escolha e o servidor recusa seleção.
+   */
+  enhancementCost: FormulaSchema.optional(),
   /** Rótulo do campo "atributo de conjuração" na ficha. */
   spellcastingLabel: z.string().min(1).max(40).default("Atributo de conjuração"),
   /** Tag (skills[].tags) das perícias que servem de teste de resistência. Ausente = qualquer perícia. */

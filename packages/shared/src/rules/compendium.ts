@@ -83,6 +83,13 @@ export function validateCompendiumEntry(def: SystemDefinition, entry: Compendium
     if (a.range.units && !rangeUnits.some((u) => u.key === a.range.units)) return `${where}: unidade de alcance desconhecida "${a.range.units}"`;
   }
 
+  if (entry.enhancements.length > 0 && !kind.hasActivation) return `${where}: "${kind.key}" não tem bloco de ativação (aprimoramentos)`;
+  const enhancementIds = new Set<string>();
+  for (const e of entry.enhancements) {
+    if (enhancementIds.has(e.id)) return `${where}: aprimoramento "${e.id}" repetido`;
+    enhancementIds.add(e.id);
+  }
+
   if (entry.save && !kind.hasSave) return `${where}: "${kind.key}" não tem teste de resistência`;
   if (entry.save) {
     if (!saveSkills(def).some((s) => s.key === entry.save?.skill)) return `${where}: "${entry.save.skill}" não é perícia de resistência`;
@@ -129,6 +136,7 @@ export function entryToItem(def: SystemDefinition, entry: CompendiumEntry, newId
     statBonuses: entry.statBonuses,
     actions: entry.actions.map((a) => ({ ...a, id: newId() })),
     activation: kind.hasActivation ? (entry.activation ?? {}) : null,
+    enhancements: kind.hasActivation ? entry.enhancements : [],
     save: kind.hasSave ? entry.save : null,
     page: entry.page,
   });

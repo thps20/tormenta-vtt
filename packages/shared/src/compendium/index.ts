@@ -11,7 +11,8 @@
  * - demais `*.json`: gerados por scripts/import-foundry-compendium.ts, no formato
  *   `{ "$generated": "...", "entries": [...] }` (um array simples também vale).
  * - `descriptions.local.json` (ignorado pelo git): `{ "<id>": "texto" }` com as
- *   descrições; quando existe, preenche `description` das entradas.
+ *   descrições e `"<id>#<enhId>": "texto"` com o texto de cada aprimoramento;
+ *   quando existe, preenche `description` e `enhancements[].label` das entradas.
  * Novo sistema = nova pasta com JSONs; nada para registrar aqui.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -52,7 +53,10 @@ export function listCompendiumFiles(systemId: string): string[] {
   return files.map((f) => join(dir, f));
 }
 
-/** Descrições locais (`{ id: texto }`), ou um mapa vazio se o arquivo não existe. */
+/** Chave do texto de um aprimoramento em descriptions.local.json. */
+export const enhancementTextKey = (entryId: string, enhancementId: string): string => `${entryId}#${enhancementId}`;
+
+/** Descrições locais (`{ id: texto }`, `{ "id#enh": texto }`), ou um mapa vazio se o arquivo não existe. */
 export function readLocalDescriptions(systemId: string): Record<string, string> {
   const path = join(compendiumDir(systemId), DESCRIPTIONS_FILE);
   if (!existsSync(path)) return {};
@@ -85,6 +89,17 @@ export function validateCompendiumEntries(systemId: string, raw: unknown[]): Com
   });
 }
 
+/** Preenche descrição e textos dos aprimoramentos que estiverem vazios com os do arquivo local (sem tocar os já definidos). */
+export function withLocalTexts(entry: CompendiumEntry, descriptions: Record<string, string>): CompendiumEntry {
+  const description = entry.description || descriptions[entry.id] || "";
+  const enhancements = entry.enhancements.map((e) => {
+    const local = e.label ? undefined : descriptions[enhancementTextKey(entry.id, e.id)];
+    return local ? { ...e, label: local } : e;
+  });
+  const changed = description !== entry.description || enhancements.some((e, i) => e !== entry.enhancements[i]);
+  return changed ? CompendiumEntrySchema.parse({ ...entry, description, enhancements }) : entry;
+}
+
 /**
  * Lê todos os arquivos da pasta aplicando a precedência de custom.json e as
  * descrições locais. Cada arquivo é validado separadamente (o erro diz qual);
@@ -103,8 +118,7 @@ export function loadCompendiumEntries(systemId: string): CompendiumEntry[] {
     }
     for (const entry of entries) {
       if (byId.has(entry.id)) continue;
-      const description = entry.description || descriptions[entry.id] || "";
-      byId.set(entry.id, description === entry.description ? entry : CompendiumEntrySchema.parse({ ...entry, description }));
+      byId.set(entry.id, withLocalTexts(entry, descriptions));
     }
   }
   return [...byId.values()];

@@ -6,7 +6,7 @@ import { createDefaultCharacterData, createDefaultItem } from "./defaults.js";
 import { describeModifierTarget, listModifierTargets, parseModifierTarget, ModifierTargetSchema } from "./modifierTarget.js";
 import { collectPlaceholders, substitutePlaceholders, FormulaError } from "./placeholders.js";
 import { buildCharacterRoll, resolveCharacterFormula, RollBuildError } from "./rolls.js";
-import { buildItemUse, describeActivation, effectiveCost, isPassiveItem, ItemUseError, saveDcFor, saveSkills } from "./activation.js";
+import { baseCost, buildItemUse, describeActivation, effectiveCost, isPassiveItem, ItemUseError, resolveEnhancements, saveDcFor, saveSkills } from "./activation.js";
 import { describeClasses, pendingChoices, validateCharacterItems } from "./progression.js";
 
 const def = getSystemDefinition("tormenta20");
@@ -352,6 +352,75 @@ describe("activation (poderes e magias)", () => {
     expect(use.spend).toBeNull();
     expect(use.card.cost).toBeNull();
     expect(use.card.save).toBeNull();
+  });
+});
+
+describe("aprimoramentos (custo total)", () => {
+  /** Magia 2 PM com um aprimoramento fixo (+3) e um repetível (+1 por vez). */
+  const spell = CharacterItemSchema.parse({
+    id: "spell",
+    kind: "spell",
+    name: "Armadura Arcana",
+    activation: { cost: 2, execution: "standard" },
+    enhancements: [
+      { id: "e1", label: "muda a execução para reação", cost: 3 },
+      { id: "e2", label: "aumenta o bônus em +1", cost: 1, repeatable: true },
+      { id: "e3", label: "variação gratuita", cost: 0 },
+    ],
+  });
+  const freePower = CharacterItemSchema.parse({ id: "fp", kind: "power", name: "Golpe", activation: { cost: 0, execution: "standard" }, enhancements: [{ id: "x", label: "+1d6", cost: 1, repeatable: true }] });
+  const costMod = (value: number) => ModifierSchema.parse({ id: "cm", target: "resource.pm.cost", value });
+  const sel = (...uses: [string, number][]) => resolveEnhancements(def, spell, uses.map(([id, times]) => ({ id, times })));
+  const noRule = { ...def, activation: { ...def.activation, enhancementCost: undefined } };
+
+  it("soma base + custo × vezes pela fórmula do sistema", () => {
+    expect(def.activation.enhancementCost).toBe("{base} + {enhancements}");
+    expect(baseCost(def, spell)).toBe(2);
+    expect(baseCost(def, spell, sel(["e1", 1]))).toBe(5);
+    expect(baseCost(def, spell, sel(["e2", 3]))).toBe(5);
+    expect(baseCost(def, spell, sel(["e1", 1], ["e2", 2], ["e3", 1]))).toBe(7);
+  });
+
+  it("modificadores e minCost valem sobre o total; total 0 continua 0", () => {
+    expect(effectiveCost(def, { modifiers: [costMod(-1)] }, spell, sel(["e1", 1]))).toBe(4);
+    expect(effectiveCost(def, { modifiers: [costMod(-9)] }, spell, sel(["e1", 1]))).toBe(def.activation.minCost);
+    // Poder gratuito + aprimoramento pago: passa a custar (e o modificador entra).
+    const x = resolveEnhancements(def, freePower, [{ id: "x", times: 2 }]);
+    expect(effectiveCost(def, { modifiers: [] }, freePower, x)).toBe(2);
+    expect(effectiveCost(def, { modifiers: [costMod(-1)] }, freePower, x)).toBe(1);
+    expect(effectiveCost(def, { modifiers: [costMod(+2)] }, freePower)).toBe(0);
+  });
+
+  it("recusa id desconhecido, id repetido, vezes > 1 em não repetível e sistema sem a regra", () => {
+    expect(() => sel(["nope", 1])).toThrow(/não encontrado/);
+    expect(() => sel(["e1", 1], ["e1", 1])).toThrow(/repetido/);
+    expect(() => sel(["e1", 2])).toThrow(/só pode ser aplicado uma vez/);
+    expect(() => resolveEnhancements(noRule, spell, [{ id: "e1", times: 1 }])).toThrow(/não tem aprimoramentos/);
+    expect(resolveEnhancements(noRule, spell, [])).toEqual([]);
+    expect(baseCost(noRule, spell, sel(["e1", 1]))).toBe(2);
+  });
+
+  it("buildItemUse cobra o total, recusa PM insuficiente pelo total e lista os usados no card", () => {
+    const withSpell = (pm: number) => ({
+      ...fixture({ items: [spell], resources: { pm: { current: pm, temp: 0, maxOverride: 10 } } }),
+      id: "c1",
+      roomId: "r1",
+      ownerId: null,
+      name: "Maga",
+      kind: "pc" as const,
+      createdAt: "2026-09-06T00:00:00.000Z",
+      updatedAt: "2026-09-06T00:00:00.000Z",
+    });
+    const use = buildItemUse(def, withSpell(10), "spell", [{ id: "e2", times: 2 }, { id: "e1", times: 1 }]);
+    expect(use.cost).toBe(7);
+    expect(use.spend?.resources.pm?.current).toBe(3);
+    expect(use.card.cost).toEqual({ abbr: "PM", amount: 7 });
+    expect(use.card.enhancements).toEqual([
+      { id: "e2", label: "aumenta o bônus em +1", cost: 1, times: 2 },
+      { id: "e1", label: "muda a execução para reação", cost: 3, times: 1 },
+    ]);
+    expect(() => buildItemUse(def, withSpell(4), "spell", [{ id: "e1", times: 1 }])).toThrow(/PM insuficiente: precisa de 5, tem 4/);
+    expect(buildItemUse(def, withSpell(4), "spell").card.enhancements).toEqual([]);
   });
 });
 

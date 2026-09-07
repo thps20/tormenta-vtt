@@ -4,11 +4,11 @@
  * buildItemUse, persiste os recursos devolvidos e publica o card; o cliente
  * usa as mesmas funções só para exibir (botão "Usar", custo, CD).
  *
- * Nenhuma chave de sistema aqui: o recurso do custo, o piso, a fórmula da CD e
- * quais execuções são passivas vêm de def.activation.
+ * Nenhuma chave de sistema aqui: o recurso do custo, o piso, a fórmula da CD,
+ * a do custo com aprimoramentos e quais execuções são passivas vêm de def.activation.
  */
 import { DiceParseError, evaluateConstant } from "../dice/index.js";
-import type { Activation, Character, CharacterData, CharacterItem, CharacterResource, ItemCard } from "../schemas/character.js";
+import type { Activation, Character, CharacterData, CharacterItem, CharacterResource, Enhancement, EnhancementUse, ItemCard } from "../schemas/character.js";
 import type { SkillDef, SystemDefinition } from "../schemas/system.js";
 import { computeCharacter, makeResolver, parseModifiers, sumModifiers, type ComputedCharacter } from "./compute.js";
 import { FormulaError, substitutePlaceholders } from "./placeholders.js";
@@ -33,13 +33,63 @@ export function isPassiveItem(def: SystemDefinition, item: Pick<CharacterItem, "
   return execution?.passive ?? false;
 }
 
+/** Um aprimoramento escolhido, já resolvido contra o item. */
+export interface SelectedEnhancement {
+  enhancement: Enhancement;
+  times: number;
+}
+
 /**
- * Custo depois dos modificadores "resource.<recurso>.cost".
- * Base 0 continua 0 (habilidade gratuita não ganha custo); senão o piso é
- * def.activation.minCost (T20: reduções nunca levam abaixo de 1 PM).
+ * Confere a escolha do jogador contra o item: cada id existe, não se repete e
+ * `times` só passa de 1 em aprimoramento repetível. Seleção não vazia num
+ * sistema sem activation.enhancementCost é recusada (o sistema não tem a regra).
+ * Lança ItemUseError com mensagem pronta para o ack.
  */
-export function effectiveCost(def: SystemDefinition, data: Pick<CharacterData, "modifiers">, item: Pick<CharacterItem, "activation">): number {
+export function resolveEnhancements(def: SystemDefinition, item: Pick<CharacterItem, "enhancements">, selection: EnhancementUse[]): SelectedEnhancement[] {
+  if (selection.length === 0) return [];
+  if (!def.activation.enhancementCost) throw new ItemUseError("Este sistema não tem aprimoramentos");
+  const seen = new Set<string>();
+  return selection.map((use) => {
+    const enhancement = item.enhancements.find((e) => e.id === use.id);
+    if (!enhancement) throw new ItemUseError("Aprimoramento não encontrado");
+    if (seen.has(use.id)) throw new ItemUseError("Aprimoramento repetido na escolha");
+    seen.add(use.id);
+    if (use.times > 1 && !enhancement.repeatable) throw new ItemUseError(`"${enhancement.label || enhancement.id}" só pode ser aplicado uma vez`);
+    return { enhancement, times: use.times };
+  });
+}
+
+/**
+ * Custo antes dos modificadores: activation.cost do item ou, com aprimoramentos,
+ * a fórmula def.activation.enhancementCost com {base} e {enhancements}
+ * (Σ custo × vezes). Fórmula com erro = custo base (não bloqueia o uso).
+ */
+export function baseCost(def: SystemDefinition, item: Pick<CharacterItem, "activation">, selected: SelectedEnhancement[] = []): number {
   const base = item.activation?.cost ?? 0;
+  const formula = def.activation.enhancementCost;
+  if (selected.length === 0 || !formula) return base;
+  const sum = selected.reduce((acc, s) => acc + s.enhancement.cost * s.times, 0);
+  try {
+    return evaluateConstant(substitutePlaceholders(formula, (p) => (p === "base" ? base : p === "enhancements" ? sum : undefined)));
+  } catch (err) {
+    if (err instanceof FormulaError || err instanceof DiceParseError) return base;
+    throw err;
+  }
+}
+
+/**
+ * Custo depois dos modificadores "resource.<recurso>.cost", aplicados sobre o
+ * total (base + aprimoramentos). Total 0 continua 0 (habilidade gratuita não
+ * ganha custo); senão o piso é def.activation.minCost (T20: reduções nunca
+ * levam abaixo de 1 PM).
+ */
+export function effectiveCost(
+  def: SystemDefinition,
+  data: Pick<CharacterData, "modifiers">,
+  item: Pick<CharacterItem, "activation">,
+  selected: SelectedEnhancement[] = [],
+): number {
+  const base = baseCost(def, item, selected);
   if (base <= 0) return 0;
   const resource = def.activation.resource;
   if (!resource) return base;
@@ -94,7 +144,14 @@ function summarizeEffect(item: CharacterItem): string {
   return desc.length > EFFECT_MAX ? `${desc.slice(0, EFFECT_MAX - 1)}…` : desc;
 }
 
-export function buildItemCard(def: SystemDefinition, character: Character, computed: ComputedCharacter, item: CharacterItem, cost: number): ItemCard {
+export function buildItemCard(
+  def: SystemDefinition,
+  character: Character,
+  computed: ComputedCharacter,
+  item: CharacterItem,
+  cost: number,
+  selected: SelectedEnhancement[] = [],
+): ItemCard {
   const kind = def.itemKinds.find((k) => k.key === item.kind);
   const costResource = def.activation.resource ? def.resources.find((r) => r.key === def.activation.resource) : undefined;
   const activation = item.activation ?? { cost: 0, execution: "", duration: { units: "", value: 0 }, range: { units: "", value: 0 }, target: "", area: "", effect: "" };
@@ -116,6 +173,7 @@ export function buildItemCard(def: SystemDefinition, character: Character, compu
     kindLabel: kind?.label ?? item.kind,
     fields,
     cost: cost > 0 && costResource ? { abbr: costResource.abbr, amount: cost } : null,
+    enhancements: selected.map((s) => ({ id: s.enhancement.id, label: s.enhancement.label, cost: s.enhancement.cost, times: s.times })),
     execution: described.execution,
     range: described.range,
     duration: described.duration,
@@ -135,7 +193,9 @@ export function buildItemCard(def: SystemDefinition, character: Character, compu
 
 export interface ItemUse {
   item: CharacterItem;
-  /** Custo efetivo (0 = nada a descontar). */
+  /** Aprimoramentos escolhidos, já validados contra o item. */
+  selected: SelectedEnhancement[];
+  /** Custo efetivo total (0 = nada a descontar). */
   cost: number;
   /** Recursos da ficha já com o custo descontado; null quando não há o que descontar. */
   spend: { resourceKey: string; resources: Record<string, CharacterResource> } | null;
@@ -145,16 +205,17 @@ export interface ItemUse {
 /**
  * Valida o uso de um item ativo e prepara o que o servidor precisa persistir e
  * publicar. Lança ItemUseError (mensagem pronta para o ack) se o item não
- * existir, for passivo ou o recurso for insuficiente. Pontos temporários são
- * gastos antes dos atuais.
+ * existir, for passivo, a escolha de aprimoramentos for inválida ou o recurso
+ * for insuficiente para o custo TOTAL. Pontos temporários são gastos antes dos atuais.
  */
-export function buildItemUse(def: SystemDefinition, character: Character, itemId: string): ItemUse {
+export function buildItemUse(def: SystemDefinition, character: Character, itemId: string, selection: EnhancementUse[] = []): ItemUse {
   const item = character.items.find((i) => i.id === itemId);
   if (!item) throw new ItemUseError("Item não encontrado");
   if (isPassiveItem(def, item)) throw new ItemUseError(`${item.name} é uma habilidade passiva`);
 
+  const selected = resolveEnhancements(def, item, selection);
   const computed = computeCharacter(def, character);
-  const cost = effectiveCost(def, character, item);
+  const cost = effectiveCost(def, character, item, selected);
   const resourceKey = def.activation.resource;
 
   let spend: ItemUse["spend"] = null;
@@ -170,5 +231,5 @@ export function buildItemUse(def: SystemDefinition, character: Character, itemId
     spend = { resourceKey, resources: { ...character.resources, [resourceKey]: next } };
   }
 
-  return { item, cost, spend, card: buildItemCard(def, character, computed, item, cost) };
+  return { item, selected, cost, spend, card: buildItemCard(def, character, computed, item, cost, selected) };
 }

@@ -93,6 +93,31 @@ describe("entryToItem", () => {
     const power = CompendiumEntrySchema.parse({ id: "p", name: "P", kind: "power" });
     expect(entryToItem(def, power, () => "x").activation).not.toBeNull();
   });
+
+  it("copia os aprimoramentos (com texto) para o item", () => {
+    const spell = CompendiumEntrySchema.parse({
+      id: "s",
+      name: "S",
+      kind: "spell",
+      fields: { circle: 1, school: "evocacao", type: "arcana" },
+      activation: { cost: 1 },
+      enhancements: [{ id: "e1", label: "+1d6", cost: 2, repeatable: true }, { id: "e2", cost: 1 }],
+    });
+    expect(entryToItem(def, spell, () => "x").enhancements).toEqual([
+      { id: "e1", label: "+1d6", cost: 2, repeatable: true },
+      { id: "e2", label: "", cost: 1, repeatable: false },
+    ]);
+  });
+});
+
+describe("validateCompendiumEntry: aprimoramentos", () => {
+  it("só em tipo com ativação e sem id repetido", () => {
+    const enhancements = [{ id: "e1", cost: 1 }];
+    expect(validateCompendiumEntry(def, weapon({ enhancements }))).toMatch(/não tem bloco de ativação \(aprimoramentos\)/);
+    const power = (list: unknown[]) => CompendiumEntrySchema.parse({ id: "p", name: "P", kind: "power", enhancements: list });
+    expect(validateCompendiumEntry(def, power(enhancements))).toBeNull();
+    expect(validateCompendiumEntry(def, power([{ id: "e1", cost: 1 }, { id: "e1", cost: 2 }]))).toMatch(/aprimoramento "e1" repetido/);
+  });
 });
 
 describe("mergeCompendium", () => {

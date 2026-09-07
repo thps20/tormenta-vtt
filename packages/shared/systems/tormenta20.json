@@ -219,10 +219,11 @@
   ],
 
   "activation": {
-    "$comment": "Poderes e magias custam PM. Reduções de custo (modificador resource.pm.cost) nunca levam abaixo de 1 PM. CD de resistência = 10 + meio nível + atributo de conjuração (ou o do item) + bônus do item.",
+    "$comment": "Poderes e magias custam PM. Reduções de custo (modificador resource.pm.cost) nunca levam abaixo de 1 PM. CD de resistência = 10 + meio nível + atributo de conjuração (ou o do item) + bônus do item. Aprimoramentos: o custo total é o base mais a soma de cada aprimoramento vezes quantas vezes foi aplicado; modificadores e o piso valem sobre o total.",
     "resource": "pm",
     "minCost": 1,
     "saveDc": "10 + {halfLevel} + {saveAttr} + {saveBonus}",
+    "enhancementCost": "{base} + {enhancements}",
     "spellcastingLabel": "Atributo de conjuração",
     "saveSkillTag": "resistencia",
     "executions": [

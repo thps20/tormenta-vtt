@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Character, CharacterCreatePayload, CharacterPatch, CharacterRollRequest, SystemDefinition } from "@tormenta-vtt/shared";
+import type { Character, CharacterCreatePayload, CharacterPatch, CharacterRollRequest, EnhancementUse, SystemDefinition } from "@tormenta-vtt/shared";
 import { buildInsertPatch, checkInsert } from "../lib/compendium";
 import { newId } from "../lib/ids";
 import { emitAck } from "./connection";
@@ -29,7 +29,8 @@ interface CharactersState {
    * Usa um item ativo (poder, magia). Sem otimismo: o servidor desconta o custo
    * (character:updated) e publica o card (chat:message). Erro (ex.: PM insuficiente) vira toast.
    */
-  useItem: (characterId: string, itemId: string) => Promise<boolean>;
+  /** Usa um item ativo; `enhancements` = aprimoramentos escolhidos no popover de conjuração. */
+  useItem: (characterId: string, itemId: string, enhancements?: EnhancementUse[]) => Promise<boolean>;
   /**
    * Copia uma entrada do compêndio para a ficha (Enter, "+" e soltar chamam esta
    * mesma função). `def` vem do componente para a store não depender da sala.
@@ -101,8 +102,8 @@ export const useCharacters = create<CharactersState>((set, get) => ({
     return res.ok;
   },
 
-  useItem: async (characterId, itemId) => {
-    const res = await emitAck("character:use-item", { characterId, itemId });
+  useItem: async (characterId, itemId, enhancements = []) => {
+    const res = await emitAck("character:use-item", { characterId, itemId, enhancements });
     if (!res.ok) toast(res.error);
     return res.ok;
   },

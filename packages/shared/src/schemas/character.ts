@@ -94,6 +94,28 @@ export const ActivationSchema = z.object({
 });
 export type Activation = z.infer<typeof ActivationSchema>;
 
+/**
+ * Aprimoramento de um item ativo (T20: "+2 PM: aumenta o dano em +1d6"). Só o
+ * custo é mecânica; `label` é o texto resumido. No compêndio do repositório o
+ * label fica vazio (vem de descriptions.local.json, chave "<entryId>#<id>") e é
+ * copiado para o item na inserção, então a ficha funciona sem o arquivo local.
+ * Ids frouxos de propósito: importados são "e1", "e2"...; manuais usam newId().
+ */
+export const EnhancementIdSchema = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/).max(80);
+export const EnhancementSchema = z.object({
+  id: EnhancementIdSchema,
+  label: z.string().max(1000).default(""),
+  /** Custo extra no recurso de ativação, somado ao base por activation.enhancementCost do sistema. */
+  cost: z.number().int().min(0).default(0),
+  /** true = pode ser aplicado mais de uma vez (o custo multiplica por `times`). */
+  repeatable: z.boolean().default(false),
+});
+export type Enhancement = z.infer<typeof EnhancementSchema>;
+
+/** Escolha do jogador ao usar o item: quais aprimoramentos e quantas vezes cada um. */
+export const EnhancementUseSchema = z.object({ id: EnhancementIdSchema, times: z.number().int().min(1).default(1) });
+export type EnhancementUse = z.infer<typeof EnhancementUseSchema>;
+
 /** Teste de resistência exigido pelo item. A CD vem de derived (ex.: "dc"). */
 export const SaveSchema = z.object({
   skill: KeySchema,
@@ -161,6 +183,8 @@ export const CharacterItemSchema = z.object({
   statBonuses: z.record(KeySchema, z.number()).default({}),
   actions: z.array(ActionSchema).default([]),
   activation: ActivationSchema.nullable().default(null),
+  /** Aprimoramentos escolhíveis ao usar (só faz sentido com activation e activation.enhancementCost no sistema). */
+  enhancements: z.array(EnhancementSchema).default([]),
   save: SaveSchema.nullable().default(null),
   /** Página do livro, copiada do compêndio: a ficha mostra "ver livro, pág. X" quando não há descrição. */
   page: z.number().int().positive().nullable().default(null),
@@ -250,8 +274,10 @@ export const ItemCardSchema = z.object({
   kindLabel: z.string().max(40),
   /** Campos do tipo com rótulo (ex.: "Círculo: 1", "Escola: Evocação"). */
   fields: z.array(z.object({ label: z.string().max(40), value: z.string().max(200) })),
-  /** Custo efetivo já descontado; null = sem custo. */
+  /** Custo efetivo já descontado (base + aprimoramentos + modificadores); null = sem custo. */
   cost: z.object({ abbr: z.string().max(6), amount: z.number().int().min(0) }).nullable(),
+  /** Aprimoramentos usados nesta conjuração (texto e custo copiados do item). Cards antigos não têm o campo. */
+  enhancements: z.array(z.object({ id: EnhancementIdSchema, label: z.string().max(1000), cost: z.number().int().min(0), times: z.number().int().min(1) })).default([]),
   execution: z.string().max(60),
   range: z.string().max(60),
   duration: z.string().max(60),

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { KeySchema } from "./system.js";
-import { ActionTemplateSchema, ActivationSchema, ItemFieldValueSchema, SaveSchema } from "./character.js";
+import { ActionTemplateSchema, ActivationSchema, EnhancementSchema, ItemFieldValueSchema, SaveSchema } from "./character.js";
 
 /**
  * Compêndio: biblioteca de itens pré-definidos (classes, raças, armas, magias...).
@@ -29,6 +29,8 @@ export const CompendiumEntrySchema = z.object({
   /** Ações sem id; o id é gerado ao copiar para a ficha. */
   actions: z.array(ActionTemplateSchema).default([]),
   activation: ActivationSchema.nullable().default(null),
+  /** Aprimoramentos (só mecânica: id, custo, repetível). O texto vem de descriptions.local.json ("<id>#<enhId>"). */
+  enhancements: z.array(EnhancementSchema).default([]),
   save: SaveSchema.nullable().default(null),
   /** Stats fornecidos quando equipado (chaves de itemKinds[].statBonuses). */
   statBonuses: z.record(KeySchema, z.number()).default({}),

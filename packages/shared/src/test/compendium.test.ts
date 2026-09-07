@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import { basename } from "node:path";
 import {
   CUSTOM_FILE,
+  enhancementTextKey,
   getSystemCompendium,
   listCompendiumFiles,
   loadCompendiumEntries,
   readCompendiumFile,
   validateCompendiumEntries,
+  withLocalTexts,
 } from "../compendium/index.js";
 import { listSystemIds } from "../systems.js";
 
@@ -45,6 +47,17 @@ describe("compêndios (packages/shared/systems/<id>/compendium/*.json)", () => {
 
   it("sistema sem pasta de compêndio carrega vazio", () => {
     expect(loadCompendiumEntries("nao-existe-compendio")).toEqual([]);
+  });
+
+  it("textos locais preenchem descrição e aprimoramentos vazios pela chave \"id#enh\"", () => {
+    const [entry] = validateCompendiumEntries("tormenta20", [
+      { id: "s", name: "S", kind: "spell", fields: { circle: 1, school: "evocacao", type: "arcana" }, enhancements: [{ id: "e1", cost: 1 }, { id: "e2", cost: 2, label: "já tinha" }] },
+    ]);
+    const filled = withLocalTexts(entry!, { s: "Descrição", [enhancementTextKey("s", "e1")]: "+1d6", [enhancementTextKey("s", "e2")]: "ignorado" });
+    expect(filled.description).toBe("Descrição");
+    expect(filled.enhancements.map((e) => e.label)).toEqual(["+1d6", "já tinha"]);
+    // Sem texto local, a entrada volta igual (mesma referência).
+    expect(withLocalTexts(entry!, {})).toBe(entry);
   });
 });
 

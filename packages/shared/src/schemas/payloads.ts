@@ -3,7 +3,7 @@ import { IdSchema } from "./common.js";
 import { GridConfigSchema } from "./scene.js";
 import { FogShapeSchema } from "./fog.js";
 import { InitiativeEntrySchema } from "./initiative.js";
-import { CharacterDataSchema, CharacterKindSchema, CharacterRollRequestSchema } from "./character.js";
+import { CharacterDataSchema, CharacterKindSchema, CharacterRollRequestSchema, EnhancementUseSchema } from "./character.js";
 
 /**
  * Schemas dos payloads que entram no servidor (socket e HTTP).
@@ -132,8 +132,12 @@ export const CharacterRollSchema = z.object({
 });
 export type CharacterRollPayload = z.infer<typeof CharacterRollSchema>;
 
-/** Usa um item ativo (poder, magia): desconta o custo e publica o card no chat. */
-export const CharacterUseItemSchema = z.object({ characterId: IdSchema, itemId: IdSchema });
+/**
+ * Usa um item ativo (poder, magia): desconta o custo e publica o card no chat.
+ * `enhancements` = aprimoramentos escolhidos; o servidor valida contra o item
+ * (ids existentes, times = 1 se não repetível) e cobra o custo total.
+ */
+export const CharacterUseItemSchema = z.object({ characterId: IdSchema, itemId: IdSchema, enhancements: z.array(EnhancementUseSchema).default([]) });
 export type CharacterUseItemPayload = z.infer<typeof CharacterUseItemSchema>;
 
 // --- Chat ------------------------------------------------------------------
