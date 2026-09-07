@@ -18,6 +18,21 @@ export type Key = z.infer<typeof KeySchema>;
 export const OptionDefSchema = z.object({ key: KeySchema, label: z.string().min(1) });
 export type OptionDef = z.infer<typeof OptionDefSchema>;
 
+/** Cor em hex de 6 dígitos ("#f4511e"); a UI deriva o fundo translúcido dela. */
+export const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+/** Grupo de tipos de dano que compartilham a cor do selo (ex.: "físico" para corte, impacto, perfuração). */
+export const DamageTypeGroupDefSchema = z.object({ key: KeySchema, label: z.string().min(1), color: HexColorSchema });
+export type DamageTypeGroupDef = z.infer<typeof DamageTypeGroupDefSchema>;
+
+/** Tipo de dano. Cor do selo: `color` própria, senão a do `group`, senão cinza neutro na UI. */
+export const DamageTypeDefSchema = OptionDefSchema.extend({
+  color: HexColorSchema.optional(),
+  /** Chave em damageTypeGroups[]. */
+  group: KeySchema.optional(),
+});
+export type DamageTypeDef = z.infer<typeof DamageTypeDefSchema>;
+
 /**
  * Fórmulas usam placeholders entre chaves, resolvidos em tempo de cálculo/rolagem:
  *   {attr.<key>}         valor do atributo (já é o modificador em T20)
@@ -303,7 +318,8 @@ export const SystemDefinitionSchema = z.object({
   derived: z.array(DerivedDefSchema).default([]),
   level: LevelDefSchema,
   sizes: z.array(SizeDefSchema).default([]),
-  damageTypes: z.array(OptionDefSchema).default([]),
+  damageTypeGroups: z.array(DamageTypeGroupDefSchema).default([]),
+  damageTypes: z.array(DamageTypeDefSchema).default([]),
   currencies: z.array(CurrencyDefSchema).default([]),
   traitFields: z.array(TraitFieldDefSchema).default([]),
   equipStats: z.array(EquipStatDefSchema).default([]),
@@ -394,6 +410,12 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
   assertUnique(def, "stat derivado", def.derived.map((d) => d.key));
   assertUnique(def, "equipStat", def.equipStats.map((e) => e.key));
   assertUnique(def, "tipo de item", def.itemKinds.map((k) => k.key));
+  assertUnique(def, "tipo de dano", def.damageTypes.map((d) => d.key));
+  assertUnique(def, "grupo de tipo de dano", def.damageTypeGroups.map((g) => g.key));
+
+  for (const type of def.damageTypes) {
+    if (type.group !== undefined && !def.damageTypeGroups.some((g) => g.key === type.group)) fail(def, `tipo de dano "${type.key}" referencia grupo inexistente "${type.group}"`);
+  }
 
   for (const skill of def.skills) {
     if (!attrKeys.has(skill.attribute)) fail(def, `perícia "${skill.key}" referencia atributo inexistente "${skill.attribute}"`);

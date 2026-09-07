@@ -9,15 +9,24 @@ import { SkillsSection } from "./character/SkillsSection";
 import { ItemsSection } from "./character/ItemsSection";
 import { ModifiersSection } from "./character/ModifiersSection";
 import { DetailsSection } from "./character/DetailsSection";
-import { CompendiumPalette } from "./compendium/CompendiumPalette";
+import { CompendiumPalette, PALETTE_WIDTH_PX } from "./compendium/CompendiumPalette";
 import { DragGhost } from "./compendium/DragGhost";
 import { useCompendium } from "../store/compendium";
 import { isOpenPaletteShortcut } from "../lib/compendium";
 import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
 import { isTyping } from "../lib/isTyping";
+import { useMediaQuery } from "../lib/useMediaQuery";
 
 /** Id do alvo de soltura da ficha (lib/dropTargets). */
 const SHEET_DROP_TARGET = "character-sheet";
+
+/** Largura máxima do painel da ficha (Tailwind max-w-3xl = 48rem). */
+const SHEET_MAX_WIDTH_PX = 768;
+/**
+ * A paleta só encaixa ao lado da ficha se a janela couber as duas sem encolher a
+ * ficha (768 + 384 + folga). Abaixo disso ela flutua por cima, alinhada à esquerda.
+ */
+const PALETTE_DOCK_QUERY = `(min-width: ${SHEET_MAX_WIDTH_PX + PALETTE_WIDTH_PX + 28}px)`;
 
 export interface CharacterSheetDrawerProps {
   def: SystemDefinition;
@@ -49,6 +58,7 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
   const compendiumOpen = useCompendium((s) => s.isOpen);
   const openCompendium = useCompendium((s) => s.open);
   const closeCompendium = useCompendium((s) => s.close);
+  const paletteDocked = useMediaQuery(PALETTE_DOCK_QUERY);
   // A paleta só faz sentido editando; se a ficha sair do modo edição (ou fechar), ela fecha junto.
   useEffect(() => {
     if (!(isEditMode && canEdit)) closeCompendium();
@@ -85,10 +95,17 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
   const computed = useMemo(() => (character ? computeCharacter(def, character) : null), [def, character]);
   // Quem não pode editar nunca fica em modo edição (ex.: jogador vendo a ficha de outro).
   const editing = isEditMode && canEdit;
+  const paletteOpen = compendiumOpen && editing && character !== null;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="fixed inset-0 bg-black/70 backdrop-blur-[2px]" onClick={onClose} />
+
+      {/* Paleta encaixada: irmã da ficha, à esquerda, ocupando espaço do backdrop (a ficha não se move). */}
+      {paletteOpen && paletteDocked && character && (
+        <CompendiumPalette def={def} character={character} mode="docked" onInsert={onInsertFromCompendium} onClose={closeCompendium} />
+      )}
+      {paletteOpen && <DragGhost def={def} />}
 
       <div
         id="character-sheet-drawer"
@@ -147,11 +164,9 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
               <span>{editing ? "Modo edição" : canEdit ? "Modo visualização (clique para rolar)" : "Somente leitura"}</span>
             </div>
 
-            {compendiumOpen && editing && (
-              <>
-                <CompendiumPalette def={def} character={character} onInsert={onInsertFromCompendium} onClose={closeCompendium} />
-                <DragGhost def={def} />
-              </>
+            {/* Janela estreita: a paleta flutua por cima da ficha, alinhada à esquerda. */}
+            {paletteOpen && !paletteDocked && (
+              <CompendiumPalette def={def} character={character} mode="floating" onInsert={onInsertFromCompendium} onClose={closeCompendium} />
             )}
           </>
         ) : (

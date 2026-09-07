@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { IdSchema } from "./common.js";
 import { ItemCardSchema } from "./character.js";
+import { KeySchema } from "./system.js";
 
 /**
  * Resultado de um único grupo de dados dentro da fórmula.
@@ -16,14 +17,24 @@ export const DiceGroupResultSchema = z.object({
 });
 export type DiceGroupResult = z.infer<typeof DiceGroupResultSchema>;
 
+/** Uma parcela de dano já rolada. */
+export const DamageRollComponentSchema = z.object({
+  damageType: KeySchema.nullable(),
+  formula: z.string().min(1).max(200),
+  groups: z.array(DiceGroupResultSchema),
+  modifier: z.number().int(),
+  total: z.number().int(),
+});
+export type DamageRollComponent = z.infer<typeof DamageRollComponentSchema>;
+
 export const DiceRollSchema = z.object({
   id: IdSchema,
   roomId: IdSchema,
   /** Quem rolou. */
   participantId: IdSchema,
   nickname: z.string(),
-  /** Fórmula original digitada, ex.: "1d20+5". */
-  formula: z.string().min(1).max(200),
+  /** Fórmula rolada (normalizada), ex.: "1d20+5"; dano com várias parcelas junta todas ("6d6 + 1 + 4d6"). */
+  formula: z.string().min(1).max(600),
   /** Rótulo opcional, ex.: "Ataque com espada". */
   label: z.string().max(80).optional(),
   groups: z.array(DiceGroupResultSchema),
@@ -36,6 +47,12 @@ export const DiceRollSchema = z.object({
   characterId: IdSchema.optional(),
   /** Resultado natural do dado a partir do qual é crítico (ataques com margem ampliada). Ausente = máximo do dado. */
   critThreshold: z.number().int().optional(),
+  /**
+   * Rolagem de dano da ficha: uma parcela por tipo de dano, cada uma rolada em separado
+   * (groups/modifier/total acima são a junção). A UI mostra "21 (7 fogo + 14 frio)".
+   * Ausente = rolagem sem tipo (teste, ataque, /r).
+   */
+  damage: z.array(DamageRollComponentSchema).optional(),
   createdAt: z.string().datetime(),
 });
 export type DiceRoll = z.infer<typeof DiceRollSchema>;

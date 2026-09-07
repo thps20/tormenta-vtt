@@ -107,6 +107,23 @@ export function rollParsed(parsed: ParsedFormula, rng: Rng = Math.random): RollO
   return { formula: parsed.normalized, groups: v.groups, modifier: v.constant, total: diceTotal + v.constant };
 }
 
+/**
+ * Rola várias fórmulas como uma rolagem só (parcelas de dano por tipo): `formula`
+ * é a junção ("6d6 + 1 + 4d6"), groups/modifier/total somam tudo e `parts` guarda
+ * cada parcela na ordem recebida. Rolar em separado é o mesmo que rolar junto: cada
+ * dado é independente; só muda que dá para saber quanto cada parcela rendeu.
+ */
+export function rollParsedMany(parsed: ParsedFormula[], rng: Rng = Math.random): RollOutcome & { parts: RollOutcome[] } {
+  const parts = parsed.map((p) => rollParsed(p, rng));
+  return {
+    formula: parts.map((p) => p.formula).join(" + "),
+    groups: parts.flatMap((p) => p.groups),
+    modifier: parts.reduce((acc, p) => acc + p.modifier, 0),
+    total: parts.reduce((acc, p) => acc + p.total, 0),
+    parts,
+  };
+}
+
 /** Atalho: parseia e rola. Lança DiceParseError se a fórmula for inválida. */
 export function roll(formula: string, rng: Rng = Math.random): RollOutcome {
   return rollParsed(parseFormula(formula), rng);

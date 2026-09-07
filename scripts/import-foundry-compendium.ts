@@ -847,17 +847,39 @@ function htmlToText(html: string, unknownEntities: Set<string>): string {
 /** Tamanho máximo do texto de um aprimoramento (EnhancementSchema.label). */
 const ENHANCEMENT_TEXT_MAX = 1000;
 
+/** Tipo de dano que a frase nomeia mas o sistema não tem: fica só custo e vai para o TODO. */
+export interface UnknownDamageType {
+  unknownType: string;
+}
+
 /**
  * Efeito mecânico a partir do texto, SÓ quando a frase inteira casa um padrão
  * estrito. Qualquer outra frase devolve null (vai para o relatório): nunca inferir.
+ * "+4d6 de dano de frio" / "aumenta o dano em +2d6 de fogo" preenchem `damageType`
+ * (rótulo → chave via `damageTypeKey`); tipo desconhecido devolve { unknownType }.
  */
-export function parseEnhancementEffect(text: string): EnhancementEffect | null {
+export function parseEnhancementEffect(text: string, damageTypeKey: (label: string) => string | null = () => null): EnhancementEffect | UnknownDamageType | null {
   const t = text.trim().replace(/\s+/g, " ").toLowerCase();
-  const add = /^aumenta o dano em \+?(\d+d\d+)[.;]?$/.exec(t) ?? /^\+?(\d+d\d+) de dano[.;]?$/.exec(t);
-  if (add?.[1]) return { kind: "damageDiceAdd", dice: add[1] };
+  const add = /^aumenta o dano em \+?(\d+d\d+)(?: de ([\p{L}]+))?[.;]?$/u.exec(t) ?? /^\+?(\d+d\d+) de dano(?: de ([\p{L}]+))?[.;]?$/u.exec(t);
+  if (add?.[1]) {
+    const typeLabel = add[2];
+    if (typeLabel === undefined) return { kind: "damageDiceAdd", dice: add[1] };
+    const key = damageTypeKey(typeLabel);
+    return key ? { kind: "damageDiceAdd", dice: add[1], damageType: key } : { unknownType: typeLabel };
+  }
   const set = /^muda o dano para (\d+d\d+)[.;]?$/.exec(t);
   if (set?.[1]) return { kind: "damageSet", formula: set[1] };
   return null;
+}
+
+/** Chave de tipo de dano a partir do rótulo ou da própria chave, sem acento/caixa ("Frio", "frio" → "frio"). */
+function damageTypeKeyResolver(def: SystemDefinition): (label: string) => string | null {
+  const byLabel = new Map<string, string>();
+  for (const d of def.damageTypes) {
+    byLabel.set(normalize(d.label), d.key);
+    byLabel.set(normalize(d.key), d.key);
+  }
+  return (label) => byLabel.get(normalize(label)) ?? null;
 }
 
 /** Categoria do relatório para um aprimoramento sem efeito (primeira que casar). */
@@ -885,7 +907,7 @@ interface ExtractedEnhancements {
  * checkbox "Múltiplas Aplicações" (repetível). Em magia, custo vazio é o
  * Truque, que é outra regra (custo total 0): fica só na descrição.
  */
-function extractEnhancements(doc: FoundryDoc, id: string, kind: string, report: Report, unknownEntities: Set<string>): ExtractedEnhancements {
+function extractEnhancements(doc: FoundryDoc, id: string, kind: string, report: Report, unknownEntities: Set<string>, damageTypeKey: (label: string) => string | null): ExtractedEnhancements {
   const list: ExtractedEnhancements["list"] = [];
   const texts = new Map<string, string>();
   const lines: string[] = [];
@@ -919,9 +941,14 @@ function extractEnhancements(doc: FoundryDoc, id: string, kind: string, report: 
     }
     if (flags.aumenta === undefined) report.todo("aprimoramento: sem a flag de múltiplas aplicações (gravado como não repetível)", id, `"${text.slice(0, 80)}"`);
     const enhId = `e${list.length + 1}`;
-    const mech = parseEnhancementEffect(text);
+    const parsed = parseEnhancementEffect(text, damageTypeKey);
+    let mech: EnhancementEffect | null = null;
+    if (parsed && "unknownType" in parsed) {
+      // O texto nomeia um tipo que o sistema não tem: fica só custo e vira pendência (não é "sem padrão").
+      report.todo("aprimoramento: tipo de dano sem correspondência (gravado só custo)", id, `\`${parsed.unknownType}\`: "${text.slice(0, 80)}"`);
+    } else mech = parsed;
     if (mech) report.bump(report.effectsByKind, mech.kind);
-    else {
+    else if (!parsed) {
       const category = report.noEffect.get(noEffectCategory(text)) ?? [];
       category.push(`\`${enhancementTextKey(id, enhId)}\`: ${text.length > 100 ? `${text.slice(0, 99)}…` : text}`);
       report.noEffect.set(noEffectCategory(text), category);
@@ -976,6 +1003,7 @@ function main(): void {
   const def = getSystemDefinition(opts.systemId);
   const report = new Report();
   const converter = new Converter(def, report);
+  const damageTypeKey = damageTypeKeyResolver(def);
   const outDir = compendiumDir(opts.systemId);
   if (!existsSync(outDir)) throw new Error(`Pasta do compêndio não existe: ${outDir}`);
   const scriptsDir = dirname(fileURLToPath(import.meta.url));
@@ -1038,7 +1066,7 @@ function main(): void {
     drafts.set(kind, list);
 
     // Aprimoramentos só em tipos com bloco de ativação (o schema recusa nos outros).
-    const enhancements = converter.kind(kind).hasActivation ? extractEnhancements(doc, id, kind, report, unknownEntities) : null;
+    const enhancements = converter.kind(kind).hasActivation ? extractEnhancements(doc, id, kind, report, unknownEntities, damageTypeKey) : null;
     if (enhancements && enhancements.list.length > 0) draft.enhancements = enhancements.list.map((e) => ({ ...e, label: "" }));
 
     if (opts.withDescriptions) {

@@ -19,6 +19,7 @@ import {
   type CharacterPatch,
   type CharacterRollRequest,
   type ComputedCharacter,
+  type BuiltRoll,
   type EnhancementEffect,
   type EnhancementUse,
   type ItemFieldDef,
@@ -32,6 +33,7 @@ import { newId } from "../../lib/ids";
 import { useCompendium } from "../../store/compendium";
 import { kindIcon } from "./kindIcons";
 import { EnhancementPicker } from "./EnhancementPicker";
+import { DamageFormula, EffectDamageType } from "../DamageTypeBadge";
 import { NumInput, Select, TextArea, TextInput, ghostBtn, smallBtn } from "./fields";
 import { AttributeBonusesEditor, AttributeChoiceField, SizeField, SkillGrantsField, summarizeField } from "./StructuredFields";
 
@@ -77,10 +79,10 @@ function newAction(def: SystemDefinition, kind: Action["kind"]): Action {
   }
 }
 
-/** Fórmula que o servidor rolaria para esta ação (só para mostrar no botão). */
-function previewFormula(def: SystemDefinition, character: Character, itemId: string, actionId: string): string | null {
+/** Rolagem que o servidor montaria para esta ação (fórmula e parcelas de dano), só para mostrar no botão. */
+function previewRoll(def: SystemDefinition, character: Character, itemId: string, actionId: string): BuiltRoll | null {
   try {
-    return buildCharacterRoll(def, character, { type: "action", itemId, actionId }).formula;
+    return buildCharacterRoll(def, character, { type: "action", itemId, actionId });
   } catch (err) {
     if (err instanceof RollBuildError) return null;
     throw err;
@@ -361,18 +363,23 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
             </div>
           )}
           {item.actions.map((act) => {
-            const formula = previewFormula(def, character, item.id, act.id);
+            const built = previewRoll(def, character, item.id, act.id);
             return (
               <button
                 key={act.id}
                 onClick={() => onRoll(act.id)}
                 disabled={!canRoll}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#221c14] hover:bg-[#33281b] border border-[#d4af37]/50 hover:border-[#d4af37] text-amber-100 text-xs font-serif font-semibold transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                title={formula ? `Rolar ${act.label}: ${formula}` : `Rolar ${act.label}`}
+                title={built ? `Rolar ${act.label}: ${built.formula}` : `Rolar ${act.label}`}
               >
                 <Dices className="w-3.5 h-3.5 text-[#d4af37]" />
                 <span>{act.label}</span>
-                {formula && <span className={`font-mono font-bold ml-0.5 ${act.kind === "attack" ? "text-emerald-400" : "text-amber-300"}`}>({formula})</span>}
+                {/* Dano: cada parcela com o selo do tipo ("6d6 + 1 [Fogo]"); demais ações só a fórmula. */}
+                {built && (
+                  <span className={`font-mono font-bold ml-0.5 ${act.kind === "attack" ? "text-emerald-400" : "text-amber-300"}`}>
+                    ({built.damage ? <DamageFormula def={def} components={built.damage} /> : built.formula})
+                  </span>
+                )}
               </button>
             );
           })}
@@ -400,7 +407,7 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
             <>
               {/* Passivo: só a descrição. Ativo: bloco de ativação + resistência com a CD calculada. */}
               {!passive && item.activation && <ActivationView def={def} activation={item.activation} />}
-              {!passive && item.enhancements.length > 0 && <EnhancementsView abbr={costResource?.abbr ?? ""} enhancements={item.enhancements} />}
+              {!passive && item.enhancements.length > 0 && <EnhancementsView def={def} abbr={costResource?.abbr ?? ""} enhancements={item.enhancements} />}
               {!passive && item.save && (
                 <div className="text-[11px] text-zinc-400 font-mono flex items-center gap-2 flex-wrap">
                   <span>
@@ -426,7 +433,7 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
 // --- Ativação (poderes, magias, consumíveis) --------------------------------
 
 /** Lista dos aprimoramentos do item (fora do modo edição). "×" marca os repetíveis. */
-const EnhancementsView: React.FC<{ abbr: string; enhancements: CharacterItem["enhancements"] }> = ({ abbr, enhancements }) => (
+const EnhancementsView: React.FC<{ def: SystemDefinition; abbr: string; enhancements: CharacterItem["enhancements"] }> = ({ def, abbr, enhancements }) => (
   <ul className="p-2 rounded bg-[#181613] border border-[#2d261c] space-y-0.5 text-[11px]">
     {enhancements.map((e) => (
       <li key={e.id} className="flex gap-1.5">
@@ -435,6 +442,7 @@ const EnhancementsView: React.FC<{ abbr: string; enhancements: CharacterItem["en
           {e.repeatable ? " ×" : ""}
         </span>
         {describeEffect(e) && <span className="shrink-0 px-1 rounded bg-amber-950/40 border border-amber-800/60 text-amber-300 font-mono text-[10px]">{describeEffect(e)}</span>}
+        <EffectDamageType def={def} effect={enhancementEffect(e)} />
         <span className="text-zinc-300 font-serif">{e.label || <span className="text-zinc-600 italic">sem texto</span>}</span>
       </li>
     ))}
@@ -631,7 +639,7 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onP
                 repetível
               </label>
               {/* Efeito mecânico: o importador só preenche por padrão estrito; o jogador completa aqui. */}
-              <EnhancementEffectEditor effect={enhancementEffect(e)} onChange={(effect) => patchEnhancement(e.id, { effect })} />
+              <EnhancementEffectEditor def={def} effect={enhancementEffect(e)} onChange={(effect) => patchEnhancement(e.id, { effect })} />
               <button onClick={() => onPatch({ enhancements: item.enhancements.filter((x) => x.id !== e.id) })} className="p-1 rounded text-zinc-500 hover:text-red-400 cursor-pointer" title="Remover aprimoramento">
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -692,20 +700,31 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onP
   );
 };
 
-/** Tipo e valor do efeito de um aprimoramento (dados "XdY" validados no commit; fórmula livre). */
-const EnhancementEffectEditor: React.FC<{ effect: EnhancementEffect; onChange: (effect: EnhancementEffect | undefined) => void }> = ({ effect, onChange }) => (
+/** Tipo e valor do efeito de um aprimoramento (dados "XdY" validados no commit; fórmula livre; tipo de dano do extra). */
+const EnhancementEffectEditor: React.FC<{ def: SystemDefinition; effect: EnhancementEffect; onChange: (effect: EnhancementEffect | undefined) => void }> = ({ def, effect, onChange }) => (
   <label className="flex items-center gap-1 text-zinc-400" title="O que muda no dano ao conjurar com este aprimoramento">
     efeito
     <Select value={effect.kind} onChange={(kind) => onChange(effectForKind(kind as EnhancementEffect["kind"], effect))} options={EFFECT_KIND_OPTIONS} />
     {effect.kind === "damageDiceAdd" && (
-      <TextInput
-        value={effect.dice}
-        onCommit={(dice) => DiceTermSchema.safeParse(dice.trim()).success && onChange({ kind: "damageDiceAdd", dice: dice.trim() })}
-        placeholder="1d6"
-        className="w-16 font-mono"
-        maxLength={10}
-        title="Dados somados ao dano por aplicação (ex.: 1d6)"
-      />
+      <>
+        <TextInput
+          value={effect.dice}
+          onCommit={(dice) => DiceTermSchema.safeParse(dice.trim()).success && onChange({ ...effect, dice: dice.trim() })}
+          placeholder="1d6"
+          className="w-16 font-mono"
+          maxLength={10}
+          title="Dados somados ao dano por aplicação (ex.: 1d6)"
+        />
+        {/* Sem tipo = herda o da ação (mesma parcela); com tipo = parcela separada ("+1d6 de dano de frio"). */}
+        {def.damageTypes.length > 0 && (
+          <Select
+            value={effect.damageType ?? ""}
+            onChange={(v) => onChange(v ? { kind: "damageDiceAdd", dice: effect.dice, damageType: v } : { kind: "damageDiceAdd", dice: effect.dice })}
+            options={[{ value: "", label: "tipo da ação" }, ...def.damageTypes.map((d) => ({ value: d.key, label: d.label }))]}
+            title="Tipo de dano dos dados extras; 'tipo da ação' soma na mesma parcela"
+          />
+        )}
+      </>
     )}
     {effect.kind === "damageSet" && (
       <TextInput value={effect.formula} onCommit={(formula) => formula.trim() && onChange({ kind: "damageSet", formula: formula.trim() })} placeholder="10d6" className="w-24 font-mono" maxLength={200} title="Fórmula que substitui os dados do dano" />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DiceParseError, parseFormula } from "./parser.js";
-import { evaluateConstant, roll } from "./roller.js";
+import { evaluateConstant, roll, rollParsedMany } from "./roller.js";
 
 /** RNG que devolve valores fixos em sequência (repete o último). */
 function seq(values: number[]) {
@@ -137,5 +137,21 @@ describe("evaluateConstant", () => {
 
   it("rejeita dados", () => {
     expect(() => evaluateConstant("10 + 1d6")).toThrow(DiceParseError);
+  });
+});
+
+describe("rollParsedMany (parcelas de dano por tipo)", () => {
+  it("rola cada parcela em separado e junta fórmula, grupos, modificador e total", () => {
+    // 2d6 → 6 e 1; 4d6 → 6, 6, 1, 1; a constante fica na primeira parcela.
+    const out = rollParsedMany([parseFormula("2d6 + 3", { requireDice: false }), parseFormula("4d6")], seq([0.99, 0, 0.99, 0.99, 0, 0]));
+    expect(out.parts.map((p) => p.total)).toEqual([10, 14]);
+    expect(out.parts.map((p) => p.formula)).toEqual(["2d6+3", "4d6"]);
+    expect(out).toMatchObject({ formula: "2d6+3 + 4d6", modifier: 3, total: 24 });
+    expect(out.groups.map((g) => g.rolls)).toEqual([[6, 1], [6, 6, 1, 1]]);
+  });
+
+  it("uma parcela só é igual a rollParsed", () => {
+    const out = rollParsedMany([parseFormula("1d8")], seq([0.5]));
+    expect(out).toMatchObject({ formula: "1d8", total: 5, parts: [{ total: 5 }] });
   });
 });

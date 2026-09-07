@@ -126,6 +126,7 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
         secret,
         characterId: character.id,
         critThreshold: built.critThreshold,
+        damage: built.damage,
         allowNoDice: true,
       });
     }),

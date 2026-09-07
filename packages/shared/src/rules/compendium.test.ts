@@ -60,6 +60,10 @@ describe("validateCompendiumEntry", () => {
   it("confere perícias e atributos das ações", () => {
     expect(validateCompendiumEntry(def, weapon({ actions: [{ label: "A", kind: "attack", skill: "percepcao" }] }))).toMatch(/não é perícia de ataque/);
     expect(validateCompendiumEntry(def, weapon({ actions: [{ label: "D", kind: "damage", formula: "1d6", damageType: "sonico" }] }))).toMatch(/tipo de dano desconhecido/);
+    // Efeito de aprimoramento com tipo próprio: a chave precisa existir em damageTypes[].
+    const spell = (effect: unknown) => ({ id: "s", name: "S", kind: "spell", activation: { cost: 1 }, enhancements: [{ id: "e1", cost: 2, effect }] });
+    expect(validateCompendiumEntry(def, CompendiumEntrySchema.parse(spell({ kind: "damageDiceAdd", dice: "1d6", damageType: "frio" })))).toBeNull();
+    expect(validateCompendiumEntry(def, CompendiumEntrySchema.parse(spell({ kind: "damageDiceAdd", dice: "1d6", damageType: "sonico" })))).toMatch(/aprimoramento "e1": tipo de dano desconhecido "sonico"/);
     expect(validateCompendiumEntry(def, weapon({ actions: [{ label: "T", kind: "check", skill: "nope" }] }))).toMatch(/perícia desconhecida/);
   });
 });

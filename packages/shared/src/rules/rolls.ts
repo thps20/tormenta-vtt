@@ -2,7 +2,7 @@
  * Monta a fórmula de uma rolagem pedida a partir da ficha. Puro: devolve
  * { formula, label } com os placeholders já resolvidos; quem rola é o servidor.
  */
-import type { Action, Character, CharacterData, CharacterItem, CharacterRollRequest } from "../schemas/character.js";
+import type { Action, Character, CharacterData, CharacterItem, CharacterRollRequest, DamageComponent } from "../schemas/character.js";
 import type { SystemDefinition } from "../schemas/system.js";
 import { computeCharacter, makeResolver, parseModifiers, sumModifiers, type ComputedCharacter } from "./compute.js";
 import { applyDamageEnhancements, EnhancementError, resolveEnhancements } from "./enhancements.js";
@@ -17,6 +17,11 @@ export interface BuiltRoll {
   critThreshold?: number;
   /** Decomposição do dano quando aprimoramentos mudaram a fórmula ("6d6 base + 4d6 … ×2"); null = como está no item. */
   breakdown?: string | null;
+  /**
+   * Só ações de dano: parcelas por tipo, na ordem base → extras. `formula` acima é a
+   * junção; o servidor rola cada parcela em separado para o chat mostrar o total por tipo.
+   */
+  damage?: DamageComponent[];
 }
 
 export class RollBuildError extends Error {
@@ -130,9 +135,11 @@ export function buildCharacterRoll(def: SystemDefinition, character: Character |
             const skill = attackSkillOf(item);
             const bonus = sumModifiers(mods, (t) => t.kind === "damage" && (t.skill === null || t.skill === skill));
             // Aprimoramentos (só na ação de dano): dados primeiro, atributo e bônus depois ("6d6 + 4d6 + 3").
+            // Dados de outro tipo viram parcelas próprias, sem atributo/bônus (esses ficam só na base).
             const selected = resolveEnhancements(def, item, request.enhancements ?? []);
-            const enhanced = applyDamageEnhancements(substitutePlaceholders(action.formula, resolveGlobal), selected);
-            return { formula: joinParts(enhanced.formula, [attrValue, action.bonus, bonus]), label, breakdown: enhanced.breakdown };
+            const enhanced = applyDamageEnhancements(substitutePlaceholders(action.formula, resolveGlobal), action.damageType, selected);
+            const damage: DamageComponent[] = [{ formula: joinParts(enhanced.formula, [attrValue, action.bonus, bonus]), damageType: action.damageType }, ...enhanced.extra];
+            return { formula: damage.map((d) => d.formula).join(" + "), label, breakdown: enhanced.breakdown, damage };
           }
           case "check": {
             const skill = computed.skills[action.skill];

@@ -1,8 +1,11 @@
 import React from "react";
 import { Dices, Sparkles } from "lucide-react";
-import type { ChatMessage, ItemCard } from "@tormenta-vtt/shared";
+import type { ChatMessage, ItemCard, SystemDefinition } from "@tormenta-vtt/shared";
+import { DamageFormula } from "../DamageTypeBadge";
 
 interface ItemCardMessageProps {
+  /** Sistema da sala, para pintar os selos de tipo de dano (null = selos neutros). */
+  def: SystemDefinition | null;
   msg: ChatMessage;
   card: ItemCard;
   isGm: boolean;
@@ -18,7 +21,7 @@ interface ItemCardMessageProps {
  * servidor com os rótulos do sistema (ItemCard é denormalizado); os botões só
  * disparam character:roll { type: "action" } pela ficha de origem.
  */
-export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ msg, card, isGm, isMe, time, canAct, onRoll }) => {
+export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card, isGm, isMe, time, canAct, onRoll }) => {
   const meta: { label: string; value: string }[] = [];
   if (card.execution) meta.push({ label: "Execução", value: card.execution });
   if (card.range) meta.push({ label: "Alcance", value: card.range });
@@ -118,7 +121,8 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ msg, card, isG
             >
               <Dices className="w-3.5 h-3.5 text-[#d4af37]" />
               <span>{a.label}</span>
-              {a.formula && <span className="font-mono font-bold text-amber-300 ml-0.5">({a.formula})</span>}
+              {/* Dano: parcelas com o selo do tipo; cards antigos não têm `damage` e mostram só a fórmula. */}
+              {a.formula && <span className="font-mono font-bold text-amber-300 ml-0.5">({(a.damage ?? []).length > 0 ? <DamageFormula def={def} components={a.damage} /> : a.formula})</span>}
             </button>
           ))}
           {/* Decomposição do dano com os aprimoramentos (só quando algum efeito mudou a fórmula). */}

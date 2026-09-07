@@ -8,6 +8,7 @@ import { collectPlaceholders, substitutePlaceholders, FormulaError } from "./pla
 import { buildCharacterRoll, resolveCharacterFormula, RollBuildError } from "./rolls.js";
 import { baseCost, buildItemUse, describeActivation, effectiveCost, isPassiveItem, ItemUseError, saveDcFor, saveSkills } from "./activation.js";
 import { applyDamageEnhancements, EnhancementError, resolveEnhancements } from "./enhancements.js";
+import { damageTypeInfo } from "./damageTypes.js";
 import { describeClasses, pendingChoices, validateCharacterItems } from "./progression.js";
 
 const def = getSystemDefinition("tormenta20");
@@ -426,7 +427,7 @@ describe("aprimoramentos (custo total)", () => {
 });
 
 describe("aprimoramentos (efeito no dano)", () => {
-  /** Bola de fogo 6d6 (+1 de bônus na ação) com: add repetível 2d6, set 10d6, só custo, add 1d8. */
+  /** Bola de fogo 6d6 (+1 de bônus na ação) com: add repetível 2d6, set 10d6, só custo, add 1d8, add 1d6 de frio, add 2d6 de fogo (tipo da ação, explícito). */
   const fireball = CharacterItemSchema.parse({
     id: "fb",
     kind: "spell",
@@ -442,6 +443,9 @@ describe("aprimoramentos (efeito no dano)", () => {
       { id: "set2", label: "muda o dano para 12d6", cost: 7, effect: { kind: "damageSet", formula: "12d6" } },
       { id: "only", label: "muda o alcance para longo", cost: 1 },
       { id: "add8", label: "aumenta o dano em +1d8 (texto bem comprido para ser cortado no resumo)", cost: 2, effect: { kind: "damageDiceAdd", dice: "1d8" } },
+      { id: "frio", label: "+1d6 de dano de frio", cost: 2, repeatable: true, effect: { kind: "damageDiceAdd", dice: "1d6", damageType: "frio" } },
+      { id: "frio8", label: "+1d8 de dano de frio", cost: 3, effect: { kind: "damageDiceAdd", dice: "1d8", damageType: "frio" } },
+      { id: "fogo", label: "+2d6 de dano de fogo", cost: 2, effect: { kind: "damageDiceAdd", dice: "2d6", damageType: "fogo" } },
     ],
   });
   const c = {
@@ -455,39 +459,81 @@ describe("aprimoramentos (efeito no dano)", () => {
     updatedAt: "2026-09-06T00:00:00.000Z",
   };
   const sel = (...uses: [string, number][]) => resolveEnhancements(def, fireball, uses.map(([id, times]) => ({ id, times })));
+  const apply = (...uses: [string, number][]) => applyDamageEnhancements("6d6", "fogo", sel(...uses));
   const roll = (...uses: [string, number][]) => buildCharacterRoll(def, c, { type: "action", itemId: "fb", actionId: "dmg", enhancements: uses.map(([id, times]) => ({ id, times })) });
 
   it("applyDamageEnhancements: add, add repetível, set, set + add, sem efeito", () => {
-    expect(applyDamageEnhancements("6d6", sel(["add", 1]))).toEqual({ formula: "6d6 + 2d6", breakdown: "6d6 base + 2d6 aumenta o dano em +2d6" });
-    expect(applyDamageEnhancements("6d6", sel(["add", 2]))).toEqual({ formula: "6d6 + 4d6", breakdown: "6d6 base + 4d6 aumenta o dano em +2d6 ×2" });
-    expect(applyDamageEnhancements("6d6", sel(["set", 1]))).toEqual({ formula: "10d6", breakdown: "10d6 muda o dano para 10d6" });
-    expect(applyDamageEnhancements("6d6", sel(["set", 1], ["add", 1]))).toEqual({ formula: "10d6 + 2d6", breakdown: "10d6 muda o dano para 10d6 + 2d6 aumenta o dano em +2d6" });
-    expect(applyDamageEnhancements("6d6", sel(["only", 1]))).toEqual({ formula: "6d6", breakdown: null });
-    expect(applyDamageEnhancements("6d6", [])).toEqual({ formula: "6d6", breakdown: null });
+    expect(apply(["add", 1])).toEqual({ formula: "6d6 + 2d6", extra: [], breakdown: "6d6 base + 2d6 aumenta o dano em +2d6" });
+    expect(apply(["add", 2])).toEqual({ formula: "6d6 + 4d6", extra: [], breakdown: "6d6 base + 4d6 aumenta o dano em +2d6 ×2" });
+    expect(apply(["set", 1])).toEqual({ formula: "10d6", extra: [], breakdown: "10d6 muda o dano para 10d6" });
+    expect(apply(["set", 1], ["add", 1])).toEqual({ formula: "10d6 + 2d6", extra: [], breakdown: "10d6 muda o dano para 10d6 + 2d6 aumenta o dano em +2d6" });
+    expect(apply(["only", 1])).toEqual({ formula: "6d6", extra: [], breakdown: null });
+    expect(apply()).toEqual({ formula: "6d6", extra: [], breakdown: null });
     // Rótulo longo é cortado no resumo.
-    expect(applyDamageEnhancements("6d6", sel(["add8", 1])).breakdown).toBe("6d6 base + 1d8 aumenta o dano em +1d8 (texto bem compr…");
-    expect(() => applyDamageEnhancements("6d6", sel(["set", 1], ["set2", 1]))).toThrow(/Mais de um aprimoramento muda o dano/);
+    expect(apply(["add8", 1]).breakdown).toBe("6d6 base + 1d8 aumenta o dano em +1d8 (texto bem compr…");
+    expect(() => apply(["set", 1], ["set2", 1])).toThrow(/Mais de um aprimoramento muda o dano/);
+  });
+
+  it("applyDamageEnhancements: tipo de dano próprio vira parcela separada; igual ao da ação entra na base", () => {
+    // Outro tipo: parcela própria; repetir o mesmo tipo engrossa a mesma parcela (uma por tipo).
+    expect(apply(["frio", 2])).toEqual({ formula: "6d6", extra: [{ formula: "2d6", damageType: "frio" }], breakdown: "6d6 base + 2d6 +1d6 de dano de frio ×2" });
+    expect(apply(["frio", 1], ["frio8", 1]).extra).toEqual([{ formula: "1d6 + 1d8", damageType: "frio" }]);
+    // Tipo explícito igual ao da ação: mesma parcela, como se estivesse ausente.
+    expect(apply(["fogo", 1], ["add", 1])).toMatchObject({ formula: "6d6 + 2d6 + 2d6", extra: [] });
+    // set troca a base; o extra de outro tipo continua separado.
+    expect(apply(["set", 1], ["frio", 1])).toMatchObject({ formula: "10d6", extra: [{ formula: "1d6", damageType: "frio" }] });
+    // Ação sem tipo: efeito sem tipo herda o "sem tipo"; efeito tipado vira parcela.
+    expect(applyDamageEnhancements("1d8", null, sel(["add", 1], ["frio", 1]))).toMatchObject({ formula: "1d8 + 2d6", extra: [{ formula: "1d6", damageType: "frio" }] });
   });
 
   it("buildCharacterRoll: dados primeiro, bônus depois; ataque ignora a escolha; escolha inválida é RollBuildError", () => {
-    expect(roll()).toMatchObject({ formula: "6d6 + 1", breakdown: null });
+    expect(roll()).toMatchObject({ formula: "6d6 + 1", breakdown: null, damage: [{ formula: "6d6 + 1", damageType: "fogo" }] });
     expect(roll(["add", 2], ["only", 1])).toMatchObject({ formula: "6d6 + 4d6 + 1", breakdown: "6d6 base + 4d6 aumenta o dano em +2d6 ×2" });
     expect(roll(["set", 1])).toMatchObject({ formula: "10d6 + 1" });
-    expect(buildCharacterRoll(def, c, { type: "action", itemId: "fb", actionId: "atk", enhancements: [{ id: "add", times: 2 }] }).breakdown).toBeUndefined();
+    expect(buildCharacterRoll(def, c, { type: "action", itemId: "fb", actionId: "atk", enhancements: [{ id: "add", times: 2 }] })).not.toHaveProperty("damage");
     expect(() => roll(["nope", 1])).toThrow(RollBuildError);
     expect(() => roll(["set", 1], ["set2", 1])).toThrow(RollBuildError);
   });
 
-  it("card da conjuração guarda a fórmula final e a decomposição de cada ação", () => {
-    const use = buildItemUse(def, c, "fb", [{ id: "add", times: 2 }]);
+  it("buildCharacterRoll: atributo e bônus ficam só na parcela base; a fórmula completa junta as parcelas", () => {
+    expect(roll(["add", 1], ["frio", 2])).toMatchObject({
+      formula: "6d6 + 2d6 + 1 + 2d6",
+      damage: [
+        { formula: "6d6 + 2d6 + 1", damageType: "fogo" },
+        { formula: "2d6", damageType: "frio" },
+      ],
+    });
+  });
+
+  it("card da conjuração guarda a fórmula final, a decomposição e as parcelas de cada ação", () => {
+    const use = buildItemUse(def, c, "fb", [{ id: "add", times: 2 }, { id: "frio", times: 1 }]);
     expect(use.card.actions).toEqual([
-      { id: "dmg", label: "Dano", kind: "damage", formula: "6d6 + 4d6 + 1", breakdown: "6d6 base + 4d6 aumenta o dano em +2d6 ×2" },
-      { id: "atk", label: "Toque", kind: "attack", formula: expect.stringMatching(/^1d20/), breakdown: null },
+      {
+        id: "dmg",
+        label: "Dano",
+        kind: "damage",
+        formula: "6d6 + 4d6 + 1 + 1d6",
+        breakdown: "6d6 base + 4d6 aumenta o dano em +2d6 ×2 + 1d6 +1d6 de dano de frio",
+        damage: [
+          { formula: "6d6 + 4d6 + 1", damageType: "fogo" },
+          { formula: "1d6", damageType: "frio" },
+        ],
+      },
+      { id: "atk", label: "Toque", kind: "attack", formula: expect.stringMatching(/^1d20/), breakdown: null, damage: [] },
     ]);
     // Sem efeito escolhido: fórmula como está no item e sem decomposição.
-    expect(buildItemUse(def, c, "fb", [{ id: "only", times: 1 }]).card.actions[0]).toMatchObject({ formula: "6d6 + 1", breakdown: null });
+    expect(buildItemUse(def, c, "fb", [{ id: "only", times: 1 }]).card.actions[0]).toMatchObject({ formula: "6d6 + 1", breakdown: null, damage: [{ formula: "6d6 + 1", damageType: "fogo" }] });
     // Dois sets: o uso é recusado antes de cobrar.
     expect(() => buildItemUse(def, c, "fb", [{ id: "set", times: 1 }, { id: "set2", times: 1 }])).not.toThrow();
+  });
+});
+
+describe("damageTypeInfo", () => {
+  it("cor própria, senão a do grupo, senão null; chave desconhecida vira rótulo", () => {
+    expect(damageTypeInfo(def, "fogo")).toEqual({ key: "fogo", label: "Fogo", color: "#f4511e", known: true });
+    expect(damageTypeInfo(def, "corte")).toMatchObject({ label: "Corte", color: def.damageTypeGroups.find((g) => g.key === "fisico")?.color, known: true });
+    expect(damageTypeInfo({ damageTypes: [{ key: "x", label: "X" }], damageTypeGroups: [] }, "x")).toEqual({ key: "x", label: "X", color: null, known: true });
+    expect(damageTypeInfo(def, "sonico")).toEqual({ key: "sonico", label: "sonico", color: null, known: false });
   });
 });
 

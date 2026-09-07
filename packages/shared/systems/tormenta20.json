@@ -84,20 +84,23 @@
     { "key": "colossal",  "label": "Colossal",  "skillModifier": -10, "tokenCells": 6 }
   ],
 
+  "damageTypeGroups": [
+    { "key": "fisico", "label": "Físico", "color": "#a8a29e" }
+  ],
   "damageTypes": [
-    { "key": "normal",       "label": "Dano" },
-    { "key": "corte",        "label": "Corte" },
-    { "key": "impacto",      "label": "Impacto" },
-    { "key": "perfuracao",   "label": "Perfuração" },
-    { "key": "acido",        "label": "Ácido" },
-    { "key": "eletricidade", "label": "Eletricidade" },
-    { "key": "essencia",     "label": "Essência" },
-    { "key": "fogo",         "label": "Fogo" },
-    { "key": "frio",         "label": "Frio" },
-    { "key": "luz",          "label": "Luz" },
-    { "key": "psiquico",     "label": "Psíquico" },
-    { "key": "trevas",       "label": "Trevas" },
-    { "key": "cura",         "label": "Cura" }
+    { "key": "normal",       "label": "Dano",         "group": "fisico" },
+    { "key": "corte",        "label": "Corte",        "group": "fisico" },
+    { "key": "impacto",      "label": "Impacto",      "group": "fisico" },
+    { "key": "perfuracao",   "label": "Perfuração",   "group": "fisico" },
+    { "key": "acido",        "label": "Ácido",        "color": "#84cc16" },
+    { "key": "eletricidade", "label": "Eletricidade", "color": "#facc15" },
+    { "key": "essencia",     "label": "Essência",     "color": "#bae6fd" },
+    { "key": "fogo",         "label": "Fogo",         "color": "#f4511e" },
+    { "key": "frio",         "label": "Frio",         "color": "#7dd3fc" },
+    { "key": "luz",          "label": "Luz",          "color": "#fbbf24" },
+    { "key": "psiquico",     "label": "Psíquico",     "color": "#e879f9" },
+    { "key": "trevas",       "label": "Trevas",       "color": "#a855f7" },
+    { "key": "cura",         "label": "Cura",         "color": "#4ade80" }
   ],
 
   "currencies": [

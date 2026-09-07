@@ -55,6 +55,21 @@
   animation: drawer-slide-in 0.25s ease-out;
 }
 
+/* Paleta encaixada à esquerda da ficha: sai de trás dela. */
+@keyframes palette-dock-in {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.palette-dock-in {
+  animation: palette-dock-in 0.2s ease-out;
+}
+
 /* Item recém-inserido do compêndio: brilho dourado que some. */
 @keyframes item-flash {
   0% {

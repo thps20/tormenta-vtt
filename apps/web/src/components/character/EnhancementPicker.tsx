@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus, X, Zap } from "lucide-react";
-import { effectiveCost, resolveEnhancements, type Character, type CharacterItem, type EnhancementUse, type SystemDefinition } from "@tormenta-vtt/shared";
+import { effectiveCost, enhancementEffect, resolveEnhancements, type Character, type CharacterItem, type EnhancementUse, type SystemDefinition } from "@tormenta-vtt/shared";
 import { describeEffect } from "../../lib/enhancements";
+import { EffectDamageType } from "../DamageTypeBadge";
 
 interface EnhancementPickerProps {
   def: SystemDefinition;
@@ -101,6 +102,7 @@ export const EnhancementPicker: React.FC<EnhancementPickerProps> = ({ def, chara
                     {describeEffect(e)}
                   </span>
                 )}
+                <EffectDamageType def={def} effect={enhancementEffect(e)} />{" "}
                 <span className="text-zinc-300 font-serif leading-snug line-clamp-2">{e.label || e.id}</span>
               </label>
             </li>

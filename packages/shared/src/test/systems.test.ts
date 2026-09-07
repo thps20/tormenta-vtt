@@ -32,6 +32,13 @@ describe("validateSystemDefinition (integridade)", () => {
   const base = JSON.parse(readFileSync(join(systemsDir, "tormenta20.json"), "utf-8")) as Record<string, unknown>;
   const withPatch = (patch: Record<string, unknown>) => ({ ...structuredClone(base), ...patch });
 
+  it("rejeita tipo de dano com grupo inexistente ou cor fora do hex", () => {
+    const damageTypes = [...(base.damageTypes as unknown[]), { key: "sonico", label: "Sônico", group: "nope" }];
+    expect(() => validateSystemDefinition(withPatch({ damageTypes }))).toThrow(/grupo inexistente "nope"/);
+    expect(() => validateSystemDefinition(withPatch({ damageTypes: [{ key: "x", label: "X", color: "red" }] }))).toThrow();
+    expect(() => validateSystemDefinition(withPatch({ damageTypes: [{ key: "x", label: "X" }, { key: "x", label: "X2" }] }))).toThrow(/tipo de dano/);
+  });
+
   it("rejeita perícia com atributo inexistente", () => {
     const skills = [...(base.skills as unknown[]), { key: "x", label: "X", attribute: "nope" }];
     expect(() => validateSystemDefinition(withPatch({ skills }))).toThrow(/atributo inexistente/);

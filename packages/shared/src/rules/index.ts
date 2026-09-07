@@ -8,3 +8,4 @@ export * from "./activation.js";
 export * from "./enhancements.js";
 export * from "./progression.js";
 export * from "./compendium.js";
+export * from "./damageTypes.js";

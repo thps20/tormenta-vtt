@@ -175,7 +175,7 @@ export function buildItemCard(
       : null,
     actions: item.actions.map((a) => {
       const built = builtOf(a.id);
-      return { id: a.id, label: a.label, kind: a.kind, formula: built?.formula ?? null, breakdown: built?.breakdown ?? null };
+      return { id: a.id, label: a.label, kind: a.kind, formula: built?.formula ?? null, breakdown: built?.breakdown ?? null, damage: built?.damage ?? [] };
     }),
   };
 }

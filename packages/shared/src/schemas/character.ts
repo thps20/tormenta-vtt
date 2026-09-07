@@ -109,13 +109,14 @@ export const DiceTermSchema = z.string().regex(/^\d+d\d+$/);
 /**
  * Efeito mecânico de um aprimoramento, aplicado à ação de dano do item ao usar:
  *   costOnly       só cobra (default quando `effect` está ausente)
- *   damageDiceAdd  soma `dice` × vezes ao dano ("aumenta o dano em +1d6")
+ *   damageDiceAdd  soma `dice` × vezes ao dano ("aumenta o dano em +1d6"). `damageType` ausente = herda o
+ *                  tipo da ação; presente = parcela separada com o próprio tipo ("+4d6 de dano de frio")
  *   damageSet      troca os dados do dano por `formula` ("muda o dano para 10d6"); atributo e bônus continuam
  * Explícito de propósito: o importador só preenche quando o texto casa um padrão estrito.
  */
 export const EnhancementEffectSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("costOnly") }),
-  z.object({ kind: z.literal("damageDiceAdd"), dice: DiceTermSchema }),
+  z.object({ kind: z.literal("damageDiceAdd"), dice: DiceTermSchema, damageType: KeySchema.optional() }),
   z.object({ kind: z.literal("damageSet"), formula: z.string().min(1).max(200) }),
 ]);
 export type EnhancementEffect = z.infer<typeof EnhancementEffectSchema>;
@@ -282,6 +283,14 @@ export const CharacterRollRequestSchema = z.discriminatedUnion("type", [
 export type CharacterRollRequest = z.infer<typeof CharacterRollRequestSchema>;
 
 /**
+ * Parcela de uma rolagem de dano: fórmula já resolvida e o tipo dela (null = sem
+ * tipo). Uma ação de dano vira uma parcela por tipo: a base (tipo da ação, com
+ * atributo e bônus) e uma para cada tipo extra vindo de aprimoramentos.
+ */
+export const DamageComponentSchema = z.object({ formula: z.string().min(1).max(200), damageType: KeySchema.nullable() });
+export type DamageComponent = z.infer<typeof DamageComponentSchema>;
+
+/**
  * Card publicado no chat quando um item ativo é usado (character:use-item).
  * Denormalizado de propósito: guarda rótulos já resolvidos pelo JSON do sistema,
  * então o histórico continua legível mesmo se o item mudar ou for apagado.
@@ -316,6 +325,8 @@ export const ItemCardSchema = z.object({
       formula: z.string().max(200).nullable().default(null),
       /** Decomposição quando algum efeito foi aplicado ("6d6 base + 4d6 aumenta o dano ×2"); null = dano como está no item. */
       breakdown: z.string().max(300).nullable().default(null),
+      /** Só ações de dano: parcelas por tipo (a UI mostra cada uma com o selo do tipo). Vazio nas demais e em cards antigos. */
+      damage: z.array(DamageComponentSchema).default([]),
     }),
   ),
 });

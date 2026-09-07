@@ -5,6 +5,7 @@ import { signed } from "../../lib/system";
 import { summarizeField } from "../character/StructuredFields";
 import { seeBook } from "../../lib/compendium";
 import type { PaletteRow } from "./CompendiumPalette";
+import { DamageTypeBadge } from "../DamageTypeBadge";
 
 interface EntryPreviewProps {
   def: SystemDefinition;
@@ -20,7 +21,7 @@ export const EntryPreview: React.FC<EntryPreviewProps> = ({ def, row, onReplace 
   const { entry, check } = row;
   const kind = def.itemKinds.find((k) => k.key === entry.kind);
   const physical = kind?.physical ?? true;
-  const lines: { label: string; value: string }[] = [];
+  const lines: { label: string; value: React.ReactNode }[] = [];
 
   for (const f of kind?.fields ?? []) {
     const v = entry.fields[f.key];
@@ -42,8 +43,15 @@ export const EntryPreview: React.FC<EntryPreviewProps> = ({ def, row, onReplace 
       const skill = def.skills.find((s) => s.key === a.skill)?.label ?? a.skill;
       lines.push({ label: a.label, value: `${skill}${a.bonus ? ` ${signed(a.bonus)}` : ""}, crítico ${a.critRange}/×${a.critMult}` });
     } else if (a.kind === "damage") {
-      const type = a.damageType ? (def.damageTypes.find((d) => d.key === a.damageType)?.label ?? a.damageType) : "";
-      lines.push({ label: a.label, value: `${a.formula}${a.bonus ? ` ${signed(a.bonus)}` : ""} ${type}`.trim() });
+      lines.push({
+        label: a.label,
+        value: (
+          <>
+            {a.formula}
+            {a.bonus ? ` ${signed(a.bonus)}` : ""} <DamageTypeBadge def={def} type={a.damageType} />
+          </>
+        ),
+      });
     } else if (a.kind === "check") {
       lines.push({ label: a.label, value: def.skills.find((s) => s.key === a.skill)?.label ?? a.skill });
     } else {

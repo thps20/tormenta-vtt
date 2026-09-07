@@ -2,7 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Dices, Scroll, ShieldAlert } from 'lucide-react';
 import type { Character, CharacterRollRequest, ChatMessage, Participant } from '@tormenta-vtt/shared';
 import { canEditCharacter } from '../store/characters';
+import { useSystemDef } from '../lib/system';
 import { ItemCardMessage } from './chat/ItemCardMessage';
+import { DamageFormula, DamageTypeBadge } from './DamageTypeBadge';
 
 interface ChatTabProps {
   messages: ChatMessage[];
@@ -23,6 +25,8 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   onRollCharacter,
 }) => {
   const currentUserId = me.id;
+  // Sistema da sala: só para pintar os selos de tipo de dano (null fora de sala = selos neutros).
+  const def = useSystemDef();
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -100,6 +104,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             return (
               <ItemCardMessage
                 key={msg.id}
+                def={def}
                 msg={msg}
                 card={card}
                 isGm={isGm}
@@ -117,6 +122,8 @@ export const ChatTab: React.FC<ChatTabProps> = ({
           // 3. DICE ROLL MESSAGE (HIGHLIGHTED) - Elegant Dark
           if (msg.kind === 'roll' && msg.roll) {
             const roll = msg.roll;
+            // Parcelas de dano por tipo (só rolagens de dano da ficha; rolagens antigas não têm).
+            const damage = roll.damage && roll.damage.length > 0 ? roll.damage : null;
             // Crítico a partir de critThreshold (ataques com margem ampliada); padrão = 20 natural.
             const critFrom = roll.critThreshold ?? 20;
             const isCritical =
@@ -179,6 +186,21 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                       >
                         {roll.total}
                       </span>
+                      {/* Dano por tipo: uma parcela = só o selo; várias = "(7 [Fogo] + 14 [Frio])". */}
+                      {damage && damage.length === 1 && damage[0] && <DamageTypeBadge def={def} type={damage[0].damageType} />}
+                      {damage && damage.length > 1 && (
+                        <span className="text-[11px] font-mono text-zinc-300 flex items-center gap-1 flex-wrap" data-damage-breakdown>
+                          (
+                          {damage.map((d, i) => (
+                            <React.Fragment key={i}>
+                              {i > 0 && <span className="text-zinc-500">+</span>}
+                              <span className="font-bold text-amber-200">{d.total}</span>
+                              <DamageTypeBadge def={def} type={d.damageType} />
+                            </React.Fragment>
+                          ))}
+                          )
+                        </span>
+                      )}
                       <span className="text-[11px] font-mono text-zinc-500">
                         {roll.groups.map((g) => `[${g.rolls.join(', ')}]`).join(' ')}
                         {roll.modifier !== 0 && (
@@ -189,6 +211,12 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                         )}
                       </span>
                     </div>
+                    {/* Fórmula do dano com o selo de cada parcela: "6d6 + 1 [Fogo] + 4d6 [Frio]". */}
+                    {damage && (
+                      <div className="mt-1 text-[10px] font-mono text-zinc-500" data-damage-formula>
+                        <DamageFormula def={def} components={damage} />
+                      </div>
+                    )}
                   </div>
 
                   {/* Elegant Rhombus Dice Badge */}

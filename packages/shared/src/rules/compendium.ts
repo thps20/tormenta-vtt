@@ -88,6 +88,10 @@ export function validateCompendiumEntry(def: SystemDefinition, entry: Compendium
   for (const e of entry.enhancements) {
     if (enhancementIds.has(e.id)) return `${where}: aprimoramento "${e.id}" repetido`;
     enhancementIds.add(e.id);
+    const effect = e.effect;
+    if (effect?.kind === "damageDiceAdd" && effect.damageType !== undefined && !def.damageTypes.some((d) => d.key === effect.damageType)) {
+      return `${where}: aprimoramento "${e.id}": tipo de dano desconhecido "${effect.damageType}"`;
+    }
   }
 
   if (entry.save && !kind.hasSave) return `${where}: "${kind.key}" não tem teste de resistência`;
