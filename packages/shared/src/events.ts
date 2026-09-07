@@ -32,6 +32,7 @@ import type {
   SceneSetMapPayload,
   SceneUpdateGridPayload,
   Token,
+  TokenApplyDamagePayload,
   TokenCreate,
   TokenLinkCharacterPayload,
   TokenPatch,
@@ -76,6 +77,13 @@ export interface ClientToServerEvents {
   "token:delete": (payload: { tokenId: string }, ack: Ack) => void;
   /** GM, ou dono do token que também é dono da ficha. characterId null desvincula. */
   "token:link-character": (payload: TokenLinkCharacterPayload, ack: Ack<Token>) => void;
+  /**
+   * Aplica um card de dano/cura (chat) num ou mais tokens: GM sempre, jogador só nos
+   * que possui (tudo-ou-nada). Aplica no recurso `tokenBar` da ficha vinculada, ou em
+   * `token.hp` se solto; devolve a mensagem com `roll.applied` atualizado (broadcast
+   * normal também sai em token:updated/character:updated + chat:message).
+   */
+  "token:apply-damage": (payload: TokenApplyDamagePayload, ack: Ack<ChatMessage>) => void;
 
   // Ficha de personagem
   /** Jogador cria só para si (ownerId = ele, kind = pc); GM cria qualquer uma. */

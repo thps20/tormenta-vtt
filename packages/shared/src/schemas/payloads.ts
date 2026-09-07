@@ -87,6 +87,21 @@ export const TokenDeleteSchema = z.object({ tokenId: IdSchema });
 export const TokenLinkCharacterSchema = z.object({ tokenId: IdSchema, characterId: IdSchema.nullable() });
 export type TokenLinkCharacterPayload = z.infer<typeof TokenLinkCharacterSchema>;
 
+/**
+ * Aplica um card de dano/cura do chat em um ou mais tokens. `amount` já vem com
+ * sinal do cliente (negativo tira PV, positivo cura); o servidor só trava nos
+ * limites (min/max da ficha, ou 0..max do token solto) e não precisa saber se
+ * a rolagem "é" dano ou cura. Tudo-ou-nada: um alvo sem permissão rejeita o lote inteiro.
+ */
+export const TokenApplyDamageSchema = z.object({
+  messageId: IdSchema,
+  targets: z
+    .array(z.object({ tokenId: IdSchema, amount: z.number().int(), multiplier: z.enum(["1", "0.5", "2", "0"]).optional() }))
+    .min(1)
+    .max(50),
+});
+export type TokenApplyDamagePayload = z.infer<typeof TokenApplyDamageSchema>;
+
 // --- Régua (efêmera) -------------------------------------------------------
 
 /** Ponto em pixels do mapa. */

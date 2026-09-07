@@ -27,6 +27,22 @@ export const DamageRollComponentSchema = z.object({
 });
 export type DamageRollComponent = z.infer<typeof DamageRollComponentSchema>;
 
+/**
+ * Uma aplicação de dano/cura desta rolagem num token (token:apply-damage).
+ * Acrescentado ao clicar "Confirmar" no seletor; a lista nunca é sobrescrita,
+ * só cresce (permite aplicar em levas diferentes e manter o histórico no card).
+ */
+export const AppliedDamageSchema = z.object({
+  tokenId: IdSchema,
+  /** Nome do token no momento da aplicação (sobrevive a renomear/apagar o token). */
+  tokenName: z.string().max(64),
+  /** Já com sinal: negativo = tirou PV, positivo = curou. */
+  amount: z.number().int(),
+  /** Multiplicador usado no seletor (×1/×½/×2/×0); ausente = valor digitado à mão. */
+  multiplier: z.enum(["1", "0.5", "2", "0"]).optional(),
+});
+export type AppliedDamage = z.infer<typeof AppliedDamageSchema>;
+
 export const DiceRollSchema = z.object({
   id: IdSchema,
   roomId: IdSchema,
@@ -53,6 +69,8 @@ export const DiceRollSchema = z.object({
    * Ausente = rolagem sem tipo (teste, ataque, /r).
    */
   damage: z.array(DamageRollComponentSchema).optional(),
+  /** Dano/cura já aplicado em tokens a partir deste card (token:apply-damage). */
+  applied: z.array(AppliedDamageSchema).default([]),
   createdAt: z.string().datetime(),
 });
 export type DiceRoll = z.infer<typeof DiceRollSchema>;

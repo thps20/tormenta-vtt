@@ -55,6 +55,7 @@ export async function createRollMessage(io: TypedServer, roomId: string, me: DbP
     characterId: input.characterId,
     critThreshold: input.critThreshold,
     damage,
+    applied: [],
     createdAt: new Date().toISOString(),
   };
 
