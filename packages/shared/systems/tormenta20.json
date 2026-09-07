@@ -195,7 +195,8 @@
       "key": "power", "label": "Poder", "physical": false, "hasActivation": true, "hasSave": true,
       "fields": [
         { "key": "type", "label": "Tipo", "type": "enum", "default": "geral", "options": [
-          { "key": "classe", "label": "De classe" }, { "key": "concedido", "label": "Concedido" },
+          { "key": "classe", "label": "De classe" }, { "key": "habilidade", "label": "Habilidade de classe" },
+          { "key": "concedido", "label": "Concedido" }, { "key": "distincao", "label": "De distinção" },
           { "key": "geral", "label": "Geral" }, { "key": "origem", "label": "De origem" }, { "key": "racial", "label": "Racial" }
         ] }
       ]

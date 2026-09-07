@@ -162,6 +162,8 @@ export const CharacterItemSchema = z.object({
   actions: z.array(ActionSchema).default([]),
   activation: ActivationSchema.nullable().default(null),
   save: SaveSchema.nullable().default(null),
+  /** Página do livro, copiada do compêndio: a ficha mostra "ver livro, pág. X" quando não há descrição. */
+  page: z.number().int().positive().nullable().default(null),
 });
 export type CharacterItem = z.infer<typeof CharacterItemSchema>;
 

@@ -1,35 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-import { getSystemCompendium, validateCompendiumEntries } from "../compendium/index.js";
+import { basename } from "node:path";
+import {
+  CUSTOM_FILE,
+  getSystemCompendium,
+  listCompendiumFiles,
+  loadCompendiumEntries,
+  readCompendiumFile,
+  validateCompendiumEntries,
+} from "../compendium/index.js";
 import { listSystemIds } from "../systems.js";
-
-const systemsDir = join(__dirname, "..", "..", "systems");
 
 /**
  * Todo arquivo em systems/<id>/compendium/*.json é uma lista de entradas
- * válidas para AQUELE sistema, e o registro em src/compendium/index.ts as
- * carrega. Um JSON com campo errado quebra aqui, não em produção.
+ * válidas para AQUELE sistema, e o loader as carrega com custom.json vencendo
+ * em id repetido. Um JSON com campo errado quebra aqui, não em produção.
  */
 describe("compêndios (packages/shared/systems/<id>/compendium/*.json)", () => {
   for (const systemId of listSystemIds()) {
-    const dir = join(systemsDir, systemId, "compendium");
-    if (!existsSync(dir)) continue;
-    const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
+    const files = listCompendiumFiles(systemId);
+    if (files.length === 0) continue;
 
     for (const file of files) {
-      it(`${systemId}/compendium/${file} só tem entradas válidas para o sistema`, () => {
-        const raw = JSON.parse(readFileSync(join(dir, file), "utf-8")) as unknown;
-        expect(Array.isArray(raw)).toBe(true);
-        expect(() => validateCompendiumEntries(systemId, raw as unknown[])).not.toThrow();
+      it(`${systemId}/compendium/${basename(file)} só tem entradas válidas para o sistema`, () => {
+        expect(() => validateCompendiumEntries(systemId, readCompendiumFile(file))).not.toThrow();
       });
     }
 
-    it(`${systemId}: o registro carrega todas as entradas dos arquivos, sem id repetido`, () => {
-      const fromFiles = files.flatMap((f) => JSON.parse(readFileSync(join(dir, f), "utf-8")) as { id: string }[]).map((e) => e.id);
+    it(`${systemId}: o loader carrega todas as entradas dos arquivos, sem id repetido, com custom.json na frente`, () => {
+      const custom = new Set(files.filter((f) => basename(f) === CUSTOM_FILE).flatMap((f) => readCompendiumFile(f) as { id: string }[]).map((e) => e.id));
+      const fromFiles = new Set(files.flatMap((f) => readCompendiumFile(f) as { id: string }[]).map((e) => e.id));
       const loaded = getSystemCompendium(systemId).entries.map((e) => e.id);
-      expect(loaded.sort()).toEqual(fromFiles.sort());
+      expect(new Set(loaded)).toEqual(fromFiles);
       expect(new Set(loaded).size).toBe(loaded.length);
+      expect(loaded.slice(0, custom.size).every((id) => custom.has(id))).toBe(true);
     });
   }
 
@@ -38,6 +41,10 @@ describe("compêndios (packages/shared/systems/<id>/compendium/*.json)", () => {
     expect(() => validateCompendiumEntries("tormenta20", [race, race])).toThrow(/id duplicado/);
     expect(() => validateCompendiumEntries("tormenta20", [{ ...race, kind: "nope" }])).toThrow(/tipo de item desconhecido/);
     expect(() => validateCompendiumEntries("tormenta20", [{ id: "Maiúsculo", name: "X", kind: "race" }])).toThrow(/entrada "Maiúsculo"/);
+  });
+
+  it("sistema sem pasta de compêndio carrega vazio", () => {
+    expect(loadCompendiumEntries("nao-existe-compendio")).toEqual([]);
   });
 });
 

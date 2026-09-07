@@ -130,6 +130,7 @@ export function entryToItem(def: SystemDefinition, entry: CompendiumEntry, newId
     actions: entry.actions.map((a) => ({ ...a, id: newId() })),
     activation: kind.hasActivation ? (entry.activation ?? {}) : null,
     save: kind.hasSave ? entry.save : null,
+    page: entry.page,
   });
 }
 
