@@ -25,7 +25,7 @@ import { homedir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
-import { CUSTOM_FILE, DESCRIPTIONS_FILE, compendiumDir, readCompendiumFile, validateCompendiumEntries } from "../packages/shared/src/compendium/index.js";
+import { CUSTOM_FILE, DESCRIPTIONS_FILE, compendiumDir, enhancementTextKey, readCompendiumFile, validateCompendiumEntries } from "../packages/shared/src/compendium/index.js";
 import { parseFormula } from "../packages/shared/src/dice/index.js";
 import { saveSkills } from "../packages/shared/src/rules/activation.js";
 import type { ActionTemplate, Activation, Save, SkillGrantsValue } from "../packages/shared/src/schemas/character.js";
@@ -78,7 +78,8 @@ interface FoundryDoc {
 interface FoundryEffect {
   name?: string;
   changes?: unknown[];
-  flags?: { tormenta20?: { custo?: string | number; aumenta?: boolean } };
+  /** onuse+self = aprimoramento do próprio item (é o filtro do diálogo de uso do Foundry); aumenta = "Múltiplas Aplicações". */
+  flags?: { tormenta20?: { custo?: string | number; aumenta?: boolean; onuse?: boolean; self?: boolean } };
 }
 
 /** Packs que ficam fora do compêndio de personagem (criaturas, convocações, macros, tabelas, journals). */
@@ -170,6 +171,13 @@ class Report {
   readonly notes: string[] = [];
   descriptions = 0;
   descriptionsEmpty: string[] = [];
+  /** Aprimoramentos gerados (entradas com pelo menos um, total, repetíveis) e o que ficou só como texto. */
+  enhancementEntries = 0;
+  enhancements = 0;
+  enhancementsRepeatable = 0;
+  cantrips = 0;
+  /** Effects `onuse` sem `self` (aprimoramentos que um poder concede a OUTRAS magias/ataques): fora do modelo. */
+  grantedEffects = 0;
 
   todo(category: string, id: string, detail: string): void {
     const list = this.todos.get(category) ?? [];
@@ -209,6 +217,11 @@ class Report {
     lines.push("");
     for (const n of this.notes) lines.push(`- ${n}`);
     lines.push("");
+    lines.push(
+      `Aprimoramentos (effects \`onuse\`+\`self\`): ${this.enhancements} em ${this.enhancementEntries} entradas, ${this.enhancementsRepeatable} repetíveis (\`aumenta\`); ` +
+        `${this.cantrips} truques (custo vazio em magia, só na descrição); ${this.grantedEffects} effects \`onuse\` sem \`self\` não modelados (aprimoramentos concedidos a outras magias/ataques, ex.: Familiar Coruja).`,
+    );
+    lines.push("");
     lines.push("Efeitos ativos (`effects[]` com `changes`) são ignorados de propósito; só a contagem:");
     lines.push("");
     lines.push("| Tipo Foundry | Documentos com efeitos |", "|---|---|", ...table(this.effectsIgnored));
@@ -240,7 +253,7 @@ class Report {
     lines.push("## Descrições");
     lines.push("");
     if (opts.withDescriptions) {
-      lines.push(`\`${DESCRIPTIONS_FILE}\` gravado com ${this.descriptions} descrições (fora do git).`);
+      lines.push(`\`${DESCRIPTIONS_FILE}\` gravado com ${this.descriptions} descrições e ${this.enhancements} textos de aprimoramento (\`<id>#eN\`), fora do git.`);
       if (this.descriptionsEmpty.length > 0) {
         lines.push("");
         lines.push(`Entradas sem descrição no Foundry (o app mostra "ver livro"): ${this.descriptionsEmpty.length}.`);
@@ -811,16 +824,68 @@ function htmlToText(html: string, unknownEntities: Set<string>): string {
   return t;
 }
 
-/** Aprimoramentos de magia: o Foundry os guarda em effects[] com flags.tormenta20.custo. */
-function spellEnhancements(doc: FoundryDoc, unknownEntities: Set<string>): string {
-  const items: string[] = [];
+/** Tamanho máximo do texto de um aprimoramento (EnhancementSchema.label). */
+const ENHANCEMENT_TEXT_MAX = 1000;
+
+interface ExtractedEnhancements {
+  /** Só mecânica, na ordem do arquivo; ids "e1", "e2"... */
+  list: { id: string; cost: number; repeatable: boolean }[];
+  /** Texto de cada aprimoramento, por id. */
+  texts: Map<string, string>;
+  /** Lista para o fim da descrição ("Aprimoramentos:" + "- +N PM: ..."), vazia se não há nada. */
+  description: string;
+}
+
+/**
+ * Aprimoramentos: no Foundry são os effects[] com flags.tormenta20 onuse+self
+ * (o mesmo filtro do diálogo de uso). `custo` é o PM extra; `aumenta` é o
+ * checkbox "Múltiplas Aplicações" (repetível). Em magia, custo vazio é o
+ * Truque, que é outra regra (custo total 0): fica só na descrição.
+ */
+function extractEnhancements(doc: FoundryDoc, id: string, kind: string, report: Report, unknownEntities: Set<string>): ExtractedEnhancements {
+  const list: ExtractedEnhancements["list"] = [];
+  const texts = new Map<string, string>();
+  const lines: string[] = [];
   for (const effect of doc.effects) {
-    const text = htmlToText(str(effect.name), unknownEntities);
-    if (!text) continue;
-    const cost = str(effect.flags?.tormenta20?.custo).trim();
-    items.push(cost ? `- +${cost} PM: ${text}` : `- ${text}`);
+    const flags = effect.flags?.tormenta20 ?? {};
+    if (!flags.onuse) continue;
+    if (!flags.self) {
+      report.grantedEffects++;
+      continue;
+    }
+    let text = htmlToText(str(effect.name), unknownEntities);
+    if (!text) {
+      report.todo("aprimoramento: effect sem texto (ignorado)", id, `effect ${str((effect as { _id?: unknown })._id) || "?"}`);
+      continue;
+    }
+    const rawCost = str(flags.custo).trim();
+    if (rawCost === "" && kind === "spell") {
+      report.cantrips++;
+      lines.push(`- Truque: ${text}`);
+      continue;
+    }
+    const cost = Math.round(num(rawCost));
+    if (cost < 0) {
+      report.todo("aprimoramento: custo negativo (ficou só na descrição)", id, `\`${rawCost}\`: "${text.slice(0, 80)}"`);
+      lines.push(`- ${rawCost} PM: ${text}`);
+      continue;
+    }
+    if (text.length > ENHANCEMENT_TEXT_MAX) {
+      report.todo(`aprimoramento: texto com mais de ${ENHANCEMENT_TEXT_MAX} caracteres (truncado)`, id, `"${text.slice(0, 60)}..."`);
+      text = `${text.slice(0, ENHANCEMENT_TEXT_MAX - 1)}…`;
+    }
+    if (flags.aumenta === undefined) report.todo("aprimoramento: sem a flag de múltiplas aplicações (gravado como não repetível)", id, `"${text.slice(0, 80)}"`);
+    const enhId = `e${list.length + 1}`;
+    list.push({ id: enhId, cost, repeatable: flags.aumenta === true });
+    texts.set(enhId, text);
+    lines.push(`- +${cost} PM: ${text}`);
   }
-  return items.length > 0 ? `Aprimoramentos:\n${items.join("\n")}` : "";
+  if (list.length > 0) {
+    report.enhancementEntries++;
+    report.enhancements += list.length;
+    report.enhancementsRepeatable += list.filter((e) => e.repeatable).length;
+  }
+  return { list, texts, description: lines.length > 0 ? `Aprimoramentos:\n${lines.join("\n")}` : "" };
 }
 
 // ---------------------------------------------------------------------------
@@ -845,6 +910,9 @@ function compact(draft: Draft): Record<string, unknown> {
   if (draft.fields && Object.keys(draft.fields).length > 0) out.fields = draft.fields;
   if (draft.actions && draft.actions.length > 0) out.actions = draft.actions;
   if (draft.activation) out.activation = draft.activation;
+  if (draft.enhancements && draft.enhancements.length > 0) {
+    out.enhancements = draft.enhancements.map((e) => (e.repeatable ? { id: e.id, cost: e.cost, repeatable: true } : { id: e.id, cost: e.cost }));
+  }
   if (draft.save) out.save = draft.save;
   if (draft.statBonuses && Object.keys(draft.statBonuses).length > 0) out.statBonuses = draft.statBonuses;
   if (draft.slots) out.slots = draft.slots;
@@ -867,7 +935,9 @@ function main(): void {
   report.notes.push("Resistência: `resistencia.atributo` do Foundry é ignorado; a CD usa o atributo de conjuração da ficha (`save.attribute = null`).");
   report.notes.push("Armas: `@for` no dano vira `attribute: \"auto\"` (a regra `damageAttribute` do sistema decide por tipo de uso); armas mágicas com \"+N\" no ataque/dano recebem `bonus: N`.");
   report.notes.push("Poderes `ability` → `habilidade`, `distincao` → `distincao` (opções adicionadas a `power.type` no JSON do sistema).");
-  report.notes.push("Aprimoramentos de magia (guardados como `effects[]` no Foundry) entram no fim da descrição como lista \"+N PM: ...\"; a flag `aumenta` é ignorada.");
+  report.notes.push(
+    "Aprimoramentos (effects `onuse`+`self` de magias, poderes e consumíveis) viram `enhancements[{ id: \"eN\", cost, repeatable }]`; `repeatable` = flag `aumenta` (\"Múltiplas Aplicações\"). O texto vai para `descriptions.local.json` na chave `<id>#eN` e a lista continua no fim da descrição (\"+N PM: ...\"). Truque (custo vazio em magia) e custos negativos ficam só na descrição. Os demais effects (efeitos ativos) não entram mais na descrição.",
+  );
   report.notes.push("Poderes raciais entram em `powers.json` com a raça como tag; o vínculo raça → poderes (`grants` do Foundry) não é modelado no nosso schema.");
 
   const customIds = new Set<string>();
@@ -917,9 +987,12 @@ function main(): void {
     list.push(draft);
     drafts.set(kind, list);
 
+    // Aprimoramentos só em tipos com bloco de ativação (o schema recusa nos outros).
+    const enhancements = converter.kind(kind).hasActivation ? extractEnhancements(doc, id, kind, report, unknownEntities) : null;
+    if (enhancements && enhancements.list.length > 0) draft.enhancements = enhancements.list.map((e) => ({ ...e, label: "" }));
+
     if (opts.withDescriptions) {
-      const parts = [htmlToText(str(obj(doc.system.description).value), unknownEntities)];
-      if (kind === "spell") parts.push(spellEnhancements(doc, unknownEntities));
+      const parts = [htmlToText(str(obj(doc.system.description).value), unknownEntities), enhancements?.description ?? ""];
       const text = parts.filter(Boolean).join("\n\n");
       if (!text) report.descriptionsEmpty.push(id);
       else if (text.length > 4000) throw new Error(`Descrição de "${id}" tem ${text.length} caracteres (máximo 4000 no schema)`);
@@ -927,6 +1000,7 @@ function main(): void {
         descriptions[id] = text;
         report.descriptions++;
       }
+      for (const [enhId, enhText] of enhancements?.texts ?? []) descriptions[enhancementTextKey(id, enhId)] = enhText;
     }
   }
 

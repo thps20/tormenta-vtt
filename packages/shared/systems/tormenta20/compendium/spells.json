@@ -31,6 +31,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        }
+      ],
       "page": 184
     },
     {
@@ -63,6 +74,25 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        },
+        {
+          "id": "e3",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e4",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -111,6 +141,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -149,6 +194,20 @@
         "area": "Esfera de 9m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        },
+        {
+          "id": "e3",
+          "cost": 9
+        }
+      ],
       "page": 178
     },
     {
@@ -181,6 +240,20 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 7
+        },
+        {
+          "id": "e3",
+          "cost": 12
+        }
+      ],
       "page": 178
     },
     {
@@ -245,6 +318,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -283,6 +366,25 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        },
+        {
+          "id": "e4",
+          "cost": 7
+        }
+      ],
       "page": 179
     },
     {
@@ -315,6 +417,22 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -353,6 +471,20 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -391,6 +523,28 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 4
+        },
+        {
+          "id": "e4",
+          "cost": 4
+        },
+        {
+          "id": "e5",
+          "cost": 9
+        }
+      ],
       "page": 179
     },
     {
@@ -423,6 +577,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 5
+        }
+      ],
       "page": 179
     },
     {
@@ -462,6 +622,21 @@
         "area": "esfera de 6m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        },
+        {
+          "id": "e3",
+          "cost": 9
+        }
+      ],
       "page": 180
     },
     {
@@ -494,6 +669,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        }
+      ],
       "page": 180
     },
     {
@@ -564,6 +745,21 @@
         "area": "Quadrado de 3m ou 1 objeto",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -612,6 +808,34 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 2
+        },
+        {
+          "id": "e5",
+          "cost": 5
+        },
+        {
+          "id": "e6",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 180
     },
     {
@@ -644,6 +868,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "page": 181
     },
     {
@@ -676,6 +915,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        }
+      ],
       "page": 181
     },
     {
@@ -708,6 +962,26 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e4",
+          "cost": 5,
+          "repeatable": true
+        }
+      ],
       "page": 181
     },
     {
@@ -782,6 +1056,24 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3
+        },
+        {
+          "id": "e2",
+          "cost": 7
+        },
+        {
+          "id": "e3",
+          "cost": 7
+        },
+        {
+          "id": "e4",
+          "cost": 12
+        }
+      ],
       "page": 187
     },
     {
@@ -814,6 +1106,13 @@
         "area": "esfera com 9m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -852,6 +1151,26 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 3,
+          "repeatable": true
+        }
+      ],
       "page": 182
     },
     {
@@ -884,6 +1203,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 0
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -956,6 +1281,17 @@
         "area": "",
         "effect": "4 esferas elementais"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 5,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -994,6 +1330,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 182
     },
     {
@@ -1036,6 +1383,21 @@
         "area": "esfera com 6m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -1074,6 +1436,12 @@
         "area": "",
         "effect": "Buraco Negro"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -1112,6 +1480,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 183
     },
     {
@@ -1186,6 +1565,28 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 7
+        },
+        {
+          "id": "e4",
+          "cost": 9
+        },
+        {
+          "id": "e5",
+          "cost": 7
+        }
+      ],
       "page": 183
     },
     {
@@ -1218,6 +1619,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3
+        },
+        {
+          "id": "e2",
+          "cost": 7
+        }
+      ],
       "page": 183
     },
     {
@@ -1268,6 +1679,13 @@
         "area": "quadrado com 18m de lado",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -1306,6 +1724,20 @@
         "area": "cubo com 9m de lado;",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 7
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -1354,6 +1786,13 @@
         "area": "esfera de 3m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 186
     },
     {
@@ -1409,6 +1848,22 @@
         "area": "esfera com 6m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -1465,6 +1920,18 @@
         "area": "cilindro com 3m de raio e 30m de altura",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -1503,6 +1970,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -1541,6 +2019,24 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -1579,6 +2075,25 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 4
+        },
+        {
+          "id": "e4",
+          "cost": 8
+        }
+      ],
       "page": 184
     },
     {
@@ -1611,6 +2126,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4
+        }
+      ],
       "page": 186
     },
     {
@@ -1643,6 +2164,24 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        },
+        {
+          "id": "e3",
+          "cost": 9
+        },
+        {
+          "id": "e4",
+          "cost": 14
+        }
+      ],
       "page": 185
     },
     {
@@ -1675,6 +2214,18 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 185
     },
     {
@@ -1707,6 +2258,16 @@
         "area": "",
         "effect": "parceiro elemental"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 5
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "page": 195
     },
     {
@@ -1739,6 +2300,60 @@
         "area": "",
         "effect": "1 criatura conjurada"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 1
+        },
+        {
+          "id": "e4",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e5",
+          "cost": 2
+        },
+        {
+          "id": "e6",
+          "cost": 2
+        },
+        {
+          "id": "e7",
+          "cost": 4
+        },
+        {
+          "id": "e8",
+          "cost": 5
+        },
+        {
+          "id": "e9",
+          "cost": 9
+        },
+        {
+          "id": "e10",
+          "cost": 9
+        },
+        {
+          "id": "e11",
+          "cost": 9,
+          "repeatable": true
+        },
+        {
+          "id": "e12",
+          "cost": 14,
+          "repeatable": true
+        }
+      ],
       "page": 185
     },
     {
@@ -1781,6 +2396,21 @@
         "area": "",
         "effect": "6 mortos-vivos"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 7
+        }
+      ],
       "page": 186
     },
     {
@@ -1813,6 +2443,21 @@
         "area": "esfera com 9m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 9
+        }
+      ],
       "page": 186
     },
     {
@@ -1845,6 +2490,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 8
+        }
+      ],
       "page": 186
     },
     {
@@ -1919,6 +2575,13 @@
         "area": "esfera com 30m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 186
     },
     {
@@ -1950,7 +2613,14 @@
         "target": "",
         "area": "varia",
         "effect": ""
-      }
+      },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        }
+      ]
     },
     {
       "id": "controlar-fogo",
@@ -1992,6 +2662,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        }
+      ],
       "page": 187
     },
     {
@@ -2024,6 +2709,24 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 7
+        },
+        {
+          "id": "e4",
+          "cost": 12
+        }
+      ],
       "page": 187
     },
     {
@@ -2056,6 +2759,12 @@
         "area": "esfera com 2km de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        }
+      ],
       "page": 187
     },
     {
@@ -2120,6 +2829,20 @@
         "area": "quadrado com 9m de lado",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -2158,6 +2881,17 @@
         "area": "9 cubos com 1,5m de lado",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        }
+      ],
       "page": 188
     },
     {
@@ -2190,6 +2924,26 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        },
+        {
+          "id": "e3",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e4",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 188
     },
     {
@@ -2232,6 +2986,18 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -2288,6 +3054,22 @@
         "area": "",
         "effect": "elemento escolhido"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        },
+        {
+          "id": "e3",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 188
     },
     {
@@ -2320,6 +3102,41 @@
         "area": "",
         "effect": "ilusão que se estende a até 4 cubos de 1,5m"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 1
+        },
+        {
+          "id": "e4",
+          "cost": 1
+        },
+        {
+          "id": "e5",
+          "cost": 2
+        },
+        {
+          "id": "e6",
+          "cost": 2
+        },
+        {
+          "id": "e7",
+          "cost": 2
+        },
+        {
+          "id": "e8",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -2358,6 +3175,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -2406,6 +3233,25 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 5
+        }
+      ],
       "page": 189
     },
     {
@@ -2448,6 +3294,17 @@
         "area": "esfera de 15m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -2518,6 +3375,20 @@
         "area": "Cone de 6m",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -2574,6 +3445,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -2622,6 +3500,33 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        },
+        {
+          "id": "e4",
+          "cost": 9
+        },
+        {
+          "id": "e5",
+          "cost": 14
+        },
+        {
+          "id": "e6",
+          "cost": 5
+        }
+      ],
       "page": 190
     },
     {
@@ -2654,6 +3559,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        }
+      ],
       "page": 190
     },
     {
@@ -2686,6 +3601,16 @@
         "area": "Esfera de 18m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        }
+      ],
       "page": 196
     },
     {
@@ -2718,6 +3643,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        }
+      ],
       "page": 190
     },
     {
@@ -2750,6 +3685,24 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 3
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -2788,6 +3741,25 @@
         "area": "Esfera de 6m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        },
+        {
+          "id": "e3",
+          "cost": 4
+        },
+        {
+          "id": "e4",
+          "cost": 9
+        }
+      ],
       "page": 199
     },
     {
@@ -2820,6 +3792,12 @@
         "area": "ou esfera com 3m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 12
+        }
+      ],
       "page": 191
     },
     {
@@ -2852,6 +3830,12 @@
         "area": "",
         "effect": "cópia ilusória"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3
+        }
+      ],
       "page": 191
     },
     {
@@ -2884,6 +3868,20 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -2922,6 +3920,16 @@
         "area": "",
         "effect": "disco de energia com 1,5m de diâmetro"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        }
+      ],
       "page": 192
     },
     {
@@ -2964,6 +3972,26 @@
         "area": "",
         "effect": "1 enxame Médio (quadrado de 1,5m)"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 5,
+          "repeatable": true
+        },
+        {
+          "id": "e4",
+          "cost": 7
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -3012,6 +4040,33 @@
         "area": "",
         "effect": "1 enxame Grande (quadrado de 3m);"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 3
+        },
+        {
+          "id": "e5",
+          "cost": 3
+        },
+        {
+          "id": "e6",
+          "cost": 4
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -3068,6 +4123,17 @@
         "area": "quadrado de 6m de lado",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -3106,6 +4172,29 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        },
+        {
+          "id": "e3",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e4",
+          "cost": 2
+        },
+        {
+          "id": "e5",
+          "cost": 3
+        }
+      ],
       "page": 192
     },
     {
@@ -3138,6 +4227,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -3176,6 +4272,29 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        },
+        {
+          "id": "e4",
+          "cost": 2
+        },
+        {
+          "id": "e5",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -3262,6 +4381,17 @@
         "area": "Cone de 6m",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -3310,6 +4440,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 9
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -3348,6 +4489,39 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 7
+        },
+        {
+          "id": "e4",
+          "cost": 15
+        },
+        {
+          "id": "e5",
+          "cost": 0,
+          "repeatable": true
+        },
+        {
+          "id": "e6",
+          "cost": 0,
+          "repeatable": true
+        },
+        {
+          "id": "e7",
+          "cost": 0,
+          "repeatable": true
+        }
+      ],
       "page": 193
     },
     {
@@ -3390,6 +4564,22 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -3428,6 +4618,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 5
+        }
+      ],
       "page": 193
     },
     {
@@ -3534,6 +4730,24 @@
         "area": "",
         "effect": "1 globo"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 4
+        }
+      ],
       "page": 194
     },
     {
@@ -3566,6 +4780,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4
+        },
+        {
+          "id": "e2",
+          "cost": 9
+        }
+      ],
       "page": 196
     },
     {
@@ -3630,6 +4854,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        }
+      ],
       "page": 196
     },
     {
@@ -3662,6 +4892,28 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 2
+        },
+        {
+          "id": "e5",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -3710,6 +4962,18 @@
         "area": "cubo de 9m",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 4,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -3748,6 +5012,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        }
+      ],
       "page": 195
     },
     {
@@ -3780,6 +5055,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -3828,6 +5118,25 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -3898,6 +5207,24 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        },
+        {
+          "id": "e4",
+          "cost": 7
+        }
+      ],
       "page": 195
     },
     {
@@ -3930,6 +5257,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 5
+        }
+      ],
       "page": 195
     },
     {
@@ -3962,6 +5295,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -4018,6 +5361,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -4056,6 +5410,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -4094,6 +5455,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4
+        }
+      ],
       "page": 196
     },
     {
@@ -4126,6 +5493,21 @@
         "area": "cone de 4,5m",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -4164,6 +5546,28 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 5
+        },
+        {
+          "id": "e5",
+          "cost": 5
+        }
+      ],
       "page": 196
     },
     {
@@ -4196,6 +5600,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -4234,6 +5644,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        }
+      ],
       "page": 197
     },
     {
@@ -4266,6 +5687,13 @@
         "area": "esfera com 90m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 5,
+          "repeatable": true
+        }
+      ],
       "page": 197
     },
     {
@@ -4298,6 +5726,37 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 0
+        },
+        {
+          "id": "e5",
+          "cost": 2
+        },
+        {
+          "id": "e6",
+          "cost": 2
+        },
+        {
+          "id": "e7",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -4336,6 +5795,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4
+        }
+      ],
       "page": 197
     },
     {
@@ -4410,6 +5875,17 @@
         "area": "",
         "effect": "mão gigante de energia"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "page": 197
     },
     {
@@ -4442,6 +5918,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3
+        }
+      ],
       "page": 197
     },
     {
@@ -4474,6 +5956,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -4560,6 +6052,13 @@
         "area": "cone de 30m",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -4598,6 +6097,39 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 7
+        },
+        {
+          "id": "e4",
+          "cost": 0,
+          "repeatable": true
+        },
+        {
+          "id": "e5",
+          "cost": 0,
+          "repeatable": true
+        },
+        {
+          "id": "e6",
+          "cost": 0,
+          "repeatable": true
+        },
+        {
+          "id": "e7",
+          "cost": 15
+        }
+      ],
       "page": 198
     },
     {
@@ -4630,6 +6162,36 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        },
+        {
+          "id": "e4",
+          "cost": 3
+        },
+        {
+          "id": "e5",
+          "cost": 5
+        },
+        {
+          "id": "e6",
+          "cost": 9
+        },
+        {
+          "id": "e7",
+          "cost": 12
+        }
+      ],
       "page": 204
     },
     {
@@ -4672,6 +6234,17 @@
         "area": "nuvem com 6m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -4710,6 +6283,16 @@
         "area": "cubo de até 90m de lado",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4
+        },
+        {
+          "id": "e2",
+          "cost": 9
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -4748,6 +6331,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 4,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -4786,6 +6380,25 @@
         "area": "",
         "effect": "criatura conjurada"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e4",
+          "cost": 3
+        }
+      ],
       "page": 199
     },
     {
@@ -4818,6 +6431,17 @@
         "area": "",
         "effect": "muro de ossos"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "page": 199
     },
     {
@@ -4850,6 +6474,22 @@
         "area": "",
         "effect": "muralha de energia"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        },
+        {
+          "id": "e3",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 200
     },
     {
@@ -4882,6 +6522,33 @@
         "area": "",
         "effect": "nuvem com 6m de raio e 6m de altura"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 2
+        },
+        {
+          "id": "e5",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e6",
+          "cost": 5
+        }
+      ],
       "page": 200
     },
     {
@@ -4914,6 +6581,26 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 7
+        },
+        {
+          "id": "e4",
+          "cost": 12
+        }
+      ],
       "page": 200
     },
     {
@@ -4946,6 +6633,20 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "page": 200
     },
     {
@@ -5026,6 +6727,28 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        },
+        {
+          "id": "e3",
+          "cost": 4
+        },
+        {
+          "id": "e4",
+          "cost": 4
+        },
+        {
+          "id": "e5",
+          "cost": 9
+        }
+      ],
       "page": 201
     },
     {
@@ -5058,6 +6781,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 201
     },
     {
@@ -5100,6 +6830,13 @@
         "area": "nuvem com 6m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -5138,6 +6875,20 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 5
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -5176,6 +6927,22 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 5,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        }
+      ],
       "page": 201
     },
     {
@@ -5208,6 +6975,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3
+        },
+        {
+          "id": "e2",
+          "cost": 10
+        }
+      ],
       "page": 201
     },
     {
@@ -5240,6 +7017,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        }
+      ],
       "page": 16
     },
     {
@@ -5272,6 +7055,20 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        }
+      ],
       "page": 201
     },
     {
@@ -5304,6 +7101,21 @@
         "area": "esfera com 9m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 9
+        }
+      ],
       "page": 202
     },
     {
@@ -5336,6 +7148,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 10
+        }
+      ],
       "page": 202
     },
     {
@@ -5367,7 +7185,21 @@
         "target": "1 criatura",
         "area": "",
         "effect": ""
-      }
+      },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        },
+        {
+          "id": "e3",
+          "cost": 9
+        }
+      ]
     },
     {
       "id": "protecao-divina",
@@ -5399,6 +7231,25 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 5
+        }
+      ],
       "page": 202
     },
     {
@@ -5431,6 +7282,24 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        },
+        {
+          "id": "e4",
+          "cost": 7
+        }
+      ],
       "page": 202
     },
     {
@@ -5463,6 +7332,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        }
+      ],
       "page": 202
     },
     {
@@ -5495,6 +7374,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -5543,6 +7432,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -5591,6 +7491,21 @@
         "area": "linha",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -5661,6 +7576,24 @@
         "area": "",
         "effect": "domo com 6m de raio"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        },
+        {
+          "id": "e4",
+          "cost": 9
+        }
+      ],
       "page": 203
     },
     {
@@ -5703,6 +7636,17 @@
         "area": "linha",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -5767,6 +7711,18 @@
         "area": "",
         "effect": "bolas de fogo e relâmpagos"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -5843,6 +7799,78 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        },
+        {
+          "id": "e4",
+          "cost": 9
+        },
+        {
+          "id": "e5",
+          "cost": 0
+        },
+        {
+          "id": "e6",
+          "cost": 0
+        },
+        {
+          "id": "e7",
+          "cost": 0
+        },
+        {
+          "id": "e8",
+          "cost": 0
+        },
+        {
+          "id": "e9",
+          "cost": 0
+        },
+        {
+          "id": "e10",
+          "cost": 0
+        },
+        {
+          "id": "e11",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e12",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e13",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e14",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e15",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e16",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 204
     },
     {
@@ -5875,6 +7903,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 7
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -5913,6 +7952,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 5
+        },
+        {
+          "id": "e2",
+          "cost": 10
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -5961,6 +8010,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        }
+      ],
       "page": 205
     },
     {
@@ -5993,6 +8057,25 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 3
+        }
+      ],
       "page": 205
     },
     {
@@ -6025,6 +8108,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 9
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -6073,6 +8166,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "page": 205
     },
     {
@@ -6105,6 +8213,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -6143,6 +8257,16 @@
         "area": "",
         "effect": "semiplano com 30m de lado"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "page": 205
     },
     {
@@ -6175,6 +8299,16 @@
         "area": "",
         "effect": "criatura conjurada"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4
+        },
+        {
+          "id": "e2",
+          "cost": 9
+        }
+      ],
       "page": 205
     },
     {
@@ -6207,6 +8341,20 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 7
+        }
+      ],
       "page": 206
     },
     {
@@ -6239,6 +8387,17 @@
         "area": "",
         "effect": "criaturas conjuradas"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        }
+      ],
       "page": 206
     },
     {
@@ -6281,6 +8440,24 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 4
+        },
+        {
+          "id": "e4",
+          "cost": 9
+        }
+      ],
       "page": 206
     },
     {
@@ -6313,6 +8490,16 @@
         "area": "esfera com 6m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        }
+      ],
       "page": 206
     },
     {
@@ -6355,6 +8542,26 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 4,
+          "repeatable": true
+        },
+        {
+          "id": "e4",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -6393,6 +8600,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 10
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -6441,6 +8654,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 207
     },
     {
@@ -6473,6 +8697,20 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -6521,6 +8759,21 @@
         "area": "cone de 9m",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        },
+        {
+          "id": "e3",
+          "cost": 4
+        }
+      ],
       "page": 207
     },
     {
@@ -6563,6 +8816,18 @@
         "area": "cone de 9m",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -6601,6 +8866,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 5
+        }
+      ],
       "page": 207
     },
     {
@@ -6633,6 +8904,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3
+        },
+        {
+          "id": "e3",
+          "cost": 12
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -6681,6 +8967,17 @@
         "area": "cone de 9m",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -6719,6 +9016,21 @@
         "area": "cubo com 6m de lado",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -6757,6 +9069,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3,
+          "repeatable": true
+        }
+      ],
       "page": 208
     },
     {
@@ -6789,6 +9108,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 9
+        }
+      ],
       "page": 208
     },
     {
@@ -6821,6 +9155,33 @@
         "area": "cilindro com 15m de raio e 15m de altura",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 3
+        },
+        {
+          "id": "e4",
+          "cost": 3
+        },
+        {
+          "id": "e5",
+          "cost": 3
+        },
+        {
+          "id": "e6",
+          "cost": 3
+        }
+      ],
       "page": 208
     },
     {
@@ -6869,6 +9230,18 @@
         "area": "esfera com 6m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3,
+          "repeatable": true
+        }
+      ],
       "page": 209
     },
     {
@@ -6943,6 +9316,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -6991,6 +9379,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 10
+        }
+      ],
       "page": 209
     },
     {
@@ -7033,6 +9431,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        },
+        {
+          "id": "e2",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -7071,6 +9484,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 5,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "page": 209
     },
     {
@@ -7103,6 +9531,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -7141,6 +9584,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        }
+      ],
       "page": 210
     },
     {
@@ -7173,6 +9627,35 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 3,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 1
+        },
+        {
+          "id": "e4",
+          "cost": 5
+        },
+        {
+          "id": "e5",
+          "cost": 9
+        },
+        {
+          "id": "e6",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 210
     },
     {
@@ -7205,6 +9688,20 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 7
+        },
+        {
+          "id": "e2",
+          "cost": 7
+        },
+        {
+          "id": "e3",
+          "cost": 0
+        }
+      ],
       "page": 210
     },
     {
@@ -7237,6 +9734,26 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 3
+        },
+        {
+          "id": "e2",
+          "cost": 4,
+          "repeatable": true
+        },
+        {
+          "id": "e3",
+          "cost": 7
+        },
+        {
+          "id": "e4",
+          "cost": 0,
+          "repeatable": true
+        }
+      ],
       "page": 210
     },
     {
@@ -7269,6 +9786,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        }
+      ],
       "page": 210
     },
     {
@@ -7301,6 +9824,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2
+        }
+      ],
       "page": 211
     },
     {
@@ -7371,6 +9900,24 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        },
+        {
+          "id": "e4",
+          "cost": 4
+        }
+      ],
       "page": 211
     },
     {
@@ -7403,6 +9950,20 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 2
+        }
+      ],
       "page": 211
     },
     {
@@ -7445,6 +10006,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 5
+        }
+      ],
       "page": 211
     },
     {
@@ -7477,6 +10049,20 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 4
+        },
+        {
+          "id": "e3",
+          "cost": 4
+        }
+      ],
       "page": 211
     },
     {
@@ -7509,6 +10095,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        }
+      ],
       "page": 211
     }
   ]

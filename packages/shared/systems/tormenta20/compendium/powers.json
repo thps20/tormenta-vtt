@@ -303,6 +303,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 68
     },
     {
@@ -604,6 +611,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 33
     },
     {
@@ -754,6 +768,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        }
+      ],
       "page": 16
     },
     {
@@ -1227,6 +1247,13 @@
         "area": "esfera com 1,5m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 0,
+          "repeatable": true
+        }
+      ],
       "page": 22
     },
     {
@@ -1415,6 +1442,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        }
+      ],
       "page": 30
     },
     {
@@ -2545,6 +2578,21 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 2
+        },
+        {
+          "id": "e3",
+          "cost": 5
+        }
+      ],
       "page": 53
     },
     {
@@ -3278,6 +3326,13 @@
         "area": "esfera com 9m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -4111,6 +4166,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 28
     },
     {
@@ -4701,6 +4763,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        }
+      ],
       "page": 82
     },
     {
@@ -4754,6 +4827,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 136
     },
     {
@@ -4813,6 +4893,16 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1
+        },
+        {
+          "id": "e2",
+          "cost": 1
+        }
+      ],
       "page": 20
     },
     {
@@ -5781,6 +5871,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 53
     },
     {
@@ -6425,6 +6522,17 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 0
+        }
+      ],
       "page": 51
     },
     {
@@ -6581,6 +6689,13 @@
       "fields": {
         "type": "concedido"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 0,
+          "repeatable": true
+        }
+      ],
       "page": 133
     },
     {
@@ -7252,6 +7367,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 79
     },
     {
@@ -7922,6 +8044,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 18
     },
     {
@@ -8239,6 +8368,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 62
     },
     {
@@ -8556,6 +8692,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 41
     },
     {
@@ -8959,6 +9102,29 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        },
+        {
+          "id": "e2",
+          "cost": 0
+        },
+        {
+          "id": "e3",
+          "cost": 0
+        },
+        {
+          "id": "e4",
+          "cost": 0
+        },
+        {
+          "id": "e5",
+          "cost": 0
+        }
+      ],
       "page": 45
     },
     {
@@ -9243,6 +9409,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 80
     },
     {
@@ -9744,6 +9917,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "page": 44
     },
     {
@@ -10283,6 +10463,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 83
     },
     {
@@ -11367,6 +11554,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 4
+        }
+      ],
       "page": 40
     },
     {
@@ -11570,6 +11763,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 50
     },
     {
@@ -11644,6 +11844,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 0,
+          "repeatable": true
+        }
+      ],
       "page": 130
     },
     {
@@ -12455,6 +12662,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 45
     },
     {
@@ -12484,6 +12698,13 @@
           "attribute": null,
           "damageType": null,
           "bonus": 0
+        }
+      ],
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
         }
       ],
       "save": {
@@ -12633,6 +12854,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 0,
+          "repeatable": true
+        }
+      ],
       "page": 77
     },
     {
@@ -12995,6 +13223,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 0,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "vontade",
         "attribute": null,
@@ -13143,6 +13378,13 @@
       "fields": {
         "type": "classe"
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 70
     },
     {
@@ -13582,6 +13824,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 2,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "reflexos",
         "attribute": null,
@@ -14168,6 +14417,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 0
+        }
+      ],
       "page": 31
     },
     {
@@ -15723,6 +15978,13 @@
         "area": "esfera com 9m de raio",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 0,
+          "repeatable": true
+        }
+      ],
       "save": {
         "skill": "fortitude",
         "attribute": null,
@@ -16588,6 +16850,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 42
     },
     {
@@ -16714,6 +16983,13 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 1,
+          "repeatable": true
+        }
+      ],
       "page": 83
     },
     {

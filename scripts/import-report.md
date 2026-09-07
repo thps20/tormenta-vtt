@@ -34,8 +34,10 @@ Packs ignorados de propósito (criaturas, convocações, macros, tabelas, journa
 - Resistência: `resistencia.atributo` do Foundry é ignorado; a CD usa o atributo de conjuração da ficha (`save.attribute = null`).
 - Armas: `@for` no dano vira `attribute: "auto"` (a regra `damageAttribute` do sistema decide por tipo de uso); armas mágicas com "+N" no ataque/dano recebem `bonus: N`.
 - Poderes `ability` → `habilidade`, `distincao` → `distincao` (opções adicionadas a `power.type` no JSON do sistema).
-- Aprimoramentos de magia (guardados como `effects[]` no Foundry) entram no fim da descrição como lista "+N PM: ..."; a flag `aumenta` é ignorada.
+- Aprimoramentos (effects `onuse`+`self` de magias, poderes e consumíveis) viram `enhancements[{ id: "eN", cost, repeatable }]`; `repeatable` = flag `aumenta` ("Múltiplas Aplicações"). O texto vai para `descriptions.local.json` na chave `<id>#eN` e a lista continua no fim da descrição ("+N PM: ..."). Truque (custo vazio em magia) e custos negativos ficam só na descrição. Os demais effects (efeitos ativos) não entram mais na descrição.
 - Poderes raciais entram em `powers.json` com a raça como tag; o vínculo raça → poderes (`grants` do Foundry) não é modelado no nosso schema.
+
+Aprimoramentos (effects `onuse`+`self`): 568 em 218 entradas, 170 repetíveis (`aumenta`); 15 truques (custo vazio em magia, só na descrição); 291 effects `onuse` sem `self` não modelados (aprimoramentos concedidos a outras magias/ataques, ex.: Familiar Coruja).
 
 Efeitos ativos (`effects[]` com `changes`) são ignorados de propósito; só a contagem:
 
@@ -68,7 +70,7 @@ Nomes repetidos; o id ganhou sufixo (subtipo ou id do Foundry):
 
 ## TODO (sem correspondência no Foundry ou fora dos nossos enums)
 
-Total: 192 pendências em 13 categorias.
+Total: 198 pendências em 14 categorias.
 
 ### alcance: valor fora dos nossos enums (gravado "special") (7)
 
@@ -79,6 +81,15 @@ Total: 192 pendências em 13 categorias.
 - `projetar-consciencia`: `any`
 - `sonho`: `any`
 - `videncia`: `any`
+
+### aprimoramento: sem a flag de múltiplas aplicações (gravado como não repetível) (6)
+
+- `amedrontar`: "afeta todos os alvos válidos a sua escolha dentro do alcance."
+- `ancora-dimensional`: "muda o efeito para criar um fio de energia cor de esmeralda que prende o alvo a "
+- `area-escorregadia`: "muda a CD dos testes de Acrobacia para 15."
+- `area-escorregadia`: "muda a CD dos testes de Acrobacia para 20."
+- `arma-espiritual`: "invoca duas armas, permitindo que você contra-ataque (ou ataque, se usar o aprim"
+- `arma-espiritual`: "muda o tipo do dano para essência. Requer 2o círculo."
 
 ### armadura pesada: limite de atributo na Defesa (maxAttr) não importado; conferir no livro (9)
 
@@ -303,7 +314,7 @@ Total: 192 pendências em 13 categorias.
 
 ## Descrições
 
-`descriptions.local.json` gravado com 1288 descrições (fora do git).
+`descriptions.local.json` gravado com 1288 descrições e 568 textos de aprimoramento (`<id>#eN`), fora do git.
 
 Entradas sem descrição no Foundry (o app mostra "ver livro"): 30.
 

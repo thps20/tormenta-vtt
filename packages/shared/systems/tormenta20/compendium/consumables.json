@@ -1751,6 +1751,12 @@
         "area": "",
         "effect": ""
       },
+      "enhancements": [
+        {
+          "id": "e1",
+          "cost": 0
+        }
+      ],
       "slots": 0.5,
       "price": 30
     },
