@@ -1,4 +1,5 @@
-import { TokenCreateSchema, TokenDeleteSchema, TokenLinkCharacterSchema, TokenPatchSchema, type FogConfig, type Token } from "@tormenta-vtt/shared";
+import { Prisma } from "@prisma/client";
+import { TokenCreateSchema, TokenDeleteSchema, TokenLinkCharacterSchema, TokenPatchSchema, type FogConfig, type Token, type TokenHp } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { canEditCharacter, requireCharacter, toCharacter } from "../services/characters.js";
 import { canEditToken, restrictPatchForRole } from "../services/permissions.js";
@@ -12,6 +13,11 @@ async function requireToken(tokenId: string, roomId: string) {
   const row = await prisma.token.findUnique({ where: { id: tokenId }, include: { scene: true } });
   if (!row || row.scene.roomId !== roomId) throw new HandlerError("Token não encontrado");
   return row;
+}
+
+/** Json? do Prisma não aceita `null` cru (precisa de Prisma.JsonNull pra gravar SQL NULL). */
+function hpJson(hp: TokenHp | null): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  return hp === null ? Prisma.JsonNull : hp;
 }
 
 /**
@@ -34,7 +40,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
         const owner = await prisma.participant.findUnique({ where: { id: data.ownerId } });
         if (!owner || owner.roomId !== ctx.roomId) throw new HandlerError("Dono inválido");
       }
-      const token = toToken(await prisma.token.create({ data }));
+      const token = toToken(await prisma.token.create({ data: { ...data, hp: hpJson(data.hp) } }));
       broadcastToken(io, ctx.roomId, token, "token:created", toScene(scene).fog);
       return token;
     }, { gmOnly: true }),
@@ -46,12 +52,12 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       const row = await requireToken(patch.id, ctx.roomId);
       if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla este token");
 
-      const { id, sceneId: _ignoreScene, ...fields } = restrictPatchForRole(ctx, patch);
+      const { id, sceneId: _ignoreScene, hp, ...fields } = restrictPatchForRole(ctx, patch);
       if (fields.ownerId) {
         const owner = await prisma.participant.findUnique({ where: { id: fields.ownerId } });
         if (!owner || owner.roomId !== ctx.roomId) throw new HandlerError("Dono inválido");
       }
-      const token = toToken(await prisma.token.update({ where: { id }, data: fields }));
+      const token = toToken(await prisma.token.update({ where: { id }, data: { ...fields, ...(hp !== undefined ? { hp: hpJson(hp) } : {}) } }));
       // A cena já veio junto com o token (requireToken): sem consulta extra a cada movimento.
       broadcastToken(io, ctx.roomId, token, "token:updated", toScene(row.scene).fog);
       return token;

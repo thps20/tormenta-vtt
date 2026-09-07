@@ -15,6 +15,7 @@ import {
   ChatMessageSchema,
   FogConfigSchema,
   GridConfigSchema,
+  TokenHpSchema,
   type ChatMessage,
   type InitiativeEntry,
   type Participant,
@@ -68,6 +69,7 @@ export function toToken(t: DbToken): Token {
     ownerId: t.ownerId,
     color: t.color,
     characterId: t.characterId,
+    hp: TokenHpSchema.nullable().parse(t.hp),
   };
 }
 

@@ -249,6 +249,7 @@ function Table() {
                     zIndex: n,
                     visible: true,
                     ownerId: null,
+                    hp: null,
                     color: TOKEN_COLORS[(n - 1) % TOKEN_COLORS.length] ?? "#e11d48",
                   }).then((created) => created && selectToken(created.id));
                 }}

@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { IdSchema } from "./common.js";
 
+export const TokenHpSchema = z.object({ current: z.number().int(), max: z.number().int().min(0) });
+export type TokenHp = z.infer<typeof TokenHpSchema>;
+
 export const TokenSchema = z.object({
   id: IdSchema,
   sceneId: IdSchema,
@@ -23,6 +26,12 @@ export const TokenSchema = z.object({
   color: z.string().default("#e11d48"),
   /** Ficha vinculada (ver token:link-character). null = sem ficha. */
   characterId: IdSchema.nullable().default(null),
+  /**
+   * PV do token "solto" (sem ficha), editado no Inspector (GM). Ignorado enquanto
+   * characterId aponta pra uma ficha: aí quem manda é o recurso `tokenBar` dela.
+   * null = PV não definido (token não aparece como alvo de token:apply-damage).
+   */
+  hp: TokenHpSchema.nullable().default(null),
 });
 export type Token = z.infer<typeof TokenSchema>;
 

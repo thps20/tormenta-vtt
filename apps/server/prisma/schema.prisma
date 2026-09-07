@@ -83,6 +83,9 @@ model Token {
   color    String  @default("#e11d48")
   /// Ficha vinculada (token:link-character). Apagar a ficha só desvincula.
   characterId String?
+  /// PV do token solto (sem characterId), editado no Inspector: { current, max }. Ver TokenHpSchema.
+  /// Ignorado enquanto characterId aponta pra uma ficha (quem manda é o recurso `tokenBar` dela).
+  hp Json?
 
   scene     Scene        @relation(fields: [sceneId], references: [id], onDelete: Cascade)
   owner     Participant? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
