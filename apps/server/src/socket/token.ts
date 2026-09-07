@@ -1,9 +1,33 @@
 import { Prisma } from "@prisma/client";
-import { TokenCreateSchema, TokenDeleteSchema, TokenLinkCharacterSchema, TokenPatchSchema, type FogConfig, type Token, type TokenHp } from "@tormenta-vtt/shared";
+import {
+  CharacterDataSchema,
+  TokenApplyDamageSchema,
+  TokenCreateSchema,
+  TokenDeleteSchema,
+  TokenHpSchema,
+  TokenLinkCharacterSchema,
+  TokenPatchSchema,
+  applyResourceDelta,
+  computeCharacter,
+  type AppliedDamage,
+  type FogConfig,
+  type Token,
+  type TokenHp,
+} from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
-import { canEditCharacter, requireCharacter, toCharacter } from "../services/characters.js";
+import {
+  broadcastCharacter,
+  canEditCharacter,
+  characterDataOf,
+  requireCharacter,
+  requireSystem,
+  toCharacter,
+  toJson,
+} from "../services/characters.js";
+import { checkApplyDamageTarget } from "../services/applyDamage.js";
+import { emitChatMessage, messageVisibleTo } from "../services/chatVisibility.js";
 import { canEditToken, restrictPatchForRole } from "../services/permissions.js";
-import { toScene, toToken } from "../services/serialize.js";
+import { toChatMessage, toScene, toToken } from "../services/serialize.js";
 import { emitTokenToPlayers } from "../services/visibility.js";
 import { guarded, HandlerError } from "./ack.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
@@ -87,6 +111,68 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       const token = toToken(await prisma.token.update({ where: { id: tokenId }, data: { characterId } }));
       broadcastToken(io, ctx.roomId, token, "token:updated", toScene(row.scene).fog);
       return token;
+    }),
+  );
+
+  socket.on(
+    "token:apply-damage",
+    guarded(socket, TokenApplyDamageSchema, async ({ messageId, targets }, ctx) => {
+      const row = await prisma.chatMessage.findUnique({ where: { id: messageId } });
+      if (!row || row.roomId !== ctx.roomId) throw new HandlerError("Mensagem não encontrada");
+      const msg = toChatMessage(row);
+      // Mesma regra de quem vê a mensagem (não dá pra aplicar num card que nem devia enxergar).
+      if (!messageVisibleTo(msg, { role: ctx.role, participantId: ctx.participantId })) throw new HandlerError("Mensagem não encontrada");
+      if (msg.kind !== "roll" || !msg.roll?.damage?.length) throw new HandlerError("Essa rolagem não tem dano/cura pra aplicar");
+      const roll = msg.roll;
+
+      // 1. Valida TUDO antes de aplicar qualquer alvo (tudo-ou-nada): permissão (dono ou GM)
+      // e se o alvo tem PV pra mexer (ficha com recurso `tokenBar`, ou hp do token solto).
+      const def = await requireSystem(ctx.roomId);
+      const tokenRows = await Promise.all(targets.map((t) => requireToken(t.tokenId, ctx.roomId)));
+      for (const tokenRow of tokenRows) {
+        const error = checkApplyDamageTarget(ctx, tokenRow, def);
+        if (error) throw new HandlerError(error);
+      }
+
+      // 2. Aplica: recurso `tokenBar` da ficha vinculada (dano gasta temp antes do current),
+      // ou hp do próprio token quando solto. Lê fresco a cada alvo (dois alvos podem apontar
+      // pra mesma ficha, ou o mesmo token repetido no lote).
+      const applied: AppliedDamage[] = [];
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i]!;
+        const tokenRow = tokenRows[i]!;
+
+        if (tokenRow.characterId) {
+          const resourceKey = def.tokenBar!;
+          const character = toCharacter(await requireCharacter(tokenRow.characterId, ctx.roomId));
+          const computed = computeCharacter(def, character);
+          const bounds = computed.resources[resourceKey] ?? { max: 0, min: 0, detail: null };
+          const res = character.resources[resourceKey] ?? { current: 0, temp: 0, maxOverride: null };
+          const next = applyResourceDelta(res, target.amount, bounds);
+          const data = CharacterDataSchema.parse({
+            ...characterDataOf(character),
+            resources: { ...character.resources, [resourceKey]: { ...res, ...next } },
+          });
+          const updated = toCharacter(await prisma.character.update({ where: { id: character.id }, data: { data: toJson(data) } }));
+          broadcastCharacter(io, ctx.roomId, updated, "character:updated");
+        } else {
+          const fresh = await requireToken(tokenRow.id, ctx.roomId);
+          const hp = TokenHpSchema.parse(fresh.hp);
+          const next = applyResourceDelta({ current: hp.current, temp: 0 }, target.amount, { min: 0, max: hp.max });
+          const updatedToken = toToken(
+            await prisma.token.update({ where: { id: tokenRow.id }, data: { hp: hpJson({ current: next.current, max: hp.max }) } }),
+          );
+          broadcastToken(io, ctx.roomId, updatedToken, "token:updated", toScene(tokenRow.scene).fog);
+        }
+
+        applied.push({ tokenId: tokenRow.id, tokenName: tokenRow.name, amount: target.amount, multiplier: target.multiplier });
+      }
+
+      // 3. Acrescenta ao registro do card (nunca sobrescreve) e reemite pra quem já via a mensagem.
+      const updatedRoll = { ...roll, applied: [...roll.applied, ...applied] };
+      const updatedMsg = toChatMessage(await prisma.chatMessage.update({ where: { id: messageId }, data: { roll: updatedRoll } }));
+      emitChatMessage(io, ctx.roomId, updatedMsg);
+      return updatedMsg;
     }),
   );
 }

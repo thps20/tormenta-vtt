@@ -1,9 +1,16 @@
 import type { Character as DbCharacter } from "@prisma/client";
 import { Prisma } from "@prisma/client";
-import { CharacterSchema, type Character, type CharacterData, type CharacterKind } from "@tormenta-vtt/shared";
+import { CharacterSchema, getSystemDefinition, type Character, type CharacterData, type CharacterKind, type SystemDefinition } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { HandlerError, type Ctx } from "../socket/ack.js";
 import { rooms, type TypedServer } from "../socket/types.js";
+
+/** Carrega o sistema da sala (JSON validado por SystemDefinitionSchema). */
+export async function requireSystem(roomId: string): Promise<SystemDefinition> {
+  const room = await prisma.room.findUnique({ where: { id: roomId } });
+  if (!room) throw new HandlerError("Sala não encontrada");
+  return getSystemDefinition(room.systemId);
+}
 
 /**
  * Linha do Prisma -> Character do shared. As colunas vencem o que estiver

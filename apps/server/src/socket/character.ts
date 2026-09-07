@@ -10,9 +10,7 @@ import {
   buildCharacterRoll,
   buildItemUse,
   createDefaultCharacterData,
-  getSystemDefinition,
   validateCharacterItems,
-  type SystemDefinition,
 } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import {
@@ -20,6 +18,7 @@ import {
   canEditCharacter,
   characterDataOf,
   requireCharacter,
+  requireSystem,
   toCharacter,
   toJson,
 } from "../services/characters.js";
@@ -28,12 +27,6 @@ import { toChatMessage, toScene, toToken } from "../services/serialize.js";
 import { guarded, HandlerError } from "./ack.js";
 import { broadcastToken } from "./token.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
-
-async function requireSystem(roomId: string): Promise<SystemDefinition> {
-  const room = await prisma.room.findUnique({ where: { id: roomId } });
-  if (!room) throw new HandlerError("Sala não encontrada");
-  return getSystemDefinition(room.systemId);
-}
 
 async function requireOwnerInRoom(ownerId: string | null, roomId: string): Promise<void> {
   if (!ownerId) return;

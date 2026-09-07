@@ -2,7 +2,7 @@ import type { Token, TokenPatch } from "@tormenta-vtt/shared";
 import type { Ctx } from "../socket/ack.js";
 
 /** GM pode tudo; jogador só mexe no token que possui. */
-export function canEditToken(ctx: Ctx, token: Pick<Token, "ownerId">): boolean {
+export function canEditToken(ctx: Pick<Ctx, "role" | "participantId">, token: Pick<Token, "ownerId">): boolean {
   return ctx.role === "gm" || (token.ownerId !== null && token.ownerId === ctx.participantId);
 }
 
