@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { BookOpen, Eye, EyeOff, ImagePlus, Trash2, User, X } from "lucide-react";
+import { BookOpen, Eye, EyeOff, Heart, ImagePlus, Trash2, User, X } from "lucide-react";
 import type { Character, Participant, Token, TokenPatch } from "@tormenta-vtt/shared";
 import { uploadImage } from "../lib/api";
 import { toast } from "../store/ui";
@@ -55,6 +55,23 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({
     const trimmed = name.trim();
     if (trimmed && trimmed !== token.name) onPatch({ id: token.id, name: trimmed });
     else setName(token.name);
+  };
+
+  // PV do token solto (sem ficha): só o GM edita, e só enquanto não há characterId
+  // (com ficha vinculada, quem manda é o recurso tokenBar dela — ver ResourcesBlock).
+  const [hpCurrent, setHpCurrent] = useState(String(token.hp?.current ?? 0));
+  const [hpMax, setHpMax] = useState(String(token.hp?.max ?? 0));
+  const [prevHp, setPrevHp] = useState(token.hp);
+  if (prevHp !== token.hp) {
+    setPrevHp(token.hp);
+    setHpCurrent(String(token.hp?.current ?? 0));
+    setHpMax(String(token.hp?.max ?? 0));
+  }
+
+  const commitHp = () => {
+    const current = Math.trunc(Number(hpCurrent)) || 0;
+    const max = Math.max(0, Math.trunc(Number(hpMax)) || 0);
+    onPatch({ id: token.id, hp: { current, max } });
   };
 
   const handleImage = async (file: File | undefined) => {
@@ -157,6 +174,41 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({
             )}
           </div>
         </Row>
+
+        {isGm && token.characterId === null && (
+          <Row label="PV" icon={<Heart className="w-3.5 h-3.5 text-[#d4af37]" />}>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                value={hpCurrent}
+                onChange={(e) => setHpCurrent(e.target.value)}
+                onBlur={commitHp}
+                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                className="w-12 bg-[#141414] border border-[#2d2417] rounded px-1 py-0.5 text-[11px] text-zinc-200 focus:outline-none focus:border-[#d4af37]"
+                title="PV atual"
+              />
+              <span className="text-zinc-500">/</span>
+              <input
+                type="number"
+                value={hpMax}
+                onChange={(e) => setHpMax(e.target.value)}
+                onBlur={commitHp}
+                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                className="w-12 bg-[#141414] border border-[#2d2417] rounded px-1 py-0.5 text-[11px] text-zinc-200 focus:outline-none focus:border-[#d4af37]"
+                title="PV máximo"
+              />
+              {token.hp && (
+                <button
+                  onClick={() => onPatch({ id: token.id, hp: null })}
+                  title="Parar de rastrear PV deste token"
+                  className="text-[10px] text-zinc-500 hover:text-red-400 cursor-pointer"
+                >
+                  remover
+                </button>
+              )}
+            </div>
+          </Row>
+        )}
 
         {isGm && (
           <>
