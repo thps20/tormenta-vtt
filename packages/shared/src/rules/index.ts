@@ -5,5 +5,6 @@ export * from "./rolls.js";
 export * from "./defaults.js";
 export * from "./measure.js";
 export * from "./activation.js";
+export * from "./enhancements.js";
 export * from "./progression.js";
 export * from "./compendium.js";

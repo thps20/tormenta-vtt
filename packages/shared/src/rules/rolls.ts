@@ -5,6 +5,7 @@
 import type { Action, Character, CharacterData, CharacterItem, CharacterRollRequest } from "../schemas/character.js";
 import type { SystemDefinition } from "../schemas/system.js";
 import { computeCharacter, makeResolver, parseModifiers, sumModifiers, type ComputedCharacter } from "./compute.js";
+import { applyDamageEnhancements, EnhancementError, resolveEnhancements } from "./enhancements.js";
 import { FormulaError, substitutePlaceholders } from "./placeholders.js";
 
 export interface BuiltRoll {
@@ -14,6 +15,8 @@ export interface BuiltRoll {
   label: string;
   /** Resultado natural do dado a partir do qual é crítico (só ataques). */
   critThreshold?: number;
+  /** Decomposição do dano quando aprimoramentos mudaram a fórmula ("6d6 base + 4d6 … ×2"); null = como está no item. */
+  breakdown?: string | null;
 }
 
 export class RollBuildError extends Error {
@@ -72,7 +75,7 @@ export function buildCharacterRoll(def: SystemDefinition, character: Character |
     try {
       return fn();
     } catch (err) {
-      if (err instanceof FormulaError) throw new RollBuildError(err.message);
+      if (err instanceof FormulaError || err instanceof EnhancementError) throw new RollBuildError(err.message);
       throw err;
     }
   };
@@ -126,8 +129,10 @@ export function buildCharacterRoll(def: SystemDefinition, character: Character |
             const attrValue = attrKey ? (computed.attributes[attrKey] ?? 0) : 0;
             const skill = attackSkillOf(item);
             const bonus = sumModifiers(mods, (t) => t.kind === "damage" && (t.skill === null || t.skill === skill));
-            const base = substitutePlaceholders(action.formula, resolveGlobal);
-            return { formula: joinParts(base, [attrValue, action.bonus, bonus]), label };
+            // Aprimoramentos (só na ação de dano): dados primeiro, atributo e bônus depois ("6d6 + 4d6 + 3").
+            const selected = resolveEnhancements(def, item, request.enhancements ?? []);
+            const enhanced = applyDamageEnhancements(substitutePlaceholders(action.formula, resolveGlobal), selected);
+            return { formula: joinParts(enhanced.formula, [attrValue, action.bonus, bonus]), label, breakdown: enhanced.breakdown };
           }
           case "check": {
             const skill = computed.skills[action.skill];

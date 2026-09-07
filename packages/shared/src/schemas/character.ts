@@ -102,6 +102,24 @@ export type Activation = z.infer<typeof ActivationSchema>;
  * Ids frouxos de propósito: importados são "e1", "e2"...; manuais usam newId().
  */
 export const EnhancementIdSchema = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/).max(80);
+
+/** Um grupo de dados ("1d6"): multiplicar por `times` é só multiplicar a contagem. */
+export const DiceTermSchema = z.string().regex(/^\d+d\d+$/);
+
+/**
+ * Efeito mecânico de um aprimoramento, aplicado à ação de dano do item ao usar:
+ *   costOnly       só cobra (default quando `effect` está ausente)
+ *   damageDiceAdd  soma `dice` × vezes ao dano ("aumenta o dano em +1d6")
+ *   damageSet      troca os dados do dano por `formula` ("muda o dano para 10d6"); atributo e bônus continuam
+ * Explícito de propósito: o importador só preenche quando o texto casa um padrão estrito.
+ */
+export const EnhancementEffectSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("costOnly") }),
+  z.object({ kind: z.literal("damageDiceAdd"), dice: DiceTermSchema }),
+  z.object({ kind: z.literal("damageSet"), formula: z.string().min(1).max(200) }),
+]);
+export type EnhancementEffect = z.infer<typeof EnhancementEffectSchema>;
+
 export const EnhancementSchema = z.object({
   id: EnhancementIdSchema,
   label: z.string().max(1000).default(""),
@@ -109,6 +127,8 @@ export const EnhancementSchema = z.object({
   cost: z.number().int().min(0).default(0),
   /** true = pode ser aplicado mais de uma vez (o custo multiplica por `times`). */
   repeatable: z.boolean().default(false),
+  /** Ausente = costOnly. */
+  effect: EnhancementEffectSchema.optional(),
 });
 export type Enhancement = z.infer<typeof EnhancementSchema>;
 
@@ -256,7 +276,8 @@ export const CharacterRollRequestSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("skill"), key: SkillInstanceKeySchema }),
   z.object({ type: z.literal("initiative") }),
   z.object({ type: z.literal("extra"), key: KeySchema }),
-  z.object({ type: z.literal("action"), itemId: IdSchema, actionId: IdSchema }),
+  /** `enhancements` = aprimoramentos aplicados à ação (o card do chat reenvia os da conjuração); ausente/vazio = ação como está no item. */
+  z.object({ type: z.literal("action"), itemId: IdSchema, actionId: IdSchema, enhancements: z.array(EnhancementUseSchema).optional() }),
 ]);
 export type CharacterRollRequest = z.infer<typeof CharacterRollRequestSchema>;
 
@@ -286,6 +307,16 @@ export const ItemCardSchema = z.object({
   effect: z.string().max(2000),
   /** CD calculada (null quando o sistema não define saveDc). */
   save: z.object({ skillLabel: z.string().max(40), dc: z.number().int().nullable(), text: z.string().max(500) }).nullable(),
-  actions: z.array(z.object({ id: IdSchema, label: z.string().max(60), kind: z.string().max(20) })),
+  actions: z.array(
+    z.object({
+      id: IdSchema,
+      label: z.string().max(60),
+      kind: z.string().max(20),
+      /** Fórmula final já resolvida, com os aprimoramentos da conjuração (null = não deu para montar). Cards antigos não têm. */
+      formula: z.string().max(200).nullable().default(null),
+      /** Decomposição quando algum efeito foi aplicado ("6d6 base + 4d6 aumenta o dano ×2"); null = dano como está no item. */
+      breakdown: z.string().max(300).nullable().default(null),
+    }),
+  ),
 });
 export type ItemCard = z.infer<typeof ItemCardSchema>;

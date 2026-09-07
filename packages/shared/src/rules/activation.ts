@@ -8,10 +8,12 @@
  * a do custo com aprimoramentos e quais execuções são passivas vêm de def.activation.
  */
 import { DiceParseError, evaluateConstant } from "../dice/index.js";
-import type { Activation, Character, CharacterData, CharacterItem, CharacterResource, Enhancement, EnhancementUse, ItemCard } from "../schemas/character.js";
+import type { Activation, Character, CharacterData, CharacterItem, CharacterResource, EnhancementUse, ItemCard } from "../schemas/character.js";
 import type { SkillDef, SystemDefinition } from "../schemas/system.js";
 import { computeCharacter, makeResolver, parseModifiers, sumModifiers, type ComputedCharacter } from "./compute.js";
+import { EnhancementError, resolveEnhancements, type SelectedEnhancement } from "./enhancements.js";
 import { FormulaError, substitutePlaceholders } from "./placeholders.js";
+import { buildCharacterRoll, RollBuildError, type BuiltRoll } from "./rolls.js";
 
 export class ItemUseError extends Error {
   constructor(message: string) {
@@ -31,32 +33,6 @@ export function isPassiveItem(def: SystemDefinition, item: Pick<CharacterItem, "
   if (!item.activation) return true;
   const execution = def.activation.executions.find((e) => e.key === item.activation?.execution);
   return execution?.passive ?? false;
-}
-
-/** Um aprimoramento escolhido, já resolvido contra o item. */
-export interface SelectedEnhancement {
-  enhancement: Enhancement;
-  times: number;
-}
-
-/**
- * Confere a escolha do jogador contra o item: cada id existe, não se repete e
- * `times` só passa de 1 em aprimoramento repetível. Seleção não vazia num
- * sistema sem activation.enhancementCost é recusada (o sistema não tem a regra).
- * Lança ItemUseError com mensagem pronta para o ack.
- */
-export function resolveEnhancements(def: SystemDefinition, item: Pick<CharacterItem, "enhancements">, selection: EnhancementUse[]): SelectedEnhancement[] {
-  if (selection.length === 0) return [];
-  if (!def.activation.enhancementCost) throw new ItemUseError("Este sistema não tem aprimoramentos");
-  const seen = new Set<string>();
-  return selection.map((use) => {
-    const enhancement = item.enhancements.find((e) => e.id === use.id);
-    if (!enhancement) throw new ItemUseError("Aprimoramento não encontrado");
-    if (seen.has(use.id)) throw new ItemUseError("Aprimoramento repetido na escolha");
-    seen.add(use.id);
-    if (use.times > 1 && !enhancement.repeatable) throw new ItemUseError(`"${enhancement.label || enhancement.id}" só pode ser aplicado uma vez`);
-    return { enhancement, times: use.times };
-  });
 }
 
 /**
@@ -152,6 +128,16 @@ export function buildItemCard(
   cost: number,
   selected: SelectedEnhancement[] = [],
 ): ItemCard {
+  const selection = selected.map((s) => ({ id: s.enhancement.id, times: s.times }));
+  /** Rolagem final da ação com os aprimoramentos; null se não dá para montar (o card não bloqueia por isso). */
+  const builtOf = (actionId: string): BuiltRoll | null => {
+    try {
+      return buildCharacterRoll(def, character, { type: "action", itemId: item.id, actionId, enhancements: selection });
+    } catch (err) {
+      if (err instanceof RollBuildError) return null;
+      throw err;
+    }
+  };
   const kind = def.itemKinds.find((k) => k.key === item.kind);
   const costResource = def.activation.resource ? def.resources.find((r) => r.key === def.activation.resource) : undefined;
   const activation = item.activation ?? { cost: 0, execution: "", duration: { units: "", value: 0 }, range: { units: "", value: 0 }, target: "", area: "", effect: "" };
@@ -187,7 +173,10 @@ export function buildItemCard(
           text: item.save.text,
         }
       : null,
-    actions: item.actions.map((a) => ({ id: a.id, label: a.label, kind: a.kind })),
+    actions: item.actions.map((a) => {
+      const built = builtOf(a.id);
+      return { id: a.id, label: a.label, kind: a.kind, formula: built?.formula ?? null, breakdown: built?.breakdown ?? null };
+    }),
   };
 }
 
@@ -213,7 +202,13 @@ export function buildItemUse(def: SystemDefinition, character: Character, itemId
   if (!item) throw new ItemUseError("Item não encontrado");
   if (isPassiveItem(def, item)) throw new ItemUseError(`${item.name} é uma habilidade passiva`);
 
-  const selected = resolveEnhancements(def, item, selection);
+  let selected: SelectedEnhancement[];
+  try {
+    selected = resolveEnhancements(def, item, selection);
+  } catch (err) {
+    if (err instanceof EnhancementError) throw new ItemUseError(err.message);
+    throw err;
+  }
   const computed = computeCharacter(def, character);
   const cost = effectiveCost(def, character, item, selected);
   const resourceKey = def.activation.resource;

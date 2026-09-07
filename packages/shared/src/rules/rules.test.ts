@@ -6,7 +6,8 @@ import { createDefaultCharacterData, createDefaultItem } from "./defaults.js";
 import { describeModifierTarget, listModifierTargets, parseModifierTarget, ModifierTargetSchema } from "./modifierTarget.js";
 import { collectPlaceholders, substitutePlaceholders, FormulaError } from "./placeholders.js";
 import { buildCharacterRoll, resolveCharacterFormula, RollBuildError } from "./rolls.js";
-import { baseCost, buildItemUse, describeActivation, effectiveCost, isPassiveItem, ItemUseError, resolveEnhancements, saveDcFor, saveSkills } from "./activation.js";
+import { baseCost, buildItemUse, describeActivation, effectiveCost, isPassiveItem, ItemUseError, saveDcFor, saveSkills } from "./activation.js";
+import { applyDamageEnhancements, EnhancementError, resolveEnhancements } from "./enhancements.js";
 import { describeClasses, pendingChoices, validateCharacterItems } from "./progression.js";
 
 const def = getSystemDefinition("tormenta20");
@@ -395,7 +396,7 @@ describe("aprimoramentos (custo total)", () => {
     expect(() => sel(["nope", 1])).toThrow(/não encontrado/);
     expect(() => sel(["e1", 1], ["e1", 1])).toThrow(/repetido/);
     expect(() => sel(["e1", 2])).toThrow(/só pode ser aplicado uma vez/);
-    expect(() => resolveEnhancements(noRule, spell, [{ id: "e1", times: 1 }])).toThrow(/não tem aprimoramentos/);
+    expect(() => resolveEnhancements(noRule, spell, [{ id: "e1", times: 1 }])).toThrow(EnhancementError);
     expect(resolveEnhancements(noRule, spell, [])).toEqual([]);
     expect(baseCost(noRule, spell, sel(["e1", 1]))).toBe(2);
   });
@@ -421,6 +422,72 @@ describe("aprimoramentos (custo total)", () => {
     ]);
     expect(() => buildItemUse(def, withSpell(4), "spell", [{ id: "e1", times: 1 }])).toThrow(/PM insuficiente: precisa de 5, tem 4/);
     expect(buildItemUse(def, withSpell(4), "spell").card.enhancements).toEqual([]);
+  });
+});
+
+describe("aprimoramentos (efeito no dano)", () => {
+  /** Bola de fogo 6d6 (+1 de bônus na ação) com: add repetível 2d6, set 10d6, só custo, add 1d8. */
+  const fireball = CharacterItemSchema.parse({
+    id: "fb",
+    kind: "spell",
+    name: "Bola de fogo",
+    activation: { cost: 3, execution: "standard" },
+    actions: [
+      { id: "dmg", label: "Dano", kind: "damage", formula: "6d6", attribute: null, damageType: "fogo", bonus: 1 },
+      { id: "atk", label: "Toque", kind: "attack", skill: "pontaria" },
+    ],
+    enhancements: [
+      { id: "add", label: "aumenta o dano em +2d6", cost: 2, repeatable: true, effect: { kind: "damageDiceAdd", dice: "2d6" } },
+      { id: "set", label: "muda o dano para 10d6", cost: 5, effect: { kind: "damageSet", formula: "10d6" } },
+      { id: "set2", label: "muda o dano para 12d6", cost: 7, effect: { kind: "damageSet", formula: "12d6" } },
+      { id: "only", label: "muda o alcance para longo", cost: 1 },
+      { id: "add8", label: "aumenta o dano em +1d8 (texto bem comprido para ser cortado no resumo)", cost: 2, effect: { kind: "damageDiceAdd", dice: "1d8" } },
+    ],
+  });
+  const c = {
+    ...fixture({ items: [fireball], resources: { pm: { current: 20, temp: 0, maxOverride: 20 } } }),
+    id: "c1",
+    roomId: "r1",
+    ownerId: null,
+    name: "Maga",
+    kind: "pc" as const,
+    createdAt: "2026-09-06T00:00:00.000Z",
+    updatedAt: "2026-09-06T00:00:00.000Z",
+  };
+  const sel = (...uses: [string, number][]) => resolveEnhancements(def, fireball, uses.map(([id, times]) => ({ id, times })));
+  const roll = (...uses: [string, number][]) => buildCharacterRoll(def, c, { type: "action", itemId: "fb", actionId: "dmg", enhancements: uses.map(([id, times]) => ({ id, times })) });
+
+  it("applyDamageEnhancements: add, add repetível, set, set + add, sem efeito", () => {
+    expect(applyDamageEnhancements("6d6", sel(["add", 1]))).toEqual({ formula: "6d6 + 2d6", breakdown: "6d6 base + 2d6 aumenta o dano em +2d6" });
+    expect(applyDamageEnhancements("6d6", sel(["add", 2]))).toEqual({ formula: "6d6 + 4d6", breakdown: "6d6 base + 4d6 aumenta o dano em +2d6 ×2" });
+    expect(applyDamageEnhancements("6d6", sel(["set", 1]))).toEqual({ formula: "10d6", breakdown: "10d6 muda o dano para 10d6" });
+    expect(applyDamageEnhancements("6d6", sel(["set", 1], ["add", 1]))).toEqual({ formula: "10d6 + 2d6", breakdown: "10d6 muda o dano para 10d6 + 2d6 aumenta o dano em +2d6" });
+    expect(applyDamageEnhancements("6d6", sel(["only", 1]))).toEqual({ formula: "6d6", breakdown: null });
+    expect(applyDamageEnhancements("6d6", [])).toEqual({ formula: "6d6", breakdown: null });
+    // Rótulo longo é cortado no resumo.
+    expect(applyDamageEnhancements("6d6", sel(["add8", 1])).breakdown).toBe("6d6 base + 1d8 aumenta o dano em +1d8 (texto bem compr…");
+    expect(() => applyDamageEnhancements("6d6", sel(["set", 1], ["set2", 1]))).toThrow(/Mais de um aprimoramento muda o dano/);
+  });
+
+  it("buildCharacterRoll: dados primeiro, bônus depois; ataque ignora a escolha; escolha inválida é RollBuildError", () => {
+    expect(roll()).toMatchObject({ formula: "6d6 + 1", breakdown: null });
+    expect(roll(["add", 2], ["only", 1])).toMatchObject({ formula: "6d6 + 4d6 + 1", breakdown: "6d6 base + 4d6 aumenta o dano em +2d6 ×2" });
+    expect(roll(["set", 1])).toMatchObject({ formula: "10d6 + 1" });
+    expect(buildCharacterRoll(def, c, { type: "action", itemId: "fb", actionId: "atk", enhancements: [{ id: "add", times: 2 }] }).breakdown).toBeUndefined();
+    expect(() => roll(["nope", 1])).toThrow(RollBuildError);
+    expect(() => roll(["set", 1], ["set2", 1])).toThrow(RollBuildError);
+  });
+
+  it("card da conjuração guarda a fórmula final e a decomposição de cada ação", () => {
+    const use = buildItemUse(def, c, "fb", [{ id: "add", times: 2 }]);
+    expect(use.card.actions).toEqual([
+      { id: "dmg", label: "Dano", kind: "damage", formula: "6d6 + 4d6 + 1", breakdown: "6d6 base + 4d6 aumenta o dano em +2d6 ×2" },
+      { id: "atk", label: "Toque", kind: "attack", formula: expect.stringMatching(/^1d20/), breakdown: null },
+    ]);
+    // Sem efeito escolhido: fórmula como está no item e sem decomposição.
+    expect(buildItemUse(def, c, "fb", [{ id: "only", times: 1 }]).card.actions[0]).toMatchObject({ formula: "6d6 + 1", breakdown: null });
+    // Dois sets: o uso é recusado antes de cobrar.
+    expect(() => buildItemUse(def, c, "fb", [{ id: "set", times: 1 }, { id: "set2", times: 1 }])).not.toThrow();
   });
 });
 
