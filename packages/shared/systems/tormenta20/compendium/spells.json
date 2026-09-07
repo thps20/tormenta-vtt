@@ -153,7 +153,11 @@
         {
           "id": "e3",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "1d6"
+          }
         }
       ],
       "save": {
@@ -1387,7 +1391,11 @@
         {
           "id": "e1",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "2d6"
+          }
         },
         {
           "id": "e2",
@@ -2579,7 +2587,11 @@
         {
           "id": "e1",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "2d8"
+          }
         }
       ],
       "page": 186
@@ -3976,7 +3988,11 @@
         {
           "id": "e1",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "1d12"
+          }
         },
         {
           "id": "e2",
@@ -4048,7 +4064,11 @@
         {
           "id": "e2",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "1d12"
+          }
         },
         {
           "id": "e3",
@@ -4385,7 +4405,11 @@
         {
           "id": "e1",
           "cost": 1,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "1d6"
+          }
         },
         {
           "id": "e2",
@@ -4444,7 +4468,11 @@
         {
           "id": "e1",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "1d8"
+          }
         },
         {
           "id": "e2",
@@ -4966,7 +4994,11 @@
         {
           "id": "e1",
           "cost": 3,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "2d6"
+          }
         },
         {
           "id": "e2",
@@ -6056,7 +6088,11 @@
         {
           "id": "e1",
           "cost": 1,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "1d12"
+          }
         }
       ],
       "save": {
@@ -6238,7 +6274,11 @@
         {
           "id": "e1",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "1d6"
+          }
         },
         {
           "id": "e2",
@@ -7436,7 +7476,11 @@
         {
           "id": "e1",
           "cost": 3,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "2d8"
+          }
         },
         {
           "id": "e2",
@@ -7640,7 +7684,11 @@
         {
           "id": "e1",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "2d6"
+          }
         },
         {
           "id": "e2",
@@ -8014,7 +8062,11 @@
         {
           "id": "e1",
           "cost": 1,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "2d6"
+          }
         },
         {
           "id": "e2",
@@ -8550,7 +8602,11 @@
         {
           "id": "e2",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "1d6"
+          }
         },
         {
           "id": "e3",
@@ -8971,7 +9027,11 @@
         {
           "id": "e1",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "2d8"
+          }
         },
         {
           "id": "e2",
@@ -9439,7 +9499,11 @@
         {
           "id": "e2",
           "cost": 2,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "2d6"
+          }
         },
         {
           "id": "e3",

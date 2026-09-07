@@ -9106,7 +9106,11 @@
         {
           "id": "e1",
           "cost": 1,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "1d6"
+          }
         },
         {
           "id": "e2",
@@ -13227,7 +13231,11 @@
         {
           "id": "e1",
           "cost": 0,
-          "repeatable": true
+          "repeatable": true,
+          "effect": {
+            "kind": "damageDiceAdd",
+            "dice": "2d6"
+          }
         }
       ],
       "save": {

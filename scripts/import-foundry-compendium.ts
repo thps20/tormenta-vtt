@@ -28,7 +28,7 @@ import { parse as parseYaml } from "yaml";
 import { CUSTOM_FILE, DESCRIPTIONS_FILE, compendiumDir, enhancementTextKey, readCompendiumFile, validateCompendiumEntries } from "../packages/shared/src/compendium/index.js";
 import { parseFormula } from "../packages/shared/src/dice/index.js";
 import { saveSkills } from "../packages/shared/src/rules/activation.js";
-import type { ActionTemplate, Activation, Save, SkillGrantsValue } from "../packages/shared/src/schemas/character.js";
+import type { ActionTemplate, Activation, EnhancementEffect, Save, SkillGrantsValue } from "../packages/shared/src/schemas/character.js";
 import { CompendiumEntrySchema, type CompendiumEntry } from "../packages/shared/src/schemas/compendium.js";
 import type { ItemKindDef, SystemDefinition } from "../packages/shared/src/schemas/system.js";
 import { getSystemDefinition } from "../packages/shared/src/systems.js";
@@ -178,6 +178,10 @@ class Report {
   cantrips = 0;
   /** Effects `onuse` sem `self` (aprimoramentos que um poder concede a OUTRAS magias/ataques): fora do modelo. */
   grantedEffects = 0;
+  /** Efeitos mecânicos preenchidos por padrão estrito, por tipo. */
+  readonly effectsByKind = new Map<string, number>();
+  /** Aprimoramentos SEM efeito mecânico (texto fora dos padrões), por categoria → "`id#eN`: texto". */
+  readonly noEffect = new Map<string, string[]>();
 
   todo(category: string, id: string, detail: string): void {
     const list = this.todos.get(category) ?? [];
@@ -222,6 +226,9 @@ class Report {
         `${this.cantrips} truques (custo vazio em magia, só na descrição); ${this.grantedEffects} effects \`onuse\` sem \`self\` não modelados (aprimoramentos concedidos a outras magias/ataques, ex.: Familiar Coruja).`,
     );
     lines.push("");
+    const kinds = [...this.effectsByKind.entries()].sort().map(([k, n]) => `${n} \`${k}\``).join(", ") || "nenhum";
+    lines.push(`Efeito mecânico preenchido só quando o texto inteiro casa um padrão estrito ("aumenta o dano em +XdY", "+XdY de dano", "muda o dano para XdY"): ${kinds}. Os demais ficam como só custo e estão listados por categoria no fim deste relatório.`);
+    lines.push("");
     lines.push("Efeitos ativos (`effects[]` com `changes`) são ignorados de propósito; só a contagem:");
     lines.push("");
     lines.push("| Tipo Foundry | Documentos com efeitos |", "|---|---|", ...table(this.effectsIgnored));
@@ -249,6 +256,19 @@ class Report {
       lines.push("");
       for (const item of items.sort()) lines.push(`- ${item}`);
       lines.push("");
+    }
+    if (this.noEffect.size > 0) {
+      const total = [...this.noEffect.values()].reduce((n, l) => n + l.length, 0);
+      lines.push("## Aprimoramentos sem efeito mecânico (por categoria)");
+      lines.push("");
+      lines.push(`${total} aprimoramentos ficaram como só custo (\`effect\` ausente) porque o texto não casa nenhum padrão estrito. Não entram no total de TODO; o jogador pode completar o efeito na ficha (modo edição).`);
+      lines.push("");
+      for (const [category, items] of [...this.noEffect.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+        lines.push(`### ${category} (${items.length})`);
+        lines.push("");
+        for (const item of items.sort()) lines.push(`- ${item}`);
+        lines.push("");
+      }
     }
     lines.push("## Descrições");
     lines.push("");
@@ -827,9 +847,32 @@ function htmlToText(html: string, unknownEntities: Set<string>): string {
 /** Tamanho máximo do texto de um aprimoramento (EnhancementSchema.label). */
 const ENHANCEMENT_TEXT_MAX = 1000;
 
+/**
+ * Efeito mecânico a partir do texto, SÓ quando a frase inteira casa um padrão
+ * estrito. Qualquer outra frase devolve null (vai para o relatório): nunca inferir.
+ */
+export function parseEnhancementEffect(text: string): EnhancementEffect | null {
+  const t = text.trim().replace(/\s+/g, " ").toLowerCase();
+  const add = /^aumenta o dano em \+?(\d+d\d+)[.;]?$/.exec(t) ?? /^\+?(\d+d\d+) de dano[.;]?$/.exec(t);
+  if (add?.[1]) return { kind: "damageDiceAdd", dice: add[1] };
+  const set = /^muda o dano para (\d+d\d+)[.;]?$/.exec(t);
+  if (set?.[1]) return { kind: "damageSet", formula: set[1] };
+  return null;
+}
+
+/** Categoria do relatório para um aprimoramento sem efeito (primeira que casar). */
+function noEffectCategory(text: string): string {
+  const t = normalize(text);
+  if (/\bdano\b/.test(t)) return "dano fora do padrão";
+  if (/\balvos?\b/.test(t)) return "alvo adicional";
+  if (/\balcance\b/.test(t)) return "alcance";
+  if (/\bduracao\b/.test(t)) return "duração";
+  return "outro";
+}
+
 interface ExtractedEnhancements {
   /** Só mecânica, na ordem do arquivo; ids "e1", "e2"... */
-  list: { id: string; cost: number; repeatable: boolean }[];
+  list: { id: string; cost: number; repeatable: boolean; effect?: EnhancementEffect }[];
   /** Texto de cada aprimoramento, por id. */
   texts: Map<string, string>;
   /** Lista para o fim da descrição ("Aprimoramentos:" + "- +N PM: ..."), vazia se não há nada. */
@@ -876,7 +919,14 @@ function extractEnhancements(doc: FoundryDoc, id: string, kind: string, report: 
     }
     if (flags.aumenta === undefined) report.todo("aprimoramento: sem a flag de múltiplas aplicações (gravado como não repetível)", id, `"${text.slice(0, 80)}"`);
     const enhId = `e${list.length + 1}`;
-    list.push({ id: enhId, cost, repeatable: flags.aumenta === true });
+    const mech = parseEnhancementEffect(text);
+    if (mech) report.bump(report.effectsByKind, mech.kind);
+    else {
+      const category = report.noEffect.get(noEffectCategory(text)) ?? [];
+      category.push(`\`${enhancementTextKey(id, enhId)}\`: ${text.length > 100 ? `${text.slice(0, 99)}…` : text}`);
+      report.noEffect.set(noEffectCategory(text), category);
+    }
+    list.push(mech ? { id: enhId, cost, repeatable: flags.aumenta === true, effect: mech } : { id: enhId, cost, repeatable: flags.aumenta === true });
     texts.set(enhId, text);
     lines.push(`- +${cost} PM: ${text}`);
   }
@@ -911,7 +961,7 @@ function compact(draft: Draft): Record<string, unknown> {
   if (draft.actions && draft.actions.length > 0) out.actions = draft.actions;
   if (draft.activation) out.activation = draft.activation;
   if (draft.enhancements && draft.enhancements.length > 0) {
-    out.enhancements = draft.enhancements.map((e) => (e.repeatable ? { id: e.id, cost: e.cost, repeatable: true } : { id: e.id, cost: e.cost }));
+    out.enhancements = draft.enhancements.map((e) => ({ id: e.id, cost: e.cost, ...(e.repeatable ? { repeatable: true } : {}), ...(e.effect ? { effect: e.effect } : {}) }));
   }
   if (draft.save) out.save = draft.save;
   if (draft.statBonuses && Object.keys(draft.statBonuses).length > 0) out.statBonuses = draft.statBonuses;
@@ -936,7 +986,7 @@ function main(): void {
   report.notes.push("Armas: `@for` no dano vira `attribute: \"auto\"` (a regra `damageAttribute` do sistema decide por tipo de uso); armas mágicas com \"+N\" no ataque/dano recebem `bonus: N`.");
   report.notes.push("Poderes `ability` → `habilidade`, `distincao` → `distincao` (opções adicionadas a `power.type` no JSON do sistema).");
   report.notes.push(
-    "Aprimoramentos (effects `onuse`+`self` de magias, poderes e consumíveis) viram `enhancements[{ id: \"eN\", cost, repeatable }]`; `repeatable` = flag `aumenta` (\"Múltiplas Aplicações\"). O texto vai para `descriptions.local.json` na chave `<id>#eN` e a lista continua no fim da descrição (\"+N PM: ...\"). Truque (custo vazio em magia) e custos negativos ficam só na descrição. Os demais effects (efeitos ativos) não entram mais na descrição.",
+    "Aprimoramentos (effects `onuse`+`self` de magias, poderes e consumíveis) viram `enhancements[{ id: \"eN\", cost, repeatable, effect? }]`; `repeatable` = flag `aumenta` (\"Múltiplas Aplicações\"). O texto vai para `descriptions.local.json` na chave `<id>#eN` e a lista continua no fim da descrição (\"+N PM: ...\"). Truque (custo vazio em magia) e custos negativos ficam só na descrição. Os demais effects (efeitos ativos) não entram mais na descrição.",
   );
   report.notes.push("Poderes raciais entram em `powers.json` com a raça como tag; o vínculo raça → poderes (`grants` do Foundry) não é modelado no nosso schema.");
 
