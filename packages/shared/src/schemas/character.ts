@@ -107,18 +107,41 @@ export const EnhancementIdSchema = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$
 export const DiceTermSchema = z.string().regex(/^\d+d\d+$/);
 
 /**
- * Efeito mecânico de um aprimoramento, aplicado à ação de dano do item ao usar:
- *   costOnly       só cobra (default quando `effect` está ausente)
- *   damageDiceAdd  soma `dice` × vezes ao dano ("aumenta o dano em +1d6"). `damageType` ausente = herda o
- *                  tipo da ação; presente = parcela separada com o próprio tipo ("+4d6 de dano de frio")
- *   damageSet      troca os dados do dano por `formula` ("muda o dano para 10d6"); atributo e bônus continuam
+ * Efeito mecânico de um aprimoramento, aplicado ao usar o item. "× vezes" = multiplica
+ * por `times` quando o aprimoramento é repetível.
+ *   costOnly        só cobra (default quando `effect` está ausente)
+ *   damageDiceAdd   soma `dice` × vezes ao dano ("aumenta o dano em +1d6"). `damageType` ausente = herda o
+ *                   tipo da ação; presente = parcela separada com o próprio tipo ("+4d6 de dano de frio").
+ *                   Ignora ações de cura (tipo com `healing` no sistema)
+ *   damageSet       troca os dados do dano por `formula` ("muda o dano para 10d6"); atributo e bônus continuam
+ *   healDiceAdd     como damageDiceAdd, mas só nas ações de cura ("aumenta a cura em +1d8")
+ *   dcAdd           soma `value` × vezes à CD de resistência do card ("aumenta a CD em +2")
+ *   attackBonusAdd  soma `value` × vezes ao ataque das ações de ataque do item
+ *   rangeSet        troca o alcance mostrado no card (`units` de activation.rangeUnits; `value` opcional)
+ *   durationSet     troca a duração mostrada no card (`units` de activation.durationUnits; `value` opcional)
+ *   areaSet         troca a área mostrada no card
+ *   targetsAdd      soma `count` × vezes alvos ao alvo mostrado no card ("+1 alvo")
+ *   text            só descritivo: aparece em destaque no card, sem automação
  * Explícito de propósito: o importador só preenche quando o texto casa um padrão estrito.
  */
 export const EnhancementEffectSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("costOnly") }),
   z.object({ kind: z.literal("damageDiceAdd"), dice: DiceTermSchema, damageType: KeySchema.optional() }),
   z.object({ kind: z.literal("damageSet"), formula: z.string().min(1).max(200) }),
+  z.object({ kind: z.literal("healDiceAdd"), dice: DiceTermSchema }),
+  z.object({ kind: z.literal("dcAdd"), value: z.number().int() }),
+  z.object({ kind: z.literal("attackBonusAdd"), value: z.number().int() }),
+  z.object({ kind: z.literal("rangeSet"), units: z.string().min(1).max(40), value: z.number().min(0).optional() }),
+  z.object({ kind: z.literal("durationSet"), units: z.string().min(1).max(40), value: z.number().min(0).optional() }),
+  z.object({ kind: z.literal("areaSet"), text: z.string().max(200) }),
+  z.object({ kind: z.literal("targetsAdd"), count: z.number().int().min(1) }),
+  z.object({ kind: z.literal("text"), text: z.string().max(1000) }),
 ]);
+export type EnhancementEffectKind = EnhancementEffect["kind"];
+
+/** Campos do card que um aprimoramento pode alterar; a UI marca "(aprimorado)". */
+export const EnhancedFieldSchema = z.enum(["range", "duration", "area", "target", "dc", "attack"]);
+export type EnhancedField = z.infer<typeof EnhancedFieldSchema>;
 export type EnhancementEffect = z.infer<typeof EnhancementEffectSchema>;
 
 export const EnhancementSchema = z.object({
@@ -306,8 +329,12 @@ export const ItemCardSchema = z.object({
   fields: z.array(z.object({ label: z.string().max(40), value: z.string().max(200) })),
   /** Custo efetivo já descontado (base + aprimoramentos + modificadores); null = sem custo. */
   cost: z.object({ abbr: z.string().max(6), amount: z.number().int().min(0) }).nullable(),
-  /** Aprimoramentos usados nesta conjuração (texto e custo copiados do item). Cards antigos não têm o campo. */
-  enhancements: z.array(z.object({ id: EnhancementIdSchema, label: z.string().max(1000), cost: z.number().int().min(0), times: z.number().int().min(1) })).default([]),
+  /** Aprimoramentos usados nesta conjuração (texto e custo copiados do item). `note` = texto de um efeito `text`. Cards antigos não têm o campo. */
+  enhancements: z
+    .array(z.object({ id: EnhancementIdSchema, label: z.string().max(1000), cost: z.number().int().min(0), times: z.number().int().min(1), note: z.string().max(1000).optional() }))
+    .default([]),
+  /** Campos alterados por aprimoramento nesta conjuração (alcance, CD...). Vazio em cards antigos. */
+  enhanced: z.array(EnhancedFieldSchema).default([]),
   execution: z.string().max(60),
   range: z.string().max(60),
   duration: z.string().max(60),

@@ -30,6 +30,11 @@ export const DamageTypeDefSchema = OptionDefSchema.extend({
   color: HexColorSchema.optional(),
   /** Chave em damageTypeGroups[]. */
   group: KeySchema.optional(),
+  /**
+   * true = ação de dano com este tipo é CURA: recebe healDiceAdd dos aprimoramentos
+   * e ignora damageDiceAdd/damageSet. Assim o código não precisa conhecer a chave "cura".
+   */
+  healing: z.boolean().default(false),
 });
 export type DamageTypeDef = z.infer<typeof DamageTypeDefSchema>;
 

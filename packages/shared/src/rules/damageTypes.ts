@@ -15,6 +15,11 @@ export interface DamageTypeInfo {
   known: boolean;
 }
 
+/** true quando o tipo é de cura no sistema (damageTypes[].healing); null ou desconhecido = dano. */
+export function isHealingType(def: Pick<SystemDefinition, "damageTypes">, key: string | null): boolean {
+  return key !== null && (def.damageTypes.find((d) => d.key === key)?.healing ?? false);
+}
+
 export function damageTypeInfo(def: Pick<SystemDefinition, "damageTypes" | "damageTypeGroups">, key: string): DamageTypeInfo {
   const type = def.damageTypes.find((d) => d.key === key);
   if (!type) return { key, label: key, color: null, known: false };

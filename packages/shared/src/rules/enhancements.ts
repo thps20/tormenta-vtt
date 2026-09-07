@@ -3,7 +3,7 @@
  * e aplicar os efeitos mecânicos à fórmula de dano. Módulo separado porque
  * tanto activation.ts (custo, card) quanto rolls.ts (fórmula) precisam dele.
  */
-import type { CharacterItem, DamageComponent, Enhancement, EnhancementEffect, EnhancementUse } from "../schemas/character.js";
+import type { Activation, CharacterItem, DamageComponent, EnhancedField, Enhancement, EnhancementEffect, EnhancementUse } from "../schemas/character.js";
 import type { SystemDefinition } from "../schemas/system.js";
 
 export class EnhancementError extends Error {
@@ -64,16 +64,20 @@ export interface EnhancedDamage {
   breakdown: string | null;
 }
 
+const timesSuffix = (times: number): string => (times > 1 ? ` ×${times}` : "");
+
 /**
  * Aplica os efeitos de dano à fórmula-base (já sem placeholders). damageSet
  * troca a base (mais de um é erro: o resultado precisa ser inequívoco; `times`
  * não conta no efeito, só no custo); damageDiceAdd soma dados × vezes: sem
  * `damageType` (ou igual ao da ação) entra na parcela principal; com outro tipo
  * vira/engrossa a parcela daquele tipo, para o chat mostrar "7 fogo + 14 frio".
- * Sem efeito de dano na escolha, devolve a base intacta e breakdown null.
+ * `healing` = a ação é de cura: só healDiceAdd entra (na parcela principal) e
+ * os efeitos de dano são ignorados. Sem efeito aplicável na escolha, devolve a
+ * base intacta e breakdown null.
  */
-export function applyDamageEnhancements(baseFormula: string, baseType: string | null, selected: SelectedEnhancement[]): EnhancedDamage {
-  const sets = selected.filter((s) => enhancementEffect(s.enhancement).kind === "damageSet");
+export function applyDamageEnhancements(baseFormula: string, baseType: string | null, selected: SelectedEnhancement[], healing = false): EnhancedDamage {
+  const sets = healing ? [] : selected.filter((s) => enhancementEffect(s.enhancement).kind === "damageSet");
   if (sets.length > 1) throw new EnhancementError("Mais de um aprimoramento muda o dano; escolha só um");
   const set = sets[0];
   const setEffect = set ? enhancementEffect(set.enhancement) : null;
@@ -83,17 +87,107 @@ export function applyDamageEnhancements(baseFormula: string, baseType: string | 
   let applied = set !== undefined;
   for (const s of selected) {
     const effect = enhancementEffect(s.enhancement);
-    if (effect.kind !== "damageDiceAdd") continue;
-    const dice = multiplyDice(effect.dice, s.times);
-    const type = effect.damageType ?? baseType;
+    let dice: string;
+    let type: string | null;
+    if (effect.kind === "healDiceAdd" && healing) {
+      dice = multiplyDice(effect.dice, s.times);
+      type = baseType;
+    } else if (effect.kind === "damageDiceAdd" && !healing) {
+      dice = multiplyDice(effect.dice, s.times);
+      type = effect.damageType ?? baseType;
+    } else continue;
     if (type === baseType) formula = `${formula} + ${dice}`;
     else {
       const existing = extra.find((c) => c.damageType === type);
       if (existing) existing.formula = `${existing.formula} + ${dice}`;
       else extra.push({ formula: dice, damageType: type });
     }
-    parts.push(`${dice} ${shortLabel(s.enhancement)}${s.times > 1 ? ` ×${s.times}` : ""}`);
+    parts.push(`${dice} ${shortLabel(s.enhancement)}${timesSuffix(s.times)}`);
     applied = true;
   }
   return { formula, extra, breakdown: applied ? parts.join(" + ") : null };
+}
+
+export interface EnhancedAttack {
+  /** Fórmula do ataque já com o bônus dos aprimoramentos. */
+  formula: string;
+  /** Decomposição legível; null quando nenhum attackBonusAdd foi escolhido. */
+  breakdown: string | null;
+}
+
+/** Soma os attackBonusAdd (× vezes) à fórmula de ataque já resolvida ("1d20 + 7" → "1d20 + 7 + 2"). */
+export function applyAttackEnhancements(baseFormula: string, selected: SelectedEnhancement[]): EnhancedAttack {
+  const base = baseFormula.trim();
+  const parts: string[] = [`${base} base`];
+  let bonus = 0;
+  for (const s of selected) {
+    const effect = enhancementEffect(s.enhancement);
+    if (effect.kind !== "attackBonusAdd") continue;
+    const value = effect.value * s.times;
+    bonus += value;
+    parts.push(`${value >= 0 ? "+" : ""}${value} ${shortLabel(s.enhancement)}${timesSuffix(s.times)}`);
+  }
+  if (parts.length === 1) return { formula: base, breakdown: null };
+  const formula = bonus === 0 ? base : `${base} ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
+  return { formula, breakdown: parts.join(" ") };
+}
+
+export interface EnhancedActivation {
+  range: Activation["range"];
+  duration: Activation["duration"];
+  area: string;
+  target: string;
+  /** Soma à CD de resistência (dcAdd × vezes). */
+  dcBonus: number;
+  /** Soma ao ataque (attackBonusAdd × vezes); só para marcar o card, a fórmula vem de applyAttackEnhancements. */
+  attackBonus: number;
+  /** O que mudou em relação ao bloco de ativação do item, sem repetição. */
+  enhanced: EnhancedField[];
+}
+
+const TARGET_MAX = 200;
+
+/**
+ * Aplica ao bloco de ativação os efeitos que só mudam o que o card exibe.
+ * rangeSet/durationSet/areaSet trocam o valor (dois do mesmo tipo é erro,
+ * como damageSet; `times` não conta); targetsAdd e dcAdd somam × vezes.
+ * Não valida `units` contra o sistema: chave desconhecida aparece como está.
+ */
+export function applyActivationEnhancements(activation: Activation, selected: SelectedEnhancement[]): EnhancedActivation {
+  const single = <K extends EnhancementEffect["kind"]>(kind: K, what: string): Extract<EnhancementEffect, { kind: K }> | undefined => {
+    const found = selected.filter((s) => enhancementEffect(s.enhancement).kind === kind);
+    if (found.length > 1) throw new EnhancementError(`Mais de um aprimoramento muda ${what}; escolha só um`);
+    const first = found[0];
+    return first ? (enhancementEffect(first.enhancement) as Extract<EnhancementEffect, { kind: K }>) : undefined;
+  };
+  const range = single("rangeSet", "o alcance");
+  const duration = single("durationSet", "a duração");
+  const area = single("areaSet", "a área");
+  let targets = 0;
+  let dcBonus = 0;
+  let attackBonus = 0;
+  for (const s of selected) {
+    const effect = enhancementEffect(s.enhancement);
+    if (effect.kind === "targetsAdd") targets += effect.count * s.times;
+    else if (effect.kind === "dcAdd") dcBonus += effect.value * s.times;
+    else if (effect.kind === "attackBonusAdd") attackBonus += effect.value * s.times;
+  }
+  const enhanced: EnhancedField[] = [];
+  if (range) enhanced.push("range");
+  if (duration) enhanced.push("duration");
+  if (area) enhanced.push("area");
+  if (targets > 0) enhanced.push("target");
+  if (dcBonus !== 0) enhanced.push("dc");
+  if (attackBonus !== 0) enhanced.push("attack");
+  const extraTargets = `+${targets} alvo${targets > 1 ? "s" : ""}`;
+  const target = targets > 0 ? (activation.target.trim() ? `${activation.target.trim()}, ${extraTargets}` : extraTargets).slice(0, TARGET_MAX) : activation.target;
+  return {
+    range: range ? { units: range.units, value: range.value ?? 0 } : activation.range,
+    duration: duration ? { units: duration.units, value: duration.value ?? 0 } : activation.duration,
+    area: area ? area.text : activation.area,
+    target,
+    dcBonus,
+    attackBonus,
+    enhanced,
+  };
 }

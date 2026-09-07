@@ -7,8 +7,8 @@ import { describeModifierTarget, listModifierTargets, parseModifierTarget, Modif
 import { collectPlaceholders, substitutePlaceholders, FormulaError } from "./placeholders.js";
 import { buildCharacterRoll, resolveCharacterFormula, RollBuildError } from "./rolls.js";
 import { baseCost, buildItemUse, describeActivation, effectiveCost, isPassiveItem, ItemUseError, saveDcFor, saveSkills } from "./activation.js";
-import { applyDamageEnhancements, EnhancementError, resolveEnhancements } from "./enhancements.js";
-import { damageTypeInfo } from "./damageTypes.js";
+import { applyActivationEnhancements, applyAttackEnhancements, applyDamageEnhancements, EnhancementError, resolveEnhancements } from "./enhancements.js";
+import { damageTypeInfo, isHealingType } from "./damageTypes.js";
 import { describeClasses, pendingChoices, validateCharacterItems } from "./progression.js";
 
 const def = getSystemDefinition("tormenta20");
@@ -193,6 +193,7 @@ describe("buildCharacterRoll", () => {
       formula: "1d20 + 7",
       label: "Espada longa: Ataque",
       critThreshold: 20,
+      breakdown: null,
     });
     expect(buildCharacterRoll(def, data, { type: "action", itemId: "bow", actionId: "atk" })).toMatchObject({
       formula: "1d20 + 4",
@@ -528,11 +529,101 @@ describe("aprimoramentos (efeito no dano)", () => {
   });
 });
 
+describe("aprimoramentos (CD, cura, ataque e card)", () => {
+  /** Magia com dano (fogo), cura (tipo `healing`), ataque e CD; aprimoramentos de cada tipo novo. */
+  const spell = CharacterItemSchema.parse({
+    id: "sp",
+    kind: "spell",
+    name: "Chama sagrada",
+    activation: { cost: 2, execution: "standard", range: { units: "short", value: 0 }, duration: { units: "scene", value: 0 }, target: "1 criatura", area: "" },
+    save: { skill: "reflexos" },
+    actions: [
+      { id: "dmg", label: "Dano", kind: "damage", formula: "6d6", attribute: null, damageType: "fogo" },
+      { id: "heal", label: "Cura", kind: "damage", formula: "2d8", attribute: null, damageType: "cura" },
+      { id: "atk", label: "Toque", kind: "attack", skill: "luta", bonus: 1 },
+    ],
+    enhancements: [
+      { id: "dc", label: "aumenta a CD em +2", cost: 1, repeatable: true, effect: { kind: "dcAdd", value: 2 } },
+      { id: "heal", label: "aumenta a cura em +1d8", cost: 1, repeatable: true, effect: { kind: "healDiceAdd", dice: "1d8" } },
+      { id: "add", label: "aumenta o dano em +1d6", cost: 1, effect: { kind: "damageDiceAdd", dice: "1d6" } },
+      { id: "set", label: "muda o dano para 10d6", cost: 5, effect: { kind: "damageSet", formula: "10d6" } },
+      { id: "atk", label: "+2 no ataque", cost: 1, repeatable: true, effect: { kind: "attackBonusAdd", value: 2 } },
+      { id: "rng", label: "muda o alcance para médio", cost: 1, effect: { kind: "rangeSet", units: "medium" } },
+      { id: "rng2", label: "muda o alcance para longo", cost: 2, effect: { kind: "rangeSet", units: "long" } },
+      { id: "dur", label: "muda a duração para 1 dia", cost: 2, effect: { kind: "durationSet", units: "day", value: 1 } },
+      { id: "area", label: "muda a área para esfera de 6 m", cost: 1, effect: { kind: "areaSet", text: "esfera de 6 m de raio" } },
+      { id: "tgt", label: "aumenta o número de alvos em +1", cost: 1, repeatable: true, effect: { kind: "targetsAdd", count: 1 } },
+      { id: "note", label: "também remove uma condição", cost: 1, effect: { kind: "text", text: "Remove uma condição de fadiga do alvo." } },
+    ],
+  });
+  const c = {
+    ...fixture({ items: [spell], resources: { pm: { current: 20, temp: 0, maxOverride: 20 } } }),
+    id: "c1",
+    roomId: "r1",
+    ownerId: null,
+    name: "Clériga",
+    kind: "pc" as const,
+    createdAt: "2026-09-06T00:00:00.000Z",
+    updatedAt: "2026-09-06T00:00:00.000Z",
+  };
+  const uses = (...list: [string, number][]) => list.map(([id, times]) => ({ id, times }));
+  const sel = (...list: [string, number][]) => resolveEnhancements(def, spell, uses(...list));
+  const roll = (actionId: string, ...list: [string, number][]) => buildCharacterRoll(def, c, { type: "action", itemId: "sp", actionId, enhancements: uses(...list) });
+  const use = (...list: [string, number][]) => buildItemUse(def, c, "sp", uses(...list));
+
+  it("healDiceAdd só entra na ação de cura; damageDiceAdd/damageSet só nas de dano", () => {
+    expect(isHealingType(def, "cura")).toBe(true);
+    expect(isHealingType(def, "fogo")).toBe(false);
+    expect(isHealingType(def, null)).toBe(false);
+    expect(roll("heal", ["heal", 2], ["add", 1], ["set", 1])).toMatchObject({ formula: "2d8 + 2d8", breakdown: "2d8 base + 2d8 aumenta a cura em +1d8 ×2", damage: [{ formula: "2d8 + 2d8", damageType: "cura" }] });
+    expect(roll("dmg", ["heal", 2], ["add", 1])).toMatchObject({ formula: "6d6 + 1d6", breakdown: "6d6 base + 1d6 aumenta o dano em +1d6" });
+    expect(applyDamageEnhancements("2d8", "cura", sel(["set", 1]), true)).toEqual({ formula: "2d8", extra: [], breakdown: null });
+  });
+
+  it("attackBonusAdd soma × vezes ao ataque, com decomposição; as outras ações ignoram", () => {
+    const base = roll("atk").formula;
+    expect(base).toMatch(/^1d20/);
+    expect(roll("atk")).toMatchObject({ breakdown: null });
+    expect(roll("atk", ["atk", 2], ["add", 1])).toMatchObject({ formula: `${base} + 4`, breakdown: `${base} base +4 +2 no ataque ×2` });
+    expect(roll("dmg", ["atk", 2]).formula).toBe("6d6");
+    expect(applyAttackEnhancements("1d20 + 5", [])).toEqual({ formula: "1d20 + 5", breakdown: null });
+  });
+
+  it("dcAdd soma × vezes à CD do card e marca 'dc'", () => {
+    expect(use().card.save).toMatchObject({ dc: 12 });
+    expect(use().card.enhanced).toEqual([]);
+    const card = use(["dc", 2]).card;
+    expect(card.save).toMatchObject({ skillLabel: "Reflexos", dc: 16 });
+    expect(card.enhanced).toEqual(["dc"]);
+    // Item sem save: a CD continua null e "dc" não entra em enhanced.
+    const noSave = { ...c, items: [{ ...spell, save: null }] };
+    const card2 = buildItemUse(def, noSave, "sp", uses(["dc", 1])).card;
+    expect(card2.save).toBeNull();
+    expect(card2.enhanced).toEqual([]);
+  });
+
+  it("rangeSet, durationSet, areaSet, targetsAdd e text só mudam o card", () => {
+    const card = use(["rng", 1], ["dur", 1], ["area", 1], ["tgt", 2], ["note", 1], ["atk", 1]).card;
+    expect(card).toMatchObject({ range: "Médio (30 m)", duration: "1 Dia", area: "esfera de 6 m de raio", target: "1 criatura, +2 alvos" });
+    expect(card.enhanced).toEqual(["range", "duration", "area", "target", "attack"]);
+    expect(card.enhancements.find((e) => e.id === "note")).toMatchObject({ note: "Remove uma condição de fadiga do alvo." });
+    expect(card.enhancements.find((e) => e.id === "rng")).not.toHaveProperty("note");
+    expect(card.actions.find((a) => a.id === "dmg")).toMatchObject({ formula: "6d6", breakdown: null });
+    // Sem escolha: como está no item.
+    expect(use().card).toMatchObject({ range: "Curto (9 m)", duration: "Cena", area: "", target: "1 criatura" });
+    // Alvo vazio: só o extra. Um alvo: singular.
+    expect(applyActivationEnhancements({ ...spell.activation!, target: "" }, sel(["tgt", 1])).target).toBe("+1 alvo");
+    // Dois rangeSet: escolha inválida antes de cobrar.
+    expect(() => use(["rng", 1], ["rng2", 1])).toThrow(ItemUseError);
+    expect(() => use(["rng", 1], ["rng2", 1])).toThrow(/Mais de um aprimoramento muda o alcance/);
+  });
+});
+
 describe("damageTypeInfo", () => {
   it("cor própria, senão a do grupo, senão null; chave desconhecida vira rótulo", () => {
     expect(damageTypeInfo(def, "fogo")).toEqual({ key: "fogo", label: "Fogo", color: "#f4511e", known: true });
     expect(damageTypeInfo(def, "corte")).toMatchObject({ label: "Corte", color: def.damageTypeGroups.find((g) => g.key === "fisico")?.color, known: true });
-    expect(damageTypeInfo({ damageTypes: [{ key: "x", label: "X" }], damageTypeGroups: [] }, "x")).toEqual({ key: "x", label: "X", color: null, known: true });
+    expect(damageTypeInfo({ damageTypes: [{ key: "x", label: "X", healing: false }], damageTypeGroups: [] }, "x")).toEqual({ key: "x", label: "X", color: null, known: true });
     expect(damageTypeInfo(def, "sonico")).toEqual({ key: "sonico", label: "sonico", color: null, known: false });
   });
 });

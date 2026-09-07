@@ -100,7 +100,7 @@
     { "key": "luz",          "label": "Luz",          "color": "#fbbf24" },
     { "key": "psiquico",     "label": "Psíquico",     "color": "#e879f9" },
     { "key": "trevas",       "label": "Trevas",       "color": "#a855f7" },
-    { "key": "cura",         "label": "Cura",         "color": "#4ade80" }
+    { "key": "cura",         "label": "Cura",         "color": "#4ade80", "healing": true }
   ],
 
   "currencies": [

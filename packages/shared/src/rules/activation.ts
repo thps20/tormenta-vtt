@@ -11,7 +11,7 @@ import { DiceParseError, evaluateConstant } from "../dice/index.js";
 import type { Activation, Character, CharacterData, CharacterItem, CharacterResource, EnhancementUse, ItemCard } from "../schemas/character.js";
 import type { SkillDef, SystemDefinition } from "../schemas/system.js";
 import { computeCharacter, makeResolver, parseModifiers, sumModifiers, type ComputedCharacter } from "./compute.js";
-import { EnhancementError, resolveEnhancements, type SelectedEnhancement } from "./enhancements.js";
+import { applyActivationEnhancements, EnhancementError, resolveEnhancements, type SelectedEnhancement } from "./enhancements.js";
 import { FormulaError, substitutePlaceholders } from "./placeholders.js";
 import { buildCharacterRoll, RollBuildError, type BuiltRoll } from "./rolls.js";
 
@@ -141,7 +141,10 @@ export function buildItemCard(
   const kind = def.itemKinds.find((k) => k.key === item.kind);
   const costResource = def.activation.resource ? def.resources.find((r) => r.key === def.activation.resource) : undefined;
   const activation = item.activation ?? { cost: 0, execution: "", duration: { units: "", value: 0 }, range: { units: "", value: 0 }, target: "", area: "", effect: "" };
-  const described = describeActivation(def, activation);
+  // Efeitos que só mudam o que o card exibe (alcance, duração, área, alvo) e a CD.
+  const enhancedActivation = applyActivationEnhancements(activation, selected);
+  const described = describeActivation(def, { ...activation, range: enhancedActivation.range, duration: enhancedActivation.duration });
+  const dc = saveDcFor(def, computed, character, item);
 
   const fields: ItemCard["fields"] = [];
   for (const f of kind?.fields ?? []) {
@@ -159,17 +162,22 @@ export function buildItemCard(
     kindLabel: kind?.label ?? item.kind,
     fields,
     cost: cost > 0 && costResource ? { abbr: costResource.abbr, amount: cost } : null,
-    enhancements: selected.map((s) => ({ id: s.enhancement.id, label: s.enhancement.label, cost: s.enhancement.cost, times: s.times })),
+    enhancements: selected.map((s) => {
+      const effect = s.enhancement.effect;
+      return { id: s.enhancement.id, label: s.enhancement.label, cost: s.enhancement.cost, times: s.times, ...(effect?.kind === "text" ? { note: effect.text } : {}) };
+    }),
+    // "dc" só conta como aprimorado quando há CD para somar.
+    enhanced: enhancedActivation.enhanced.filter((f) => f !== "dc" || dc !== null),
     execution: described.execution,
     range: described.range,
     duration: described.duration,
-    target: activation.target,
-    area: activation.area,
+    target: enhancedActivation.target,
+    area: enhancedActivation.area,
     effect: summarizeEffect(item),
     save: item.save
       ? {
           skillLabel: def.skills.find((s) => s.key === item.save?.skill)?.label ?? item.save.skill,
-          dc: saveDcFor(def, computed, character, item),
+          dc: dc === null ? null : dc + enhancedActivation.dcBonus,
           text: item.save.text,
         }
       : null,
@@ -226,5 +234,13 @@ export function buildItemUse(def: SystemDefinition, character: Character, itemId
     spend = { resourceKey, resources: { ...character.resources, [resourceKey]: next } };
   }
 
-  return { item, selected, cost, spend, card: buildItemCard(def, character, computed, item, cost, selected) };
+  let card: ItemCard;
+  try {
+    card = buildItemCard(def, character, computed, item, cost, selected);
+  } catch (err) {
+    // Dois efeitos que trocam o mesmo campo do card (dois rangeSet): escolha inválida, nada é cobrado.
+    if (err instanceof EnhancementError) throw new ItemUseError(err.message);
+    throw err;
+  }
+  return { item, selected, cost, spend, card };
 }

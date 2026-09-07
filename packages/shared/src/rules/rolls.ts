@@ -5,7 +5,8 @@
 import type { Action, Character, CharacterData, CharacterItem, CharacterRollRequest, DamageComponent } from "../schemas/character.js";
 import type { SystemDefinition } from "../schemas/system.js";
 import { computeCharacter, makeResolver, parseModifiers, sumModifiers, type ComputedCharacter } from "./compute.js";
-import { applyDamageEnhancements, EnhancementError, resolveEnhancements } from "./enhancements.js";
+import { applyAttackEnhancements, applyDamageEnhancements, EnhancementError, resolveEnhancements } from "./enhancements.js";
+import { isHealingType } from "./damageTypes.js";
 import { FormulaError, substitutePlaceholders } from "./placeholders.js";
 
 export interface BuiltRoll {
@@ -15,7 +16,7 @@ export interface BuiltRoll {
   label: string;
   /** Resultado natural do dado a partir do qual é crítico (só ataques). */
   critThreshold?: number;
-  /** Decomposição do dano quando aprimoramentos mudaram a fórmula ("6d6 base + 4d6 … ×2"); null = como está no item. */
+  /** Decomposição do dano ou do ataque quando aprimoramentos mudaram a fórmula ("6d6 base + 4d6 … ×2"); null = como está no item. */
   breakdown?: string | null;
   /**
    * Só ações de dano: parcelas por tipo, na ordem base → extras. `formula` acima é a
@@ -121,23 +122,26 @@ export function buildCharacterRoll(def: SystemDefinition, character: Character |
         const action = item.actions.find((a) => a.id === request.actionId);
         if (!action) throw new RollBuildError("Ação não encontrada");
         const label = `${item.name}: ${action.label}`;
+        // Aprimoramentos escolhidos na conjuração (vazio = ação como está no item).
+        const selected = resolveEnhancements(def, item, request.enhancements ?? []);
 
         switch (action.kind) {
           case "attack": {
             const total = skillTotalWithOverride(computed, action.skill, action.attributeOverride);
             const bonus = sumModifiers(mods, (t) => t.kind === "attack" && (t.skill === null || t.skill === action.skill));
             const base = substitutePlaceholders(def.rolls.attack ?? def.rolls.skillCheck, (p) => (p === "skill" ? total : resolveGlobal(p)));
-            return { formula: joinParts(base, [action.bonus, bonus]), label, critThreshold: action.critRange };
+            const enhanced = applyAttackEnhancements(joinParts(base, [action.bonus, bonus]), selected);
+            return { formula: enhanced.formula, label, critThreshold: action.critRange, breakdown: enhanced.breakdown };
           }
           case "damage": {
             const attrKey = action.attribute === "auto" ? autoDamageAttribute(def, item) : action.attribute;
             const attrValue = attrKey ? (computed.attributes[attrKey] ?? 0) : 0;
             const skill = attackSkillOf(item);
             const bonus = sumModifiers(mods, (t) => t.kind === "damage" && (t.skill === null || t.skill === skill));
-            // Aprimoramentos (só na ação de dano): dados primeiro, atributo e bônus depois ("6d6 + 4d6 + 3").
-            // Dados de outro tipo viram parcelas próprias, sem atributo/bônus (esses ficam só na base).
-            const selected = resolveEnhancements(def, item, request.enhancements ?? []);
-            const enhanced = applyDamageEnhancements(substitutePlaceholders(action.formula, resolveGlobal), action.damageType, selected);
+            // Aprimoramentos: dados primeiro, atributo e bônus depois ("6d6 + 4d6 + 3"). Dados de outro
+            // tipo viram parcelas próprias, sem atributo/bônus (esses ficam só na base). Ação de cura
+            // (tipo com `healing` no sistema) só recebe healDiceAdd.
+            const enhanced = applyDamageEnhancements(substitutePlaceholders(action.formula, resolveGlobal), action.damageType, selected, isHealingType(def, action.damageType));
             const damage: DamageComponent[] = [{ formula: joinParts(enhanced.formula, [attrValue, action.bonus, bonus]), damageType: action.damageType }, ...enhanced.extra];
             return { formula: damage.map((d) => d.formula).join(" + "), label, breakdown: enhanced.breakdown, damage };
           }
