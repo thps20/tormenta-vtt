@@ -103,3 +103,8 @@ export function isOpenPaletteShortcut(e: ShortcutKey, typing: boolean): boolean 
   if ((e.ctrlKey || e.metaKey) && isSpace) return true;
   return e.key === "/" && !e.ctrlKey && !e.metaKey && !typing;
 }
+
+/** Texto de fallback quando um item/entrada não tem descrição: aponta para o livro. */
+export function seeBook(page: number | null | undefined): string {
+  return page ? `Ver livro, pág. ${page}.` : "Ver livro.";
+}

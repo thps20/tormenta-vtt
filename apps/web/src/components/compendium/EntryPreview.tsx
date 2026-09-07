@@ -3,6 +3,7 @@ import { AlertCircle, Replace } from "lucide-react";
 import { describeActivation, entryToItem, pendingChoices, type SystemDefinition } from "@tormenta-vtt/shared";
 import { signed } from "../../lib/system";
 import { summarizeField } from "../character/StructuredFields";
+import { seeBook } from "../../lib/compendium";
 import type { PaletteRow } from "./CompendiumPalette";
 
 interface EntryPreviewProps {
@@ -126,7 +127,11 @@ export const EntryPreview: React.FC<EntryPreviewProps> = ({ def, row, onReplace 
           ))}
         </div>
       )}
-      {entry.description && <p className="text-zinc-400 font-serif italic leading-relaxed">{entry.description}</p>}
+      {entry.description ? (
+        <p className="text-zinc-400 font-serif italic leading-relaxed whitespace-pre-line">{entry.description}</p>
+      ) : (
+        <p className="text-zinc-600 italic">{seeBook(entry.page)}</p>
+      )}
     </div>
   );
 };

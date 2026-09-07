@@ -22,7 +22,7 @@ import {
   type Save,
   type SystemDefinition,
 } from "@tormenta-vtt/shared";
-import { PALETTE_SHORTCUT_LABEL } from "../../lib/compendium";
+import { PALETTE_SHORTCUT_LABEL, seeBook } from "../../lib/compendium";
 import { newId } from "../../lib/ids";
 import { useCompendium } from "../../store/compendium";
 import { kindIcon } from "./kindIcons";
@@ -390,7 +390,11 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
                   {item.save.text && <span className="text-zinc-500 font-serif">— {item.save.text}</span>}
                 </div>
               )}
-              {item.description ? <div className="text-zinc-400 font-serif leading-relaxed italic">"{item.description}"</div> : <div className="text-zinc-600 italic">Sem descrição.</div>}
+              {item.description ? (
+                <div className="text-zinc-400 font-serif leading-relaxed italic whitespace-pre-line">{item.description}</div>
+              ) : (
+                <div className="text-zinc-600 italic">{seeBook(item.page)}</div>
+              )}
             </>
           )}
         </div>
