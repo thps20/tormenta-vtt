@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Dices, Scroll, ShieldAlert } from 'lucide-react';
+import { Send, Dices, Scroll, Eye } from 'lucide-react';
 import type { Character, CharacterRollRequest, ChatMessage, Participant, Token } from '@tormenta-vtt/shared';
 import { canEditCharacter } from '../store/characters';
 import { useChat } from '../store/chat';
 import { useSystemDef } from '../lib/system';
+import { rollModeInfo } from '../lib/rollMode';
 import { ApplyDamageButton } from './chat/ApplyDamageButton';
 import { ItemCardMessage } from './chat/ItemCardMessage';
+import { RollModeButton } from './chat/RollModeButton';
 import { DamageFormula, DamageTypeBadge } from './DamageTypeBadge';
 
 interface ChatTabProps {
@@ -32,8 +34,16 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   const currentUserId = me.id;
   // Sistema da sala: só para pintar os selos de tipo de dano (null fora de sala = selos neutros).
   const def = useSystemDef();
+  // Modo de rolagem e "Revelar" vêm direto da store do chat (não passam pelo RoomPage):
+  // são estado do próprio chat, e assim a ficha e os cards leem o mesmo modo.
+  const rollMode = useChat((s) => s.rollMode);
+  const setRollMode = useChat((s) => s.setRollMode);
+  const revealMessage = useChat((s) => s.reveal);
   const applyDamage = useChat((s) => s.applyDamage);
   const [inputText, setInputText] = useState('');
+  const isRollCommand = /^\/(r|roll|gmr|gr|pr)\b/i.test(inputText);
+  const nonPublic = rollMode !== 'all';
+  const modeInfo = rollModeInfo(rollMode);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -263,12 +273,33 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                   </div>
                 )}
 
-                {roll.secret && (
-                  <div className="mt-2 pt-1.5 border-t border-zinc-800/60 flex items-center gap-1 text-[10px] text-[#d4af37]/80 font-mono">
-                    <ShieldAlert className="w-3 h-3" />
-                    <span>Rolagem secreta: só você e o GM veem</span>
-                  </div>
-                )}
+                {msg.visibility !== 'all' && (() => {
+                  const vis = rollModeInfo(msg.visibility);
+                  const VisIcon = vis.icon;
+                  return (
+                    <div
+                      className="mt-2 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between gap-2 text-[10px] font-mono"
+                      data-visibility={msg.visibility}
+                    >
+                      <span className="flex items-center gap-1 text-[#d4af37]/80">
+                        <VisIcon className="w-3 h-3" />
+                        <span>{msg.visibility === 'gm' ? 'Rolagem secreta: só o GM vê' : 'Rolagem própria: só você vê'}</span>
+                      </span>
+                      {me.role === 'gm' && (
+                        <button
+                          type="button"
+                          id={`reveal-${msg.id}`}
+                          onClick={() => void revealMessage(msg.id)}
+                          title="Tornar pública para todos"
+                          className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#d4af37]/40 text-[#d4af37] hover:bg-[#2d2417] transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3 h-3" />
+                          Revelar
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           }
@@ -317,18 +348,22 @@ export const ChatTab: React.FC<ChatTabProps> = ({
       </div>
 
       {/* Quick Dice Bar - Elegant Dark */}
-      <div className="p-2 bg-[#121212] border-t border-[#2d2417] flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
-        <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-serif font-bold pl-1 flex items-center gap-1">
-          <Dices className="w-3 h-3 text-[#d4af37]" />
-          ROLAR:
-        </span>
-        <div className="flex items-center gap-1">
+      {/* Quebra linha em painéis estreitos (sem overflow: o popover do modo não pode ser recortado). */}
+      <div className="p-2 bg-[#121212] border-t border-[#2d2417] flex items-center justify-between flex-wrap gap-1 text-[11px]">
+        <div className="flex items-center gap-2 pl-1">
+          <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-serif font-bold flex items-center gap-1">
+            <Dices className="w-3 h-3 text-[#d4af37]" />
+            ROLAR:
+          </span>
+          <RollModeButton mode={rollMode} onChange={setRollMode} />
+        </div>
+        <div className="flex items-center gap-0.5">
           {[4, 6, 8, 10, 12, 20, 100].map((sides) => (
             <button
               key={sides}
               onClick={() => handleQuickDice(sides)}
               title={`Rolar 1d${sides}`}
-              className="px-2 py-0.5 rounded bg-[#1a1a1a] hover:bg-[#2d2417] text-zinc-400 hover:text-[#d4af37] border border-[#3d3d3d] hover:border-[#d4af37]/50 font-mono text-[10px] transition-colors cursor-pointer"
+              className="px-1.5 py-0.5 rounded bg-[#1a1a1a] hover:bg-[#2d2417] text-zinc-400 hover:text-[#d4af37] border border-[#3d3d3d] hover:border-[#d4af37]/50 font-mono text-[10px] transition-colors cursor-pointer"
             >
               d{sides}
             </button>
@@ -347,12 +382,22 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Mensagem, /r 2d6+3 # rótulo ou /gr (secreto)..."
-            className="w-full bg-[#1a1a1a] border border-[#3d3d3d] rounded-md px-3 py-2 text-xs focus:outline-none focus:border-[#d4af37] text-zinc-200 placeholder:text-zinc-600"
+            placeholder="Mensagem, /r 2d6+3 # rótulo, /gmr (secreta) ou /pr (pública)..."
+            data-roll-mode={rollMode}
+            className={`w-full bg-[#1a1a1a] border rounded-md px-3 py-2 text-xs focus:outline-none text-zinc-200 placeholder:text-zinc-600 ${
+              nonPublic ? 'border-amber-500/70 focus:border-amber-400' : 'border-[#3d3d3d] focus:border-[#d4af37]'
+            }`}
           />
-          {/^\/(r|gr|roll)\b/i.test(inputText) && (
-            <span className="absolute right-2.5 top-2 text-[10px] text-[#d4af37] font-mono pointer-events-none uppercase tracking-widest">
-              DADO
+          {/* Indicador discreto: modo fora de "Pública" e/ou comando de dado digitado. */}
+          {(isRollCommand || nonPublic) && (
+            <span
+              className={`absolute right-2.5 top-2 text-[10px] font-mono pointer-events-none uppercase tracking-widest ${
+                nonPublic ? 'text-amber-400' : 'text-[#d4af37]'
+              }`}
+            >
+              {isRollCommand && 'DADO'}
+              {isRollCommand && nonPublic && ' · '}
+              {nonPublic && modeInfo.label}
             </span>
           )}
         </div>

@@ -3,6 +3,7 @@ import type { Character, CharacterCreatePayload, CharacterPatch, CharacterRollRe
 import { buildInsertPatch, checkInsert } from "../lib/compendium";
 import { newId } from "../lib/ids";
 import { emitAck } from "./connection";
+import { notifyBlindRoll, useChat } from "./chat";
 import { useCompendium } from "./compendium";
 import { toast } from "./ui";
 
@@ -23,8 +24,8 @@ interface CharactersState {
   /** Otimista com ack e reversão. Patch raso: cada campo enviado substitui o campo inteiro. */
   update: (id: string, patch: CharacterPatch) => Promise<boolean>;
   delete: (characterId: string) => Promise<boolean>;
-  /** Sem otimismo: a rolagem só existe depois do servidor (chega por chat:message). */
-  roll: (characterId: string, roll: CharacterRollRequest, secret?: boolean) => Promise<boolean>;
+  /** Sem otimismo: a rolagem só existe depois do servidor (chega por chat:message). Usa o modo de rolagem do chat. */
+  roll: (characterId: string, roll: CharacterRollRequest) => Promise<boolean>;
   /**
    * Usa um item ativo (poder, magia). Sem otimismo: o servidor desconta o custo
    * (character:updated) e publica o card (chat:message). Erro (ex.: PM insuficiente) vira toast.
@@ -96,9 +97,10 @@ export const useCharacters = create<CharactersState>((set, get) => ({
     return true;
   },
 
-  roll: async (characterId, roll, secret = false) => {
-    const res = await emitAck("character:roll", { characterId, roll, secret });
+  roll: async (characterId, roll) => {
+    const res = await emitAck("character:roll", { characterId, roll, visibility: useChat.getState().rollMode });
     if (!res.ok) toast(res.error);
+    else notifyBlindRoll(res.data);
     return res.ok;
   },
 
