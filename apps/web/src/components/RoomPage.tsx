@@ -12,6 +12,7 @@ import { selectEffectiveMode, useTools } from "../store/tools";
 import { computeCharacter, isPointRevealed, tokenCenter } from "@tormenta-vtt/shared";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { CombatBanner } from "./CombatBanner";
+import { type CombatPanelCallbacks } from "./CombatPanel";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
 import { FogToolbar } from "./FogToolbar";
@@ -134,22 +135,41 @@ function Table() {
   const combatDelay = useCombat((s) => s.delay);
   const combatResume = useCombat((s) => s.resume);
   const combatEnd = useCombat((s) => s.end);
-  const combatActions = useMemo(
+  // Callbacks do CombatPanel: cada um reempacota os argumentos "soltos" da UI no payload
+  // que o evento combat:* espera e chama a ação correspondente da store (server = fonte da verdade,
+  // sem otimismo — ver store/combat.ts).
+  const combatCallbacks: CombatPanelCallbacks = useMemo(
     () => ({
-      start: (p: Parameters<typeof combatStart>[0]) => void combatStart(p),
-      addCombatants: (p: Parameters<typeof combatAddCombatants>[0]) => void combatAddCombatants(p),
-      remove: (ids: string[]) => void combatRemove(ids),
-      roll: (p: Parameters<typeof combatRoll>[0]) => void combatRoll(p),
-      setInitiative: (p: Parameters<typeof combatSetInitiative>[0]) => void combatSetInitiative(p),
-      setSurprised: (combatantId: string, surprised: boolean) => void combatSetSurprised({ combatantId, surprised }),
-      next: () => void combatNext(),
-      prev: () => void combatPrev(),
-      reorder: (ids: string[]) => void combatReorder(ids),
-      delay: (id: string) => void combatDelay(id),
-      resume: (id: string) => void combatResume(id),
-      end: (clear?: boolean) => void combatEnd(clear),
+      onStart: (sceneId, tokenIds) => void combatStart({ sceneId, tokenIds }),
+      onRoll: (scope, combatantId, visibility) => void combatRoll({ scope, combatantId, visibility }),
+      onSetInitiative: (combatantId, initiative, bonus) => void combatSetInitiative({ combatantId, initiative, bonus }),
+      onNext: () => void combatNext(),
+      onPrev: () => void combatPrev(),
+      onReorder: (combatantIds) => void combatReorder(combatantIds),
+      onAdd: (tokenIds) => void combatAddCombatants({ tokenIds }),
+      onRemove: (combatantIds) => void combatRemove(combatantIds),
+      onDelay: (combatantId) => void combatDelay(combatantId),
+      onResume: (combatantId) => void combatResume(combatantId),
+      // Sem evento combat:skip no servidor: só faz sentido pular quem está agindo agora, e
+      // aí equivale a avançar o turno (CombatPanel só mostra "Pular turno" pro combatente ativo).
+      onSkip: () => void combatNext(),
+      onSetSurprised: (combatantId, surprised) => void combatSetSurprised({ combatantId, surprised }),
+      onEnd: (clear) => void combatEnd(clear),
     }),
-    [combatStart, combatAddCombatants, combatRemove, combatRoll, combatSetInitiative, combatSetSurprised, combatNext, combatPrev, combatReorder, combatDelay, combatResume, combatEnd],
+    [
+      combatStart,
+      combatRoll,
+      combatSetInitiative,
+      combatNext,
+      combatPrev,
+      combatReorder,
+      combatAddCombatants,
+      combatRemove,
+      combatDelay,
+      combatResume,
+      combatSetSurprised,
+      combatEnd,
+    ],
   );
   const [centerOnActiveTurn, setCenterOnActiveTurn] = useState<boolean>(() => {
     try {
@@ -257,7 +277,7 @@ function Table() {
 
       <div className="flex-1 flex overflow-hidden relative">
         <main className="flex-1 h-full relative overflow-hidden">
-          <CombatBanner combat={combat} me={me} onRollSelf={() => combatActions.roll({ scope: "self" })} onDelay={combatActions.delay} />
+          <CombatBanner combat={combat} me={me} onRollSelf={() => combatRoll({ scope: "self" })} onDelay={combatDelay} />
           {scene ? (
             <>
               <VttCanvas
@@ -348,7 +368,7 @@ function Table() {
           combat={combat}
           activeSceneId={scene?.id ?? null}
           selectedIds={selectedIds}
-          combatActions={combatActions}
+          combatCallbacks={combatCallbacks}
           centerOnActiveTurn={centerOnActiveTurn}
           onToggleCenterOnActiveTurn={() => setCenterOnActiveTurn((v) => !v)}
           tokens={tokens}

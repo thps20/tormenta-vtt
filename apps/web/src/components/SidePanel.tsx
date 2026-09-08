@@ -1,7 +1,7 @@
 import React from 'react';
 import { MessageSquare, Swords, Users } from 'lucide-react';
 import { ChatTab } from './ChatTab';
-import { InitiativeTab, type CombatActions } from './InitiativeTab';
+import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
 import { CharactersTab } from './CharactersTab';
 import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, Participant, Token } from '@tormenta-vtt/shared';
 
@@ -17,7 +17,7 @@ interface SidePanelProps {
   combat: Combat | null;
   activeSceneId: string | null;
   selectedIds: string[];
-  combatActions: CombatActions;
+  combatCallbacks: CombatPanelCallbacks;
   centerOnActiveTurn: boolean;
   onToggleCenterOnActiveTurn: () => void;
   tokens: Token[];
@@ -44,7 +44,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   combat,
   activeSceneId,
   selectedIds,
-  combatActions,
+  combatCallbacks,
   centerOnActiveTurn,
   onToggleCenterOnActiveTurn,
   tokens,
@@ -157,18 +157,17 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             onDelete={onDeleteCharacter}
           />
         ) : (
-          <InitiativeTab
+          <CombatPanel
             combat={combat}
-            activeSceneId={activeSceneId}
-            isGm={isGm}
-            me={me}
-            tokens={tokens}
-            selectedIds={selectedIds}
+            viewer={isGm ? 'gm' : 'player'}
+            meId={me.id}
+            sceneId={activeSceneId}
+            selectedTokenIds={selectedIds}
             onSelectToken={onSelectToken}
             selectedTokenId={selectedTokenId}
             centerOnActiveTurn={centerOnActiveTurn}
             onToggleCenterOnActiveTurn={onToggleCenterOnActiveTurn}
-            actions={combatActions}
+            {...combatCallbacks}
           />
         )}
       </div>
