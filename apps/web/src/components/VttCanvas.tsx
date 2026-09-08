@@ -5,6 +5,7 @@ import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from
 import { conditionIconDataUrl, measureDistance, type Character, type ConditionDef, type FogShape, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
 import { clampToMap, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
+import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
 import { useImage } from "../lib/useImage";
 import { newId } from "../lib/ids";
 import type { FogToolMode, FogToolShape, RemoteRuler, ToolMode } from "../store/tools";
@@ -165,6 +166,10 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     const y = Math.min(rect.y, dimensions.height - CONDITION_MENU_HEIGHT);
     setConditionMenu({ tokenId: token.id, x: Math.max(4, x), y: Math.max(4, y) });
   };
+
+  // Fora do modo Selecionar não calculamos hover de badge; sem isso um tooltip aberto ficaria preso
+  // na tela ao trocar de ferramenta (nenhum mousemove novo o limparia).
+  useEffect(() => setConditionTooltip(null), [mode]);
 
   // Caixa de seleção (modo Selecionar, arraste no mapa vazio), em pixels do mapa.
   const [selectionBox, setSelectionBox] = useState<Box | null>(null);
@@ -340,6 +345,49 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     return null;
   };
 
+  /**
+   * Badge de condição sob o ponteiro, por GEOMETRIA (mesmo motivo de `tokenAtPointer`: o canvas de
+   * hit do Konva é embaralhado por proteção anti-fingerprinting e o mouseenter simplesmente não
+   * dispara — ver docs/debug-token.md). Devolve o tooltip pronto, ou null. Último token da lista
+   * primeiro: é o desenhado por cima.
+   */
+  const conditionTooltipAtPointer = (): ConditionTooltip | null => {
+    const p = pointerMapPos();
+    if (!p) return null;
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      const t = tokens[i];
+      if (!t || t.conditions.length === 0) continue;
+      const defs = t.conditions.map((k) => conditionByKey.get(k)).filter((c): c is ConditionDef => c !== undefined);
+      if (defs.length === 0) continue;
+
+      const layout = conditionLayout(t.width, t.height, stageScale, defs.length);
+      const slot = conditionSlotAtPoint(layout, p.x - t.x, p.y - t.y, stageScale);
+      if (slot === null) continue;
+
+      if (layout.mode === "counter") {
+        const text = defs.map((c) => c.label).join("\n");
+        return { key: `${t.id}:__counter`, x: t.x + layout.cx, y: t.y + layout.cy, anchorRadius: layout.screenRadius, text };
+      }
+      const pos = layout.slots[slot];
+      if (!pos) continue;
+      const anchorRadius = layout.r * stageScale;
+      if (isOverflowSlot(layout, slot)) {
+        const text = defs.slice(layout.visibleCount).map((c) => c.label).join("\n");
+        return { key: `${t.id}:__overflow`, x: t.x + pos.x, y: t.y + pos.y, anchorRadius, text };
+      }
+      const def = defs[slot];
+      if (!def) continue;
+      return {
+        key: `${t.id}:${def.key}`,
+        x: t.x + pos.x,
+        y: t.y + pos.y,
+        anchorRadius,
+        text: def.description ? `${def.label}\n${def.description}` : def.label,
+      };
+    }
+    return null;
+  };
+
   /** Ponteiro em pixels do mapa (desfaz pan e zoom do Stage). */
   const pointerMapPos = (): { x: number; y: number } | null => {
     const stage = stageRef.current;
@@ -486,6 +534,11 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     }
     const over = tokenAtPointer();
     setCursor(over && canControl(me, over) ? "grab" : "default");
+    // Tooltip da condição: por geometria, aqui, e não por mouseenter do badge (ver
+    // conditionTooltipAtPointer). Só troca o estado quando muda de badge, pra não repintar a cada
+    // pixel de movimento.
+    const tip = conditionTooltipAtPointer();
+    setConditionTooltip((cur) => (cur?.key === tip?.key && cur?.x === tip?.x && cur?.y === tip?.y ? cur : tip));
   };
 
   /**
@@ -572,6 +625,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
 
   // --- Arraste em grupo: o token arrastado (líder) puxa os outros selecionados que eu controlo.
   const handleTokenDragStart = (token: Token, node: Konva.Node) => {
+    setConditionTooltip(null); // arrastando não há hover; senão o balão fica pendurado
     if (!selectedIds.includes(token.id) || selectedIds.length < 2) {
       groupDragRef.current = null;
       return;
@@ -659,8 +713,6 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         onTokenPatch({ id: token.id, x: pos.x, y: pos.y, width, height });
       }}
       onContextMenu={() => openConditionMenuAt(token)}
-      onTooltipShow={setConditionTooltip}
-      onTooltipHide={(key) => setConditionTooltip((current) => (current?.key === key ? null : current))}
     />
   );
 
@@ -695,6 +747,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         onMouseLeave={() => {
           handleStageMouseUp();
           setFogPointer(null);
+          setConditionTooltip(null);
         }}
         onClick={handleStageClick}
         onDblClick={() => fogActive && fogDblClick()}
@@ -891,12 +944,9 @@ interface TokenNodeProps {
   onContextMenu: () => void;
   /** Zoom atual do Stage: os badges de condição precisam saber pra manter o tamanho em px de tela. */
   stageScale: number;
-  /** Tooltip das condições: sobe pro VttCanvas, que desenha numa camada acima de todos os tokens. */
-  onTooltipShow: (tip: ConditionTooltip) => void;
-  onTooltipHide: (key: string) => void;
 }
 
-const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu, stageScale, onTooltipShow, onTooltipHide }) => {
+const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu, stageScale }) => {
   const image = useImage(assetUrl(token.imageUrl));
   const radius = tokenRadius(token);
   const cx = token.width / 2;
@@ -1015,11 +1065,6 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, dragg
           height={token.height}
           stageScale={stageScale}
           conditions={token.conditions.map((k) => conditionByKey.get(k)).filter((c): c is ConditionDef => c !== undefined)}
-          originX={token.x}
-          originY={token.y}
-          tokenId={token.id}
-          onTooltipShow={onTooltipShow}
-          onTooltipHide={onTooltipHide}
         />
       )}
     </Group>
@@ -1028,43 +1073,19 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, dragg
 
 // --- Condições: coluna de ícones encostada na borda direita do token ----------
 //
-// Geometria (coordenadas locais do Group do token, origem no canto superior-esquerdo
-// da bounding box — a própria célula/grid que o token ocupa, `(0,0)` a `(width,height)`):
-// um badge é um círculo de raio `r`; o da coluna da direita fica centrado em
-// `x = width - r` (a borda direita do círculo encosta em `x = width`, nunca passa disso —
-// é o que garante não invadir a célula vizinha) e desce a partir de `y = r` (topo do
-// círculo encosta em `y = 0`), empilhando com passo `2r + gap`. O corpo do token é um
-// círculo INSCRITO na bounding box (raio = metade do lado menor), então ele só toca as
-// bordas nos 4 pontos cardeais — os cantos ficam vazios — e uma coluna encostada na borda
-// direita cai sobretudo nesses cantos, tocando o desenho do token só perto do meio da
-// altura ("sobrepor só a beirada").
+// A GEOMETRIA (posição/tamanho de cada badge) mora em lib/conditionLayout.ts, função pura, porque
+// duas coisas dependem dela e não podem divergir: o desenho daqui e o hit do mouse no Stage
+// (conditionTooltipAtPointer). Ler o comentário de lá para o raciocínio da coluna/colunas.
 //
-// Se não couber tudo numa coluna, a 2ª coluna nasce à esquerda da 1ª, mesmo passo
-// horizontal (vira uma grade). O teto continua sendo CONDITION_MAX_VISIBLE (6): se nem
-// 2 colunas dão conta, o último slot vira "+N" (tooltip lista as ocultas).
-//
-// Tamanho do ícone: ~22% do lado da célula, mas convertido pra px de TELA (× stageScale)
-// e limitado a [MIN_PX, MAX_PX] — daí convertido de volta pra unidades do mapa. Abaixo de
-// MIN_PX nem tenta desenhar a coluna: mostra só um contador pequeno de tamanho FIXO em
-// tela (`scale = 1/stageScale` cancela o zoom do Stage), com tooltip listando todas.
-//
-// Faixa inferior (barra de vida/nome): a barra desenha ACIMA da bounding box (`y=-12`,
-// ver TokenNode) e o nome ABAIXO dela (`y=height+4`) — nenhum dos dois entra no intervalo
-// `[0, height]` que a coluna usa, então não há nada pra reservar aqui. Se um dia a barra
-// (ou o nome) passar a desenhar DENTRO da bounding box, subtraia a altura dela de
-// `usableHeight` antes de calcular `rows`.
+// Aqui é SÓ DESENHO (`listening={false}` em tudo, igual às decorações do token): o hover não pode
+// depender do canvas de hit do Konva, que navegadores com proteção anti-fingerprinting embaralham
+// (docs/debug-token.md) — medido: com o hit sabotado, 0 de 6 badges disparavam mouseenter.
 
-const CONDITION_ICON_PCT = 0.22;
-const CONDITION_MIN_PX = 10;
-const CONDITION_MAX_PX = 24;
-/** Teto de sempre (1 ou 2 colunas); além disso o resto vira um badge "+N". */
-const CONDITION_MAX_VISIBLE = 6;
+type ConditionSlot = { key: string; label: string; description: string; icon?: string; color: string };
 
-type ConditionSlot = { key: string; label: string; description: string; icon?: string; color: string; hiddenLabels?: string[] };
-
-/** Tooltip de condição, desenhado numa camada ACIMA de todos os tokens (ver ConditionTooltipLayer). */
+/** Tooltip de condição, desenhado numa camada ACIMA de todos os tokens (ver ConditionTooltipLayerContent). */
 export interface ConditionTooltip {
-  /** Identidade do que está em hover (`<tokenId>:<slot>`): o onLeave só limpa se ainda for o dele. */
+  /** Identidade do que está sob o mouse (`<tokenId>:<slot>`), pra não repintar a cada mousemove. */
   key: string;
   /** Âncora em pixels do MAPA (centro do badge). */
   x: number;
@@ -1074,89 +1095,30 @@ export interface ConditionTooltip {
   text: string;
 }
 
-const ConditionMarkers: React.FC<{
-  width: number;
-  height: number;
-  stageScale: number;
-  conditions: ConditionDef[];
-  /** Canto superior esquerdo do token em pixels do mapa: o tooltip vive fora deste Group. */
-  originX: number;
-  originY: number;
-  tokenId: string;
-  onTooltipShow: (tip: ConditionTooltip) => void;
-  onTooltipHide: (key: string) => void;
-}> = ({ width, height, stageScale, conditions, originX, originY, tokenId, onTooltipShow, onTooltipHide }) => {
-  // Zoom baixo demais pro ícone ficar legível: troca a coluna toda por um contador fixo.
-  const cellSide = Math.min(width, height);
-  const rawScreenSize = cellSide * CONDITION_ICON_PCT * stageScale;
-  if (rawScreenSize < CONDITION_MIN_PX) {
-    const radius = CONDITION_COUNTER_RADIUS / stageScale;
-    return (
-      <ConditionCounter
-        x={width}
-        y={0}
-        count={conditions.length}
-        stageScale={stageScale}
-        onHover={() =>
-          onTooltipShow({
-            key: `${tokenId}:__counter`,
-            x: originX + width - radius,
-            y: originY + radius,
-            anchorRadius: CONDITION_COUNTER_RADIUS,
-            text: conditions.map((c) => c.label).join("\n"),
-          })
-        }
-        onLeave={() => onTooltipHide(`${tokenId}:__counter`)}
-      />
-    );
+const ConditionMarkers: React.FC<{ width: number; height: number; stageScale: number; conditions: ConditionDef[] }> = ({
+  width,
+  height,
+  stageScale,
+  conditions,
+}) => {
+  const layout = conditionLayout(width, height, stageScale, conditions.length);
+
+  if (layout.mode === "counter") {
+    return <ConditionCounter cx={layout.cx} cy={layout.cy} count={conditions.length} stageScale={stageScale} />;
   }
 
-  const screenSize = Math.min(CONDITION_MAX_PX, Math.max(CONDITION_MIN_PX, rawScreenSize));
-  const size = screenSize / stageScale;
-  // Cinto de segurança: um token redimensionado bem menor que uma célula não deveria
-  // deixar o badge estourar a própria bounding box.
-  const r = Math.min(size / 2, width / 2, height / 2);
-  const gap = r * 0.4;
-  const step = 2 * r + gap;
-
-  const usableHeight = height; // ver comentário acima: bar/nome não entram em [0, height] hoje
-  const rows = Math.max(1, Math.floor((usableHeight - 2 * r) / step) + 1);
-  const maxSlots = Math.min(CONDITION_MAX_VISIBLE, 2 * rows);
-  const overflow = conditions.length > maxSlots;
-  const visibleCount = overflow ? maxSlots - 1 : conditions.length;
-  const visible = conditions.slice(0, visibleCount);
-  const hidden = overflow ? conditions.slice(visibleCount) : [];
-
-  const slots: ConditionSlot[] = visible.map((c) => ({ key: c.key, label: c.label, description: c.description, icon: c.icon, color: c.color }));
-  if (hidden.length > 0) {
-    slots.push({ key: "__overflow", label: `+${hidden.length}`, description: "", color: "#71717a", hiddenLabels: hidden.map((c) => c.label) });
+  const slots: ConditionSlot[] = conditions
+    .slice(0, layout.visibleCount)
+    .map((c) => ({ key: c.key, label: c.label, description: c.description, icon: c.icon, color: c.color }));
+  if (layout.hiddenCount > 0) {
+    slots.push({ key: "__overflow", label: `+${layout.hiddenCount}`, description: "", color: "#71717a" });
   }
-
-  const posOf = (i: number) => {
-    const col = Math.floor(i / rows);
-    const rowInCol = i % rows;
-    return { x: width - r - col * step, y: r + rowInCol * step };
-  };
-
-  const tipText = (slot: ConditionSlot) =>
-    slot.hiddenLabels ? slot.hiddenLabels.join("\n") : slot.description ? `${slot.label}\n${slot.description}` : slot.label;
 
   return (
     <>
       {slots.map((slot, i) => {
-        const p = posOf(i);
-        const key = `${tokenId}:${slot.key}`;
-        return (
-          <ConditionBadge
-            key={slot.key}
-            slot={slot}
-            x={p.x}
-            y={p.y}
-            r={r}
-            onHover={() => onTooltipShow({ key, x: originX + p.x, y: originY + p.y, anchorRadius: r * stageScale, text: tipText(slot) })}
-            onLeave={() => onTooltipHide(key)}
-          />
-        );
+        const p = layout.slots[i];
+        return p ? <ConditionBadge key={slot.key} slot={slot} x={p.x} y={p.y} r={layout.r} /> : null;
       })}
     </>
   );
@@ -1164,73 +1126,40 @@ const ConditionMarkers: React.FC<{
 
 /**
  * Um badge: fundo circular escuro semitransparente + ícone (SVG do JSON, rasterizado com a cor da
- * condição), ou "+N". Quem recebe o mouse é SEMPRE o Circle de fundo (`fill` definido, listening
- * padrão); o ícone é `listening={false}`. Assim o tooltip funciona igual mesmo se a imagem não
- * carregar — e, se não carregar, cai num fallback visível: a INICIAL da condição (nunca o rótulo
- * inteiro, que quebraria em várias linhas e vazaria pra fora do círculo).
+ * condição), ou "+N". Ícone que falha no load cai na INICIAL da condição — nunca no rótulo inteiro,
+ * que quebraria em várias linhas e vazaria pra fora do círculo.
  */
-const ConditionBadge: React.FC<{ slot: ConditionSlot; x: number; y: number; r: number; onHover: () => void; onLeave: () => void }> = ({
-  slot,
-  x,
-  y,
-  r,
-  onHover,
-  onLeave,
-}) => {
+const ConditionBadge: React.FC<{ slot: ConditionSlot; x: number; y: number; r: number }> = ({ slot, x, y, r }) => {
   const iconUrl = useMemo(() => (slot.icon ? conditionIconDataUrl(slot.icon, slot.color) : null), [slot.icon, slot.color]);
   const icon = useImage(iconUrl);
   const iconSize = r * 1.24;
-  // O slot "+N" não tem ícone e usa o próprio rótulo ("+3"); condição sem ícone (ou com ícone que
+  // O slot "+N" não tem ícone e usa o próprio rótulo ("+3"); condição sem ícone (ou cujo ícone
   // falhou no load) mostra só a inicial.
   const fallback = slot.icon ? slot.label.charAt(0).toUpperCase() : slot.label;
 
   return (
-    <Group name="condition-badge" x={x} y={y} onMouseEnter={onHover} onMouseLeave={onLeave}>
+    <Group name="condition-badge" x={x} y={y} listening={false}>
       <Circle radius={r} fill="rgba(12, 12, 12, 0.75)" stroke={slot.color} strokeWidth={Math.max(1, r * 0.1)} />
       {icon ? (
-        <KonvaImage image={icon} x={-iconSize / 2} y={-iconSize / 2} width={iconSize} height={iconSize} listening={false} />
+        <KonvaImage image={icon} x={-iconSize / 2} y={-iconSize / 2} width={iconSize} height={iconSize} />
       ) : (
-        <Text
-          x={-r}
-          y={-r * 0.45}
-          width={r * 2}
-          text={fallback}
-          align="center"
-          fontSize={r * 0.85}
-          fontFamily="sans-serif"
-          fontStyle="bold"
-          fill="#e0e0e0"
-          wrap="none"
-          ellipsis
-          listening={false}
-        />
+        <Text x={-r} y={-r * 0.45} width={r * 2} text={fallback} align="center" fontSize={r * 0.85} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" wrap="none" ellipsis />
       )}
     </Group>
   );
 };
-
-const CONDITION_COUNTER_RADIUS = 9;
 
 /**
  * Fallback de zoom baixo: um badge de tamanho FIXO em tela (não some nem encolhe além disso),
  * ancorado no canto superior direito da bounding box. `scale={1/stageScale}` cancela o zoom do
  * Stage no subtree — os filhos são desenhados direto em "px de tela equivalente".
  */
-const ConditionCounter: React.FC<{ x: number; y: number; count: number; stageScale: number; onHover: () => void; onLeave: () => void }> = ({
-  x,
-  y,
-  count,
-  stageScale,
-  onHover,
-  onLeave,
-}) => {
+const ConditionCounter: React.FC<{ cx: number; cy: number; count: number; stageScale: number }> = ({ cx, cy, count, stageScale }) => {
   const radius = CONDITION_COUNTER_RADIUS;
   return (
-    <Group x={x} y={y} scaleX={1 / stageScale} scaleY={1 / stageScale}>
-      <Group name="condition-badge" x={-radius} y={radius} onMouseEnter={onHover} onMouseLeave={onLeave}>
-        <Circle radius={radius} fill="rgba(12, 12, 12, 0.85)" stroke="#71717a" strokeWidth={1.2} />
-        <Text x={-radius} y={-4} width={radius * 2} text={String(count)} align="center" fontSize={9} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" listening={false} />
-      </Group>
+    <Group name="condition-badge" x={cx} y={cy} scaleX={1 / stageScale} scaleY={1 / stageScale} listening={false}>
+      <Circle radius={radius} fill="rgba(12, 12, 12, 0.85)" stroke="#71717a" strokeWidth={1.2} />
+      <Text x={-radius} y={-4} width={radius * 2} text={String(count)} align="center" fontSize={9} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" />
     </Group>
   );
 };
@@ -1238,22 +1167,21 @@ const ConditionCounter: React.FC<{ x: number; y: number; count: number; stageSca
 /**
  * Tooltip das condições, numa camada PRÓPRIA acima de todos os tokens.
  *
- * Por que não dentro do Group do token (era o bug): tokens são Groups irmãos na mesma layer, então
- * um token desenhado depois pinta por cima do tooltip do anterior. Como o balão abre pra direita
- * (a coluna de badges fica na borda direita), ele caía justamente na célula vizinha: medido ao vivo,
- * com um token colado à direita sobravam 9 px visíveis — dava pra ler uma letra de "Cego" e nada de
- * "Sobrecarregado", o que parecia "essas condições nunca mostram tooltip".
+ * Por que não dentro do Group do token (era um bug real, medido): tokens são Groups irmãos na mesma
+ * layer, então um token desenhado depois pinta por cima do tooltip do anterior. Como o balão abre
+ * pra direita, ele caía justamente na célula vizinha — com um token colado à direita sobravam 9 px
+ * visíveis, dava pra ler uma letra de "Cego" e nada de "Sobrecarregado".
  *
  * Só o TOOLTIP sobe de camada, não os badges: badge é permanente e precisa continuar respeitando a
  * ordem mapa → tokens alheios → névoa → meus tokens (§9.3 do SPEC); o tooltip é efêmero e só existe
  * pro token que o usuário já está apontando, então não vaza nada da névoa.
  *
- * O balão é desenhado em tamanho de TELA fixo (`scale = 1/stageScale`): antes ele escalava junto com
- * o zoom e ficava ilegível de longe.
+ * O balão é desenhado em tamanho de TELA fixo (`scale = 1/stageScale`): antes escalava com o zoom
+ * e ficava ilegível de longe.
  */
 const ConditionTooltipLayerContent: React.FC<{ tip: ConditionTooltip; stageScale: number }> = ({ tip, stageScale }) => (
   <Group x={tip.x} y={tip.y} scaleX={1 / stageScale} scaleY={1 / stageScale} listening={false}>
-    <Label x={tip.anchorRadius + 4} y={-tip.anchorRadius - 2} listening={false}>
+    <Label x={tip.anchorRadius + 4} y={-tip.anchorRadius - 2}>
       <Tag fill="#0c0c0c" stroke="#2d2417" strokeWidth={1} cornerRadius={3} />
       <Text text={tip.text} fontSize={11} fontFamily="sans-serif" fill="#e0e0e0" padding={5} lineHeight={1.3} />
     </Label>
