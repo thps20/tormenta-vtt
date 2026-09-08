@@ -20,14 +20,27 @@ export interface RollMessageInput {
   allowNoDice?: boolean;
   /** Parcelas de dano por tipo (ação de dano da ficha): cada uma é rolada em separado e `formula` é ignorada. */
   damage?: DamageComponent[];
+  /**
+   * Token ao qual esta rolagem está ligada (combatente de combat:roll, ou personagem com
+   * token vinculado na cena ativa). Quem não vê esse token não recebe a mensagem, nem
+   * placeholder, independente de `visibility` (ver services/chatVisibility.ts).
+   */
+  tokenId?: string;
+}
+
+export interface RollMessageResult {
+  /** Mensagem como o autor pode vê-la (às cegas = sem `roll`). */
+  message: ChatMessage;
+  /** Total real (o servidor sempre sabe, mesmo numa rolagem às cegas) — usado pelo combate para gravar Combatant.initiative. */
+  total: number;
 }
 
 /**
  * Rola NO SERVIDOR, persiste como ChatMessage{kind:"roll"} e faz o broadcast
- * conforme a visibilidade. Usado pelo chat (/r, /gmr, /pr) e pela ficha (character:roll).
- * Devolve a mensagem como o autor pode vê-la (às cegas = sem `roll`).
+ * conforme a visibilidade. Usado pelo chat (/r, /gmr, /pr), pela ficha (character:roll)
+ * e pelo combate (combat:roll).
  */
-export async function createRollMessage(io: TypedServer, roomId: string, me: DbParticipant, input: RollMessageInput): Promise<ChatMessage> {
+export async function createRollMessage(io: TypedServer, roomId: string, me: DbParticipant, input: RollMessageInput): Promise<RollMessageResult> {
   let outcome;
   let damage: DiceRoll["damage"];
   try {
@@ -63,10 +76,19 @@ export async function createRollMessage(io: TypedServer, roomId: string, me: DbP
 
   const msg = toChatMessage(
     await prisma.chatMessage.create({
-      data: { roomId, participantId: me.id, nickname: me.nickname, kind: "roll", roll: diceRoll, visibility: input.visibility },
+      data: {
+        roomId,
+        participantId: me.id,
+        nickname: me.nickname,
+        kind: "roll",
+        roll: diceRoll,
+        visibility: input.visibility,
+        tokenId: input.tokenId ?? null,
+      },
     }),
   );
 
-  emitChatMessage(io, roomId, msg);
-  return redactForAuthor(msg, { role: me.role === "gm" ? "gm" : "player", participantId: me.id });
+  await emitChatMessage(io, roomId, msg);
+  const message = redactForAuthor(msg, { role: me.role === "gm" ? "gm" : "player", participantId: me.id });
+  return { message, total: outcome.total };
 }

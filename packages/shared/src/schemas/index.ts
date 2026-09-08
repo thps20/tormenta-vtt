@@ -4,7 +4,7 @@ export * from "./scene.js";
 export * from "./fog.js";
 export * from "./token.js";
 export * from "./dice.js";
-export * from "./initiative.js";
+export * from "./combat.js";
 export * from "./system.js";
 export * from "./payloads.js";
 export * from "./character.js";

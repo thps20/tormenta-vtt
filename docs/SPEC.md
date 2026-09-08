@@ -70,6 +70,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - O modo vale para tudo que a pessoa rolar (faixa, `/r`, ficha, botões dos cards) até trocar; persiste na aba (`sessionStorage`). `/gmr` e `/pr` forçam secreta/pública pontualmente. Texto e cards de item (`character:use-item`) são sempre públicos.
   - Fora de "Pública", o campo do chat ganha borda âmbar e o rótulo do modo à direita.
   - `ChatMessage.visibility` (`all | gm | self`) é filtrado pelo servidor no broadcast e no snapshot (`messageVisibleTo`, `apps/server/src/services/chatVisibility.ts`). Quem não pode ver o resultado **não fica sem a mensagem**: recebe a mesma mensagem sem `roll`/`item`/`text` (placeholder "Fulano fez uma rolagem secreta/própria", `apps/server/src/services/chatVisibility.ts#redactMessage`) na hora da rolagem, e o cliente mostra um card oculto no lugar do card de rolagem. O GM tem o botão **Revelar** (`chat:reveal`) nesse card, que muda `visibility` para `all` e reenvia a mesma mensagem (mesmo `id`) a todos com o conteúdo completo: o cliente faz upsert ordenado por `createdAt`, então o card oculto vira o card cheio no lugar.
+  - **Rolagem ligada a um token** (`ChatMessage.tokenId`, opcional: combate — §3.5 — ou ficha com token vinculado na cena ativa): quem não pode ver esse token (`visible = false` ou sob a névoa) não recebe a mensagem de jeito nenhum — nem o card, nem o placeholder acima — independente de `visibility`; o GM e o **autor da própria rolagem** sempre recebem (mesmo que o token dele esteja oculto), o gate vale só para os demais jogadores. Essa checagem roda **antes** e além da de `visibility` (`tokenGateOk`/`emitChatMessage` em `apps/server/src/services/chatVisibility.ts`).
 - **Gramática da fórmula** (parser genérico em `packages/shared/src/dice`):
   ```
   expr    := term (("+"|"-") term)*
@@ -88,14 +89,18 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Resultado exibido como: `Thiago rolou 1d20+5: [14] + 5 = 19`. Dados naturais máximo/mínimo destacados (crítico/falha), regra visual apenas.
 - Placeholders de sistema (`{attr.for}`, `{skill.percepcao}`, `{derived.defense}`, `{level}`...) são resolvidos **antes** do parser a partir da ficha do autor. Regra do `/r`: o autor precisa ter exatamente **uma** ficha própria na sala; com zero ou várias, o ack devolve erro pedindo para rolar pela ficha (`character:roll`), que sabe qual usar.
 
-### 3.5 Iniciativa
-- Painel lateral com lista ordenada por `value` desc, depois `tiebreak` desc.
-- GM: adicionar entrada (a partir de um token ou manual), editar valor, ocultar/mostrar, remover, `next`/`prev`, `reset` (limpa e volta `round = 0`).
-- `next` com `currentIndex = null` inicia o combate (índice 0, `round = 1`). `next` no último da lista incrementa `round` e volta ao índice 0. `prev` no primeiro volta ao último e decrementa `round` (mínimo 1).
-- Ao alterar a lista (add/update/remove), o cursor continua apontando para a mesma entrada; se ela for removida, quem vinha depois passa a agir.
-- Para jogadores, `currentIndex` é recalculado sobre a lista filtrada; se quem age está oculto, `currentIndex = null`.
-- Jogadores veem a lista (entradas `visible = true`) e o destaque de quem está agindo. Token do turno atual ganha um contorno no mapa.
-- A fórmula de iniciativa vem do JSON do sistema (`rolls.initiative`), mas no MVP o valor é digitado ou rolado com `/r`.
+### 3.5 Modo de combate
+> Substitui o rastreador manual de iniciativa da versão anterior do MVP. Plano e decisões em `docs/plano-combate.md`; divergências encontradas na implementação em `docs/revisao-combate.md`.
+
+- **Combate por cena** (`Combat`, um por cena — `Scene.combat?`, `@@unique` em `sceneId`): `{ id, sceneId, round, status: "rolling" | "active" | "ended", activeCombatantId, combatants[] }`. `Combatant`: `{ id, tokenId, characterId? (cópia do token no momento em que entrou, só informativa), name/color (denormalizados do token na hora de enviar), ownerId (do token), initiative: number | null, rolled, bonus, delayed, surprised, order, addedRound }`.
+- **Regras do sistema** (`SystemDefinition.combat`, nunca hardcoded): `initiative` (fórmula de quem tem ficha vinculada), `initiativeNoSheet` (token sem ficha, `{bonus}` = valor manual do GM), `tiebreakBonus` (fórmula sem dado gravada em `Combatant.bonus` ao entrar), `tiebreak` (critérios de desempate após o valor, na ordem: T20 usa `["bonus", "order"]`), `surprise.rounds` (combatente surpreso é pulado nas N primeiras rodadas; `0` = sistema sem surpresa).
+- **Fluxo**: GM seleciona tokens no mapa (ferramenta Selecionar) e clica "Iniciar combate" (`combat:start`) — cria o combate com `status: "rolling"`; tokens podem ser adicionados (`combat:add`, reforços, entram sem iniciativa) ou removidos (`combat:remove`) depois. `combat:next` com `status: "rolling"` inicia os turnos (`round = 1`); no último combatente que pode agir, incrementa a rodada e volta ao primeiro; `combat:prev` faz o inverso (rodada mínima 1). Combatente sem iniciativa nunca recebe turno, fica no fim da lista; surpreso é pulado enquanto `round <= surprise.rounds`; adiado (`combat:delay`, só no próprio turno) sai da rotação até "entrar agora" (`combat:resume`) — que copia iniciativa/bônus de quem está agindo e assume o turno na hora, deixando quem foi interrompido para agir em seguida. `combat:end { clear? }` encerra (`status: "ended"`, mantém a ordem visível) ou, com `clear: true`, apaga o combate.
+- **Rolagem**: `combat:roll { scope, combatantId?, visibility? }` rola no servidor e publica cada rolagem como `ChatMessage{kind:"roll"}` normal (rótulo "Nome: Iniciativa", com `characterId` quando há ficha vinculada) — ganha de graça o card, "Revelar" e a rolagem às cegas; `combat:updated` sai uma vez só, no fim do lote. `scope: "self"` (GM ou jogador) rola os combatentes do autor (token que possui, ou cuja ficha vinculada é dele) que ainda faltam; `"one"` um específico; `"npcs"`/`"missing"` (só GM) os sem dono / todos que faltam. `visibility` é o modo de rolagem de quem clicou — inclusive do GM (sem forçar secreta para NPC automaticamente). Token sem ficha: rola por `combat.initiativeNoSheet` com o bônus manual; a UI mostra a faixa discreta "Combate iniciado — rolar iniciativa" para quem tem combatente sem `rolled`, e "É o seu turno" (com botão Adiar) para quem está agindo — ambas somem sozinhas quando deixam de valer; o título da aba pisca "▶ Seu turno" enquanto isso.
+- **Visibilidade**: jogador recebe só os combatentes cujo token pode ver (mesmo filtro de token/névoa de sempre) — oculto/na névoa não aparece nem some da posição: ao ser revelado, reaparece onde já estava, porque a ordem é sempre calculada sobre a lista completa no servidor e só depois filtrada. Jogador vê a ORDEM de todo mundo (nome, se já rolou), mas o **valor numérico** (iniciativa e bônus) só do **próprio** combatente (token que possui) — e mesmo assim não quando a última rolagem dele foi às cegas (`visibility: "gm"`, mesma regra de "rolagem às cegas" do chat: quem rolou não vê o próprio resultado); valor digitado à mão pelo GM (`combat:set-initiative`) não conta como às cegas, fica visível. Dos demais combatentes (inclusive de outros jogadores), nunca vê o valor. GM vê tudo sempre. Rolagens ligadas a um token que o jogador não pode ver (`visible = false` ou sob a névoa) são omitidas por completo para ele — nem card, nem placeholder de "rolagem secreta" — independentemente do modo de rolagem de quem rolou; o **autor da rolagem sempre a recebe**, mesmo que o próprio token dele esteja oculto — o gate vale só para os demais jogadores; só o GM sempre recebe também (`ChatMessage.tokenId`, ver §3.4 e §5). Vale para `combat:roll`, `character:roll` (token vinculado à ficha na cena ativa) e `character:use-item`. Se o token depois for revelado ou sair da névoa, essas mensagens passam a ser entregues no próximo `room:join`/snapshot (não há reenvio ao vivo das mensagens já publicadas; anotado em `docs/backlog.md`).
+- **GM**: reordenar arrastando (`combat:reorder`, grava `order`), editar valor à mão (`combat:set-initiative`, `null` volta pra "não rolou"), marcar/desmarcar surpresa (`combat:set-surprised`), adicionar/remover, pular turno, encerrar. Jogador: rolar a própria, adiar/retomar a própria. Opção por usuário (checkbox na aba, `localStorage`) de centralizar o mapa no token da vez.
+- **Mapa**: anel destacado no token da vez (visível para quem vê o token).
+- Preparado, **sem implementar**: `Token.conditions` ganhará duração em rodadas (`TokenConditionWithDurationSchema`, `{ key, expiresRound }` comparado a `Combat.round`) — só o tipo e um TODO documentado no schema; nada lê isso ainda.
+- UI nesta fase: mínima e funcional na aba Iniciativa (renomeada para o modo de combate); o visual definitivo virá do AI Studio depois.
 
 ### 3.6 Ficha de personagem
 - Tudo que é regra vem do JSON do sistema (`SystemDefinitionSchema` v2): atributos, perícias (com tags, variantes como "Ofício" e flags de tamanho/armadura), recursos, stats derivados por fórmula (`derived[]`: Defesa, CD, carga...), tamanhos, tipos de dano, moedas, campos de traço, stats de equipamento (`equipStats`) e tipos de item com campos declarados (`itemKinds`).
@@ -125,10 +130,10 @@ Espelhado em `apps/server/prisma/schema.prisma` (persistência) e `packages/shar
 ```
 Room 1───* Participant
 Room 1───* Scene 1───* Token *───? Participant (owner)
+Scene 0/1─* Combat 1───* Combatant *───1 Token
 Room 1───* Character *───? Participant (owner)
 Token *───? Character
-Room 1───* ChatMessage
-Room 1───* InitiativeEntry ?──1 Token
+Room 1───* ChatMessage *───? Token
 ```
 
 | Entidade | Campos principais | Notas |
@@ -138,9 +143,10 @@ Room 1───* InitiativeEntry ?──1 Token
 | **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON)` | `grid` e `fog` são JSON para evoluir sem migration. `fog` segue `FogConfigSchema` (§9.3) |
 | **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(string[])` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = chaves de `SystemDefinition.conditions[]` (§3.3) |
 | **Character** | `id, roomId, ownerId?, name, kind, data(JSON)` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration |
-| **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), visibility` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3); `item` segue `ItemCardSchema` (kind `item`); `visibility` = `all \| gm \| self` (§3.4) |
-| **InitiativeEntry** | `id, roomId, tokenId?, name, value, tiebreak, visible` | `currentIndex` e `round` ficam em memória por sala (perdem-se ao reiniciar o servidor; aceitável no MVP) |
-| **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[]`), skillTotal, rolls{}, damageAttribute, tokenBar, trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código |
+| **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), visibility, tokenId?` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3); `item` segue `ItemCardSchema` (kind `item`); `visibility` = `all \| gm \| self` (§3.4); `tokenId?` liga a rolagem a um token (combate/ficha), filtrado à parte de `visibility` (§3.4/§3.5) |
+| **Combat** | `id, roomId, sceneId (único: um combate por cena), round, status, activeCombatantId?` | `status` = `rolling \| active \| ended` (§3.5). Persistido (ao contrário da iniciativa manual anterior, que vivia em memória) |
+| **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound` | `initiative = null` = ainda não rolou. Apagar o token apaga o combatente (cascade); `combat:remove`/o cascade de `token:delete` ajustam `activeCombatantId`/`round` se o removido era o ativo (§3.5, `stateAfterRemoval`) |
+| **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[]`), skillTotal, rolls{}, combat{} (§3.5), damageAttribute, tokenBar, trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código |
 
 Decisão: coordenadas em pixels (não células) para o token poder ficar "fora do grid" e para suportar `grid.type = none`. A conversão célula↔pixel é uma função pura usando `cellSize` e `offset`.
 
@@ -174,10 +180,17 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `compendium:list` | `{}` | todos | ack `CompendiumEntry[]` do sistema da sala (sem broadcast; §9.4) |
 | `chat:send` | `{ text, visibility? }` (`visibility` = modo de rolagem do autor; `/gmr` e `/pr` no texto forçam) | todos | `chat:message` a todos (texto sempre público); rolagem fora de "Pública" vai a todos, mas quem `visibility` não permite recebe sem `roll` (placeholder, §3.4); ack sem `roll` quando o autor não pode ver (às cegas) |
 | `chat:reveal` | `{ messageId }` | GM | `chat:message` da mesma mensagem com `visibility: "all"` para todos (cliente faz upsert) |
-| `initiative:add` | `InitiativeEntry` sem `id` | GM | `initiative:updated` |
-| `initiative:update` | `{ id, ...campos }` | GM | `initiative:updated` |
-| `initiative:remove` | `{ entryId }` | GM | `initiative:updated` |
-| `initiative:next` / `prev` / `reset` | `{}` | GM | `initiative:updated` |
+| `combat:start` | `{ sceneId, tokenIds[] }` | GM | `combat:updated`; substitui um combate anterior da cena, se houver |
+| `combat:add` | `{ tokenIds[] }` | GM | `combat:updated`; reforços entram sem iniciativa |
+| `combat:remove` | `{ combatantIds[] }` | GM | `combat:updated`; ajusta o turno se um removido era o ativo |
+| `combat:roll` | `{ scope: self\|one\|npcs\|missing, combatantId?, visibility? }` | `self`/`one`: GM ou dono do combatente; `npcs`/`missing`: GM | Rola cada combatente-alvo no servidor, publica `chat:message{kind:"roll"}` por rolagem (§3.5); `combat:updated` uma vez, no fim do lote |
+| `combat:set-initiative` | `{ combatantId, initiative: number\|null, bonus? }` | GM | `combat:updated` |
+| `combat:set-surprised` | `{ combatantId, surprised }` | GM | `combat:updated` |
+| `combat:next` / `prev` | `{}` | GM | `combat:updated` |
+| `combat:reorder` | `{ combatantIds[] }` (nova ordem completa) | GM | `combat:updated` |
+| `combat:delay` | `{ combatantId }` (só no próprio turno) | GM ou dono do combatente | `combat:updated` |
+| `combat:resume` | `{ combatantId }` | GM ou dono do combatente | `combat:updated` |
+| `combat:end` | `{ clear? }` | GM | `combat:updated` (`null` se `clear: true`) |
 | `ruler:update` | `{ sceneId, ruler: { start, end } \| null }` (pixels do mapa) | todos | `ruler:updated` para os **outros** (efêmero: não persiste; `null` apaga) |
 
 ### Servidor → Cliente
@@ -193,7 +206,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `chat:message` | `ChatMessage` (mensagem nova ou revelada: mesmo `id`, `visibility` nova; cliente faz upsert) |
 | `character:created` / `character:updated` | `Character` (jogadores só recebem `kind = "pc"`) |
 | `character:deleted` | `{ characterId }` |
-| `initiative:updated` | `InitiativeState` (estado completo, simples de sincronizar) |
+| `combat:updated` | `Combat \| null` (estado completo, já ordenado e filtrado pela visibilidade de quem recebe — §3.5; `null` = sem combate na cena ativa) |
 | `ruler:updated` | `{ participantId, nickname, sceneId, ruler \| null }` (régua de outro participante; sem eco ao autor) |
 | `server:error` | `{ message }` |
 
@@ -220,34 +233,38 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 apps/web/src/
   App.tsx       escolhe a tela pela URL
   components/   Lobby, RoomPage (liga stores aos componentes), TopBar, Toolbar, VttCanvas,
-                TokenInspector, SidePanel, ChatTab, InitiativeTab, CharactersTab,
-                MapConfigModal, NicknamePrompt, Toasts, CharacterSheetDrawer (gaveta da ficha)
+                TokenInspector, SidePanel, ChatTab, InitiativeTab (modo de combate), CombatBanner
+                (faixa "rolar iniciativa"/"seu turno"), CharactersTab, MapConfigModal,
+                NicknamePrompt, Toasts, CharacterSheetDrawer (gaveta da ficha)
   components/compendium/  CompendiumPalette (paleta encaixada ou flutuante), EntryPreview, DragGhost (arrasto)
   components/character/  seções da ficha: CharacterHeader, AttributesGrid, ResourcesBlock,
                 DerivedStatsBar, SkillsSection, ItemsSection, ModifiersSection, DetailsSection,
                 fields.tsx (inputs "commit on blur")
   store/        connection.ts (socket + emitAck), bindSocket.ts (broadcast → store),
-                room.ts, tokens.ts, chat.ts, initiative.ts, characters.ts, ui.ts (toasts),
+                room.ts, tokens.ts, chat.ts, combat.ts (modo de combate), characters.ts, ui.ts (toasts),
                 tools.ts (ferramenta ativa, régua), compendium.ts (entradas, paleta, arrasto)
   lib/          router.ts (2 rotas, sem lib), api.ts (HTTP), grid.ts (célula↔pixel, puro),
                 session.ts (localStorage), throttle.ts, useImage.ts, system.ts (useSystemDef), ids.ts,
-                useToolShortcuts.ts (V/H/R/Esc/espaço), compendium.ts (regras de inserção, puro),
-                dropTargets.ts (alvos de soltura por data-drop-target)
+                useToolShortcuts.ts (V/H/R/Esc/espaço), useTurnTitle.ts (título da aba pisca no seu turno),
+                compendium.ts (regras de inserção, puro), dropTargets.ts (alvos de soltura por data-drop-target)
 apps/server/src/
   index.ts, env.ts, db.ts
   http/         rooms.ts, upload.ts
   socket/       index.ts, types.ts, ack.ts (validação Zod + ack), room.ts, scene.ts,
-                token.ts, chat.ts, initiative.ts, character.ts, ruler.ts (efêmero), compendium.ts
+                token.ts, chat.ts, combat.ts (modo de combate), character.ts, ruler.ts (efêmero), compendium.ts
   services/     serialize.ts (Prisma → shared), snapshot.ts, presence.ts,
-                initiativeState.ts, permissions.ts, chatCommands.ts, ids.ts,
+                combat.ts (carregar/ordenar/filtrar/emitir combate; regras de ordem em si em shared/rules/combat.ts),
+                permissions.ts, chatCommands.ts, ids.ts,
                 characters.ts (Prisma ↔ Character, visibilidade, broadcast),
-                rolls.ts (rola, persiste e publica; usado pelo chat e pela ficha),
+                rolls.ts (rola, persiste e publica; usado pelo chat, pela ficha e pelo combate),
+                chatVisibility.ts (quem vê cada mensagem: `visibility` + gate por `tokenId`),
                 compendium.ts (sistema + sala via mergeCompendium; a sala ainda é um stub vazio)
 packages/shared/src/
-  schemas/      (Zod, inclui payloads.ts e character.ts)  events.ts
+  schemas/      (Zod, inclui payloads.ts, character.ts e combat.ts)  events.ts
   dice/         parser + roller, puro, sem I/O
   rules/        placeholders.ts, modifierTarget.ts (regex do target),
-                compute.ts (computeCharacter), rolls.ts (buildCharacterRoll), defaults.ts
+                compute.ts (computeCharacter), rolls.ts (buildCharacterRoll), combat.ts (ordenação,
+                turno, surpresa — puro, testado), defaults.ts
   systems.ts    registro dos JSONs (getSystemDefinition)
   compendium/   registro dos compêndios (subpath @tormenta-vtt/shared/compendium, só o servidor importa)
 packages/shared/systems/
@@ -260,10 +277,11 @@ packages/shared/systems/
 Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a ficha básica (§3.6). Limitações conhecidas:
 - Ficha: o compêndio (§9.4) vem dos packs do Foundry e tem lacunas listadas em `scripts/import-report.md` (proficiências e limite de atributo das armaduras pesadas, sentidos/perícias das raças, páginas ausentes, fórmulas com variáveis do Foundry); o compêndio da sala (homebrew) só existe como interface. Deslocamento e sentidos da raça não alimentam `derived[]`; poderes de classe por nível ficam de fora. Consumíveis usam a mesma ativação de poderes/magias, mas a quantidade não é descontada ao usar.
 - `character:update` é um patch raso: editar um item reenvia a lista `items` inteira (fichas são pequenas; ok por ora).
-- Só existe UI para uma cena por sala (`scene:create`/`scene:activate` funcionam no servidor, sem botão no web).
-- `currentIndex`/`round` da iniciativa e a presença (`connected`) se perdem ao reiniciar o servidor.
+- Só existe UI para uma cena por sala (`scene:create`/`scene:activate` funcionam no servidor, sem botão no web); combate só existe na cena ativa (`combat:start` recusa outra).
+- A presença (`connected`) se perde ao reiniciar o servidor. O combate (§3.5), diferente da iniciativa manual anterior, agora é **persistido** (tabelas `Combat`/`Combatant`) e sobrevive a um restart.
 - Uploads ficam em disco (`apps/server/uploads/`), sem limpeza de arquivos órfãos.
 - Névoa (§9.3): só "desfazer último" (sem histórico completo nem refazer); sem luz dinâmica, paredes ou visão por token; a visibilidade de um token olha só o centro dele; `fog:updated` sempre manda a lista completa de shapes (limitada a 500).
+- Modo de combate (§3.5): duração de condição em rodadas é só schema preparado, sem automação nenhuma; uma rolagem de iniciativa em lote (`combat:roll` com `npcs`/`missing`) publica uma mensagem de chat por combatente, sem agrupar num card só (anotado em `docs/backlog.md`); a mensagem de uma rolagem ligada a um token oculto só volta a ser entregue no próximo `room:join`, não ao vivo quando o token é revelado; a barra "iniciar/adicionar combatentes" reaproveita a seleção de tokens do mapa (ferramenta Selecionar) em vez de ter um seletor próprio na aba.
 
 ## 9. Fase 2 (pós-MVP)
 
@@ -292,7 +310,7 @@ Névoa pintada à mão pelo GM. **Sem** luz dinâmica, paredes ou visão por tok
 
 - **Modelo**: `Scene.fog = { enabled, base: "hidden" | "revealed", shapes: FogShape[] }` (`FogConfigSchema`, `packages/shared/src/schemas/fog.ts`). `FogShape = { id, mode: "reveal" | "hide" }` + geometria em **pixels do mapa**: `circle {cx, cy, r}`, `rect {x, y, width, height}`, `polygon {points}` ou `stroke {points, width}` (pincel: um arrasto inteiro vira uma polilinha com largura, e não dezenas de círculos). A área visível é a composição em ordem: parte de `base` e a última shape que contém o ponto decide (`isPointRevealed`, `packages/shared/src/fog/visibility.ts`, usada por cliente e servidor).
 - **Eventos**: `fog:update { sceneId, op }` (GM) com as operações `add`, `removeLast` (desfazer último; sem histórico completo), `revealAll` / `hideAll` (limpam a lista e setam `base`) e `setEnabled`. O cliente manda a operação, não a lista, para dois cliques rápidos não se sobrescreverem. O servidor aplica, persiste e faz broadcast de `fog:updated` com o estado completo.
-- **Visibilidade de tokens**: o GM vê todos. O jogador vê um token se `visible` e (é dono, ou fog desligado, ou o **centro** do token está em área revelada). Token que o jogador não pode ver **não é enviado** (mesmo mecanismo de `visible = false`: `token:deleted` ao esconder, `token:updated` ao reaparecer), então nem nome nem existência vazam. Como "é dono" varia por pessoa, o broadcast vai para a sala do GM, a sala do dono e `players` exceto o dono. Após `fog:update` o servidor reenvia todos os tokens da cena com essa regra; o snapshot filtra igual. O cliente aplica a mesma função nos tokens alheios para cobrir broadcasts fora de ordem.
+- **Visibilidade de tokens**: o GM vê todos. O jogador vê um token se `visible` e (é dono, ou fog desligado, ou o **centro** do token está em área revelada). Token que o jogador não pode ver **não é enviado** (mesmo mecanismo de `visible = false`: `token:deleted` ao esconder, `token:updated` ao reaparecer), então nem nome nem existência vazam. Como "é dono" varia por pessoa, o broadcast vai para a sala do GM, a sala do dono e `players` exceto o dono. Após `fog:update` o servidor reenvia todos os tokens da cena com essa regra (e o combate da cena, se houver — §3.5, mesma visibilidade); o snapshot filtra igual. O cliente aplica a mesma função nos tokens alheios para cobrir broadcasts fora de ordem.
 - **Renderização**: camadas mapa → tokens que o usuário **não** controla → névoa → tokens que controla → réguas. Jogador vê a névoa preta opaca; GM a vê a 50% (opacidade CSS no canvas da Layer, para o `destination-out` das áreas reveladas continuar exato). Shapes `reveal` apagam com `destination-out`; `hide` pintam preto por cima.
 - **Ferramentas** (só GM, modo Névoa, atalho **F**): sub-modos Revelar / Ocultar; formas Pincel (círculo que segue o arrasto, tamanho ajustável), Retângulo e Polígono (cliques; duplo clique fecha; Esc cancela); botões Desfazer último (Ctrl+Z no modo Névoa), Revelar tudo, Ocultar tudo e o toggle "Fog ativo". O pincel envia ao soltar o mouse, nunca a cada movimento, com os pontos decimados.
 - **Limite de shapes** (decisão): o cliente avisa o GM ao passar de 400 e o servidor recusa `add` acima de 500 (constantes `FOG_SHAPES_WARN` / `FOG_SHAPES_MAX`). Não há mesclagem automática de geometria: unir polígonos com precisão é complexo, e na prática um arrasto já é uma shape só e "Revelar/Ocultar tudo" zera a lista. Cada shape aceita no máximo 2000 pontos.

@@ -4,7 +4,7 @@ import { getSessionToken, setLastNickname, setSessionToken, clearSessionToken } 
 import { emitAck, getSocket, type AckOf } from "./connection";
 import { useTokens } from "./tokens";
 import { useChat } from "./chat";
-import { useInitiative } from "./initiative";
+import { useCombat } from "./combat";
 import { useCharacters } from "./characters";
 import { useCompendium } from "./compendium";
 import { toast } from "./ui";
@@ -100,7 +100,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     set({ status: { kind: "idle" }, room: null, me: null, participants: [], scenes: [], lastJoin: null });
     useTokens.getState().setAll([]);
     useChat.getState().setAll([]);
-    useInitiative.getState().setState(null);
+    useCombat.getState().setState(null);
     useCharacters.getState().setAll([]);
     useCompendium.getState().reset();
     // Desconectar e reconectar é o jeito simples de sair das salas do Socket.io.
@@ -113,7 +113,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     set({ room: snap.room, me: snap.me, participants: snap.participants, scenes: snap.scenes });
     useTokens.getState().setAll(snap.tokens);
     useChat.getState().setAll(snap.chat);
-    useInitiative.getState().setState(snap.initiative);
+    useCombat.getState().setState(snap.combat);
     useCharacters.getState().setAll(snap.characters);
   },
 

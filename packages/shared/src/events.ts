@@ -19,12 +19,20 @@ import type {
   ChatMessage,
   ChatRevealPayload,
   ChatSendPayload,
+  Combat,
+  CombatAddPayload,
+  CombatDelayPayload,
+  CombatEndPayload,
+  CombatRemovePayload,
+  CombatReorderPayload,
+  CombatResumePayload,
+  CombatRollPayload,
+  CombatSetInitiativePayload,
+  CombatSetSurprisedPayload,
+  CombatStartPayload,
   CompendiumEntry,
   FogConfig,
   FogUpdatePayload,
-  InitiativeAddPayload,
-  InitiativeState,
-  InitiativeUpdatePayload,
   Participant,
   RoomJoinPayload,
   RoomPublic,
@@ -53,7 +61,8 @@ export interface RoomSnapshot {
   scenes: Scene[];
   /** Tokens da cena ativa (jogadores não recebem os invisíveis). */
   tokens: Token[];
-  initiative: InitiativeState;
+  /** Combate da cena ativa (null = nenhum). Já filtrado pela visibilidade de quem recebe. */
+  combat: Combat | null;
   chat: ChatMessage[];
   /** Fichas da sala (jogadores não recebem as de kind = "npc"). */
   characters: Character[];
@@ -124,13 +133,31 @@ export interface ClientToServerEvents {
   /** GM torna pública uma mensagem secreta/própria: `chat:message` com visibility "all" para todos (upsert no cliente). */
   "chat:reveal": (payload: ChatRevealPayload, ack: Ack<ChatMessage>) => void;
 
-  // Iniciativa (GM)
-  "initiative:add": (payload: InitiativeAddPayload, ack: Ack<InitiativeState>) => void;
-  "initiative:update": (payload: InitiativeUpdatePayload, ack: Ack<InitiativeState>) => void;
-  "initiative:remove": (payload: { entryId: string }, ack: Ack<InitiativeState>) => void;
-  "initiative:next": (payload: Record<string, never>, ack: Ack<InitiativeState>) => void;
-  "initiative:prev": (payload: Record<string, never>, ack: Ack<InitiativeState>) => void;
-  "initiative:reset": (payload: Record<string, never>, ack: Ack<InitiativeState>) => void;
+  // Combate (modo de combate por cena; ver docs/plano-combate.md)
+  /** GM seleciona tokens e inicia: substitui um combate anterior da cena, se houver. */
+  "combat:start": (payload: CombatStartPayload, ack: Ack<Combat | null>) => void;
+  /** Reforços: entram sem iniciativa, no fim da ordem. */
+  "combat:add": (payload: CombatAddPayload, ack: Ack<Combat | null>) => void;
+  "combat:remove": (payload: CombatRemovePayload, ack: Ack<Combat | null>) => void;
+  /**
+   * Rola iniciativa no servidor e publica no chat (uma mensagem por combatente rolado;
+   * o broadcast de combat:updated sai uma vez só, no fim do lote). `self`: GM ou jogador,
+   * só os seus; `one`: GM sempre, jogador só o seu; `npcs`/`missing`: só GM.
+   */
+  "combat:roll": (payload: CombatRollPayload, ack: Ack<Combat | null>) => void;
+  /** Valor digitado à mão pelo GM (initiative: null volta para "não rolou"). */
+  "combat:set-initiative": (payload: CombatSetInitiativePayload, ack: Ack<Combat | null>) => void;
+  "combat:set-surprised": (payload: CombatSetSurprisedPayload, ack: Ack<Combat | null>) => void;
+  /** Com status "rolling", inicia os turnos (round 1). Senão avança/volta na ordem. */
+  "combat:next": (payload: Record<string, never>, ack: Ack<Combat | null>) => void;
+  "combat:prev": (payload: Record<string, never>, ack: Ack<Combat | null>) => void;
+  /** Nova ordem manual completa (arrastar na lista). */
+  "combat:reorder": (payload: CombatReorderPayload, ack: Ack<Combat | null>) => void;
+  /** Só no próprio turno: sai da rotação até "entrar agora". GM, ou dono do combatente. */
+  "combat:delay": (payload: CombatDelayPayload, ack: Ack<Combat | null>) => void;
+  "combat:resume": (payload: CombatResumePayload, ack: Ack<Combat | null>) => void;
+  /** clear=false: encerra mas mantém a ordem visível; clear=true: apaga o combate. */
+  "combat:end": (payload: CombatEndPayload, ack: Ack) => void;
 }
 
 export interface ServerToClientEvents {
@@ -156,7 +183,8 @@ export interface ServerToClientEvents {
   "character:updated": (character: Character) => void;
   "character:deleted": (p: { characterId: string }) => void;
 
-  "initiative:updated": (state: InitiativeState) => void;
+  /** Estado completo do combate da cena ativa (já ordenado e filtrado por quem recebe). null = nenhum combate na cena. */
+  "combat:updated": (combat: Combat | null) => void;
 
   /** Régua de outro participante (o autor não recebe eco: já desenha a própria). ruler null = apagar. */
   "ruler:updated": (p: { participantId: string; nickname: string; sceneId: string; ruler: Ruler | null }) => void;

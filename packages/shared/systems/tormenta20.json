@@ -300,8 +300,16 @@
   "rolls": {
     "attributeCheck": "1d20 + {attr}",
     "skillCheck": "1d20 + {skill}",
-    "initiative": "1d20 + {skill.iniciativa}",
     "attack": "1d20 + {skill}"
+  },
+
+  "combat": {
+    "$comment": "Iniciativa T20: 1d20 + Iniciativa (des); desempate por Iniciativa, depois pela ordem manual do GM. Surpresa pula a 1ª rodada de quem foi surpreendido.",
+    "initiative": "1d20 + {skill.iniciativa}",
+    "initiativeNoSheet": "1d20 + {bonus}",
+    "tiebreakBonus": "{skill.iniciativa}",
+    "tiebreak": ["bonus", "order"],
+    "surprise": { "rounds": 1 }
   },
 
   "damageAttribute": {

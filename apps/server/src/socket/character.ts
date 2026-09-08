@@ -17,11 +17,13 @@ import {
   broadcastCharacter,
   canEditCharacter,
   characterDataOf,
+  findActiveSceneTokenId,
   requireCharacter,
   requireSystem,
   toCharacter,
   toJson,
 } from "../services/characters.js";
+import { emitChatMessage } from "../services/chatVisibility.js";
 import { createRollMessage } from "../services/rolls.js";
 import { toChatMessage, toScene, toToken } from "../services/serialize.js";
 import { guarded, HandlerError } from "./ack.js";
@@ -113,7 +115,8 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
         throw err;
       }
 
-      return createRollMessage(io, ctx.roomId, me, {
+      const tokenId = await findActiveSceneTokenId(character.id, ctx.roomId);
+      const { message } = await createRollMessage(io, ctx.roomId, me, {
         formula: built.formula,
         label: `${character.name}: ${built.label}`,
         visibility,
@@ -121,7 +124,9 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
         critThreshold: built.critThreshold,
         damage: built.damage,
         allowNoDice: true,
+        tokenId,
       });
+      return message;
     }),
   );
 
@@ -151,13 +156,15 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
         broadcastCharacter(io, ctx.roomId, updated, "character:updated");
       }
 
-      // 2. Publica o card. Público como uma rolagem normal (NPC do GM incluso).
+      // 2. Publica o card. Sempre "all" (SPEC: cards de item são sempre públicos), mas ligado
+      // ao token da ficha na cena ativa — quem não vê esse token não recebe o card.
+      const tokenId = await findActiveSceneTokenId(character.id, ctx.roomId);
       const msg = toChatMessage(
         await prisma.chatMessage.create({
-          data: { roomId: ctx.roomId, participantId: me.id, nickname: me.nickname, kind: "item", item: use.card },
+          data: { roomId: ctx.roomId, participantId: me.id, nickname: me.nickname, kind: "item", item: use.card, tokenId: tokenId ?? null },
         }),
       );
-      io.to(rooms.all(ctx.roomId)).emit("chat:message", msg);
+      await emitChatMessage(io, ctx.roomId, msg);
       return msg;
     }),
   );

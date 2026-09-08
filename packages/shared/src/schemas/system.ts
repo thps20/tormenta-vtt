@@ -371,9 +371,21 @@ export const SystemDefinitionSchema = z.object({
   rolls: z.object({
     attributeCheck: FormulaSchema,
     skillCheck: FormulaSchema,
-    initiative: FormulaSchema,
     /** Ataque de uma ação; {skill} é a perícia da ação. Ausente = skillCheck. */
     attack: FormulaSchema.optional(),
+  }),
+  /** Regras do modo de combate (iniciativa, desempate, surpresa). Ver docs/plano-combate.md. */
+  combat: z.object({
+    /** Iniciativa de combatente com ficha vinculada. Placeholders globais da ficha. */
+    initiative: FormulaSchema,
+    /** Iniciativa de token SEM ficha vinculada. {bonus} = bônus manual digitado pelo GM. */
+    initiativeNoSheet: FormulaSchema,
+    /** Valor sem dado (usa evaluateConstant) gravado como Combatant.bonus de quem tem ficha. */
+    tiebreakBonus: FormulaSchema,
+    /** Critérios de desempate após o valor rolado, do mais forte ao mais fraco. "order" = ordem manual do GM. */
+    tiebreak: z.array(z.enum(["bonus", "order"])).min(1),
+    /** Surpresa: combatente surpreso é pulado nas N primeiras rodadas. rounds = 0 = sistema sem surpresa. */
+    surprise: z.object({ rounds: z.number().int().min(0) }),
   }),
   /**
    * Qual atributo entra no dano quando a ação diz attribute = "auto":
@@ -416,7 +428,9 @@ const CONTEXTUAL: Record<string, string[]> = {
   saveDc: ["saveAttr", "saveBonus"],
   maxFormula: [],
   derived: [],
-  initiative: [],
+  combatInitiative: [],
+  combatInitiativeNoSheet: ["bonus"],
+  combatTiebreakBonus: [],
   extraRoll: [],
 };
 
@@ -536,8 +550,10 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
   check(def.skillTotal, "skillTotal", CONTEXTUAL.skillTotal ?? []);
   check(def.rolls.attributeCheck, "rolls.attributeCheck", CONTEXTUAL.attributeCheck ?? []);
   check(def.rolls.skillCheck, "rolls.skillCheck", CONTEXTUAL.skillCheck ?? []);
-  check(def.rolls.initiative, "rolls.initiative", CONTEXTUAL.initiative ?? []);
   if (def.rolls.attack) check(def.rolls.attack, "rolls.attack", CONTEXTUAL.attack ?? []);
+  check(def.combat.initiative, "combat.initiative", CONTEXTUAL.combatInitiative ?? []);
+  check(def.combat.initiativeNoSheet, "combat.initiativeNoSheet", CONTEXTUAL.combatInitiativeNoSheet ?? []);
+  check(def.combat.tiebreakBonus, "combat.tiebreakBonus", CONTEXTUAL.combatTiebreakBonus ?? []);
   for (const r of def.resources) {
     if (r.maxFormula) check(r.maxFormula, `resource "${r.key}".maxFormula`, CONTEXTUAL.maxFormula ?? []);
     if (r.minFormula) check(r.minFormula, `resource "${r.key}".minFormula`, CONTEXTUAL.minFormula ?? []);

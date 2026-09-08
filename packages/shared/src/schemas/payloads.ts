@@ -2,7 +2,6 @@ import { z } from "zod";
 import { IdSchema } from "./common.js";
 import { GridConfigSchema } from "./scene.js";
 import { FogShapeSchema } from "./fog.js";
-import { InitiativeEntrySchema } from "./initiative.js";
 import { CharacterDataSchema, CharacterKindSchema, CharacterRollRequestSchema, EnhancementUseSchema } from "./character.js";
 import { RollVisibilitySchema } from "./dice.js";
 
@@ -173,13 +172,59 @@ export type ChatSendPayload = z.infer<typeof ChatSendSchema>;
 export const ChatRevealSchema = z.object({ messageId: IdSchema });
 export type ChatRevealPayload = z.infer<typeof ChatRevealSchema>;
 
-// --- Iniciativa ------------------------------------------------------------
-
-export const InitiativeAddSchema = InitiativeEntrySchema.omit({ id: true });
-export const InitiativeUpdateSchema = InitiativeEntrySchema.partial().required({ id: true });
-export const InitiativeRemoveSchema = z.object({ entryId: IdSchema });
-export type InitiativeAddPayload = z.infer<typeof InitiativeAddSchema>;
-export type InitiativeUpdatePayload = z.infer<typeof InitiativeUpdateSchema>;
-
-/** Payload vazio (next/prev/reset). */
+/** Payload vazio (combat:next/prev). */
 export const EmptySchema = z.object({}).strict();
+
+// --- Combate -----------------------------------------------------------
+
+const TokenIdListSchema = z.array(IdSchema).min(1).max(100);
+
+/** GM seleciona tokens e inicia o combate na cena ativa. Substitui um combate anterior da cena, se houver. */
+export const CombatStartSchema = z.object({ sceneId: IdSchema, tokenIds: TokenIdListSchema });
+export type CombatStartPayload = z.infer<typeof CombatStartSchema>;
+
+/** Reforços: entram sem iniciativa, no fim da ordem. Token já no combate é ignorado. */
+export const CombatAddSchema = z.object({ tokenIds: TokenIdListSchema });
+export type CombatAddPayload = z.infer<typeof CombatAddSchema>;
+
+export const CombatRemoveSchema = z.object({ combatantIds: z.array(IdSchema).min(1).max(100) });
+export type CombatRemovePayload = z.infer<typeof CombatRemoveSchema>;
+
+/**
+ * `self` = os combatentes do autor que ainda não rolaram; `one` = um específico
+ * (`combatantId` obrigatório); `npcs` = os sem dono que faltam (GM); `missing` = todos
+ * que faltam (GM). `visibility` = modo de rolagem de quem clicou (ausente = "all").
+ */
+export const CombatRollSchema = z
+  .object({
+    scope: z.enum(["self", "one", "npcs", "missing"]),
+    combatantId: IdSchema.optional(),
+    visibility: RollVisibilitySchema.optional(),
+  })
+  .refine((v) => v.scope !== "one" || v.combatantId !== undefined, { message: "scope 'one' exige combatantId" });
+export type CombatRollPayload = z.infer<typeof CombatRollSchema>;
+
+/** Valor digitado à mão pelo GM. `initiative: null` volta para "não rolou". */
+export const CombatSetInitiativeSchema = z.object({
+  combatantId: IdSchema,
+  initiative: z.number().nullable(),
+  bonus: z.number().optional(),
+});
+export type CombatSetInitiativePayload = z.infer<typeof CombatSetInitiativeSchema>;
+
+export const CombatSetSurprisedSchema = z.object({ combatantId: IdSchema, surprised: z.boolean() });
+export type CombatSetSurprisedPayload = z.infer<typeof CombatSetSurprisedSchema>;
+
+/** Nova ordem manual completa (arrastar na lista): grava `order` na sequência recebida. */
+export const CombatReorderSchema = z.object({ combatantIds: z.array(IdSchema).min(1).max(100) });
+export type CombatReorderPayload = z.infer<typeof CombatReorderSchema>;
+
+export const CombatDelaySchema = z.object({ combatantId: IdSchema });
+export type CombatDelayPayload = z.infer<typeof CombatDelaySchema>;
+
+export const CombatResumeSchema = z.object({ combatantId: IdSchema });
+export type CombatResumePayload = z.infer<typeof CombatResumeSchema>;
+
+/** `clear` ausente/false: encerra mas mantém a ordem visível. `clear: true`: apaga o combate. */
+export const CombatEndSchema = z.object({ clear: z.boolean().default(false) });
+export type CombatEndPayload = z.infer<typeof CombatEndSchema>;

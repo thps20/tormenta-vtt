@@ -16,18 +16,18 @@ if (import.meta.env.DEV) {
     import("./store/room"),
     import("./store/tokens"),
     import("./store/chat"),
-    import("./store/initiative"),
+    import("./store/combat"),
     import("./store/characters"),
     import("./store/tools"),
     import("./store/compendium"),
-  ]).then(([c, r, t, ch, i, ca, tl, co]) => {
+  ]).then(([c, r, t, ch, cb, ca, tl, co]) => {
     Object.assign(window, {
       __vtt: {
         useConnection: c.useConnection,
         useRoom: r.useRoom,
         useTokens: t.useTokens,
         useChat: ch.useChat,
-        useInitiative: i.useInitiative,
+        useCombat: cb.useCombat,
         useCharacters: ca.useCharacters,
         useTools: tl.useTools,
         useCompendium: co.useCompendium,

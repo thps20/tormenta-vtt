@@ -146,7 +146,7 @@ export const DerivedStatsBar: React.FC<DerivedStatsBarProps> = ({ def, character
         </label>
         {!isEditMode && (
           <div className="flex flex-wrap items-center gap-1.5 ml-auto">
-            <button onClick={() => onRoll({ type: "initiative" })} disabled={!canRoll} className={ghostBtn} title={def.rolls.initiative}>
+            <button onClick={() => onRoll({ type: "initiative" })} disabled={!canRoll} className={ghostBtn} title={def.combat.initiative}>
               <Dices className="w-3 h-3" /> Iniciativa
             </button>
             {def.extraRolls.map((r) => (

@@ -1,5 +1,6 @@
 import { applyFogOp, FogUpdateSchema } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
+import { emitCombat } from "../services/combat.js";
 import { toScene, toToken } from "../services/serialize.js";
 import { emitTokenToPlayers } from "../services/visibility.js";
 import { guarded, HandlerError } from "./ack.js";
@@ -26,6 +27,8 @@ export function registerFogHandlers(io: TypedServer, socket: TypedSocket): void 
       // Só a visibilidade para jogadores muda; o GM já tem todos os tokens.
       const tokens = await prisma.token.findMany({ where: { sceneId }, orderBy: { zIndex: "asc" } });
       for (const t of tokens) emitTokenToPlayers(io, ctx.roomId, toToken(t), "token:updated", fog);
+      // A visibilidade do combate (se a cena tiver um) também pode ter mudado.
+      await emitCombat(io, ctx.roomId, { role: "gm", participantId: ctx.participantId });
       return fog;
     }, { gmOnly: true }),
   );

@@ -92,6 +92,13 @@ export const ChatMessageSchema = z.object({
   text: z.string().max(2000).optional(),
   roll: DiceRollSchema.optional(),
   item: ItemCardSchema.optional(),
+  /**
+   * Token ao qual esta rolagem está ligada (combatente de combat:roll, ou personagem com
+   * token vinculado na cena ativa). Quem não pode ver esse token (oculto ou sob a névoa) não
+   * recebe a mensagem — nem o card, nem o placeholder — independente de `visibility`; só o
+   * GM recebe sempre. Ver services/chatVisibility.ts no servidor. null = sem token, regra normal.
+   */
+  tokenId: IdSchema.nullable().default(null),
   /** Quem recebe a mensagem (servidor filtra no broadcast e no snapshot). "Revelar" (GM) muda para "all". */
   visibility: RollVisibilitySchema.default("all"),
   createdAt: z.string().datetime(),

@@ -3,21 +3,13 @@
  * Diferenças: Date -> string ISO; `grid`/`roll` são Json no banco e precisam
  * ser validados pelo schema Zod antes de sair (garantia de formato).
  */
-import type {
-  ChatMessage as DbChatMessage,
-  InitiativeEntry as DbInitiativeEntry,
-  Participant as DbParticipant,
-  Room as DbRoom,
-  Scene as DbScene,
-  Token as DbToken,
-} from "@prisma/client";
+import type { ChatMessage as DbChatMessage, Participant as DbParticipant, Room as DbRoom, Scene as DbScene, Token as DbToken } from "@prisma/client";
 import {
   ChatMessageSchema,
   FogConfigSchema,
   GridConfigSchema,
   TokenHpSchema,
   type ChatMessage,
-  type InitiativeEntry,
   type Participant,
   type RoomPublic,
   type Scene,
@@ -85,17 +77,7 @@ export function toChatMessage(m: DbChatMessage): ChatMessage {
     roll: m.roll ?? undefined,
     item: m.item ?? undefined,
     visibility: m.visibility,
+    tokenId: m.tokenId,
     createdAt: m.createdAt.toISOString(),
   });
-}
-
-export function toInitiativeEntry(e: DbInitiativeEntry): InitiativeEntry {
-  return {
-    id: e.id,
-    tokenId: e.tokenId,
-    name: e.name,
-    value: e.value,
-    tiebreak: e.tiebreak,
-    visible: e.visible,
-  };
 }

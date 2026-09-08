@@ -60,6 +60,19 @@ export async function requireCharacter(characterId: string, roomId: string): Pro
 }
 
 /**
+ * Token vinculado a esta ficha, NA CENA ATIVA da sala (se houver). Usado só para saber a que
+ * `tokenId` uma rolagem de ficha (character:roll / character:use-item) fica ligada — quem não
+ * vê esse token não recebe a mensagem (ver services/chatVisibility.ts). Se o personagem tiver
+ * mais de um token na cena (incomum; nada no MVP impede), pega o primeiro encontrado.
+ */
+export async function findActiveSceneTokenId(characterId: string, roomId: string): Promise<string | undefined> {
+  const room = await prisma.room.findUnique({ where: { id: roomId } });
+  if (!room?.activeSceneId) return undefined;
+  const token = await prisma.token.findFirst({ where: { characterId, sceneId: room.activeSceneId } });
+  return token?.id;
+}
+
+/**
  * Broadcast respeitando visibilidade: GM sempre; jogadores só se for PC.
  * Se a ficha deixou de ser PC (virou NPC), jogadores recebem character:deleted.
  */

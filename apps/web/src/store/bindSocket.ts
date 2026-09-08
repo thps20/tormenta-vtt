@@ -3,7 +3,7 @@ import type { ClientToServerEvents, ServerToClientEvents } from "@tormenta-vtt/s
 import { useRoom } from "./room";
 import { useTokens } from "./tokens";
 import { useChat } from "./chat";
-import { useInitiative } from "./initiative";
+import { useCombat } from "./combat";
 import { useCharacters } from "./characters";
 import { useTools } from "./tools";
 import { toast } from "./ui";
@@ -40,7 +40,7 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
 
   socket.on("chat:message", (msg) => useChat.getState().append(msg));
 
-  socket.on("initiative:updated", (state) => useInitiative.getState().setState(state));
+  socket.on("combat:updated", (combat) => useCombat.getState().setState(combat));
 
   socket.on("ruler:updated", (p) => useTools.getState().setRemoteRuler(p));
 

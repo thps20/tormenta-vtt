@@ -106,7 +106,7 @@ export function buildCharacterRoll(def: SystemDefinition, character: Character |
       });
 
     case "initiative":
-      return wrap(() => ({ formula: substitutePlaceholders(def.rolls.initiative, resolveGlobal), label: "Iniciativa" }));
+      return wrap(() => ({ formula: substitutePlaceholders(def.combat.initiative, resolveGlobal), label: "Iniciativa" }));
 
     case "extra":
       return wrap(() => {

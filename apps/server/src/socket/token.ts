@@ -25,6 +25,7 @@ import {
   toJson,
 } from "../services/characters.js";
 import { checkApplyDamageTarget } from "../services/applyDamage.js";
+import { emitCombat, loadCombatRow, maybeReemitCombatForToken, prepareTokenRemovalFromCombat } from "../services/combat.js";
 import { emitChatMessage, messageVisibleTo } from "../services/chatVisibility.js";
 import { canEditToken, restrictPatchForRole } from "../services/permissions.js";
 import { toChatMessage, toScene, toToken } from "../services/serialize.js";
@@ -87,8 +88,12 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
         if (fields.conditions.some((key) => !known.has(key))) throw new HandlerError("Condição inexistente no sistema da sala");
       }
       const token = toToken(await prisma.token.update({ where: { id }, data: { ...fields, ...(hp !== undefined ? { hp: hpJson(hp) } : {}) } }));
+      const fog = toScene(row.scene).fog;
       // A cena já veio junto com o token (requireToken): sem consulta extra a cada movimento.
-      broadcastToken(io, ctx.roomId, token, "token:updated", toScene(row.scene).fog);
+      broadcastToken(io, ctx.roomId, token, "token:updated", fog);
+      // Nome/cor/visível mudaram, ou a posição cruzou a névoa: se este token é um combatente,
+      // a lista de combate (e quem pode vê-la) pode ter mudado junto.
+      await maybeReemitCombatForToken(io, ctx.roomId, toToken(row), token, fog);
       return token;
     }),
   );
@@ -98,8 +103,18 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
     guarded(socket, TokenDeleteSchema, async ({ tokenId }, ctx) => {
       const row = await requireToken(tokenId, ctx.roomId);
       if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla este token");
+
+      // Se o token é combatente de um combate, ajusta o cursor de turno ANTES de apagar: o
+      // cascade da FK apaga a linha do Combatant junto com o token, então depois é tarde.
+      const combat = await loadCombatRow(row.sceneId);
+      if (combat) {
+        const def = await requireSystem(ctx.roomId);
+        await prepareTokenRemovalFromCombat(def, combat, tokenId);
+      }
+
       await prisma.token.delete({ where: { id: tokenId } });
       io.to(rooms.all(ctx.roomId)).emit("token:deleted", { tokenId });
+      if (combat) await emitCombat(io, ctx.roomId, { role: ctx.role, participantId: ctx.participantId });
     }),
   );
 
@@ -176,7 +191,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       // 3. Acrescenta ao registro do card (nunca sobrescreve) e reemite pra quem já via a mensagem.
       const updatedRoll = { ...roll, applied: [...roll.applied, ...applied] };
       const updatedMsg = toChatMessage(await prisma.chatMessage.update({ where: { id: messageId }, data: { roll: updatedRoll } }));
-      emitChatMessage(io, ctx.roomId, updatedMsg);
+      await emitChatMessage(io, ctx.roomId, updatedMsg);
       return updatedMsg;
     }),
   );

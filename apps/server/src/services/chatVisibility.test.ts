@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ChatMessage } from "@tormenta-vtt/shared";
-import { emitChatMessage, messageVisibleTo, redactForAuthor } from "./chatVisibility.js";
+import type { ChatMessage, FogConfig, Token } from "@tormenta-vtt/shared";
+import { emitChatMessage, messageVisibleTo, redactForAuthor, tokenGateOk } from "./chatVisibility.js";
 import { rooms, type TypedServer } from "../socket/types.js";
 
 const base: ChatMessage = {
@@ -10,6 +10,7 @@ const base: ChatMessage = {
   nickname: "Ana",
   kind: "roll",
   visibility: "all",
+  tokenId: null,
   createdAt: new Date().toISOString(),
   roll: {
     id: "d1",
@@ -64,6 +65,64 @@ describe("redactForAuthor", () => {
   });
 });
 
+const openFog: FogConfig = { enabled: false, base: "revealed", shapes: [] };
+const hiddenFog: FogConfig = { enabled: true, base: "hidden", shapes: [] };
+
+const tokenFixture: Token = {
+  id: "t1",
+  sceneId: "s1",
+  name: "Goblin",
+  imageUrl: null,
+  x: 0,
+  y: 0,
+  width: 70,
+  height: 70,
+  rotation: 0,
+  zIndex: 0,
+  visible: true,
+  ownerId: null,
+  color: "#e11d48",
+  characterId: null,
+  hp: null,
+  conditions: [],
+};
+
+describe("tokenGateOk", () => {
+  it("sem tokenId: sempre ok (regra normal de visibility)", () => {
+    expect(tokenGateOk(null, other, "p-author", undefined)).toBe(true);
+  });
+
+  it("GM sempre recebe, mesmo com o token oculto", () => {
+    const tokenInfo = { token: { ...tokenFixture, visible: false }, fog: openFog };
+    expect(tokenGateOk("t1", gm, "p-author", tokenInfo)).toBe(true);
+  });
+
+  it("o autor sempre recebe a própria mensagem, mesmo com o token oculto do GM", () => {
+    const tokenInfo = { token: { ...tokenFixture, visible: false }, fog: openFog };
+    expect(tokenGateOk("t1", author, "p-author", tokenInfo)).toBe(true);
+  });
+
+  it("outro jogador que não vê o token (oculto) fica de fora", () => {
+    const tokenInfo = { token: { ...tokenFixture, visible: false }, fog: openFog };
+    expect(tokenGateOk("t1", other, "p-author", tokenInfo)).toBe(false);
+  });
+
+  it("outro jogador que não vê o token (sob a névoa, sem ser dono) fica de fora", () => {
+    const tokenInfo = { token: { ...tokenFixture, visible: true, ownerId: null }, fog: hiddenFog };
+    expect(tokenGateOk("t1", other, "p-author", tokenInfo)).toBe(false);
+  });
+
+  it("outro jogador que é dono do token vê normalmente", () => {
+    const tokenInfo = { token: { ...tokenFixture, visible: true, ownerId: "p-other" }, fog: hiddenFog };
+    expect(tokenGateOk("t1", other, "p-author", tokenInfo)).toBe(true);
+  });
+
+  it("outro jogador vê quando o token está revelado", () => {
+    const tokenInfo = { token: { ...tokenFixture, visible: true }, fog: openFog };
+    expect(tokenGateOk("t1", other, "p-author", tokenInfo)).toBe(true);
+  });
+});
+
 /** Fake mínimo de TypedServer: só grava em que sala e com que mensagem cada `emit` caiu. */
 function fakeIo() {
   const calls: { room: string; msg: ChatMessage }[] = [];
@@ -78,9 +137,10 @@ function fakeIo() {
 }
 
 describe("emitChatMessage", () => {
-  it("secreta: sala toda recebe na hora, mas com placeholder (sem roll); só a sala do GM recebe o resultado", () => {
+  // tokenId é null nos fixtures (base), então o gate de token nem consulta o banco (sem I/O aqui).
+  it("secreta: sala toda recebe na hora, mas com placeholder (sem roll); só a sala do GM recebe o resultado", async () => {
     const { io, calls } = fakeIo();
-    emitChatMessage(io, "r1", { ...base, visibility: "gm" });
+    await emitChatMessage(io, "r1", { ...base, visibility: "gm" });
 
     const toAll = calls.filter((c) => c.room === rooms.all("r1"));
     expect(toAll).toHaveLength(1);
@@ -94,9 +154,9 @@ describe("emitChatMessage", () => {
     expect(toGm[0]!.msg.roll!.total).toBe(7);
   });
 
-  it("própria: sala toda recebe placeholder; só a sala do autor recebe o resultado", () => {
+  it("própria: sala toda recebe placeholder; só a sala do autor recebe o resultado", async () => {
     const { io, calls } = fakeIo();
-    emitChatMessage(io, "r1", { ...base, visibility: "self" });
+    await emitChatMessage(io, "r1", { ...base, visibility: "self" });
 
     const toAll = calls.filter((c) => c.room === rooms.all("r1"));
     expect(toAll[0]!.msg.roll).toBeUndefined();
@@ -106,9 +166,9 @@ describe("emitChatMessage", () => {
     expect(toAuthor[0]!.msg.roll).toBeDefined();
   });
 
-  it("pública (inclusive depois de um /reveal, que muda visibility pra 'all'): um único emit, pra sala toda, com o resultado completo", () => {
+  it("pública (inclusive depois de um /reveal, que muda visibility pra 'all'): um único emit, pra sala toda, com o resultado completo", async () => {
     const { io, calls } = fakeIo();
-    emitChatMessage(io, "r1", { ...base, visibility: "all" });
+    await emitChatMessage(io, "r1", { ...base, visibility: "all" });
 
     expect(calls).toHaveLength(1);
     expect(calls[0]!.room).toBe(rooms.all("r1"));

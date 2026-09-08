@@ -28,18 +28,18 @@ model Room {
   scenes       Scene[]
   participants Participant[]
   messages     ChatMessage[]
-  initiative   InitiativeEntry[]
+  combats      Combat[]
   characters   Character[]
 }
 
 model Participant {
-  id        String   @id @default(cuid())
-  roomId    String
-  nickname  String
-  role      Role     @default(player)
+  id           String   @id @default(cuid())
+  roomId       String
+  nickname     String
+  role         Role     @default(player)
   /// Token secreto guardado no localStorage do navegador para reconectar como o mesmo participante.
-  sessionToken String @unique @default(cuid())
-  createdAt DateTime @default(now())
+  sessionToken String   @unique @default(cuid())
+  createdAt    DateTime @default(now())
 
   room       Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
   tokens     Token[]
@@ -49,49 +49,52 @@ model Participant {
 }
 
 model Scene {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   roomId    String
   name      String
   mapUrl    String?
   mapWidth  Int?
   mapHeight Int?
   /// GridConfig serializado (ver GridConfigSchema). JSON para não migrar a cada campo novo.
-  grid      Json    @default("{\"type\":\"square\",\"cellSize\":70,\"offsetX\":0,\"offsetY\":0,\"color\":\"#00000055\",\"snap\":true}")
+  grid      Json     @default("{\"type\":\"square\",\"cellSize\":70,\"offsetX\":0,\"offsetY\":0,\"color\":\"#00000055\",\"snap\":true}")
   /// FogConfig serializado (ver FogConfigSchema): névoa manual da fase 2.
-  fog       Json    @default("{\"enabled\":false,\"base\":\"hidden\",\"shapes\":[]}")
+  fog       Json     @default("{\"enabled\":false,\"base\":\"hidden\",\"shapes\":[]}")
   createdAt DateTime @default(now())
 
   room   Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
   tokens Token[]
+  combat Combat?
 
   @@index([roomId])
 }
 
 model Token {
-  id       String  @id @default(cuid())
-  sceneId  String
-  name     String
-  imageUrl String?
-  x        Float
-  y        Float
-  width    Float
-  height   Float
-  rotation Float   @default(0)
-  zIndex   Int     @default(0)
-  visible  Boolean @default(true)
-  ownerId  String?
-  color    String  @default("#e11d48")
+  id          String   @id @default(cuid())
+  sceneId     String
+  name        String
+  imageUrl    String?
+  x           Float
+  y           Float
+  width       Float
+  height      Float
+  rotation    Float    @default(0)
+  zIndex      Int      @default(0)
+  visible     Boolean  @default(true)
+  ownerId     String?
+  color       String   @default("#e11d48")
   /// Ficha vinculada (token:link-character). Apagar a ficha só desvincula.
   characterId String?
   /// PV do token solto (sem characterId), editado no Inspector: { current, max }. Ver TokenHpSchema.
   /// Ignorado enquanto characterId aponta pra uma ficha (quem manda é o recurso `tokenBar` dela).
-  hp Json?
+  hp          Json?
   /// Chaves de conditions[] do sistema (ex.: "cego", "atordoado"). Só marcador visual por enquanto.
-  conditions String[] @default([])
+  conditions  String[] @default([])
 
-  scene     Scene        @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-  owner     Participant? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  character Character?   @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  scene        Scene         @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  owner        Participant?  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  character    Character?    @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  combatants   Combatant[]
+  chatMessages ChatMessage[]
 
   @@index([sceneId])
   @@index([characterId])
@@ -105,7 +108,7 @@ model Character {
   roomId    String
   ownerId   String?
   name      String
-  kind      String   // "pc" | "npc"
+  kind      String // "pc" | "npc"
   data      Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -122,7 +125,7 @@ model ChatMessage {
   roomId        String
   participantId String
   nickname      String
-  kind          String   // "text" | "roll" | "system" | "item"
+  kind          String // "text" | "roll" | "system" | "item"
   text          String?
   /// DiceRoll serializado (ver DiceRollSchema) quando kind == "roll".
   roll          Json?
@@ -130,23 +133,63 @@ model ChatMessage {
   item          Json?
   /// Quem vê: "all" | "gm" | "self" (ver RollVisibilitySchema). Filtrado no broadcast e no snapshot.
   visibility    String   @default("all")
+  /// Token ao qual a rolagem está ligada (combatente de combat:roll, ou personagem com token
+  /// vinculado na cena ativa). Quem não vê esse token não recebe a mensagem, nem placeholder
+  /// (ver services/chatVisibility.ts). null = sem token, regra normal de visibility.
+  tokenId       String?
   createdAt     DateTime @default(now())
 
-  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  room  Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  token Token? @relation(fields: [tokenId], references: [id], onDelete: SetNull)
 
   @@index([roomId, createdAt])
+  @@index([tokenId])
 }
 
-model InitiativeEntry {
-  id       String  @id @default(cuid())
-  roomId   String
-  tokenId  String?
-  name     String
-  value    Float
-  tiebreak Float   @default(0)
-  visible  Boolean @default(true)
+/// Combate por cena (docs/plano-combate.md). Um combate ativo por cena (@@unique em sceneId).
+model Combat {
+  id                String   @id @default(cuid())
+  roomId            String
+  sceneId           String   @unique
+  round             Int      @default(0)
+  /// "rolling" | "active" | "ended" (ver CombatStatusSchema).
+  status            String   @default("rolling")
+  /// Combatente da vez. null = ninguém agindo (rolando iniciativa, ou combate encerrado).
+  activeCombatantId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  room       Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  scene      Scene       @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  combatants Combatant[]
 
   @@index([roomId])
+}
+
+model Combatant {
+  id                 String  @id @default(cuid())
+  combatId           String
+  tokenId            String
+  /// Cópia do token.characterId no momento em que entrou no combate; só informativo
+  /// (quem manda em "quem pode agir" é sempre o token atual, ver services/combat.ts).
+  characterId        String?
+  /// null = ainda não rolou: fica no fim da lista, cinza, sem turno.
+  initiative         Float?
+  /// Visibilidade (RollVisibility) da ÚLTIMA rolagem que gravou `initiative`: "gm" (rolagem às
+  /// cegas de um combatente de jogador) esconde o valor até do dono na lista (toCombat). null =
+  /// visível ao dono (nunca rolou às cegas, ou o GM digitou o valor à mão em combat:set-initiative).
+  lastRollVisibility String?
+  bonus              Float   @default(0)
+  delayed            Boolean @default(false)
+  surprised          Boolean @default(false)
+  /// Desempate final / posição de quem ainda não rolou. Renumerado 0..n-1 a cada mudança.
+  order              Int     @default(0)
+  /// Rodada em que entrou (reforço). 0 = entrou junto com combat:start.
+  addedRound         Int     @default(0)
+
+  combat Combat @relation(fields: [combatId], references: [id], onDelete: Cascade)
+  token  Token  @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+
+  @@unique([combatId, tokenId])
+  @@index([combatId])
 }

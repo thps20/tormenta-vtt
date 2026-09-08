@@ -3,7 +3,7 @@ import { registerRoomHandlers } from "./room.js";
 import { registerSceneHandlers } from "./scene.js";
 import { registerTokenHandlers } from "./token.js";
 import { registerChatHandlers } from "./chat.js";
-import { registerInitiativeHandlers } from "./initiative.js";
+import { registerCombatHandlers } from "./combat.js";
 import { registerCharacterHandlers } from "./character.js";
 import { registerRulerHandlers } from "./ruler.js";
 import { registerFogHandlers } from "./fog.js";
@@ -24,7 +24,7 @@ export function registerSocketHandlers(io: TypedServer, log: FastifyBaseLogger):
     registerSceneHandlers(io, socket);
     registerTokenHandlers(io, socket);
     registerChatHandlers(io, socket);
-    registerInitiativeHandlers(io, socket);
+    registerCombatHandlers(io, socket);
     registerCharacterHandlers(io, socket);
     registerRulerHandlers(io, socket);
     registerFogHandlers(io, socket);

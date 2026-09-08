@@ -11,3 +11,4 @@ export * from "./compendium.js";
 export * from "./damageTypes.js";
 export * from "./resources.js";
 export * from "./conditionIcon.js";
+export * from "./combat.js";

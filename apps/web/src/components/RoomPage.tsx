@@ -3,13 +3,15 @@ import { navigate } from "../lib/router";
 import { selectActiveScene, useRoom } from "../store/room";
 import { sceneTokens, useTokens } from "../store/tokens";
 import { useChat } from "../store/chat";
-import { currentEntry, useInitiative } from "../store/initiative";
+import { activeCombatant, isMyTurn, useCombat } from "../store/combat";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
 import { useSystemDef } from "../lib/system";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
+import { useTurnTitle } from "../lib/useTurnTitle";
 import { selectEffectiveMode, useTools } from "../store/tools";
 import { computeCharacter, isPointRevealed, tokenCenter } from "@tormenta-vtt/shared";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
+import { CombatBanner } from "./CombatBanner";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
 import { FogToolbar } from "./FogToolbar";
@@ -19,6 +21,8 @@ import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
 import { SidePanel, type SidePanelTab } from "./SidePanel";
 import { CharacterMenu } from "./CharacterMenu";
 import { NicknamePrompt } from "./NicknamePrompt";
+
+const CENTER_ON_TURN_KEY = "tvtt:centerOnActiveTurn";
 
 /**
  * Página da mesa: entra na sala pela URL e liga as stores aos componentes.
@@ -117,13 +121,60 @@ function Table() {
   const messages = useChat((s) => s.messages);
   const sendMessage = useChat((s) => s.send);
 
-  const initiative = useInitiative((s) => s.state);
-  const nextTurn = useInitiative((s) => s.next);
-  const prevTurn = useInitiative((s) => s.prev);
-  const resetInitiative = useInitiative((s) => s.reset);
-  const addEntry = useInitiative((s) => s.add);
-  const updateEntry = useInitiative((s) => s.update);
-  const removeEntry = useInitiative((s) => s.remove);
+  const combat = useCombat((s) => s.state);
+  const combatStart = useCombat((s) => s.start);
+  const combatAddCombatants = useCombat((s) => s.addCombatants);
+  const combatRemove = useCombat((s) => s.remove);
+  const combatRoll = useCombat((s) => s.roll);
+  const combatSetInitiative = useCombat((s) => s.setInitiative);
+  const combatSetSurprised = useCombat((s) => s.setSurprised);
+  const combatNext = useCombat((s) => s.next);
+  const combatPrev = useCombat((s) => s.prev);
+  const combatReorder = useCombat((s) => s.reorder);
+  const combatDelay = useCombat((s) => s.delay);
+  const combatResume = useCombat((s) => s.resume);
+  const combatEnd = useCombat((s) => s.end);
+  const combatActions = useMemo(
+    () => ({
+      start: (p: Parameters<typeof combatStart>[0]) => void combatStart(p),
+      addCombatants: (p: Parameters<typeof combatAddCombatants>[0]) => void combatAddCombatants(p),
+      remove: (ids: string[]) => void combatRemove(ids),
+      roll: (p: Parameters<typeof combatRoll>[0]) => void combatRoll(p),
+      setInitiative: (p: Parameters<typeof combatSetInitiative>[0]) => void combatSetInitiative(p),
+      setSurprised: (combatantId: string, surprised: boolean) => void combatSetSurprised({ combatantId, surprised }),
+      next: () => void combatNext(),
+      prev: () => void combatPrev(),
+      reorder: (ids: string[]) => void combatReorder(ids),
+      delay: (id: string) => void combatDelay(id),
+      resume: (id: string) => void combatResume(id),
+      end: (clear?: boolean) => void combatEnd(clear),
+    }),
+    [combatStart, combatAddCombatants, combatRemove, combatRoll, combatSetInitiative, combatSetSurprised, combatNext, combatPrev, combatReorder, combatDelay, combatResume, combatEnd],
+  );
+  const [centerOnActiveTurn, setCenterOnActiveTurn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(CENTER_ON_TURN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(CENTER_ON_TURN_KEY, centerOnActiveTurn ? "1" : "0");
+    } catch {
+      /* ignora (aba anônima etc.) */
+    }
+  }, [centerOnActiveTurn]);
+
+  // "Centralizar no token da vez": ao mudar quem age, foca (e seleciona) o token dele.
+  const activeTurnTokenId = activeCombatant(combat)?.tokenId ?? null;
+  useEffect(() => {
+    if (centerOnActiveTurn && activeTurnTokenId) focusToken(activeTurnTokenId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centerOnActiveTurn, activeTurnTokenId]);
+
+  // Título da aba pisca "Seu turno" pra quem está numa aba em segundo plano.
+  useTurnTitle(me !== null && isMyTurn(combat, me));
 
   const charById = useCharacters((s) => s.byId);
   const characters = useMemo(() => sortedCharacters(charById), [charById]);
@@ -171,7 +222,6 @@ function Table() {
   const sheetOpen = openChar !== null || emptySheetOpen;
   const linkableCharacters = characters.filter((c) => canEditCharacter(me, c));
   const isGm = me.role === "gm";
-  const activeTurnTokenId = currentEntry(initiative)?.tokenId ?? null;
 
   // Salvar do modal: só emite o que mudou (mapa e/ou grid).
   const handleSaveMapConfig = async ({ map, grid }: MapConfigResult) => {
@@ -207,6 +257,7 @@ function Table() {
 
       <div className="flex-1 flex overflow-hidden relative">
         <main className="flex-1 h-full relative overflow-hidden">
+          <CombatBanner combat={combat} me={me} onRollSelf={() => combatActions.roll({ scope: "self" })} onDelay={combatActions.delay} />
           {scene ? (
             <>
               <VttCanvas
@@ -294,17 +345,16 @@ function Table() {
           messages={messages}
           participants={participants}
           currentUserId={me.id}
-          initiative={initiative}
+          combat={combat}
+          activeSceneId={scene?.id ?? null}
+          selectedIds={selectedIds}
+          combatActions={combatActions}
+          centerOnActiveTurn={centerOnActiveTurn}
+          onToggleCenterOnActiveTurn={() => setCenterOnActiveTurn((v) => !v)}
           tokens={tokens}
           onRollCharacter={(characterId, request) => void rollCharacter(characterId, request)}
           isGm={isGm}
           onSendMessage={(text) => void sendMessage(text)}
-          onNextTurn={() => void nextTurn()}
-          onPrevTurn={() => void prevTurn()}
-          onResetInitiative={() => void resetInitiative()}
-          onAddEntry={(entry) => void addEntry(entry)}
-          onUpdateEntry={(patch) => void updateEntry(patch)}
-          onRemoveEntry={(id) => void removeEntry(id)}
           onSelectToken={focusToken}
           selectedTokenId={selectedTokenId}
           me={me}

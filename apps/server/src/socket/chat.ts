@@ -48,7 +48,8 @@ export function registerChatHandlers(io: TypedServer, socket: TypedSocket): void
       // Rolagem acontece AQUI, no servidor: o cliente só mandou a fórmula.
       // "/gmr" e "/pr" forçam a visibilidade; "/r" segue o modo de rolagem do autor.
       const formula = cmd.formula.includes("{") ? await resolveWithOwnCharacter(ctx.roomId, me.id, cmd.formula) : cmd.formula;
-      return createRollMessage(io, ctx.roomId, me, { formula, label: cmd.label, visibility: cmd.visibility ?? visibility });
+      const { message } = await createRollMessage(io, ctx.roomId, me, { formula, label: cmd.label, visibility: cmd.visibility ?? visibility });
+      return message;
     }),
   );
 
@@ -63,7 +64,7 @@ export function registerChatHandlers(io: TypedServer, socket: TypedSocket): void
         if (row.visibility === "all") throw new HandlerError("Esta mensagem já é pública");
         // Mesmo id, visibility nova: quem já tinha a mensagem atualiza; quem não tinha, recebe agora.
         const msg = toChatMessage(await prisma.chatMessage.update({ where: { id: messageId }, data: { visibility: "all" } }));
-        emitChatMessage(io, ctx.roomId, msg);
+        await emitChatMessage(io, ctx.roomId, msg);
         return msg;
       },
       { gmOnly: true },

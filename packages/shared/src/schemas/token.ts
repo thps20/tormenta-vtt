@@ -42,6 +42,17 @@ export const TokenSchema = z.object({
 });
 export type Token = z.infer<typeof TokenSchema>;
 
+/**
+ * TODO (duração de condições, preparado no plano do modo de combate — docs/plano-combate.md §8,
+ * ainda não implementado): `Token.conditions` vai virar `(string | TokenConditionWithDuration)[]`,
+ * onde a forma longa é `{ key, expiresRound }` comparado a `Combat.round`. Quando for implementado:
+ * (1) trocar `conditions` por um `z.union` com `z.preprocess` para ler fichas antigas (string vira
+ * `{ key }`, sem `expiresRound` = permanente); (2) o servidor limpa as vencidas em `combat:next`,
+ * quando a rodada muda; (3) a UI mostra "N rodadas" no tooltip da condição. Nada lê este tipo ainda.
+ */
+export const TokenConditionWithDurationSchema = z.object({ key: KeySchema, expiresRound: z.number().int().min(1) });
+export type TokenConditionWithDuration = z.infer<typeof TokenConditionWithDurationSchema>;
+
 /** Payload de criação: servidor gera o id. O vínculo com ficha é feito depois, por token:link-character. */
 export const TokenCreateSchema = TokenSchema.omit({ id: true, characterId: true });
 export type TokenCreate = z.infer<typeof TokenCreateSchema>;

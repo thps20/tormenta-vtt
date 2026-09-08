@@ -1,19 +1,9 @@
 import React from 'react';
 import { MessageSquare, Swords, Users } from 'lucide-react';
 import { ChatTab } from './ChatTab';
-import { InitiativeTab } from './InitiativeTab';
+import { InitiativeTab, type CombatActions } from './InitiativeTab';
 import { CharactersTab } from './CharactersTab';
-import type {
-  Character,
-  CharacterCreatePayload,
-  CharacterRollRequest,
-  ChatMessage,
-  InitiativeAddPayload,
-  InitiativeState,
-  InitiativeUpdatePayload,
-  Participant,
-  Token,
-} from '@tormenta-vtt/shared';
+import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, Participant, Token } from '@tormenta-vtt/shared';
 
 export type SidePanelTab = 'chat' | 'initiative' | 'characters';
 
@@ -24,16 +14,15 @@ interface SidePanelProps {
   messages: ChatMessage[];
   participants: Participant[];
   currentUserId: string;
-  initiative: InitiativeState | null;
+  combat: Combat | null;
+  activeSceneId: string | null;
+  selectedIds: string[];
+  combatActions: CombatActions;
+  centerOnActiveTurn: boolean;
+  onToggleCenterOnActiveTurn: () => void;
   tokens: Token[];
   isGm: boolean;
   onSendMessage: (text: string) => void;
-  onNextTurn: () => void;
-  onPrevTurn: () => void;
-  onResetInitiative: () => void;
-  onAddEntry: (entry: InitiativeAddPayload) => void;
-  onUpdateEntry: (patch: InitiativeUpdatePayload) => void;
-  onRemoveEntry: (entryId: string) => void;
   onSelectToken: (tokenId: string) => void;
   selectedTokenId: string | null;
   // Fichas
@@ -52,16 +41,15 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   messages,
   participants,
   currentUserId,
-  initiative,
+  combat,
+  activeSceneId,
+  selectedIds,
+  combatActions,
+  centerOnActiveTurn,
+  onToggleCenterOnActiveTurn,
   tokens,
   isGm,
   onSendMessage,
-  onNextTurn,
-  onPrevTurn,
-  onResetInitiative,
-  onAddEntry,
-  onUpdateEntry,
-  onRemoveEntry,
   onSelectToken,
   selectedTokenId,
   me,
@@ -120,7 +108,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
                 : 'bg-zinc-800 text-zinc-500'
             }`}
           >
-            R{initiative?.round ?? 0}
+            R{combat?.round ?? 0}
           </span>
         </button>
 
@@ -170,17 +158,17 @@ export const SidePanel: React.FC<SidePanelProps> = ({
           />
         ) : (
           <InitiativeTab
-            initiative={initiative}
-            tokens={tokens}
+            combat={combat}
+            activeSceneId={activeSceneId}
             isGm={isGm}
-            onNextTurn={onNextTurn}
-            onPrevTurn={onPrevTurn}
-            onResetInitiative={onResetInitiative}
-            onAddEntry={onAddEntry}
-            onUpdateEntry={onUpdateEntry}
-            onRemoveEntry={onRemoveEntry}
+            me={me}
+            tokens={tokens}
+            selectedIds={selectedIds}
             onSelectToken={onSelectToken}
             selectedTokenId={selectedTokenId}
+            centerOnActiveTurn={centerOnActiveTurn}
+            onToggleCenterOnActiveTurn={onToggleCenterOnActiveTurn}
+            actions={combatActions}
           />
         )}
       </div>
