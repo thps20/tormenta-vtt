@@ -2,9 +2,63 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { KeySchema, validateSystemDefinition } from "../schemas/system.js";
+import { conditionIconDataUrl, decodeConditionIconDataUrl } from "../rules/conditionIcon.js";
 import { getSystemDefinition, listSystemIds } from "../systems.js";
 
 const systemsDir = join(__dirname, "..", "..", "systems");
+
+/**
+ * Checagem de boa-formação de um SVG sem dependência nova: o vitest do shared roda em Node puro,
+ * sem DOMParser, e não vale a pena arrastar um parser XML pro projeto só por isto. Não valida o
+ * schema do SVG — valida o que quebra ao escrever ícone à mão: raiz `<svg>`, aspas de atributo
+ * fechadas e tags balanceadas. Devolve null se estiver ok, ou a descrição do problema.
+ */
+function parseSvg(svg: string): string | null {
+  const src = svg.trim();
+  if (!src.startsWith("<svg")) return "não começa com <svg";
+  if (!src.endsWith("</svg>")) return "não termina com </svg>";
+
+  const abertas: string[] = [];
+  let i = 0;
+  while (i < src.length) {
+    const lt = src.indexOf("<", i);
+    if (lt === -1) break;
+
+    if (src.startsWith("</", lt)) {
+      const gt = src.indexOf(">", lt);
+      if (gt === -1) return "tag de fechamento sem '>'";
+      const nome = src.slice(lt + 2, gt).trim();
+      const ultima = abertas.pop();
+      if (ultima !== nome) return `</${nome}> fecha <${ultima ?? "nada"}>`;
+      i = gt + 1;
+      continue;
+    }
+
+    // Tag de abertura: anda até o '>' respeitando aspas (um '>' dentro de atributo não fecha a tag).
+    let j = lt + 1;
+    let aspas: string | null = null;
+    while (j < src.length) {
+      const ch = src[j];
+      if (aspas !== null) {
+        if (ch === aspas) aspas = null;
+      } else if (ch === '"' || ch === "'") {
+        aspas = ch;
+      } else if (ch === ">") {
+        break;
+      }
+      j++;
+    }
+    if (j >= src.length) return aspas !== null ? "aspas de atributo não fechadas" : "tag sem '>'";
+
+    const corpo = src.slice(lt + 1, j);
+    const nome = corpo.split(/[\s/>]/)[0] ?? "";
+    if (!nome) return "tag sem nome";
+    if (!corpo.trimEnd().endsWith("/")) abertas.push(nome);
+    i = j + 1;
+  }
+
+  return abertas.length > 0 ? `tag(s) não fechada(s): ${abertas.join(", ")}` : null;
+}
 
 describe("definições de sistema (packages/shared/systems/*.json)", () => {
   const files = readdirSync(systemsDir).filter((f) => f.endsWith(".json"));
@@ -136,13 +190,47 @@ describe("conditions[] (todas as definições de sistema)", () => {
       expect(new Set(keys).size).toBe(keys.length);
     });
 
-    it(`${id}: todo ícone de condição é um SVG (com viewBox) — checagem estrutural, não um parser XML completo`, () => {
+    it(`${id}: todo ícone de condição faz parse, tem viewBox e xmlns, e sobrevive ao data URI`, () => {
       for (const c of def.conditions) {
-        expect(c.icon.trim(), `condição "${c.key}"`).toMatch(/^<svg\b[^>]*>[\s\S]*<\/svg>$/);
+        const erro = parseSvg(c.icon);
+        expect(erro, `condição "${c.key}"`).toBeNull();
+
+        // viewBox: sem ela o navegador não sabe a escala do desenho ao rasterizar.
         expect(c.icon, `condição "${c.key}"`).toMatch(/\bviewBox\s*=\s*(['"])[^'"]+\1/);
+        // xmlns: um SVG carregado como IMAGEM (data URI) é um documento standalone e o navegador
+        // recusa sem o namespace — foi exatamente esse o bug do ícone que não aparecia no token.
+        expect(c.icon, `condição "${c.key}"`).toMatch(/\bxmlns\s*=\s*(['"])http:\/\/www\.w3\.org\/2000\/svg\1/);
+
+        // Round-trip pela função que o app usa de verdade (rules/conditionIcon.ts).
+        const url = conditionIconDataUrl(c.icon, c.color);
+        expect(url.startsWith("data:image/svg+xml,"), `condição "${c.key}"`).toBe(true);
+        // Um "#" cru cortaria a URI no fragmento e a imagem viria vazia.
+        expect(url.includes("#"), `condição "${c.key}": "#" não codificado`).toBe(false);
+        expect(decodeConditionIconDataUrl(url), `condição "${c.key}"`).toBe(c.icon.replaceAll("currentColor", c.color));
+        // A cor precisa ter sido de fato gravada (nenhum currentColor sobrando na imagem estática).
+        expect(decodeConditionIconDataUrl(url)?.includes("currentColor"), `condição "${c.key}"`).toBe(false);
       }
     });
   }
+
+  // Os dois testes acima só têm valor se as checagens realmente reprovarem algo: aqui estão os
+  // contraexemplos (senão seria um teste que passa sempre).
+  it("parseSvg reprova SVG malformado", () => {
+    const ok = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='1'/></svg>";
+    expect(parseSvg(ok)).toBeNull();
+    expect(parseSvg("<circle cx='1'/>")).toMatch(/não começa/);
+    expect(parseSvg("<svg><circle cx='1'></svg>")).toMatch(/fecha/);
+    expect(parseSvg("<svg><path d='M1 1></svg>")).toMatch(/aspas/);
+    expect(parseSvg("<svg><g><path/></svg>")).toMatch(/fecha/);
+  });
+
+  it("conditionIconDataUrl grava a cor e codifica o '#' (senão a URI cortaria no fragmento)", () => {
+    const url = conditionIconDataUrl("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path stroke='currentColor'/></svg>", "#a855f7");
+    expect(url).not.toContain("#");
+    expect(url).toContain("%23a855f7");
+    expect(decodeConditionIconDataUrl(url)).toContain("stroke='#a855f7'");
+    expect(decodeConditionIconDataUrl("data:image/png;base64,xxx")).toBeNull();
+  });
 });
 
 describe("tormenta20.json", () => {
