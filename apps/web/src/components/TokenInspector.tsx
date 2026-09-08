@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
-import { BookOpen, Eye, EyeOff, Heart, ImagePlus, Trash2, User, X } from "lucide-react";
-import type { Character, Participant, Token, TokenPatch } from "@tormenta-vtt/shared";
+import { BookOpen, Eye, EyeOff, Heart, ImagePlus, Sparkles, Trash2, User, X } from "lucide-react";
+import type { Character, ConditionDef, Participant, Token, TokenPatch } from "@tormenta-vtt/shared";
 import { uploadImage } from "../lib/api";
 import { toast } from "../store/ui";
 
@@ -18,6 +18,10 @@ interface TokenInspectorProps {
   linkableCharacters: Character[];
   onLinkCharacter: (characterId: string | null) => void;
   onOpenCharacter: (characterId: string) => void;
+  /** conditions[] do sistema da sala (ver SystemDefinitionSchema); vazio se o sistema ainda não carregou. */
+  conditions: ConditionDef[];
+  /** Abre o ConditionMenu (VttCanvas decide a posição a partir do clique). */
+  onOpenConditions: (e: React.MouseEvent) => void;
 }
 
 /**
@@ -34,6 +38,8 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({
   linkableCharacters,
   onLinkCharacter,
   onOpenCharacter,
+  conditions,
+  onOpenConditions,
 }) => {
   const isGm = me.role === "gm";
   const canDelete = isGm || token.ownerId === me.id;
@@ -174,6 +180,17 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({
             )}
           </div>
         </Row>
+
+        {canLink && conditions.length > 0 && (
+          <Row label="Condições" icon={<Sparkles className="w-3.5 h-3.5 text-[#d4af37]" />}>
+            <button
+              onClick={onOpenConditions}
+              className="flex items-center gap-1 px-2 py-0.5 rounded border border-[#3d3d3d] hover:border-[#d4af37] text-[10px] text-zinc-300 hover:text-[#d4af37] cursor-pointer"
+            >
+              {token.conditions.length > 0 ? `${token.conditions.length} ativa${token.conditions.length > 1 ? "s" : ""}` : "Nenhuma"}
+            </button>
+          </Row>
+        )}
 
         {isGm && token.characterId === null && (
           <Row label="PV" icon={<Heart className="w-3.5 h-3.5 text-[#d4af37]" />}>

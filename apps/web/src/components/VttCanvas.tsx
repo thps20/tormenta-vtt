@@ -9,6 +9,7 @@ import { useImage } from "../lib/useImage";
 import { newId } from "../lib/ids";
 import type { FogToolMode, FogToolShape, RemoteRuler, ToolMode } from "../store/tools";
 import { TokenInspector } from "./TokenInspector";
+import { ConditionMenu } from "./ConditionMenu";
 import { FogLayer } from "./FogLayer";
 
 /** Tamanho padrão quando a cena ainda não tem mapa. */
@@ -143,6 +144,18 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   // Preferências locais de visualização (não vão ao servidor).
   const [snapEnabled, setSnapEnabled] = useState(scene.grid.snap);
   const [gridVisible, setGridVisible] = useState(true);
+
+  // Menu de condições: botão direito no token, ou botão "Condições" do TokenInspector. Posição já
+  // em pixels do container (não do mapa), pra desenhar por cima de tudo sem depender do zoom/pan.
+  const [conditionMenu, setConditionMenu] = useState<{ tokenId: string; x: number; y: number } | null>(null);
+  const openConditionMenuAt = (token: Token, clientX: number, clientY: number) => {
+    if (!canControl(me, token)) return;
+    const box = containerRef.current?.getBoundingClientRect();
+    if (!box) return;
+    const x = Math.min(clientX - box.left, dimensions.width - 232);
+    const y = Math.min(clientY - box.top, dimensions.height - 320);
+    setConditionMenu({ tokenId: token.id, x: Math.max(4, x), y: Math.max(4, y) });
+  };
 
   // Caixa de seleção (modo Selecionar, arraste no mapa vazio), em pixels do mapa.
   const [selectionBox, setSelectionBox] = useState<Box | null>(null);
@@ -627,6 +640,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         node.position(pos);
         onTokenPatch({ id: token.id, x: pos.x, y: pos.y, width, height });
       }}
+      onContextMenu={(clientX, clientY) => openConditionMenuAt(token, clientX, clientY)}
     />
   );
 
@@ -775,8 +789,28 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
           linkableCharacters={linkableCharacters}
           onLinkCharacter={(characterId) => onLinkCharacter(selectedToken.id, characterId)}
           onOpenCharacter={onOpenCharacter}
+          conditions={systemDef?.conditions ?? []}
+          onOpenConditions={(e) => openConditionMenuAt(selectedToken, e.clientX, e.clientY)}
         />
       )}
+
+      {conditionMenu && systemDef && (() => {
+        const target = tokens.find((t) => t.id === conditionMenu.tokenId);
+        if (!target) return null;
+        return (
+          <ConditionMenu
+            x={conditionMenu.x}
+            y={conditionMenu.y}
+            conditions={systemDef.conditions}
+            active={target.conditions}
+            onToggle={(key) => {
+              const has = target.conditions.includes(key);
+              onTokenPatch({ id: target.id, conditions: has ? target.conditions.filter((k) => k !== key) : [...target.conditions, key] });
+            }}
+            onClose={() => setConditionMenu(null)}
+          />
+        );
+      })()}
 
       {!selectedToken && (
       <div className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a1a]/95 border border-[#2d2417] text-[11px] text-zinc-400 shadow-xl pointer-events-none">
@@ -829,9 +863,11 @@ interface TokenNodeProps {
   onDragMove: (node: Konva.Node) => void;
   onDragEnd: (node: Konva.Node) => void;
   onTransformEnd: (node: Konva.Node) => void;
+  /** Botão direito no token: abre o ConditionMenu na posição do clique (em coordenadas de tela). */
+  onContextMenu: (clientX: number, clientY: number) => void;
 }
 
-const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd }) => {
+const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu }) => {
   const image = useImage(assetUrl(token.imageUrl));
   const radius = tokenRadius(token);
   const cx = token.width / 2;
@@ -860,6 +896,11 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, selectable
         if (!selectable) return;
         e.cancelBubble = true;
         onSelect(false);
+      }}
+      onContextMenu={(e) => {
+        e.evt.preventDefault();
+        e.cancelBubble = true;
+        onContextMenu(e.evt.clientX, e.evt.clientY);
       }}
       onDragStart={(e) => {
         e.cancelBubble = true;
