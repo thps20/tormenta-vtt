@@ -81,6 +81,11 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
         const owner = await prisma.participant.findUnique({ where: { id: fields.ownerId } });
         if (!owner || owner.roomId !== ctx.roomId) throw new HandlerError("Dono inválido");
       }
+      if (fields.conditions) {
+        const def = await requireSystem(ctx.roomId);
+        const known = new Set(def.conditions.map((c) => c.key));
+        if (fields.conditions.some((key) => !known.has(key))) throw new HandlerError("Condição inexistente no sistema da sala");
+      }
       const token = toToken(await prisma.token.update({ where: { id }, data: { ...fields, ...(hp !== undefined ? { hp: hpJson(hp) } : {}) } }));
       // A cena já veio junto com o token (requireToken): sem consulta extra a cada movimento.
       broadcastToken(io, ctx.roomId, token, "token:updated", toScene(row.scene).fog);

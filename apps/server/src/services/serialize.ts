@@ -70,6 +70,7 @@ export function toToken(t: DbToken): Token {
     color: t.color,
     characterId: t.characterId,
     hp: TokenHpSchema.nullable().parse(t.hp),
+    conditions: t.conditions,
   };
 }
 
