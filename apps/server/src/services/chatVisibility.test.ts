@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "@tormenta-vtt/shared";
-import { messageVisibleTo, redactForAuthor } from "./chatVisibility.js";
+import { emitChatMessage, messageVisibleTo, redactForAuthor } from "./chatVisibility.js";
+import { rooms, type TypedServer } from "../socket/types.js";
 
 const base: ChatMessage = {
   id: "m1",
@@ -60,5 +61,58 @@ describe("redactForAuthor", () => {
     expect(out.roll).toBeUndefined();
     expect(out.id).toBe("m1");
     expect(out.visibility).toBe("gm");
+  });
+});
+
+/** Fake mínimo de TypedServer: só grava em que sala e com que mensagem cada `emit` caiu. */
+function fakeIo() {
+  const calls: { room: string; msg: ChatMessage }[] = [];
+  const io = {
+    to: (room: string) => ({
+      emit: (_event: "chat:message", msg: ChatMessage) => {
+        calls.push({ room, msg });
+      },
+    }),
+  } as unknown as TypedServer;
+  return { io, calls };
+}
+
+describe("emitChatMessage", () => {
+  it("secreta: sala toda recebe na hora, mas com placeholder (sem roll); só a sala do GM recebe o resultado", () => {
+    const { io, calls } = fakeIo();
+    emitChatMessage(io, "r1", { ...base, visibility: "gm" });
+
+    const toAll = calls.filter((c) => c.room === rooms.all("r1"));
+    expect(toAll).toHaveLength(1);
+    expect(toAll[0]!.msg.kind).toBe("roll");
+    expect(toAll[0]!.msg.roll).toBeUndefined();
+    expect(toAll[0]!.msg.id).toBe("m1");
+
+    const toGm = calls.filter((c) => c.room === rooms.gm("r1"));
+    expect(toGm).toHaveLength(1);
+    expect(toGm[0]!.msg.roll).toBeDefined();
+    expect(toGm[0]!.msg.roll!.total).toBe(7);
+  });
+
+  it("própria: sala toda recebe placeholder; só a sala do autor recebe o resultado", () => {
+    const { io, calls } = fakeIo();
+    emitChatMessage(io, "r1", { ...base, visibility: "self" });
+
+    const toAll = calls.filter((c) => c.room === rooms.all("r1"));
+    expect(toAll[0]!.msg.roll).toBeUndefined();
+
+    const toAuthor = calls.filter((c) => c.room === rooms.participant("p-author"));
+    expect(toAuthor).toHaveLength(1);
+    expect(toAuthor[0]!.msg.roll).toBeDefined();
+  });
+
+  it("pública (inclusive depois de um /reveal, que muda visibility pra 'all'): um único emit, pra sala toda, com o resultado completo", () => {
+    const { io, calls } = fakeIo();
+    emitChatMessage(io, "r1", { ...base, visibility: "all" });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.room).toBe(rooms.all("r1"));
+    expect(calls[0]!.msg.roll).toBeDefined();
+    expect(calls[0]!.msg.id).toBe("m1");
   });
 });
