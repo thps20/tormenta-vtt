@@ -610,6 +610,22 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     if (e.target === stageRef.current || e.target.name() === "map-background") onSelectToken(null);
   };
 
+  /**
+   * Botão direito: abre o ConditionMenu por geometria quando o hit não aterrissou no token —
+   * mesmo motivo e mesmo fallback de `handleStageClick`. Sem isto, `onContextMenu` só existe no
+   * Group do próprio token (TokenNode) e nunca dispara com o canvas de hit embaralhado (medido em
+   * docs/auditoria-hit-canvas.md: popover nunca abria).
+   */
+  const handleStageContextMenu = (e: Konva.KonvaEventObject<PointerEvent>) => {
+    e.evt.preventDefault();
+    if (mode !== "select") return;
+    const t = tokenAtPointer();
+    if (!t) return;
+    // Se o hit tivesse acertado, o onContextMenu do Group já teria aberto o menu (que confere
+    // canControl por dentro, igual ao clique).
+    if (!hitLandedOnToken(e.target, t.id)) openConditionMenuAt(t);
+  };
+
   /** Clique num token: seleciona só ele; com Shift, entra/sai da seleção atual. */
   const selectByClick = (tokenId: string, additive: boolean) => {
     if (additive) onToggleSelect(tokenId);
@@ -751,6 +767,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         }}
         onClick={handleStageClick}
         onDblClick={() => fogActive && fogDblClick()}
+        onContextMenu={handleStageContextMenu}
       >
         {/* Camada 1: mapa + grid */}
         <Layer id="map-layer">
