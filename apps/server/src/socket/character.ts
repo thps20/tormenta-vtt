@@ -98,7 +98,7 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
 
   socket.on(
     "character:roll",
-    guarded(socket, CharacterRollSchema, async ({ characterId, roll, secret }, ctx) => {
+    guarded(socket, CharacterRollSchema, async ({ characterId, roll, visibility }, ctx) => {
       const me = await prisma.participant.findUnique({ where: { id: ctx.participantId } });
       if (!me) throw new HandlerError("Participante não encontrado");
       const character = toCharacter(await requireCharacter(characterId, ctx.roomId));
@@ -116,7 +116,7 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
       return createRollMessage(io, ctx.roomId, me, {
         formula: built.formula,
         label: `${character.name}: ${built.label}`,
-        secret,
+        visibility,
         characterId: character.id,
         critThreshold: built.critThreshold,
         damage: built.damage,

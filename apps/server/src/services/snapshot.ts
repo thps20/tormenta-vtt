@@ -1,4 +1,4 @@
-import { FogConfigSchema, type ChatMessage, type RoomSnapshot } from "@tormenta-vtt/shared";
+import { FogConfigSchema, type RoomSnapshot } from "@tormenta-vtt/shared";
 import type { Participant as DbParticipant, Room as DbRoom } from "@prisma/client";
 import { prisma } from "../db.js";
 import { isConnected } from "./presence.js";
@@ -6,14 +6,9 @@ import { loadInitiativeState } from "./initiativeState.js";
 import { toChatMessage, toParticipant, toRoomPublic, toScene, toToken } from "./serialize.js";
 import { characterVisibleTo, toCharacter } from "./characters.js";
 import { tokenVisibleTo } from "./visibility.js";
+import { messageVisibleTo } from "./chatVisibility.js";
 
 const CHAT_HISTORY_LIMIT = 100;
-
-/** Rolagem secreta: só GM e autor. */
-export function messageVisibleTo(msg: ChatMessage, role: "gm" | "player", participantId: string): boolean {
-  if (msg.kind !== "roll" || !msg.roll?.secret) return true;
-  return role === "gm" || msg.participantId === participantId;
-}
 
 /** Estado completo da sala do ponto de vista de `me`. */
 export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<RoomSnapshot> {
@@ -48,7 +43,7 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     chat: messages
       .reverse()
       .map(toChatMessage)
-      .filter((m) => messageVisibleTo(m, me.role, me.id)),
+      .filter((m) => messageVisibleTo(m, viewer)),
     characters: characters.map(toCharacter).filter((c) => characterVisibleTo(c, me.role)),
   };
 }

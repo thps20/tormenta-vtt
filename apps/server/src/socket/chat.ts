@@ -1,7 +1,8 @@
-import { ChatSendSchema, FormulaError, resolveCharacterFormula, getSystemDefinition } from "@tormenta-vtt/shared";
+import { ChatRevealSchema, ChatSendSchema, FormulaError, resolveCharacterFormula, getSystemDefinition } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { parseChatCommand } from "../services/chatCommands.js";
 import { toCharacter } from "../services/characters.js";
+import { emitChatMessage } from "../services/chatVisibility.js";
 import { createRollMessage } from "../services/rolls.js";
 import { toChatMessage } from "../services/serialize.js";
 import { guarded, HandlerError } from "./ack.js";
@@ -28,7 +29,7 @@ async function resolveWithOwnCharacter(roomId: string, participantId: string, fo
 export function registerChatHandlers(io: TypedServer, socket: TypedSocket): void {
   socket.on(
     "chat:send",
-    guarded(socket, ChatSendSchema, async ({ text }, ctx) => {
+    guarded(socket, ChatSendSchema, async ({ text, visibility }, ctx) => {
       const me = await prisma.participant.findUnique({ where: { id: ctx.participantId } });
       if (!me) throw new HandlerError("Participante não encontrado");
 
@@ -45,8 +46,27 @@ export function registerChatHandlers(io: TypedServer, socket: TypedSocket): void
       }
 
       // Rolagem acontece AQUI, no servidor: o cliente só mandou a fórmula.
+      // "/gmr" e "/pr" forçam a visibilidade; "/r" segue o modo de rolagem do autor.
       const formula = cmd.formula.includes("{") ? await resolveWithOwnCharacter(ctx.roomId, me.id, cmd.formula) : cmd.formula;
-      return createRollMessage(io, ctx.roomId, me, { formula, label: cmd.label, secret: cmd.secret });
+      return createRollMessage(io, ctx.roomId, me, { formula, label: cmd.label, visibility: cmd.visibility ?? visibility });
     }),
+  );
+
+  socket.on(
+    "chat:reveal",
+    guarded(
+      socket,
+      ChatRevealSchema,
+      async ({ messageId }, ctx) => {
+        const row = await prisma.chatMessage.findUnique({ where: { id: messageId } });
+        if (!row || row.roomId !== ctx.roomId) throw new HandlerError("Mensagem não encontrada");
+        if (row.visibility === "all") throw new HandlerError("Esta mensagem já é pública");
+        // Mesmo id, visibility nova: quem já tinha a mensagem atualiza; quem não tinha, recebe agora.
+        const msg = toChatMessage(await prisma.chatMessage.update({ where: { id: messageId }, data: { visibility: "all" } }));
+        emitChatMessage(io, ctx.roomId, msg);
+        return msg;
+      },
+      { gmOnly: true },
+    ),
   );
 }

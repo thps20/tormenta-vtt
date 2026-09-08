@@ -83,6 +83,7 @@ export function toChatMessage(m: DbChatMessage): ChatMessage {
     text: m.text ?? undefined,
     roll: m.roll ?? undefined,
     item: m.item ?? undefined,
+    visibility: m.visibility,
     createdAt: m.createdAt.toISOString(),
   });
 }

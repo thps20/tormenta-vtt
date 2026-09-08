@@ -1,16 +1,18 @@
 import { randomUUID } from "node:crypto";
 import type { Participant as DbParticipant } from "@prisma/client";
-import { DiceParseError, parseFormula, rollParsed, rollParsedMany, type ChatMessage, type DamageComponent, type DiceRoll } from "@tormenta-vtt/shared";
+import { DiceParseError, parseFormula, rollParsed, rollParsedMany, type ChatMessage, type DamageComponent, type DiceRoll, type RollVisibility } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { HandlerError } from "../socket/ack.js";
-import { rooms, type TypedServer } from "../socket/types.js";
+import type { TypedServer } from "../socket/types.js";
+import { emitChatMessage, redactForAuthor } from "./chatVisibility.js";
 import { toChatMessage } from "./serialize.js";
 
 export interface RollMessageInput {
   /** Fórmula já sem placeholders. */
   formula: string;
   label?: string;
-  secret: boolean;
+  /** Modo de rolagem (all | gm | self). */
+  visibility: RollVisibility;
   /** Rolagem vinda de uma ficha. */
   characterId?: string;
   critThreshold?: number;
@@ -22,7 +24,8 @@ export interface RollMessageInput {
 
 /**
  * Rola NO SERVIDOR, persiste como ChatMessage{kind:"roll"} e faz o broadcast
- * (secreta: só GM + autor). Usado pelo chat (/r, /gr) e pela ficha (character:roll).
+ * conforme a visibilidade. Usado pelo chat (/r, /gmr, /pr) e pela ficha (character:roll).
+ * Devolve a mensagem como o autor pode vê-la (às cegas = sem `roll`).
  */
 export async function createRollMessage(io: TypedServer, roomId: string, me: DbParticipant, input: RollMessageInput): Promise<ChatMessage> {
   let outcome;
@@ -51,7 +54,6 @@ export async function createRollMessage(io: TypedServer, roomId: string, me: DbP
     groups: outcome.groups,
     modifier: outcome.modifier,
     total: outcome.total,
-    secret: input.secret,
     characterId: input.characterId,
     critThreshold: input.critThreshold,
     damage,
@@ -61,15 +63,10 @@ export async function createRollMessage(io: TypedServer, roomId: string, me: DbP
 
   const msg = toChatMessage(
     await prisma.chatMessage.create({
-      data: { roomId, participantId: me.id, nickname: me.nickname, kind: "roll", roll: diceRoll },
+      data: { roomId, participantId: me.id, nickname: me.nickname, kind: "roll", roll: diceRoll, visibility: input.visibility },
     }),
   );
 
-  if (input.secret) {
-    // Socket.io deduplica quando o mesmo socket está nas duas salas.
-    io.to(rooms.gm(roomId)).to(rooms.participant(me.id)).emit("chat:message", msg);
-  } else {
-    io.to(rooms.all(roomId)).emit("chat:message", msg);
-  }
-  return msg;
+  emitChatMessage(io, roomId, msg);
+  return redactForAuthor(msg, { role: me.role === "gm" ? "gm" : "player", participantId: me.id });
 }

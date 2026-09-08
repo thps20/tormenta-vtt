@@ -126,6 +126,8 @@ model ChatMessage {
   roll          Json?
   /// ItemCard serializado (ver ItemCardSchema) quando kind == "item".
   item          Json?
+  /// Quem vê: "all" | "gm" | "self" (ver RollVisibilitySchema). Filtrado no broadcast e no snapshot.
+  visibility    String   @default("all")
   createdAt     DateTime @default(now())
 
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
