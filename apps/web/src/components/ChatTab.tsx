@@ -135,7 +135,60 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             );
           }
 
-          // 3. DICE ROLL MESSAGE (HIGHLIGHTED) - Elegant Dark
+          // 3. ROLAGEM OCULTA (placeholder): o servidor manda a mensagem sem `roll`
+          // pra quem não tem permissão de ver o resultado (não omite mais a mensagem
+          // inteira). Some sozinha quando o Revelar troca essa mesma mensagem (mesmo id)
+          // pela versão completa.
+          if (msg.kind === 'roll' && !msg.roll) {
+            const vis = rollModeInfo(msg.visibility);
+            const VisIcon = vis.icon;
+            return (
+              <div
+                key={msg.id}
+                id={`chat-msg-${msg.id}`}
+                className="p-2.5 rounded border border-zinc-800/60 bg-black/25"
+                data-visibility={msg.visibility}
+              >
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`text-[11px] font-bold uppercase tracking-tight ${
+                        isGm ? 'text-[#d4af37] font-serif' : isMe ? 'text-blue-400' : 'text-zinc-300'
+                      }`}
+                    >
+                      {msg.nickname}
+                    </span>
+                    {isGm && (
+                      <span className="text-[9px] px-1 rounded bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40 font-serif font-bold">
+                        GM
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[9px] font-mono text-zinc-600">{formatTime(msg.createdAt)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-xs text-zinc-500 italic">
+                    <VisIcon className="w-3 h-3 shrink-0" />
+                    {msg.visibility === 'gm' ? `${msg.nickname} fez uma rolagem secreta` : `${msg.nickname} fez uma rolagem própria`}
+                  </span>
+                  {me.role === 'gm' && (
+                    <button
+                      type="button"
+                      id={`reveal-${msg.id}`}
+                      onClick={() => void revealMessage(msg.id)}
+                      title="Tornar pública para todos"
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#d4af37]/40 text-[#d4af37] hover:bg-[#2d2417] transition-colors cursor-pointer shrink-0"
+                    >
+                      <Eye className="w-3 h-3" />
+                      Revelar
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          // 4. DICE ROLL MESSAGE (HIGHLIGHTED) - Elegant Dark
           if (msg.kind === 'roll' && msg.roll) {
             const roll = msg.roll;
             // Parcelas de dano por tipo (só rolagens de dano da ficha; rolagens antigas não têm).
@@ -304,7 +357,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             );
           }
 
-          // 4. STANDARD TEXT MESSAGE - Elegant Dark
+          // 5. STANDARD TEXT MESSAGE - Elegant Dark
           return (
             <div
               key={msg.id}
