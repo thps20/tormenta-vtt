@@ -816,7 +816,17 @@ const ActionRow: React.FC<ActionRowProps> = ({ def, action, onPatch, onRemove })
       )}
 
       {action.kind === "formula" && (
-        <TextInput value={action.formula} onCommit={(formula) => formula.trim() && onPatch({ formula: formula.trim() })} className="w-48 font-mono" maxLength={200} placeholder="1d20 + {skill.luta}" />
+        <>
+          <TextInput value={action.formula} onCommit={(formula) => formula.trim() && onPatch({ formula: formula.trim() })} className="w-48 font-mono" maxLength={200} placeholder="1d20 + {skill.luta}" />
+          {def.damageTypes.length > 0 && (
+            <Select
+              value={action.damageType ?? ""}
+              onChange={(v) => onPatch({ damageType: v || null })}
+              options={[{ value: "", label: "sem tipo (não liga Aplicar)" }, ...def.damageTypes.map((d) => ({ value: d.key, label: d.label }))]}
+              title="Definido: a rolagem vira dano/cura aplicável (a fórmula rola tal e qual, sem somar atributo/bônus)"
+            />
+          )}
+        </>
       )}
 
       <button onClick={onRemove} className="text-zinc-600 hover:text-red-400 cursor-pointer" title="Remover ação">
