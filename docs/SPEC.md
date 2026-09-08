@@ -60,8 +60,15 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 ### 3.4 Chat e dados
 - Input único. Texto normal vira `ChatMessage{kind:"text"}`. Outros tipos: `roll` (rolagem), `system` (aviso) e `item` (card de poder/magia usado pela ficha, ver §3.6).
 - Comandos:
-  - `/r <fórmula> [# rótulo]` — rola, ex.: `/r 2d6+3`, `/r 1d20+5 # Ataque`.
-  - `/gr <fórmula>` — rolagem secreta (só GM e autor veem).
+  - `/r <fórmula> [# rótulo]` — rola no **modo de rolagem** atual do autor (abaixo), ex.: `/r 2d6+3`, `/r 1d20+5 # Ataque`.
+  - `/gmr <fórmula>` — força rolagem secreta (só o GM vê); `/gr` é sinônimo. `/pr <fórmula>` — força rolagem pública.
+- **Modo de rolagem** (botão na faixa "Rolar" do chat, ao lado dos dados rápidos, com ícone e rótulo; clique alterna para o próximo, clique longo ou a seta abre o menu com os três):
+  - **Pública** (`visibility: "all"`): todos veem.
+  - **Secreta** (`"gm"`): só o GM vê. Se quem rolou é jogador, ele **não** vê o próprio resultado (rolagem às cegas; o ack volta sem `roll` e o cliente mostra o toast "Rolagem às cegas enviada ao GM"). O GM vê quem rolou e o resultado.
+  - **Própria** (`"self"`): só quem rolou vê (nem o GM).
+  - O modo vale para tudo que a pessoa rolar (faixa, `/r`, ficha, botões dos cards) até trocar; persiste na aba (`sessionStorage`). `/gmr` e `/pr` forçam secreta/pública pontualmente. Texto e cards de item (`character:use-item`) são sempre públicos.
+  - Fora de "Pública", o campo do chat ganha borda âmbar e o rótulo do modo à direita.
+  - `ChatMessage.visibility` (`all | gm | self`) é filtrado pelo servidor no broadcast e no snapshot (`messageVisibleTo`, `apps/server/src/services/chatVisibility.ts`). Rolagem fora de "Pública" mostra no rodapé quem a vê; o GM tem o botão **Revelar** (`chat:reveal`), que muda para `all` e reenvia a mesma mensagem (mesmo `id`) a todos: o cliente faz upsert ordenado por `createdAt`.
 - **Gramática da fórmula** (parser genérico em `packages/shared/src/dice`):
   ```
   expr    := term (("+"|"-") term)*
@@ -130,7 +137,7 @@ Room 1───* InitiativeEntry ?──1 Token
 | **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON)` | `grid` e `fog` são JSON para evoluir sem migration. `fog` segue `FogConfigSchema` (§9.3) |
 | **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON)` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId` |
 | **Character** | `id, roomId, ownerId?, name, kind, data(JSON)` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration |
-| **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON)` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3); `item` segue `ItemCardSchema` (kind `item`) |
+| **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), visibility` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3); `item` segue `ItemCardSchema` (kind `item`); `visibility` = `all \| gm \| self` (§3.4) |
 | **InitiativeEntry** | `id, roomId, tokenId?, name, value, tiebreak, visible` | `currentIndex` e `round` ficam em memória por sala (perdem-se ao reiniciar o servidor; aceitável no MVP) |
 | **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, skillTotal, rolls{}, damageAttribute, tokenBar, trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web |
 
@@ -161,10 +168,11 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `character:create` | `{ name, kind?, ownerId? }` | todos (jogador: `ownerId` = ele, `kind` = pc) | `character:created` (NPC só para o GM) |
 | `character:update` | `{ id, patch }` (patch raso de `CharacterDataSchema` + `name`, `ownerId`, `kind`) | GM ou owner (jogador não muda `ownerId`/`kind`) | `character:updated` |
 | `character:delete` | `{ characterId }` | GM ou owner | `character:deleted` + `token:updated` dos tokens desvinculados |
-| `character:roll` | `{ characterId, roll: {type: attribute\|skill\|initiative\|extra\|action, ...}, secret? }` (ação: `enhancements?: [{ id, times }]` aplica os efeitos dos aprimoramentos ao dano) | GM ou owner | `chat:message` (rolagem com `characterId`; dano com `damage[]` por tipo) |
+| `character:roll` | `{ characterId, roll: {type: attribute\|skill\|initiative\|extra\|action, ...}, visibility? }` (ação: `enhancements?: [{ id, times }]` aplica os efeitos dos aprimoramentos ao dano; `visibility` = modo de rolagem do autor) | GM ou owner | `chat:message` (rolagem com `characterId`; dano com `damage[]` por tipo) só para quem `visibility` permite |
 | `character:use-item` | `{ characterId, itemId, enhancements?: [{ id, times }] }` | GM ou owner | `character:updated` (se houve custo) + `chat:message` (`kind:"item"`); recurso insuficiente ou aprimoramento inválido = ack erro, sem broadcast |
 | `compendium:list` | `{}` | todos | ack `CompendiumEntry[]` do sistema da sala (sem broadcast; §9.4) |
-| `chat:send` | `{ text }` | todos | `chat:message` (rolagem secreta só p/ GM + autor) |
+| `chat:send` | `{ text, visibility? }` (`visibility` = modo de rolagem do autor; `/gmr` e `/pr` no texto forçam) | todos | `chat:message` para quem `visibility` permite (texto sempre público); ack sem `roll` quando o autor não pode ver (às cegas) |
+| `chat:reveal` | `{ messageId }` | GM | `chat:message` da mesma mensagem com `visibility: "all"` para todos (cliente faz upsert) |
 | `initiative:add` | `InitiativeEntry` sem `id` | GM | `initiative:updated` |
 | `initiative:update` | `{ id, ...campos }` | GM | `initiative:updated` |
 | `initiative:remove` | `{ entryId }` | GM | `initiative:updated` |
@@ -181,7 +189,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `fog:updated` | `{ sceneId, fog: FogConfig }` (estado completo; cliente substitui `scene.fog`) |
 | `token:created` / `token:updated` | `Token` |
 | `token:deleted` | `{ tokenId }` |
-| `chat:message` | `ChatMessage` |
+| `chat:message` | `ChatMessage` (mensagem nova ou revelada: mesmo `id`, `visibility` nova; cliente faz upsert) |
 | `character:created` / `character:updated` | `Character` (jogadores só recebem `kind = "pc"`) |
 | `character:deleted` | `{ characterId }` |
 | `initiative:updated` | `InitiativeState` (estado completo, simples de sincronizar) |
