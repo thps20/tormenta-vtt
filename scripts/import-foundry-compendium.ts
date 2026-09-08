@@ -474,7 +474,8 @@ class Converter {
         const formula = str(parts[0]?.[0]).trim();
         try {
           parseFormula(formula);
-          out.push({ label: label.slice(0, 60), kind: "formula", formula });
+          // Nunca infere damageType aqui: fórmula livre importada fica "crua", como sempre.
+          out.push({ label: label.slice(0, 60), kind: "formula", formula, damageType: null });
         } catch (e) {
           this.report.todo("fórmula: rolagem que o nosso parser não aceita (ação omitida)", id, `\`${formula}\`: ${e instanceof Error ? e.message : String(e)}`);
         }

@@ -65,6 +65,13 @@ const FormulaActionBody = z.object({
   ...ActionLabel,
   kind: z.literal("formula"),
   formula: z.string().min(1).max(200),
+  /**
+   * null (padrão) = fórmula livre "crua", sem parcela de dano (comportamento de sempre).
+   * Definido = a rolagem também vira `damage: [{ formula, damageType }]` (uma parcela só, com a
+   * fórmula exatamente como escrita — sem somar atributo/bônus nem passar por aprimoramentos, ao
+   * contrário da ação `damage`), só o suficiente pra ligar "Aplicar" no card do chat.
+   */
+  damageType: KeySchema.nullable().default(null),
 });
 
 /** Ação sem id: formato das entradas do compêndio (o id nasce ao copiar para a ficha). */

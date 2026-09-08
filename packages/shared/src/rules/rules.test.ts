@@ -213,6 +213,32 @@ describe("buildCharacterRoll", () => {
     expect(buildCharacterRoll(def, d, { type: "action", itemId: "sword", actionId: "atk" }).formula).toBe("1d20 + 6");
   });
 
+  it("ação formula sem damageType não liga damage[] (fórmula crua, como sempre)", () => {
+    const item = CharacterItemSchema.parse({
+      id: "wand",
+      kind: "consumable",
+      name: "Vareta",
+      actions: [{ id: "f", label: "Efeito", kind: "formula", formula: "1d20 + {attr.int}" }],
+    });
+    const d = fixture({ items: [item] });
+    const built = buildCharacterRoll(def, d, { type: "action", itemId: "wand", actionId: "f" });
+    expect(built.formula).toBe("1d20 + 2");
+    expect(built).not.toHaveProperty("damage");
+  });
+
+  it("ação formula COM damageType liga damage[] com a fórmula tal e qual (sem somar atributo/bônus)", () => {
+    const item = CharacterItemSchema.parse({
+      id: "wand",
+      kind: "consumable",
+      name: "Vareta",
+      actions: [{ id: "f", label: "Reflexo", kind: "formula", formula: "1d6", damageType: "fogo" }],
+    });
+    const d = fixture({ items: [item] });
+    const built = buildCharacterRoll(def, d, { type: "action", itemId: "wand", actionId: "f" });
+    expect(built.formula).toBe("1d6");
+    expect(built.damage).toEqual([{ formula: "1d6", damageType: "fogo" }]);
+  });
+
   it("resolve placeholders de uma fórmula livre", () => {
     expect(resolveCharacterFormula(def, data, "1d20 + {skill.luta} + {attr.des}")).toBe("1d20 + 7 + 2");
     expect(() => resolveCharacterFormula(def, data, "{skill.nada}")).toThrow(FormulaError);

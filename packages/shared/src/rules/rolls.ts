@@ -151,8 +151,12 @@ export function buildCharacterRoll(def: SystemDefinition, character: Character |
             const base = substitutePlaceholders(def.rolls.skillCheck, (p) => (p === "skill" ? skill.total : resolveGlobal(p)));
             return { formula: joinParts(base, [action.bonus]), label };
           }
-          case "formula":
-            return { formula: substitutePlaceholders(action.formula, resolveGlobal), label };
+          case "formula": {
+            const formula = substitutePlaceholders(action.formula, resolveGlobal);
+            // damageType definido = liga o "Aplicar" no chat (uma parcela só, sem atributo/bônus/aprimoramentos).
+            if (action.damageType === null) return { formula, label };
+            return { formula, label, damage: [{ formula, damageType: action.damageType }] };
+          }
         }
       });
   }

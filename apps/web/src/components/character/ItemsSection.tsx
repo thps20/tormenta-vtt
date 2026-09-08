@@ -76,7 +76,7 @@ function newAction(def: SystemDefinition, kind: Action["kind"]): Action {
     case "check":
       return { id, label: "Teste", kind, skill: def.skills[0]?.key ?? "skill", bonus: 0 };
     case "formula":
-      return { id, label: "Fórmula", kind, formula: "1d20" };
+      return { id, label: "Fórmula", kind, formula: "1d20", damageType: null };
   }
 }
 
