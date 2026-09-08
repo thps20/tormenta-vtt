@@ -44,6 +44,14 @@ describe("validateSystemDefinition (integridade)", () => {
     expect(() => validateSystemDefinition(withPatch({ skills }))).toThrow(/atributo inexistente/);
   });
 
+  it("rejeita condição com chave duplicada", () => {
+    const conditions = [
+      { key: "x", label: "X", icon: "<svg></svg>", color: "#ffffff" },
+      { key: "x", label: "X2", icon: "<svg></svg>", color: "#ffffff" },
+    ];
+    expect(() => validateSystemDefinition(withPatch({ conditions }))).toThrow(/condição duplicado/);
+  });
+
   it("rejeita placeholder desconhecido em stat derivado", () => {
     const derived = [{ key: "x", label: "X", formula: "10 + {attr.zzz}" }];
     expect(() => validateSystemDefinition(withPatch({ derived }))).toThrow(/placeholder/);

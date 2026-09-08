@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { collectPlaceholders } from "../rules/placeholders.js";
+import { ModifierTargetSchema } from "../rules/modifierTarget.js";
 
 /**
  * Definição de um sistema de RPG (schemaVersion 2).
@@ -181,6 +182,35 @@ export const CurrencyDefSchema = z.object({
 });
 export type CurrencyDef = z.infer<typeof CurrencyDefSchema>;
 
+/**
+ * Modificador que uma condição aplicaria automaticamente na ficha (mesmo formato de `target`/`value`
+ * usado em `Modifier`, ver character.ts). Por enquanto é só estrutura: nenhum código lê `conditions[].modifiers`
+ * ainda (a condição no token não afeta a ficha), mas o formato já fica pronto pra quando isso for automatizado.
+ */
+export const ConditionModifierSchema = z.object({
+  target: ModifierTargetSchema,
+  value: z.number().int(),
+});
+export type ConditionModifier = z.infer<typeof ConditionModifierSchema>;
+
+/**
+ * Marcador de condição (T20: Abalado, Cego, Atordoado...), exibido no token. `icon` é um SVG simples
+ * embutido no JSON (um `<svg>...</svg>` monocromático, sem arte externa): a web usa o mesmo texto pra
+ * desenhar o ícone no menu (DOM) e no token no mapa (rasterizado pra imagem do Konva).
+ * `description` vazia é válida: o JSON do sistema vai pro bundle do web (ver `systems.ts`), então não dá
+ * pra usar aqui o padrão de `descriptions.local.json` (arquivo git-ignorado) que o compêndio usa — aquele
+ * só funciona porque o compêndio é lido do disco só pelo servidor e mandado por socket.
+ */
+export const ConditionDefSchema = z.object({
+  key: KeySchema,
+  label: z.string().min(1),
+  icon: z.string().min(1),
+  color: HexColorSchema,
+  description: z.string().default(""),
+  modifiers: z.array(ConditionModifierSchema).default([]),
+});
+export type ConditionDef = z.infer<typeof ConditionDefSchema>;
+
 /** Campos de texto/enum da ficha sem regra associada (raça, origem, divindade...). */
 export const TraitFieldDefSchema = z.object({
   key: KeySchema,
@@ -330,6 +360,8 @@ export const SystemDefinitionSchema = z.object({
   equipStats: z.array(EquipStatDefSchema).default([]),
   itemKinds: z.array(ItemKindDefSchema).default([]),
   activation: ActivationDefSchema.default({}),
+  /** Marcadores de condição (T20: Abalado, Cego...) exibidos no token. Sem automação de regra por enquanto. */
+  conditions: z.array(ConditionDefSchema).default([]),
 
   /** Perícias que podem ser usadas em ações de ataque (ex.: luta, pontaria). */
   attackSkills: z.array(KeySchema).default([]),
@@ -417,6 +449,7 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
   assertUnique(def, "tipo de item", def.itemKinds.map((k) => k.key));
   assertUnique(def, "tipo de dano", def.damageTypes.map((d) => d.key));
   assertUnique(def, "grupo de tipo de dano", def.damageTypeGroups.map((g) => g.key));
+  assertUnique(def, "condição", def.conditions.map((c) => c.key));
 
   for (const type of def.damageTypes) {
     if (type.group !== undefined && !def.damageTypeGroups.some((g) => g.key === type.group)) fail(def, `tipo de dano "${type.key}" referencia grupo inexistente "${type.group}"`);
