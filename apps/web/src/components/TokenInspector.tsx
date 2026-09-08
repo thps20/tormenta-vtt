@@ -21,7 +21,7 @@ interface TokenInspectorProps {
   /** conditions[] do sistema da sala (ver SystemDefinitionSchema); vazio se o sistema ainda não carregou. */
   conditions: ConditionDef[];
   /** Abre o ConditionMenu (VttCanvas decide a posição a partir do clique). */
-  onOpenConditions: (e: React.MouseEvent) => void;
+  onOpenConditions: () => void;
 }
 
 /**

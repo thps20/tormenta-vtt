@@ -149,12 +149,21 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   // Menu de condições: botão direito no token, ou botão "Condições" do TokenInspector. Posição já
   // em pixels do container (não do mapa), pra desenhar por cima de tudo sem depender do zoom/pan.
   const [conditionMenu, setConditionMenu] = useState<{ tokenId: string; x: number; y: number } | null>(null);
-  const openConditionMenuAt = (token: Token, clientX: number, clientY: number) => {
+  const CONDITION_MENU_WIDTH = 232;
+  const CONDITION_MENU_HEIGHT = 320;
+  /**
+   * Ancorado ao LADO do token (não no ponto do clique): um popover que nasce em cima do próprio
+   * token esconde as condições que ele acabou de marcar (bug real, achado ao vivo — o popover
+   * ficava sobre a linha de baixo da coluna de badges, e o hover não alcançava o Konva por baixo
+   * dele). À direita se couber, senão à esquerda; sempre alinhado ao topo do token.
+   */
+  const openConditionMenuAt = (token: Token) => {
     if (!canControl(me, token)) return;
-    const box = containerRef.current?.getBoundingClientRect();
-    if (!box) return;
-    const x = Math.min(clientX - box.left, dimensions.width - 232);
-    const y = Math.min(clientY - box.top, dimensions.height - 320);
+    const rect = tokenGroup(token.id)?.getClientRect();
+    if (!rect) return;
+    const fitsRight = rect.x + rect.width + 8 + CONDITION_MENU_WIDTH <= dimensions.width;
+    const x = fitsRight ? rect.x + rect.width + 8 : rect.x - 8 - CONDITION_MENU_WIDTH;
+    const y = Math.min(rect.y, dimensions.height - CONDITION_MENU_HEIGHT);
     setConditionMenu({ tokenId: token.id, x: Math.max(4, x), y: Math.max(4, y) });
   };
 
@@ -646,7 +655,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         node.position(pos);
         onTokenPatch({ id: token.id, x: pos.x, y: pos.y, width, height });
       }}
-      onContextMenu={(clientX, clientY) => openConditionMenuAt(token, clientX, clientY)}
+      onContextMenu={() => openConditionMenuAt(token)}
     />
   );
 
@@ -796,7 +805,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
           onLinkCharacter={(characterId) => onLinkCharacter(selectedToken.id, characterId)}
           onOpenCharacter={onOpenCharacter}
           conditions={systemDef?.conditions ?? []}
-          onOpenConditions={(e) => openConditionMenuAt(selectedToken, e.clientX, e.clientY)}
+          onOpenConditions={() => openConditionMenuAt(selectedToken)}
         />
       )}
 
@@ -871,8 +880,8 @@ interface TokenNodeProps {
   onDragMove: (node: Konva.Node) => void;
   onDragEnd: (node: Konva.Node) => void;
   onTransformEnd: (node: Konva.Node) => void;
-  /** Botão direito no token: abre o ConditionMenu na posição do clique (em coordenadas de tela). */
-  onContextMenu: (clientX: number, clientY: number) => void;
+  /** Botão direito no token: abre o ConditionMenu ancorado ao lado do token (ver openConditionMenuAt). */
+  onContextMenu: () => void;
   /** Zoom atual do Stage: os badges de condição precisam saber pra manter o tamanho em px de tela. */
   stageScale: number;
 }
@@ -910,7 +919,7 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, dragg
       onContextMenu={(e) => {
         e.evt.preventDefault();
         e.cancelBubble = true;
-        onContextMenu(e.evt.clientX, e.evt.clientY);
+        onContextMenu();
       }}
       onDragStart={(e) => {
         e.cancelBubble = true;

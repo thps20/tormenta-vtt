@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { validateSystemDefinition } from "../schemas/system.js";
+import { KeySchema, validateSystemDefinition } from "../schemas/system.js";
 import { getSystemDefinition, listSystemIds } from "../systems.js";
 
 const systemsDir = join(__dirname, "..", "..", "systems");
@@ -118,6 +118,31 @@ describe("validateSystemDefinition (integridade)", () => {
     expect(() => validateSystemDefinition(withPatch({ itemKinds }))).toThrow(/não aceita default/);
     expect(() => validateSystemDefinition(withPatch({ sizes: [] }))).toThrow(/não declara sizes/);
   });
+});
+
+describe("conditions[] (todas as definições de sistema)", () => {
+  for (const id of listSystemIds()) {
+    const def = getSystemDefinition(id);
+
+    it(`${id}: toda key de condição é normalizada (bate com KeySchema) e única`, () => {
+      const keys = def.conditions.map((c) => c.key);
+      // KeySchema já é validado por validateSystemDefinition (schema.parse), mas o teste garante isso
+      // explicitamente aqui: ascii, minúscula, sem acento/espaço/hífen (ver docs/lista-condicoes.md —
+      // foi exatamente esse tipo de divergência, "Caído" vs "caido", que motivou conferir contra a
+      // fonte na hora de escrever a lista). "Duplicada" também já é pego por assertUnique, repetido
+      // aqui porque menu (escreve) e render (lê) resolvem pela MESMA key: se duas condições dividissem
+      // uma key, uma sobrescreveria a outra no Map de lookup sem lançar erro nenhum.
+      for (const key of keys) expect(KeySchema.safeParse(key).success, `key "${key}"`).toBe(true);
+      expect(new Set(keys).size).toBe(keys.length);
+    });
+
+    it(`${id}: todo ícone de condição é um SVG (com viewBox) — checagem estrutural, não um parser XML completo`, () => {
+      for (const c of def.conditions) {
+        expect(c.icon.trim(), `condição "${c.key}"`).toMatch(/^<svg\b[^>]*>[\s\S]*<\/svg>$/);
+        expect(c.icon, `condição "${c.key}"`).toMatch(/\bviewBox\s*=\s*(['"])[^'"]+\1/);
+      }
+    });
+  }
 });
 
 describe("tormenta20.json", () => {
