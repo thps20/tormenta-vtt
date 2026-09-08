@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { IdSchema } from "./common.js";
+import { KeySchema } from "./system.js";
 
 export const TokenHpSchema = z.object({ current: z.number().int(), max: z.number().int().min(0) });
 export type TokenHp = z.infer<typeof TokenHpSchema>;
@@ -32,6 +33,12 @@ export const TokenSchema = z.object({
    * null = PV não definido (token não aparece como alvo de token:apply-damage).
    */
   hp: TokenHpSchema.nullable().default(null),
+  /**
+   * Chaves de conditions[] do sistema (ver SystemDefinitionSchema), ex.: ["cego", "atordoado"].
+   * Só marcador visual por enquanto, sem automação de regra. Se a chave existe de verdade no
+   * sistema da sala é conferido no handler (aqui é só a forma), igual a ownerId/characterId.
+   */
+  conditions: z.array(KeySchema).default([]),
 });
 export type Token = z.infer<typeof TokenSchema>;
 
