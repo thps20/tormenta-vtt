@@ -617,6 +617,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
       token={token}
       bar={tokenBars[token.id] ?? null}
       conditionByKey={conditionByKey}
+      stageScale={stageScale}
       draggable={mode === "select" && canControl(me, token)}
       selectable={mode === "select"}
       isSelected={selectedIds.includes(token.id)}
@@ -872,9 +873,11 @@ interface TokenNodeProps {
   onTransformEnd: (node: Konva.Node) => void;
   /** Botão direito no token: abre o ConditionMenu na posição do clique (em coordenadas de tela). */
   onContextMenu: (clientX: number, clientY: number) => void;
+  /** Zoom atual do Stage: os badges de condição precisam saber pra manter o tamanho em px de tela. */
+  stageScale: number;
 }
 
-const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu }) => {
+const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu, stageScale }) => {
   const image = useImage(assetUrl(token.imageUrl));
   const radius = tokenRadius(token);
   const cx = token.width / 2;
@@ -985,12 +988,13 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, dragg
         Badges de condição por ÚLTIMO (depois do círculo de hit): senão o hit, que cobre até um
         pouco além da borda do círculo, rouba o mouseenter/leave dos badges e o tooltip nunca abre.
         Um clique num badge ainda seleciona o token normalmente (sem handler próprio, o evento sobe
-        pro onClick do Group principal).
+        pro onClick do Group principal). Ver comentário geométrico em ConditionMarkers.
       */}
       {token.conditions.length > 0 && (
-        <ConditionBadges
-          cx={cx}
-          y={token.height - CONDITION_BADGE * 0.55}
+        <ConditionMarkers
+          width={token.width}
+          height={token.height}
+          stageScale={stageScale}
           conditions={token.conditions.map((k) => conditionByKey.get(k)).filter((c): c is ConditionDef => c !== undefined)}
         />
       )}
@@ -998,57 +1002,120 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, dragg
   );
 };
 
-// --- Condições: ícones pequenos na borda do token -----------------------------
+// --- Condições: coluna de ícones encostada na borda direita do token ----------
+//
+// Geometria (coordenadas locais do Group do token, origem no canto superior-esquerdo
+// da bounding box — a própria célula/grid que o token ocupa, `(0,0)` a `(width,height)`):
+// um badge é um círculo de raio `r`; o da coluna da direita fica centrado em
+// `x = width - r` (a borda direita do círculo encosta em `x = width`, nunca passa disso —
+// é o que garante não invadir a célula vizinha) e desce a partir de `y = r` (topo do
+// círculo encosta em `y = 0`), empilhando com passo `2r + gap`. O corpo do token é um
+// círculo INSCRITO na bounding box (raio = metade do lado menor), então ele só toca as
+// bordas nos 4 pontos cardeais — os cantos ficam vazios — e uma coluna encostada na borda
+// direita cai sobretudo nesses cantos, tocando o desenho do token só perto do meio da
+// altura ("sobrepor só a beirada").
+//
+// Se não couber tudo numa coluna, a 2ª coluna nasce à esquerda da 1ª, mesmo passo
+// horizontal (vira uma grade). O teto continua sendo CONDITION_MAX_VISIBLE (6): se nem
+// 2 colunas dão conta, o último slot vira "+N" (tooltip lista as ocultas).
+//
+// Tamanho do ícone: ~22% do lado da célula, mas convertido pra px de TELA (× stageScale)
+// e limitado a [MIN_PX, MAX_PX] — daí convertido de volta pra unidades do mapa. Abaixo de
+// MIN_PX nem tenta desenhar a coluna: mostra só um contador pequeno de tamanho FIXO em
+// tela (`scale = 1/stageScale` cancela o zoom do Stage), com tooltip listando todas.
+//
+// Faixa inferior (barra de vida/nome): a barra desenha ACIMA da bounding box (`y=-12`,
+// ver TokenNode) e o nome ABAIXO dela (`y=height+4`) — nenhum dos dois entra no intervalo
+// `[0, height]` que a coluna usa, então não há nada pra reservar aqui. Se um dia a barra
+// (ou o nome) passar a desenhar DENTRO da bounding box, subtraia a altura dela de
+// `usableHeight` antes de calcular `rows`.
 
-const CONDITION_BADGE = 15;
-const CONDITION_GAP = 3;
-/** Além desse tanto, o resto vira um badge "+N" (SPEC §3.3: máx. 6 visíveis). */
+const CONDITION_ICON_PCT = 0.22;
+const CONDITION_MIN_PX = 10;
+const CONDITION_MAX_PX = 24;
+/** Teto de sempre (1 ou 2 colunas); além disso o resto vira um badge "+N". */
 const CONDITION_MAX_VISIBLE = 6;
 
-/**
- * Fileira de badges centralizada em `cx`, na borda inferior do token. O tooltip do badge em hover
- * é desenhado por ÚLTIMO aqui (não dentro de cada badge): como os badges ficam colados, um badge
- * mais à direita é um irmão desenhado DEPOIS e cobriria o tooltip do vizinho à esquerda.
- */
-const ConditionBadges: React.FC<{ cx: number; y: number; conditions: ConditionDef[] }> = ({ cx, y, conditions }) => {
+type ConditionSlot = { key: string; label: string; description: string; icon?: string; color: string; hiddenLabels?: string[] };
+
+const ConditionMarkers: React.FC<{ width: number; height: number; stageScale: number; conditions: ConditionDef[] }> = ({
+  width,
+  height,
+  stageScale,
+  conditions,
+}) => {
+  // Hook antes de qualquer `return` condicional (regra dos Hooks) — mesmo no modo "contador",
+  // que não usa isso, o componente precisa chamar sempre os mesmos Hooks na mesma ordem.
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const visible = conditions.slice(0, CONDITION_MAX_VISIBLE);
-  const hiddenCount = conditions.length - visible.length;
-  const slots = visible.length + (hiddenCount > 0 ? 1 : 0);
-  const totalWidth = slots * CONDITION_BADGE + (slots - 1) * CONDITION_GAP;
-  const startX = cx - totalWidth / 2 + CONDITION_BADGE / 2;
-  const slotX = (i: number) => startX + i * (CONDITION_BADGE + CONDITION_GAP);
-  const hovered = hoverIndex !== null ? visible[hoverIndex] : undefined;
+
+  // Zoom baixo demais pro ícone ficar legível: troca a coluna toda por um contador fixo.
+  const cellSide = Math.min(width, height);
+  const rawScreenSize = cellSide * CONDITION_ICON_PCT * stageScale;
+  if (rawScreenSize < CONDITION_MIN_PX) {
+    return <ConditionCounter x={width} y={0} count={conditions.length} labels={conditions.map((c) => c.label)} stageScale={stageScale} />;
+  }
+
+  const screenSize = Math.min(CONDITION_MAX_PX, Math.max(CONDITION_MIN_PX, rawScreenSize));
+  const size = screenSize / stageScale;
+  // Cinto de segurança: um token redimensionado bem menor que uma célula não deveria
+  // deixar o badge estourar a própria bounding box.
+  const r = Math.min(size / 2, width / 2, height / 2);
+  const gap = r * 0.4;
+  const step = 2 * r + gap;
+
+  const usableHeight = height; // ver comentário acima: bar/nome não entram em [0, height] hoje
+  const rows = Math.max(1, Math.floor((usableHeight - 2 * r) / step) + 1);
+  const maxSlots = Math.min(CONDITION_MAX_VISIBLE, 2 * rows);
+  const overflow = conditions.length > maxSlots;
+  const visibleCount = overflow ? maxSlots - 1 : conditions.length;
+  const visible = conditions.slice(0, visibleCount);
+  const hidden = overflow ? conditions.slice(visibleCount) : [];
+
+  const slots: ConditionSlot[] = visible.map((c) => ({ key: c.key, label: c.label, description: c.description, icon: c.icon, color: c.color }));
+  if (hidden.length > 0) {
+    slots.push({ key: "__overflow", label: `+${hidden.length}`, description: "", color: "#71717a", hiddenLabels: hidden.map((c) => c.label) });
+  }
+
+  const posOf = (i: number) => {
+    const col = Math.floor(i / rows);
+    const rowInCol = i % rows;
+    return { x: width - r - col * step, y: r + rowInCol * step };
+  };
+
+  const hovered = hoverIndex !== null ? slots[hoverIndex] : undefined;
+  const hoveredPos = hoverIndex !== null ? posOf(hoverIndex) : null;
 
   return (
     <>
-      {visible.map((condition, i) => (
-        <ConditionBadge
-          key={condition.key}
-          condition={condition}
-          x={slotX(i)}
-          y={y}
-          onHover={() => setHoverIndex(i)}
-          onLeave={() => setHoverIndex((current) => (current === i ? null : current))}
-        />
-      ))}
-      {hiddenCount > 0 && (
-        <Group x={slotX(visible.length)} y={y} listening={false}>
-          <Circle radius={CONDITION_BADGE / 2} fill="#0c0c0c" stroke="#71717a" strokeWidth={1.2} />
-          <Text x={-CONDITION_BADGE / 2} y={-4} width={CONDITION_BADGE} text={`+${hiddenCount}`} align="center" fontSize={8} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" />
-        </Group>
-      )}
-      {hovered && (
-        <Label x={slotX(hoverIndex!) + CONDITION_BADGE / 2 + 3} y={y - CONDITION_BADGE} listening={false}>
+      {slots.map((slot, i) => {
+        const p = posOf(i);
+        return (
+          <ConditionBadge
+            key={slot.key}
+            slot={slot}
+            x={p.x}
+            y={p.y}
+            r={r}
+            onHover={() => setHoverIndex(i)}
+            onLeave={() => setHoverIndex((current) => (current === i ? null : current))}
+          />
+        );
+      })}
+      {/*
+        Tooltip por ÚLTIMO (não dentro de cada badge): como os badges ficam colados, um badge
+        mais próximo da borda é um irmão desenhado DEPOIS e cobriria o tooltip do vizinho.
+      */}
+      {hovered && hoveredPos && (
+        <Label x={hoveredPos.x - r} y={hoveredPos.y - 2 * r} listening={false}>
           <Tag fill="#0c0c0c" stroke="#2d2417" strokeWidth={1} cornerRadius={3} />
           <Text
-            text={hovered.description ? `${hovered.label}\n${hovered.description}` : hovered.label}
+            text={hovered.hiddenLabels ? hovered.hiddenLabels.join("\n") : hovered.description ? `${hovered.label}\n${hovered.description}` : hovered.label}
             fontSize={10}
             fontFamily="sans-serif"
             fill="#e0e0e0"
             padding={5}
-            width={hovered.description ? 200 : undefined}
-            wrap={hovered.description ? "word" : "none"}
+            width={hovered.description || hovered.hiddenLabels ? 200 : undefined}
+            wrap={hovered.description || hovered.hiddenLabels ? "word" : "none"}
           />
         </Label>
       )}
@@ -1056,22 +1123,52 @@ const ConditionBadges: React.FC<{ cx: number; y: number; conditions: ConditionDe
   );
 };
 
-/** Um badge: ícone (SVG do JSON, rasterizado com a cor da condição). Tooltip é do pai (ConditionBadges). */
-const ConditionBadge: React.FC<{ condition: ConditionDef; x: number; y: number; onHover: () => void; onLeave: () => void }> = ({
-  condition,
+/** Um badge: fundo circular escuro semitransparente + ícone (SVG do JSON, rasterizado com a cor da condição), ou "+N". */
+const ConditionBadge: React.FC<{ slot: ConditionSlot; x: number; y: number; r: number; onHover: () => void; onLeave: () => void }> = ({
+  slot,
   x,
   y,
+  r,
   onHover,
   onLeave,
 }) => {
-  const iconUrl = useMemo(() => conditionIconDataUrl(condition.icon, condition.color), [condition.icon, condition.color]);
+  const iconUrl = useMemo(() => (slot.icon ? conditionIconDataUrl(slot.icon, slot.color) : null), [slot.icon, slot.color]);
   const icon = useImage(iconUrl);
-  const iconSize = CONDITION_BADGE * 0.62;
+  const iconSize = r * 1.24;
 
   return (
     <Group name="condition-badge" x={x} y={y} onMouseEnter={onHover} onMouseLeave={onLeave}>
-      <Circle radius={CONDITION_BADGE / 2} fill="#0c0c0c" stroke={condition.color} strokeWidth={1.2} />
-      {icon && <KonvaImage image={icon} x={-iconSize / 2} y={-iconSize / 2} width={iconSize} height={iconSize} listening={false} />}
+      <Circle radius={r} fill="rgba(12, 12, 12, 0.75)" stroke={slot.color} strokeWidth={Math.max(1, r * 0.1)} />
+      {icon ? (
+        <KonvaImage image={icon} x={-iconSize / 2} y={-iconSize / 2} width={iconSize} height={iconSize} listening={false} />
+      ) : (
+        <Text x={-r} y={-r * 0.45} width={r * 2} text={slot.label} align="center" fontSize={r * 0.85} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" listening={false} />
+      )}
+    </Group>
+  );
+};
+
+/**
+ * Fallback de zoom baixo: um badge de tamanho FIXO em tela (não some nem encolhe além disso),
+ * ancorado no canto superior direito da bounding box. `scale={1/stageScale}` cancela o zoom do
+ * Stage no subtree — os filhos são desenhados direto em "px de tela equivalente".
+ */
+const ConditionCounter: React.FC<{ x: number; y: number; count: number; labels: string[]; stageScale: number }> = ({ x, y, count, labels, stageScale }) => {
+  const [hover, setHover] = useState(false);
+  const radius = 9;
+
+  return (
+    <Group x={x} y={y} scaleX={1 / stageScale} scaleY={1 / stageScale}>
+      <Group x={-radius} y={radius} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+        <Circle radius={radius} fill="rgba(12, 12, 12, 0.85)" stroke="#71717a" strokeWidth={1.2} />
+        <Text x={-radius} y={-4} width={radius * 2} text={String(count)} align="center" fontSize={9} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" listening={false} />
+        {hover && (
+          <Label x={radius + 3} y={-radius * 2} listening={false}>
+            <Tag fill="#0c0c0c" stroke="#2d2417" strokeWidth={1} cornerRadius={3} />
+            <Text text={labels.join("\n")} fontSize={10} fontFamily="sans-serif" fill="#e0e0e0" padding={5} />
+          </Label>
+        )}
+      </Group>
     </Group>
   );
 };
