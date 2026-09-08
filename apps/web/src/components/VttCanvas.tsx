@@ -2,8 +2,9 @@ import React, { useRef, useState, useEffect, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
-import { measureDistance, type Character, type FogShape, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenPatch } from "@tormenta-vtt/shared";
+import { measureDistance, type Character, type ConditionDef, type FogShape, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
+import { conditionIconDataUrl } from "../lib/conditionIcon";
 import { clampToMap, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
 import { useImage } from "../lib/useImage";
 import { newId } from "../lib/ids";
@@ -607,11 +608,15 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   const tokensAboveFog = tokens.filter((t) => canControl(me, t));
   const tokensBelowFog = tokens.filter((t) => !canControl(me, t));
 
+  // Pra cada token resolver `conditions: string[]` (chaves) nas definições cheias (ícone, cor, descrição).
+  const conditionByKey = useMemo(() => new Map((systemDef?.conditions ?? []).map((c) => [c.key, c])), [systemDef]);
+
   const renderToken = (token: Token) => (
     <TokenNode
       key={token.id}
       token={token}
       bar={tokenBars[token.id] ?? null}
+      conditionByKey={conditionByKey}
       draggable={mode === "select" && canControl(me, token)}
       selectable={mode === "select"}
       isSelected={selectedIds.includes(token.id)}
@@ -850,6 +855,8 @@ function findFreeSpot(
 interface TokenNodeProps {
   token: Token;
   bar: TokenBar | null;
+  /** conditions[] do sistema, indexadas por key, pra resolver ícone/cor/descrição das do token. */
+  conditionByKey: Map<string, ConditionDef>;
   draggable: boolean;
   /** Modo Selecionar: clique seleciona. Nos outros modos o clique sobe para o Stage (ex.: vértice do polígono da névoa). */
   selectable: boolean;
@@ -867,7 +874,7 @@ interface TokenNodeProps {
   onContextMenu: (clientX: number, clientY: number) => void;
 }
 
-const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu }) => {
+const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu }) => {
   const image = useImage(assetUrl(token.imageUrl));
   const radius = tokenRadius(token);
   const cx = token.width / 2;
@@ -973,6 +980,98 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, draggable, selectable
         `fill="transparent"` não desenha nada, mas deixa explícito que a área conta como preenchida.
       */}
       <Circle name="token-hit" x={cx} y={cy} radius={radius + BODY_STROKE} fill="transparent" />
+
+      {/*
+        Badges de condição por ÚLTIMO (depois do círculo de hit): senão o hit, que cobre até um
+        pouco além da borda do círculo, rouba o mouseenter/leave dos badges e o tooltip nunca abre.
+        Um clique num badge ainda seleciona o token normalmente (sem handler próprio, o evento sobe
+        pro onClick do Group principal).
+      */}
+      {token.conditions.length > 0 && (
+        <ConditionBadges
+          cx={cx}
+          y={token.height - CONDITION_BADGE * 0.55}
+          conditions={token.conditions.map((k) => conditionByKey.get(k)).filter((c): c is ConditionDef => c !== undefined)}
+        />
+      )}
+    </Group>
+  );
+};
+
+// --- Condições: ícones pequenos na borda do token -----------------------------
+
+const CONDITION_BADGE = 15;
+const CONDITION_GAP = 3;
+/** Além desse tanto, o resto vira um badge "+N" (SPEC §3.3: máx. 6 visíveis). */
+const CONDITION_MAX_VISIBLE = 6;
+
+/**
+ * Fileira de badges centralizada em `cx`, na borda inferior do token. O tooltip do badge em hover
+ * é desenhado por ÚLTIMO aqui (não dentro de cada badge): como os badges ficam colados, um badge
+ * mais à direita é um irmão desenhado DEPOIS e cobriria o tooltip do vizinho à esquerda.
+ */
+const ConditionBadges: React.FC<{ cx: number; y: number; conditions: ConditionDef[] }> = ({ cx, y, conditions }) => {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const visible = conditions.slice(0, CONDITION_MAX_VISIBLE);
+  const hiddenCount = conditions.length - visible.length;
+  const slots = visible.length + (hiddenCount > 0 ? 1 : 0);
+  const totalWidth = slots * CONDITION_BADGE + (slots - 1) * CONDITION_GAP;
+  const startX = cx - totalWidth / 2 + CONDITION_BADGE / 2;
+  const slotX = (i: number) => startX + i * (CONDITION_BADGE + CONDITION_GAP);
+  const hovered = hoverIndex !== null ? visible[hoverIndex] : undefined;
+
+  return (
+    <>
+      {visible.map((condition, i) => (
+        <ConditionBadge
+          key={condition.key}
+          condition={condition}
+          x={slotX(i)}
+          y={y}
+          onHover={() => setHoverIndex(i)}
+          onLeave={() => setHoverIndex((current) => (current === i ? null : current))}
+        />
+      ))}
+      {hiddenCount > 0 && (
+        <Group x={slotX(visible.length)} y={y} listening={false}>
+          <Circle radius={CONDITION_BADGE / 2} fill="#0c0c0c" stroke="#71717a" strokeWidth={1.2} />
+          <Text x={-CONDITION_BADGE / 2} y={-4} width={CONDITION_BADGE} text={`+${hiddenCount}`} align="center" fontSize={8} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" />
+        </Group>
+      )}
+      {hovered && (
+        <Label x={slotX(hoverIndex!) + CONDITION_BADGE / 2 + 3} y={y - CONDITION_BADGE} listening={false}>
+          <Tag fill="#0c0c0c" stroke="#2d2417" strokeWidth={1} cornerRadius={3} />
+          <Text
+            text={hovered.description ? `${hovered.label}\n${hovered.description}` : hovered.label}
+            fontSize={10}
+            fontFamily="sans-serif"
+            fill="#e0e0e0"
+            padding={5}
+            width={hovered.description ? 200 : undefined}
+            wrap={hovered.description ? "word" : "none"}
+          />
+        </Label>
+      )}
+    </>
+  );
+};
+
+/** Um badge: ícone (SVG do JSON, rasterizado com a cor da condição). Tooltip é do pai (ConditionBadges). */
+const ConditionBadge: React.FC<{ condition: ConditionDef; x: number; y: number; onHover: () => void; onLeave: () => void }> = ({
+  condition,
+  x,
+  y,
+  onHover,
+  onLeave,
+}) => {
+  const iconUrl = useMemo(() => conditionIconDataUrl(condition.icon, condition.color), [condition.icon, condition.color]);
+  const icon = useImage(iconUrl);
+  const iconSize = CONDITION_BADGE * 0.62;
+
+  return (
+    <Group name="condition-badge" x={x} y={y} onMouseEnter={onHover} onMouseLeave={onLeave}>
+      <Circle radius={CONDITION_BADGE / 2} fill="#0c0c0c" stroke={condition.color} strokeWidth={1.2} />
+      {icon && <KonvaImage image={icon} x={-iconSize / 2} y={-iconSize / 2} width={iconSize} height={iconSize} listening={false} />}
     </Group>
   );
 };
