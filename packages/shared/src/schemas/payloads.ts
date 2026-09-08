@@ -4,6 +4,7 @@ import { GridConfigSchema } from "./scene.js";
 import { FogShapeSchema } from "./fog.js";
 import { InitiativeEntrySchema } from "./initiative.js";
 import { CharacterDataSchema, CharacterKindSchema, CharacterRollRequestSchema, EnhancementUseSchema } from "./character.js";
+import { RollVisibilitySchema } from "./dice.js";
 
 /**
  * Schemas dos payloads que entram no servidor (socket e HTTP).
@@ -143,7 +144,8 @@ export const CharacterDeleteSchema = z.object({ characterId: IdSchema });
 export const CharacterRollSchema = z.object({
   characterId: IdSchema,
   roll: CharacterRollRequestSchema,
-  secret: z.boolean().default(false),
+  /** Modo de rolagem escolhido pelo autor (ver RollVisibilitySchema). */
+  visibility: RollVisibilitySchema.default("all"),
 });
 export type CharacterRollPayload = z.infer<typeof CharacterRollSchema>;
 
@@ -157,7 +159,19 @@ export type CharacterUseItemPayload = z.infer<typeof CharacterUseItemSchema>;
 
 // --- Chat ------------------------------------------------------------------
 
-export const ChatSendSchema = z.object({ text: z.string().trim().min(1).max(2000) });
+/**
+ * `visibility` é o modo de rolagem atual do autor e só vale para rolagens
+ * (texto é sempre público). "/gmr" e "/pr" no texto forçam secreta/pública.
+ */
+export const ChatSendSchema = z.object({
+  text: z.string().trim().min(1).max(2000),
+  visibility: RollVisibilitySchema.default("all"),
+});
+export type ChatSendPayload = z.infer<typeof ChatSendSchema>;
+
+/** GM torna pública uma mensagem secreta/própria. */
+export const ChatRevealSchema = z.object({ messageId: IdSchema });
+export type ChatRevealPayload = z.infer<typeof ChatRevealSchema>;
 
 // --- Iniciativa ------------------------------------------------------------
 

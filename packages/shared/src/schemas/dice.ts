@@ -17,6 +17,15 @@ export const DiceGroupResultSchema = z.object({
 });
 export type DiceGroupResult = z.infer<typeof DiceGroupResultSchema>;
 
+/**
+ * Quem vê uma mensagem do chat (modo de rolagem):
+ *   all  = pública, todos veem;
+ *   gm   = secreta, só o GM vê (um jogador que rolou NÃO vê o próprio resultado: rolagem às cegas);
+ *   self = própria, só quem rolou vê.
+ */
+export const RollVisibilitySchema = z.enum(["all", "gm", "self"]);
+export type RollVisibility = z.infer<typeof RollVisibilitySchema>;
+
 /** Uma parcela de dano já rolada. */
 export const DamageRollComponentSchema = z.object({
   damageType: KeySchema.nullable(),
@@ -57,8 +66,6 @@ export const DiceRollSchema = z.object({
   /** Modificador fixo total (ex.: +3). */
   modifier: z.number().int(),
   total: z.number().int(),
-  /** true = só GM e quem rolou veem o resultado. */
-  secret: z.boolean().default(false),
   /** Rolagem feita a partir de uma ficha. */
   characterId: IdSchema.optional(),
   /** Resultado natural do dado a partir do qual é crítico (ataques com margem ampliada). Ausente = máximo do dado. */
@@ -85,6 +92,8 @@ export const ChatMessageSchema = z.object({
   text: z.string().max(2000).optional(),
   roll: DiceRollSchema.optional(),
   item: ItemCardSchema.optional(),
+  /** Quem recebe a mensagem (servidor filtra no broadcast e no snapshot). "Revelar" (GM) muda para "all". */
+  visibility: RollVisibilitySchema.default("all"),
   createdAt: z.string().datetime(),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;

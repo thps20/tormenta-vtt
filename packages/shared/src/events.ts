@@ -17,6 +17,8 @@ import type {
   CharacterUpdatePayload,
   CharacterUseItemPayload,
   ChatMessage,
+  ChatRevealPayload,
+  ChatSendPayload,
   CompendiumEntry,
   FogConfig,
   FogUpdatePayload,
@@ -113,8 +115,14 @@ export interface ClientToServerEvents {
   "ruler:update": (payload: RulerUpdatePayload, ack: Ack) => void;
 
   // Chat + dados
-  /** "/r <fórmula> [# rótulo]" rola; "/gr" rola em segredo (só GM + autor veem). */
-  "chat:send": (payload: { text: string }, ack: Ack<ChatMessage>) => void;
+  /**
+   * "/r <fórmula> [# rótulo]" rola no modo `visibility` do autor; "/gmr" força
+   * secreta (só GM) e "/pr" força pública. Texto é sempre público.
+   * Rolagem que o autor não pode ver (às cegas) volta no ack sem `roll`.
+   */
+  "chat:send": (payload: ChatSendPayload, ack: Ack<ChatMessage>) => void;
+  /** GM torna pública uma mensagem secreta/própria: `chat:message` com visibility "all" para todos (upsert no cliente). */
+  "chat:reveal": (payload: ChatRevealPayload, ack: Ack<ChatMessage>) => void;
 
   // Iniciativa (GM)
   "initiative:add": (payload: InitiativeAddPayload, ack: Ack<InitiativeState>) => void;
@@ -141,6 +149,7 @@ export interface ServerToClientEvents {
   "token:updated": (token: Token) => void;
   "token:deleted": (p: { tokenId: string }) => void;
 
+  /** Mensagem nova ou revelada (mesmo id, visibility nova): o cliente faz upsert. */
   "chat:message": (msg: ChatMessage) => void;
 
   "character:created": (character: Character) => void;
