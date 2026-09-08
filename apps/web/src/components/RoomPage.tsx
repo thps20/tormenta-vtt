@@ -277,7 +277,14 @@ function Table() {
 
       <div className="flex-1 flex overflow-hidden relative">
         <main className="flex-1 h-full relative overflow-hidden">
-          <CombatBanner combat={combat} me={me} onRollSelf={() => combatRoll({ scope: "self" })} onDelay={combatDelay} />
+          <CombatBanner
+            combat={combat}
+            meId={me.id}
+            viewer={isGm ? "gm" : "player"}
+            onRollSelf={() => combatRoll({ scope: "self" })}
+            onDelay={combatDelay}
+            onResume={combatResume}
+          />
           {scene ? (
             <>
               <VttCanvas
