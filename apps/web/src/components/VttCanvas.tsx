@@ -95,6 +95,9 @@ const FOG_HINTS: Record<FogToolShape, string> = {
 /** Largura da borda do círculo do token (pixels do mapa). */
 const BODY_STROKE = 3;
 
+/** Alças de redimensionar habilitadas no Transformer (sem cantos de rotação: `rotateEnabled={false}`). */
+const RESIZE_ANCHOR_NAMES = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
+
 /** Raio do círculo do token em pixels do mapa (o token é desenhado a partir de width/height). */
 function tokenRadius(t: { width: number; height: number }): number {
   return Math.min(t.width, t.height) / 2;
@@ -346,6 +349,35 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   };
 
   /**
+   * Alça de redimensionar (`Konva.Transformer`) sob o ponteiro, por GEOMETRIA — mesmo motivo de
+   * `tokenAtPointer`: cada alça é um `Rect` interno pequeno da própria lib, e um mousedown nela só
+   * inicia o resize se `getIntersection` acertar exatamente aquela shape (medido em
+   * docs/auditoria-hit-canvas.md: com o hit sabotado, nenhum arrasto de alça mudava o tamanho).
+   * `anchor.getClientRect()` já vem no mesmo espaço de `stage.getPointerPosition()` (pixels "de
+   * tela" do Stage, antes de desfazer pan/zoom) — não precisa de `pointerMapPos()` aqui.
+   */
+  const resizeAnchorAtPointer = (): Konva.Rect | null => {
+    if (!canResize) return null;
+    const tr = transformerRef.current;
+    const pointer = stageRef.current?.getPointerPosition();
+    if (!tr || !pointer) return null;
+    for (const name of RESIZE_ANCHOR_NAMES) {
+      const anchor = tr.findOne<Konva.Rect>(`.${name}`);
+      if (!anchor) continue;
+      const r = anchor.getClientRect();
+      const cx = r.x + r.width / 2;
+      const cy = r.y + r.height / 2;
+      // Folga além do próprio desenho (a alça tem uns 8px; +6 de folga, como o token-hit faz
+      // com o círculo do token — metade é a borda, metade é margem de erro do clique).
+      const radius = Math.max(r.width, r.height) / 2 + 6;
+      const dx = pointer.x - cx;
+      const dy = pointer.y - cy;
+      if (dx * dx + dy * dy <= radius * radius) return anchor;
+    }
+    return null;
+  };
+
+  /**
    * Badge de condição sob o ponteiro, por GEOMETRIA (mesmo motivo de `tokenAtPointer`: o canvas de
    * hit do Konva é embaralhado por proteção anti-fingerprinting e o mouseenter simplesmente não
    * dispara — ver docs/debug-token.md). Devolve o tooltip pronto, ou null. Último token da lista
@@ -542,8 +574,9 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   };
 
   /**
-   * Modo Selecionar: sobre um token, repassa o mousedown ao Group se o canvas de hit não o
-   * reconheceu (para o Konva iniciar o drag); no mapa vazio, começa a caixa de seleção.
+   * Modo Selecionar: sobre uma alça de redimensionar, repassa o mousedown pra ela; sobre um token,
+   * repassa pro Group — nos dois casos, só se o canvas de hit não reconheceu (pra o Konva iniciar o
+   * drag/resize normalmente a partir daí); no mapa vazio, começa a caixa de seleção.
    */
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (e.evt.button !== 0) return;
@@ -561,6 +594,13 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
       return;
     }
     if (mode !== "select") return;
+    // Alça de redimensionar tem prioridade sobre o token: geometricamente ela fica na borda dele,
+    // então "sobre o token" também é "sobre a alça" perto dos cantos.
+    const anchor = resizeAnchorAtPointer();
+    if (anchor) {
+      if (e.target !== anchor && !anchor.isAncestorOf(e.target)) anchor.fire("mousedown", { evt: e.evt, pointerId: e.pointerId }, false);
+      return;
+    }
     const t = tokenAtPointer();
     if (t) {
       if (!hitLandedOnToken(e.target, t.id)) tokenGroup(t.id)?.fire("mousedown", { evt: e.evt, pointerId: e.pointerId }, false);
@@ -797,7 +837,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
             ref={transformerRef}
             rotateEnabled={false}
             keepRatio
-            enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+            enabledAnchors={[...RESIZE_ANCHOR_NAMES]}
             anchorStroke="#d4af37"
             anchorFill="#1a1a1a"
             anchorSize={8}
