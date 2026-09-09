@@ -3,16 +3,20 @@ import {
   CharacterDataSchema,
   TokenApplyDamageSchema,
   TokenCreateSchema,
+  TokenDeleteManySchema,
   TokenDeleteSchema,
   TokenHpSchema,
   TokenLinkCharacterSchema,
   TokenPatchSchema,
+  TokenUpdateManySchema,
   applyResourceDelta,
   computeCharacter,
   type AppliedDamage,
   type FogConfig,
+  type SystemDefinition,
   type Token,
   type TokenHp,
+  type TokenPatch,
 } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import {
@@ -27,10 +31,20 @@ import {
 import { checkApplyDamageTarget } from "../services/applyDamage.js";
 import { emitCombat, loadCombatRow, maybeReemitCombatForToken, prepareTokenRemovalFromCombat } from "../services/combat.js";
 import { emitChatMessage, messageVisibleTo } from "../services/chatVisibility.js";
+import {
+  describeDelete,
+  describeTokenChange,
+  pushEntry,
+  pickTrackableTokenPatch,
+  type HistoryEntry,
+  type TrackableTokenField,
+  type TrackableTokenPatch,
+} from "../services/history.js";
 import { canEditToken, restrictPatchForRole } from "../services/permissions.js";
 import { toChatMessage, toScene, toToken } from "../services/serialize.js";
 import { emitTokenToPlayers } from "../services/visibility.js";
-import { guarded, HandlerError } from "./ack.js";
+import { guarded, HandlerError, type Ctx } from "./ack.js";
+import { emitHistoryUpdated } from "./history.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
 /**
@@ -59,6 +73,150 @@ export function broadcastToken(io: TypedServer, roomId: string, token: Token, ev
   emitTokenToPlayers(io, roomId, token, event, fog);
 }
 
+// --- token:update / token:update-many --------------------------------------------------------
+// Compartilham a mesma lógica de aplicar UM patch (permissão, campos do jogador, validação de
+// condições) — só muda quem chama e o que fazem com before/after depois (histórico, docs/plano-desfazer.md §3).
+
+/** Aplica um TokenPatch e devolve o token antes/depois (public Token, não a linha crua do Prisma). */
+async function applyTokenUpdate(io: TypedServer, ctx: Ctx, patch: TokenPatch): Promise<{ before: Token; after: Token }> {
+  const row = await requireToken(patch.id, ctx.roomId);
+  if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla este token");
+
+  const { id, sceneId: _ignoreScene, hp, live: _ignoreLive, ...fields } = restrictPatchForRole(ctx, patch);
+  if (fields.ownerId) {
+    const owner = await prisma.participant.findUnique({ where: { id: fields.ownerId } });
+    if (!owner || owner.roomId !== ctx.roomId) throw new HandlerError("Dono inválido");
+  }
+  if (fields.conditions) {
+    const def = await requireSystem(ctx.roomId);
+    const known = new Set(def.conditions.map((c) => c.key));
+    if (fields.conditions.some((c) => !known.has(c.key))) throw new HandlerError("Condição inexistente no sistema da sala");
+  }
+  const updatedRow = await prisma.token.update({ where: { id }, data: { ...fields, ...(hp !== undefined ? { hp: hpJson(hp) } : {}) } });
+  const token = toToken(updatedRow);
+  const fog = toScene(row.scene).fog;
+  // A cena já veio junto com o token (requireToken): sem consulta extra a cada movimento.
+  broadcastToken(io, ctx.roomId, token, "token:updated", fog);
+  // Nome/cor/visível mudaram, ou a posição cruzou a névoa: se este token é um combatente,
+  // a lista de combate (e quem pode vê-la) pode ter mudado junto.
+  await maybeReemitCombatForToken(io, ctx.roomId, toToken(row), token, fog);
+  return { before: toToken(row), after: token };
+}
+
+interface TrackableDiffItem {
+  tokenId: string;
+  name: string;
+  before: TrackableTokenPatch;
+  after: TrackableTokenPatch;
+}
+
+/** Reaplica só os campos rastreados capturados (before OU after) num token — usado por revert/apply.
+ *  Token sumido (limpeza definitiva, docs/plano-desfazer.md §8) invalida a entrada inteira (§7). */
+async function writeTrackablePatch(io: TypedServer, roomId: string, tokenId: string, patch: TrackableTokenPatch): Promise<void> {
+  const row = await prisma.token.findUnique({ where: { id: tokenId }, include: { scene: true } });
+  if (!row || row.deletedAt !== null) throw new Error(`token "${tokenId}" não existe mais`);
+  const fog = toScene(row.scene).fog;
+  const updated = toToken(await prisma.token.update({ where: { id: tokenId }, data: patch }));
+  broadcastToken(io, roomId, updated, "token:updated", fog);
+  await maybeReemitCombatForToken(io, roomId, toToken(row), updated, fog);
+}
+
+/** Uma entrada de histórico pra 1..N tokens que tiveram campo(s) rastreado(s) mudado(s) na MESMA
+ *  chamada de socket (token:update ou token:update-many, docs/plano-desfazer.md §3). */
+function buildUpdateHistoryEntry(io: TypedServer, roomId: string, items: TrackableDiffItem[]): HistoryEntry {
+  const subject = items.length === 1 ? (items[0] as TrackableDiffItem).name : `${items.length} tokens`;
+  const fields = new Set(items.flatMap((i) => Object.keys(i.before))) as Set<TrackableTokenField>;
+  return {
+    summary: describeTokenChange(subject, fields),
+    async revert() {
+      for (const item of items) await writeTrackablePatch(io, roomId, item.tokenId, item.before);
+    },
+    async apply() {
+      for (const item of items) await writeTrackablePatch(io, roomId, item.tokenId, item.after);
+    },
+  };
+}
+
+// --- token:delete / token:delete-many ---------------------------------------------------------
+
+interface CombatRemovalSnapshot {
+  combatId: string;
+  round: number;
+  activeCombatantId: string | null;
+  /** `order` de CADA combatente do combate antes da remoção (não só do removido): a remoção
+   *  renumera 0..n-1 os que ficam, então restaurar exige devolver a ordem de todo mundo. */
+  orders: { combatantId: string; order: number }[];
+}
+
+/**
+ * Se `tokenId` é combatente de um combate na cena, captura o estado ANTES de mexer (pro undo
+ * restaurar) e então ajusta round/activeCombatantId/order exatamente como o handler já fazia
+ * (`prepareTokenRemovalFromCombat`). `null` = token não é combatente de combate nenhum.
+ */
+async function adjustCombatForTokenRemoval(def: SystemDefinition, sceneId: string, tokenId: string): Promise<CombatRemovalSnapshot | null> {
+  const combat = await loadCombatRow(sceneId);
+  if (!combat) return null;
+  const combatant = combat.combatants.find((c) => c.tokenId === tokenId);
+  if (!combatant) return null;
+  const snapshot: CombatRemovalSnapshot = {
+    combatId: combat.id,
+    round: combat.round,
+    activeCombatantId: combat.activeCombatantId,
+    orders: combat.combatants.map((c) => ({ combatantId: c.id, order: c.order })),
+  };
+  await prepareTokenRemovalFromCombat(def, combat, tokenId);
+  return snapshot;
+}
+
+/** Reverte exatamente o snapshot capturado acima. */
+async function restoreCombatSnapshot(snap: CombatRemovalSnapshot): Promise<void> {
+  await prisma.combat.update({ where: { id: snap.combatId }, data: { round: snap.round, activeCombatantId: snap.activeCombatantId } });
+  await Promise.all(snap.orders.map((o) => prisma.combatant.update({ where: { id: o.combatantId }, data: { order: o.order } })));
+}
+
+interface DeleteItem {
+  tokenId: string;
+  name: string;
+  sceneId: string;
+  combatSnapshot: CombatRemovalSnapshot | null;
+}
+
+/** Uma entrada de histórico pra 1..N tokens apagados na MESMA chamada de socket (token:delete ou
+ *  token:delete-many, docs/plano-desfazer.md §2). `revert` faz soft-undelete + restaura o combate
+ *  capturado; `apply` (redo) soft-deleta de novo e recalcula o ajuste de combate do zero — o
+ *  estado já está de volta ao "antes" depois do revert, então dá o mesmo resultado sem precisar
+ *  guardar um segundo snapshot "depois". */
+function buildDeleteHistoryEntry(io: TypedServer, roomId: string, def: SystemDefinition, items: DeleteItem[]): HistoryEntry {
+  return {
+    summary: describeDelete(items.map((i) => i.name)),
+    async revert() {
+      let combatAffected = false;
+      for (const item of items) {
+        const row = await prisma.token.update({ where: { id: item.tokenId }, data: { deletedAt: null } });
+        const scene = await prisma.scene.findUniqueOrThrow({ where: { id: item.sceneId } });
+        broadcastToken(io, roomId, toToken(row), "token:updated", toScene(scene).fog);
+        if (item.combatSnapshot) {
+          await restoreCombatSnapshot(item.combatSnapshot);
+          combatAffected = true;
+        }
+      }
+      if (combatAffected) await emitCombat(io, roomId, { role: "gm", participantId: "" });
+    },
+    async apply() {
+      let combatAffected = false;
+      for (const item of items) {
+        const row = await prisma.token.findUnique({ where: { id: item.tokenId } });
+        if (!row || row.deletedAt !== null) throw new Error(`token "${item.name}" não existe mais`);
+        const snap = await adjustCombatForTokenRemoval(def, item.sceneId, item.tokenId);
+        await prisma.token.update({ where: { id: item.tokenId }, data: { deletedAt: new Date() } });
+        io.to(rooms.all(roomId)).emit("token:deleted", { tokenId: item.tokenId });
+        if (snap) combatAffected = true;
+      }
+      if (combatAffected) await emitCombat(io, roomId, { role: "gm", participantId: "" });
+    },
+  };
+}
+
 export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): void {
   socket.on(
     "token:create",
@@ -78,27 +236,37 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
   socket.on(
     "token:update",
     guarded(socket, TokenPatchSchema, async (patch, ctx) => {
-      const row = await requireToken(patch.id, ctx.roomId);
-      if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla este token");
+      const { before, after } = await applyTokenUpdate(io, ctx, patch);
+      // Ecos "ao vivo" do arraste (patch.live) nunca empilham — só o patch final do gesto.
+      if (ctx.role === "gm" && !patch.live) {
+        const diff = pickTrackableTokenPatch(before, after);
+        if (diff) {
+          pushEntry(ctx.roomId, buildUpdateHistoryEntry(io, ctx.roomId, [{ tokenId: after.id, name: after.name, ...diff }]));
+          emitHistoryUpdated(io, ctx.roomId);
+        }
+      }
+      return after;
+    }),
+  );
 
-      const { id, sceneId: _ignoreScene, hp, ...fields } = restrictPatchForRole(ctx, patch);
-      if (fields.ownerId) {
-        const owner = await prisma.participant.findUnique({ where: { id: fields.ownerId } });
-        if (!owner || owner.roomId !== ctx.roomId) throw new HandlerError("Dono inválido");
+  socket.on(
+    "token:update-many",
+    guarded(socket, TokenUpdateManySchema, async ({ patches }, ctx) => {
+      // Tudo-ou-nada: confere permissão de TODOS antes de aplicar qualquer um (mesmo padrão de
+      // token:apply-damage) — o arraste em grupo não pode mover metade e travar na outra.
+      const rows = await Promise.all(patches.map((p) => requireToken(p.id, ctx.roomId)));
+      for (const row of rows) if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla um dos tokens selecionados");
+
+      const items: TrackableDiffItem[] = [];
+      for (const patch of patches) {
+        const { before, after } = await applyTokenUpdate(io, ctx, patch);
+        const diff = pickTrackableTokenPatch(before, after);
+        if (diff) items.push({ tokenId: after.id, name: after.name, ...diff });
       }
-      if (fields.conditions) {
-        const def = await requireSystem(ctx.roomId);
-        const known = new Set(def.conditions.map((c) => c.key));
-        if (fields.conditions.some((c) => !known.has(c.key))) throw new HandlerError("Condição inexistente no sistema da sala");
+      if (ctx.role === "gm" && items.length > 0) {
+        pushEntry(ctx.roomId, buildUpdateHistoryEntry(io, ctx.roomId, items));
+        emitHistoryUpdated(io, ctx.roomId);
       }
-      const token = toToken(await prisma.token.update({ where: { id }, data: { ...fields, ...(hp !== undefined ? { hp: hpJson(hp) } : {}) } }));
-      const fog = toScene(row.scene).fog;
-      // A cena já veio junto com o token (requireToken): sem consulta extra a cada movimento.
-      broadcastToken(io, ctx.roomId, token, "token:updated", fog);
-      // Nome/cor/visível mudaram, ou a posição cruzou a névoa: se este token é um combatente,
-      // a lista de combate (e quem pode vê-la) pode ter mudado junto.
-      await maybeReemitCombatForToken(io, ctx.roomId, toToken(row), token, fog);
-      return token;
     }),
   );
 
@@ -107,21 +275,50 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
     guarded(socket, TokenDeleteSchema, async ({ tokenId }, ctx) => {
       const row = await requireToken(tokenId, ctx.roomId);
       if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla este token");
+      const def = await requireSystem(ctx.roomId);
 
-      // Se o token é combatente de um combate, ajusta o cursor de turno ANTES de marcar
-      // deletedAt: loadCombatRow (chamado por prepareTokenRemovalFromCombat via o `combat` daqui)
-      // só filtra combatentes com token.deletedAt null, então depois disso ele já teria sumido.
-      const combat = await loadCombatRow(row.sceneId);
-      if (combat) {
-        const def = await requireSystem(ctx.roomId);
-        await prepareTokenRemovalFromCombat(def, combat, tokenId);
-      }
+      // Se o token é combatente de um combate, captura o estado (pro undo) e ajusta o cursor de
+      // turno ANTES de marcar deletedAt: loadCombatRow só filtra combatentes com token.deletedAt
+      // null, então depois disso ele já teria sumido da lista.
+      const combatSnapshot = await adjustCombatForTokenRemoval(def, row.sceneId, tokenId);
 
       // Soft delete (docs/plano-desfazer.md §2): a linha continua no banco (PV, condições,
       // characterId, Combatant intactos) para o desfazer restaurar tudo sem precisar de snapshot.
       await prisma.token.update({ where: { id: tokenId }, data: { deletedAt: new Date() } });
       io.to(rooms.all(ctx.roomId)).emit("token:deleted", { tokenId });
-      if (combat) await emitCombat(io, ctx.roomId, { role: ctx.role, participantId: ctx.participantId });
+      if (combatSnapshot) await emitCombat(io, ctx.roomId, { role: ctx.role, participantId: ctx.participantId });
+
+      if (ctx.role === "gm") {
+        pushEntry(ctx.roomId, buildDeleteHistoryEntry(io, ctx.roomId, def, [{ tokenId, name: row.name, sceneId: row.sceneId, combatSnapshot }]));
+        emitHistoryUpdated(io, ctx.roomId);
+      }
+    }),
+  );
+
+  socket.on(
+    "token:delete-many",
+    guarded(socket, TokenDeleteManySchema, async ({ tokenIds }, ctx) => {
+      // Tudo-ou-nada, mesmo padrão de token:apply-damage: confere permissão de todos antes de apagar
+      // qualquer um.
+      const rows = await Promise.all(tokenIds.map((id) => requireToken(id, ctx.roomId)));
+      for (const row of rows) if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla um dos tokens selecionados");
+      const def = await requireSystem(ctx.roomId);
+
+      const items: DeleteItem[] = [];
+      let combatAffected = false;
+      for (const row of rows) {
+        const combatSnapshot = await adjustCombatForTokenRemoval(def, row.sceneId, row.id);
+        await prisma.token.update({ where: { id: row.id }, data: { deletedAt: new Date() } });
+        io.to(rooms.all(ctx.roomId)).emit("token:deleted", { tokenId: row.id });
+        if (combatSnapshot) combatAffected = true;
+        items.push({ tokenId: row.id, name: row.name, sceneId: row.sceneId, combatSnapshot });
+      }
+      if (combatAffected) await emitCombat(io, ctx.roomId, { role: ctx.role, participantId: ctx.participantId });
+
+      if (ctx.role === "gm") {
+        pushEntry(ctx.roomId, buildDeleteHistoryEntry(io, ctx.roomId, def, items));
+        emitHistoryUpdated(io, ctx.roomId);
+      }
     }),
   );
 
