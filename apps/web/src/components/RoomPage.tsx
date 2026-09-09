@@ -7,6 +7,7 @@ import { activeCombatant, isMyTurn, useCombat } from "../store/combat";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
 import { useSystemDef } from "../lib/system";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
+import { useDeleteSelectionShortcut } from "../lib/useDeleteSelectionShortcut";
 import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
 import { useTurnTitle } from "../lib/useTurnTitle";
 import { selectEffectiveMode, useTools } from "../store/tools";
@@ -101,6 +102,7 @@ function Table() {
   const setFogBrushSize = useTools((s) => s.setFogBrushSize);
   const fogOp = useRoom((s) => s.fogOp);
   useToolShortcuts();
+  useDeleteSelectionShortcut();
 
   // Seleciona o objeto estável (byId) e deriva a lista com useMemo: um seletor que
   // devolvesse um array novo a cada chamada faria o Zustand re-renderizar sem parar.

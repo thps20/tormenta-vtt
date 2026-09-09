@@ -1113,7 +1113,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       {!selectedToken && (
       <div className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a1a]/95 border border-[#2d2417] text-[11px] text-zinc-400 shadow-xl pointer-events-none">
         <Info className="w-3.5 h-3.5 text-[#d4af37]" />
-        <span>{fogActive && fogTool ? FOG_HINTS[fogTool.shape] : MODE_HINTS[mode]}</span>
+        {/* "Delete apaga" só pro GM: jogador não apaga token por este atalho (ver useDeleteSelectionShortcut). */}
+        <span>
+          {fogActive && fogTool
+            ? FOG_HINTS[fogTool.shape]
+            : mode === "select" && me.role === "gm"
+              ? `${MODE_HINTS.select} • Delete apaga os selecionados`
+              : MODE_HINTS[mode]}
+        </span>
       </div>
       )}
     </div>
