@@ -21,6 +21,7 @@ import { prisma } from "../db.js";
 import {
   buildCombatantInitiativeRoll,
   canControlCombatant,
+  expireConditionsOnRoundChange,
   initialBonusFor,
   linkedCharacter,
   persistNormalizedOrder,
@@ -250,10 +251,16 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
           combat.status === "rolling"
             ? startTurns(def, sorted)
             : advanceTurn(def, sorted, { activeCombatantId: combat.activeCombatantId, round: combat.round }, 1);
+        const nextRound = Math.max(1, state.round);
         await prisma.combat.update({
           where: { id: combat.id },
-          data: { status: "active", activeCombatantId: state.activeCombatantId, round: Math.max(1, state.round) },
+          data: { status: "active", activeCombatantId: state.activeCombatantId, round: nextRound },
         });
+        // Rodada mudou: expira condições com expiresRound <= nextRound (combat:prev não restaura
+        // nada — decisão deliberada, ver docs/plano-duracao-condicoes.md).
+        if (nextRound > combat.round) {
+          await expireConditionsOnRoundChange(io, ctx.roomId, combat.sceneId, def, ctx.participantId, nextRound);
+        }
         return sendCombat(io, ctx.roomId, viewerOf(ctx));
       },
       { gmOnly: true },
@@ -265,6 +272,9 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
     guarded(
       socket,
       EmptySchema,
+      // Decisão deliberada: não restaura condição nenhuma (mesmo se a rodada volta pra antes de
+      // uma que expirou em combat:next). "Prev" corrige um clique errado do GM, não rejoga o
+      // combate — ver docs/plano-duracao-condicoes.md.
       async (_p, ctx) => {
         const combat = await requireActiveCombat(ctx.roomId);
         if (combat.status !== "active") throw new HandlerError("Combate não está em andamento");

@@ -7,6 +7,7 @@ import type { Character as DbCharacter, Combat as DbCombat, Combatant as DbComba
 import {
   buildCharacterRoll,
   characterTiebreakBonus,
+  expireConditions,
   getSystemDefinition,
   isPointRevealed,
   noSheetInitiativeFormula,
@@ -14,19 +15,23 @@ import {
   sortCombatants,
   stateAfterRemoval,
   tokenCenter,
+  TokenConditionEntrySchema,
   type Combat,
   type Combatant,
   type CombatStatus,
+  type ConditionExpiry,
   type FogConfig,
   type SystemDefinition,
   type Token,
+  type TokenCondition,
 } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { HandlerError } from "../socket/ack.js";
 import { rooms, type TypedServer } from "../socket/types.js";
 import { toCharacter } from "./characters.js";
-import { toScene, toToken } from "./serialize.js";
-import { tokenVisibleTo } from "./visibility.js";
+import { emitChatMessage } from "./chatVisibility.js";
+import { toChatMessage, toScene, toToken } from "./serialize.js";
+import { emitTokenToPlayers, tokenVisibleTo } from "./visibility.js";
 
 export interface Viewer {
   role: "gm" | "player";
@@ -219,4 +224,69 @@ export async function maybeReemitCombatForToken(io: TypedServer, roomId: string,
   const combatant = await prisma.combatant.findFirst({ where: { tokenId: after.id }, select: { id: true } });
   if (!combatant) return;
   await emitCombat(io, roomId, { role: "gm", participantId: "" });
+}
+
+/**
+ * Roda `strategy` (expireConditions comparado à rodada nova, ou stripTimedConditions no fim do
+ * combate — as duas puras, em rules/conditions.ts) em CADA token da cena. Token com condição
+ * removida leva UM `token:updated` (mesmo que várias condições dele tenham ido embora juntas);
+ * cada condição removida vira UMA mensagem de chat `kind: "system"` ("Goblin: Atordoado
+ * terminou"), com `tokenId` setado pro gate de token oculto/névoa (`emitChatMessage` já filtra
+ * por isso). `actorParticipantId` = quem disparou o evento (combat:next/combat:end); o ChatTab
+ * ignora `participantId`/`nickname` pra este `kind` (sempre mostra "SISTEMA"), então não precisa
+ * de autor "de verdade".
+ */
+async function applyConditionExpiry(
+  io: TypedServer,
+  roomId: string,
+  sceneId: string,
+  def: SystemDefinition,
+  actorParticipantId: string,
+  strategy: (conditions: TokenCondition[]) => ConditionExpiry,
+): Promise<void> {
+  const [tokens, sceneRow] = await Promise.all([
+    prisma.token.findMany({ where: { sceneId } }),
+    prisma.scene.findUniqueOrThrow({ where: { id: sceneId } }),
+  ]);
+  const fog = toScene(sceneRow).fog;
+  const labelByKey = new Map(def.conditions.map((c) => [c.key, c.label]));
+
+  for (const row of tokens) {
+    const current = TokenConditionEntrySchema.array().parse(row.conditions);
+    const { remaining, expired } = strategy(current);
+    if (expired.length === 0) continue;
+
+    const updated = toToken(await prisma.token.update({ where: { id: row.id }, data: { conditions: remaining } }));
+    io.to(rooms.gm(roomId)).emit("token:updated", updated);
+    emitTokenToPlayers(io, roomId, updated, "token:updated", fog);
+
+    for (const cond of expired) {
+      const label = labelByKey.get(cond.key) ?? cond.key;
+      const msg = toChatMessage(
+        await prisma.chatMessage.create({
+          data: {
+            roomId,
+            participantId: actorParticipantId,
+            nickname: "Sistema",
+            kind: "system",
+            text: `${row.name}: ${label} terminou`,
+            tokenId: row.id,
+          },
+        }),
+      );
+      await emitChatMessage(io, roomId, msg);
+    }
+  }
+}
+
+/** `combat:next`, quando a rodada avança: expira condições com `expiresRound <= round`. */
+export async function expireConditionsOnRoundChange(
+  io: TypedServer,
+  roomId: string,
+  sceneId: string,
+  def: SystemDefinition,
+  actorParticipantId: string,
+  round: number,
+): Promise<void> {
+  await applyConditionExpiry(io, roomId, sceneId, def, actorParticipantId, (conditions) => expireConditions(conditions, round));
 }
