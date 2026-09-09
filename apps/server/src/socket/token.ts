@@ -153,8 +153,12 @@ interface CombatRemovalSnapshot {
  * Se `tokenId` é combatente de um combate na cena, captura o estado ANTES de mexer (pro undo
  * restaurar) e então ajusta round/activeCombatantId/order exatamente como o handler já fazia
  * (`prepareTokenRemovalFromCombat`). `null` = token não é combatente de combate nenhum.
+ * Exportada: socket/compendium.ts reusa (descartando o snapshot) no desfazer do spawn — um token
+ * spawnado que depois entrou em combate (`combat:add`, manual) precisa do mesmo ajuste de
+ * round/activeCombatantId/order antes do hard delete, senão o combate fica com um combatente
+ * fantasma (docs/plano-desfazer.md §4).
  */
-async function adjustCombatForTokenRemoval(def: SystemDefinition, sceneId: string, tokenId: string): Promise<CombatRemovalSnapshot | null> {
+export async function adjustCombatForTokenRemoval(def: SystemDefinition, sceneId: string, tokenId: string): Promise<CombatRemovalSnapshot | null> {
   const combat = await loadCombatRow(sceneId);
   if (!combat) return null;
   const combatant = combat.combatants.find((c) => c.tokenId === tokenId);
