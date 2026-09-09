@@ -90,8 +90,12 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
       const row = await requireCharacter(characterId, ctx.roomId);
       if (!canEditCharacter(ctx, toCharacter(row))) throw new HandlerError("Você não controla esta ficha");
 
-      // O banco desvincula os tokens (onDelete: SetNull); avisamos os clientes para atualizarem o cache.
-      const linked = await prisma.token.findMany({ where: { characterId }, include: { scene: true } });
+      // O banco desvincula os tokens (onDelete: SetNull, dispara pra QUALQUER token que referencie
+      // esta ficha — inclusive soft-deleted, docs/plano-desfazer.md §2); só avisamos os clientes dos
+      // que estão de pé (deletedAt: null). Um token na lixeira fica com characterId nulo em silêncio
+      // (o SetNull do banco já rodou de qualquer forma) — se for restaurado depois, o desfazer já vê
+      // a ficha desvinculada, sem token:updated nenhum reintroduzindo ele no mapa antes da hora.
+      const linked = await prisma.token.findMany({ where: { characterId, deletedAt: null }, include: { scene: true } });
       await prisma.character.delete({ where: { id: characterId } });
       io.to(rooms.all(ctx.roomId)).emit("character:deleted", { characterId });
       for (const t of linked) broadcastToken(io, ctx.roomId, toToken({ ...t, characterId: null }), "token:updated", toScene(t.scene).fog);

@@ -63,7 +63,7 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
         await requireActiveScene(ctx.roomId, sceneId);
         // Dedup: `IN` no banco não repete linha pra id repetido, então comparar por tamanho cru rejeitaria à toa.
         const tokenIds = [...new Set(rawTokenIds)];
-        const tokens = await prisma.token.findMany({ where: { id: { in: tokenIds }, sceneId } });
+        const tokens = await prisma.token.findMany({ where: { id: { in: tokenIds }, sceneId, deletedAt: null } });
         if (tokens.length !== tokenIds.length) throw new HandlerError("Token não encontrado nesta cena");
 
         const def = await requireSystem(ctx.roomId);
@@ -97,7 +97,7 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
         const newIds = [...new Set(tokenIds.filter((id) => !already.has(id)))];
         if (newIds.length === 0) return sendCombat(io, ctx.roomId, viewerOf(ctx));
 
-        const tokens = await prisma.token.findMany({ where: { id: { in: newIds }, sceneId: combat.sceneId } });
+        const tokens = await prisma.token.findMany({ where: { id: { in: newIds }, sceneId: combat.sceneId, deletedAt: null } });
         if (tokens.length !== newIds.length) throw new HandlerError("Token não encontrado nesta cena");
 
         const def = await requireSystem(ctx.roomId);
