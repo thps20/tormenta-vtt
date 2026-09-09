@@ -58,6 +58,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - **Condições** (`Token.conditions: TokenCondition[]`, `{ key, expiresRound? }` — chave de `SystemDefinition.conditions[]`, §3.6; `expiresRound` ausente = permanente): menu com toggle por condição, aberto pelo botão direito no token ou pelo botão "Condições" do painel — GM em qualquer token, jogador só nos que possui (`token:update` normal, sem evento novo; servidor rejeita chave que não existe no sistema da sala). Uma ficha salva antes de `expiresRound` existir grava só a chave (`string`); o schema aceita as duas formas (`z.preprocess`, sem migration de dado). Render: ícones pequenos na borda inferior do token (máx. 6 visíveis, o resto vira "+N"), tooltip no hover com nome e descrição; condição com duração ganha um selinho com as rodadas restantes no canto do ícone (mesmo número no painel de combate, ao lado do ícone da linha do combatente). Cada condição pode ter `modifiers[]` no JSON (mesmo formato `{ target, value }` do Modificador da ficha, §3.6), mas isso ainda é só estrutura — nenhuma automação de regra por enquanto.
   - **Duração em rodadas** (docs/plano-duracao-condicoes.md): com um combate ativo na cena (`status !== "ended"`) e a condição marcada, o menu mostra um campo opcional "duração (rodadas)" — vazio = permanente. Convertido para `expiresRound` via `deriveExpiresRound(round, N)` (`packages/shared/src/rules/conditions.ts`): com o combate em `"rolling"` (`round` 0, ainda rolando iniciativa) conta a partir da rodada 1, senão uma condição marcada antes do primeiro "Próximo" expiraria na própria virada pra rodada 1, sem nunca ter valido. `SystemDefinition.conditions[].defaultDuration?` pré-preenche o campo ao marcar (ex.: Surpreendido = 1). Condição já marcada pode ganhar, editar ou remover a duração pelo mesmo campo.
 - **Aplicar dano/cura em token** (card de rolagem com `damage[]` no chat): botão "Aplicar" (GM sempre; jogador só em tokens que possui) abre um seletor dos tokens da cena atual (nome, PV atual/máximo, dono, busca, multi-seleção) com um multiplicador por alvo (×1, ×½ "reduz à metade" arredondado pra baixo, ×2, ×0) e ajuste manual. Confirma → `token:apply-damage { messageId, targets: [{ tokenId, amount, multiplier? }] }`; `amount` já vem com sinal (negativo tira PV, positivo cura). O servidor valida tudo-ou-nada (todos os alvos, senão nenhum) e aplica: dano gasta PV temporário antes do atual (`applyResourceDelta`, `packages/shared/src/rules/resources.ts`), travado no mín./máx. calculado (ficha) ou em `0..max` (token solto); broadcast normal (`token:updated`/`character:updated`). O card acumula o resultado em `roll.applied[]` ("Aplicado: Goblin −7, Orc −3 (½)"), sem sobrescrever aplicações anteriores. PV mínimo/inconsciência não é automatizado — só o número.
+- **Sugestão pelo tipo de dano** (`suggestDamage`, §9.5): ao marcar um alvo com ficha vinculada, o multiplicador já vem pré-selecionado pela `damageResponses` dela (imune → ×0, vulnerável → ×2, "reduz à metade" → ×½) e aparece um aviso curto ao lado ("Imune a fogo", "Resistente a fogo (RD 5)"). RD ou dano de tipos mistos calcula o valor mas deixa o multiplicador livre (a conta não bate com um botão só). O Mestre sempre confirma ou troca; o servidor não muda nada.
 
 ### 3.4 Chat e dados
 - Input único. Texto normal vira `ChatMessage{kind:"text"}`. Outros tipos: `roll` (rolagem), `system` (aviso) e `item` (card de poder/magia usado pela ficha, ver §3.6).
@@ -179,7 +180,8 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `character:delete` | `{ characterId }` | GM ou owner | `character:deleted` + `token:updated` dos tokens desvinculados |
 | `character:roll` | `{ characterId, roll: {type: attribute\|skill\|initiative\|extra\|action, ...}, visibility? }` (ação: `enhancements?: [{ id, times }]` aplica os efeitos dos aprimoramentos ao dano; `visibility` = modo de rolagem do autor) | GM ou owner | `chat:message` a todos (rolagem com `characterId`; dano com `damage[]` por tipo); sala toda recebe, mas quem `visibility` não permite recebe sem `roll` (placeholder, §3.4) |
 | `character:use-item` | `{ characterId, itemId, enhancements?: [{ id, times }] }` | GM ou owner | `character:updated` (se houve custo) + `chat:message` (`kind:"item"`); recurso insuficiente ou aprimoramento inválido = ack erro, sem broadcast |
-| `compendium:list` | `{}` | todos | ack `CompendiumEntry[]` do sistema da sala (sem broadcast; §9.4) |
+| `compendium:list` | `{}` | todos | ack `{ entries: CompendiumEntry[], roomIds: string[] }` do sistema da sala (sem broadcast; §9.4); jogador nunca recebe `type: "creature"` — filtro no servidor, `roomIds` só para o chip "Sala" (§9.5) |
+| `compendium:spawn-creature` | `{ sceneId, entryId, count (1..20), visible, x, y }` (`x, y` em pixels do mapa) | GM | `character:created` (uma por cópia) + `token:created`; ack com os `Token[]` criados (§9.5) |
 | `chat:send` | `{ text, visibility? }` (`visibility` = modo de rolagem do autor; `/gmr` e `/pr` no texto forçam) | todos | `chat:message` a todos (texto sempre público); rolagem fora de "Pública" vai a todos, mas quem `visibility` não permite recebe sem `roll` (placeholder, §3.4); ack sem `roll` quando o autor não pode ver (às cegas) |
 | `chat:reveal` | `{ messageId }` | GM | `chat:message` da mesma mensagem com `visibility: "all"` para todos (cliente faz upsert) |
 | `combat:start` | `{ sceneId, tokenIds[] }` | GM | `combat:updated`; substitui um combate anterior da cena, se houver |
@@ -284,6 +286,7 @@ Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a fi
 - Uploads ficam em disco (`apps/server/uploads/`), sem limpeza de arquivos órfãos.
 - Névoa (§9.3): só "desfazer último" (sem histórico completo nem refazer); sem luz dinâmica, paredes ou visão por token; a visibilidade de um token olha só o centro dele; `fog:updated` sempre manda a lista completa de shapes (limitada a 500).
 - Modo de combate (§3.5): duração de condição em rodadas é só schema preparado, sem automação nenhuma; a mensagem de uma rolagem ligada a um token oculto (card individual ou linha de um `initiative-batch`) só volta a ser entregue no próximo `room:join`, não ao vivo quando o token é revelado; a barra "iniciar/adicionar combatentes" reaproveita a seleção de tokens do mapa (ferramenta Selecionar) em vez de ter um seletor próprio na aba.
+- Criaturas do compêndio (§9.5): o pack `convocacoes` do Foundry (convocações que escalam pelo nível do conjurador) ficou fora do importador — `docs/backlog.md`. `NpcQuickCard` é a versão mínima do contrato (`docs/tipos-ficha-rapida.md`); a UI de verdade vem do AI Studio depois. `token:apply-damage` continua sem aplicar `damageResponses` sozinho — só sugere e avisa (§0.4/§3.3 do plano) — `docs/backlog.md`.
 
 ## 9. Fase 2 (pós-MVP)
 
@@ -303,6 +306,71 @@ Biblioteca de itens pré-definidos que o jogador puxa para a ficha (setembro/202
 - **Inserção** (`useCharacters.insertFromCompendium`, chamada por Enter, "+" e soltar): `checkInsert` lê `itemKinds[].maxCount` (2ª raça não é inserível; a paleta oferece "Substituir"); `buildInsertPatch` marca a primeira classe como inicial e aplica o `size` de um item com esse campo à ficha. Passa pelo `character:update` normal (otimista + ack). Escolhas pendentes seguem o fluxo de "faltam N escolhas".
 - **UI**: paleta em coluna (busca, chips, lista, preview abaixo da lista), só em modo edição. Em janelas com pelo menos 1180 px ela **encaixa à esquerda da ficha** como painel lateral de 384 px (irmã do painel da ficha; a ficha não muda de tamanho nem de posição); abaixo disso flutua por cima da ficha, alinhada à esquerda. Em janelas baixas (≤ 640 px) lista e preview viram abas "Resultados"/"Detalhes". Abre pelo botão "Do compêndio" (já filtra pela aba ativa) ou atalho: Ctrl+Espaço, Ctrl+Shift+Espaço (o Brave às vezes engole o primeiro) ou "/" com o foco fora de campo de texto. O listener é do drawer da ficha (janela, fase de captura, só em modo edição) e chama `preventDefault`. Busca sem acento/caixa por nome, tags e id; chips por tipo (multi-seleção); resultados agrupados por tipo; preview à direita com o resumo mecânico e quantas escolhas a ficha vai pedir. Setas navegam, Enter insere e fecha, Ctrl+Enter insere e mantém, Esc fecha, "+" na linha insere e mantém. Após inserir, a ficha troca para a aba do tipo e destaca o item por um instante.
 - **Arrastar e soltar**: pointer events (não HTML5 drag, por causa do Konva). Fantasma segue o cursor; no modo flutuante a paleta fica translúcida e sem `pointer-events` para `elementFromPoint` achar a ficha (encaixada ela nunca cobre a ficha), que ganha um halo; soltar na ficha insere e fecha a paleta, fora cancela, Esc cancela. `lib/dropTargets.ts` registra alvos por `data-drop-target` (`accepts`, `onDrop`); hoje só a ficha, preparado para o mapa aceitar entradas depois.
+
+### 9.5 Criaturas do compêndio para o mapa
+
+Bloco de monstro pronto no compêndio, soltável direto no mapa (setembro/2026). Plano e decisões em
+`docs/plano-criaturas.md`; contrato da ficha rápida em `docs/tipos-ficha-rapida.md`. Princípio igual
+ao do compêndio de itens (§9.4): uma criatura é só um `Character` de `kind: "npc"` pré-preenchido,
+sem id; soltar faz uma **cópia** (ficha nova + token vinculado), nunca um vínculo — editar o goblin
+da mesa não mexe no compêndio. Nenhuma migration: tudo cabe nas colunas `Json` de `Character`/`Token`
+que já existem.
+
+- **Sistema**: bloco opcional `SystemDefinition.creatures = { typeField, ndField, defaultColor,
+  typeColors }` diz onde está o tipo da criatura (`traitFields[]`) e que cor cada tipo tem;
+  `validateSystemDefinition` confere que as chaves existem. `tormenta20.json` ganhou os `traitFields`
+  `nd` (texto: "1/4", "1/2", "20") e `deslocamentos` (texto: "voo 12m, natação 9m" — o deslocamento
+  normal continua sendo o derivado `movement`, sobrescritível). `CharacterDataSchema.damageResponses
+  = { all, byType: Record<tipo, resposta> }` (`{ reduction, half, immune, vulnerable }`) guarda
+  resistência/imunidade/vulnerabilidade por tipo de dano; usada em exibição (preview, ficha rápida) e
+  na sugestão de §3.3, nunca automatizada no cálculo do servidor.
+- **Compêndio**: `CompendiumEntry` (§9.4) virou união discriminada por `type` (`item` — o formato de
+  sempre, inferido por `z.preprocess` quando o campo falta — ou `creature`). Uma entrada de criatura
+  tem `id, name, tags, description, page` e `sheet` (`CharacterData` sem `imageUrl`/`bio`, com itens
+  sem id). `validateCreatureEntry` confere atributos/perícias/recursos/traits/`damageResponses`
+  contra o sistema, `size`/tipo válidos e cada item embutido pelo mesmo `validateItemBody` dos itens
+  soltos. `entryToCharacter(def, entry, newId, opts?)` monta a ficha NPC nova (`opts.name` para o
+  nome numerado). `compendium:list` (§5) some do jogador — filtro no servidor, não só na UI — e o
+  ack ganhou `roomIds` (entradas da sala, hoje sempre `[]`: o compêndio da sala aceita `type:
+  "creature"` só por schema, sem tela).
+- **Importador**: `pnpm import:compendium` converte o pack `ameacas` do Foundry (83 NPCs) em
+  `creatures.json`; mapeamento completo, o truque do "outros" pra perícia bater com `computeCharacter`
+  e as decisões (ex.: pack `convocacoes` deixado de fora — escala pelo nível do conjurador, ficha
+  quase vazia no Foundry) em `docs/plano-criaturas.md` §1.5 e `docs/backlog.md`.
+- **Paleta contextual**: a mesma paleta do compêndio (§9.4), não uma segunda. Com a Mesa em foco (sem
+  ficha aberta, sem modal) e Ctrl+Espaço/Ctrl+Shift+Espaço/"/" fora de campo de texto
+  (`useMapPaletteShortcut`), abre flutuando 384 px à esquerda do mapa, sem escurecer o fundo — o mapa
+  continua o alvo da soltura. GM vê itens + criaturas (chip "Criaturas" ativo por padrão); jogador só
+  consulta itens (o servidor nem manda criaturas). `CreaturePreview.tsx` mostra ND/tamanho/tipo,
+  recursos e derivados, iniciativa (`characterTiebreakBonus`), resistências (`DamageTypeBadge`),
+  ataques e nomes de poderes, mais **quantidade** (1..20) e o toggle **"invisível ao soltar"**
+  (padrão ligado, lembrado na sessão).
+- **Soltar no mapa**: `VttCanvas` registra o alvo `"map"` em `dropTargets` (só GM, só `type:
+  "creature"`); durante o arrasto desenha um fantasma de `count` retângulos de célula (lado pelo
+  `sizes[].tokenCells`, cor do tipo) numa espiral a partir da célula do cursor. Enter no preview
+  solta no centro da área visível, mesma espiral. `findFreeCells`/`numberedNames`
+  (`packages/shared/src/rules/placement.ts`, com testes) são as **mesmas** funções puras usadas pelo
+  cliente (fantasma) e pelo servidor (posição final) — inclusive o `findFreeSpot` que já existia no
+  `VttCanvas` virou um caso particular (1 célula) delas. `findFreeCells` anda em anéis de raio
+  crescente (Chebyshev) pulando células ocupadas e clampadas às bordas do mapa (grid `"none"` usa
+  célula virtual de 70 px, como o botão "novo token"); estoura o raio máximo (12 anéis) → devolve
+  menos posições que o pedido, e o servidor solta ali mesmo (nunca fora do mapa nem sobreposto). Nome
+  numerado a partir do maior sufixo já na cena ("Goblin 3" se já existem "Goblin 1/2"); com `count = 1`
+  e nenhum homônimo, sem número.
+- **Evento** `compendium:spawn-creature { sceneId, entryId, count, visible, x, y }` (§5): o cliente
+  manda só o ponto de soltura em pixels, nunca as posições — o servidor roda a mesma espiral, então um
+  cliente adulterado não empilha nem sai do mapa. Handler roda numa `prisma.$transaction` (N
+  `Character` + N `Token`, tudo ou nada), depois faz um `character:created`/`token:created` por cópia
+  (NPC e visibilidade respeitados pelo broadcast de sempre); spawn durante um combate ativo não mexe
+  nele — token novo nunca entra sozinho no combate (§3.5, `combat:add` continua manual). Iniciativa: a
+  ficha vem com o `{skill.iniciativa}` do bloco, então `combat.tiebreakBonus` já sai certo sem código
+  novo.
+- **Ficha rápida do NPC** (`NpcQuickCard`, contrato em `docs/tipos-ficha-rapida.md`): clique simples
+  num token NPC do GM abre este card **no lugar** do `TokenInspector` genérico (que continua existindo
+  atrás do botão "Token" do card — nome, cor, dono, imagem, apagar); qualquer outro token abre o
+  `TokenInspector` direto. Versão mínima (a UI de verdade vem do AI Studio sobre o mesmo contrato):
+  nome/ND/tipo, PV com −1/+1 e campo de delta, derivados, ataques (clique rola, `character:roll`),
+  poderes (clique usa, `character:use-item`), atalhos de condição e "Ficha completa" (abre o drawer).
 
 ### 9.2 Barra de ferramentas e régua
 Descritas em §3.2: modos Selecionar / Mover mapa / Régua com atalhos, caixa de seleção, movimento em grupo e a régua efêmera (`ruler:update`).
