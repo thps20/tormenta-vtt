@@ -58,8 +58,9 @@ async function requireToken(tokenId: string, roomId: string) {
   return row;
 }
 
-/** Json? do Prisma não aceita `null` cru (precisa de Prisma.JsonNull pra gravar SQL NULL). */
-function hpJson(hp: TokenHp | null): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+/** Json? do Prisma não aceita `null` cru (precisa de Prisma.JsonNull pra gravar SQL NULL). Também
+ *  usado por socket/compendium.ts pra recriar um token no redo do spawn (§4 do plano). */
+export function hpJson(hp: TokenHp | null): Prisma.InputJsonValue | typeof Prisma.JsonNull {
   return hp === null ? Prisma.JsonNull : hp;
 }
 
