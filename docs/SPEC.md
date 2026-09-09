@@ -43,6 +43,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - **Régua (R)**: clicar e arrastar mede do ponto inicial ao ponteiro (pontos grudam no centro da célula quando há grid e snap). A distância usa `grid` do `SystemDefinition` (`cellSize` na unidade do jogo, `unit`, regra de diagonais `euclidean | manhattan | alternating | chebyshev`; `rules/measure.ts` faz a conta) e o `cellSize` em px da cena. A régua é enviada por `ruler:update` (efêmero) e os outros a veem com o nickname do autor; some ao soltar.
   - **Névoa (F, só GM)**: fog of war manual, descrita em §9.3. Desenho: botão reservado (desabilitado), fora do MVP.
   - Esc cancela o gesto em andamento e volta para Selecionar. Scroll = zoom em todos os modos.
+  - **Desfazer/refazer (Ctrl+Z / Ctrl+Shift+Z ou Ctrl+Y, só GM)**: com a ferramenta Névoa ativa, Ctrl+Z desfaz a última forma pintada (§9.3, sem refazer); fora dela é o desfazer geral descrito em §9.6. Fora de campo de texto (`isTyping`), igual aos outros atalhos.
 - Sem mapa (`mapUrl = null`) o canvas desenha um retângulo escuro de `mapWidth × mapHeight` (padrão 1600×1100) só para o grid e os tokens terem onde ficar.
 - Renomear cena está fora do MVP (o nome é definido em `scene:create`).
 
@@ -144,11 +145,11 @@ Room 1───* ChatMessage *───? Token
 | **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`) |
 | **Participant** | `id, roomId, nickname, role, sessionToken` | `connected` é estado em memória, não persistido |
 | **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON)` | `grid` e `fog` são JSON para evoluir sem migration. `fog` segue `FogConfigSchema` (§9.3) |
-| **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[])` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto) |
+| **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[]), deletedAt?` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto). `deletedAt` (coluna só do banco, nunca serializada no `Token` do shared): soft delete de `token:delete`/`token:delete-many` (§9.6) — todo lugar que lista "tokens da cena agora" filtra `deletedAt: null`; a limpeza definitiva apaga a linha de vez depois de 30 dias (`services/cleanup.ts`) |
 | **Character** | `id, roomId, ownerId?, name, kind, data(JSON)` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration |
 | **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), initiativeBatch?(JSON), visibility, tokenId?` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3); `item` segue `ItemCardSchema` (kind `item`); `initiativeBatch` segue `InitiativeBatchSchema` (kind `initiative-batch`: `{ round, entries: [{ combatantId, tokenId, name, formula?, result? }] }`, `combat:roll` rolando mais de um combatente, §3.5); `visibility` = `all \| gm \| self` (§3.4); `tokenId?` liga a rolagem a um token (combate/ficha), filtrado à parte de `visibility` (§3.4/§3.5) — um `initiative-batch` não usa este campo (várias linhas, vários tokens): o gate é por linha, dentro de `initiativeBatch.entries` |
 | **Combat** | `id, roomId, sceneId (único: um combate por cena), round, status, activeCombatantId?` | `status` = `rolling \| active \| ended` (§3.5). Persistido (ao contrário da iniciativa manual anterior, que vivia em memória) |
-| **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound` | `initiative = null` = ainda não rolou. Apagar o token apaga o combatente (cascade); `combat:remove`/o cascade de `token:delete` ajustam `activeCombatantId`/`round` se o removido era o ativo (§3.5, `stateAfterRemoval`) |
+| **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound` | `initiative = null` = ainda não rolou. `combat:remove` apaga o combatente (e ajusta `activeCombatantId`/`round` se o removido era o ativo, `stateAfterRemoval`, §3.5). `token:delete`/`token:delete-many` **não** apagam mais a linha do combatente (o token agora é soft delete, §9.6): só param de listá-lo (o combate ignora combatente cujo token tem `deletedAt`) e fazem o mesmo ajuste de turno/`order`; a linha volta se o GM desfizer |
 | **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), skillTotal, rolls{}, combat{} (§3.5), damageAttribute, tokenBar, trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código |
 
 Decisão: coordenadas em pixels (não células) para o token poder ficar "fora do grid" e para suportar `grid.type = none`. A conversão célula↔pixel é uma função pura usando `cellSize` e `offset`.
@@ -171,8 +172,10 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `scene:updateGrid` | `{ sceneId, grid: Partial<GridConfig> }` | GM | `scene:updated` |
 | `fog:update` | `{ sceneId, op }` com `op` = `add {shape}` \| `removeLast` \| `revealAll` \| `hideAll` \| `setEnabled {enabled}` | GM | `fog:updated` + reenvio dos tokens da cena conforme a visibilidade nova (§9.3) |
 | `token:create` | `TokenCreate` | GM | `token:created` |
-| `token:update` | `TokenPatch` (`id` + campos) | GM ou owner | `token:updated` |
-| `token:delete` | `{ tokenId }` | GM ou owner | `token:deleted` |
+| `token:update` | `TokenPatch` (`id` + campos, `live?` marca eco do arraste — §9.6) | GM ou owner | `token:updated` |
+| `token:update-many` | `{ patches: TokenPatch[] }` (min 1) | GM ou owner de cada token (tudo-ou-nada) | `token:updated` de cada um; arraste em grupo (2+ tokens), uma entrada de histórico só (§9.6) |
+| `token:delete` | `{ tokenId }` | GM ou owner | `token:deleted` (soft delete, §9.6) |
+| `token:delete-many` | `{ tokenIds: string[] }` (min 1) | GM ou owner de cada token (tudo-ou-nada) | `token:deleted` de cada um; uma entrada de histórico só (§9.6) |
 | `token:link-character` | `{ tokenId, characterId \| null }` | GM, ou owner do token que é owner da ficha | `token:updated` |
 | `token:apply-damage` | `{ messageId, targets: [{ tokenId, amount, multiplier? }] }` (`amount` já assinado: negativo tira PV, positivo cura) | GM, ou owner de cada token alvo (tudo-ou-nada) | `token:updated`/`character:updated` de cada alvo + `chat:message` com `roll.applied[]` atualizado |
 | `character:create` | `{ name, kind?, ownerId? }` | todos (jogador: `ownerId` = ele, `kind` = pc) | `character:created` (NPC só para o GM) |
@@ -196,6 +199,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `combat:resume` | `{ combatantId }` | GM ou dono do combatente | `combat:updated` |
 | `combat:end` | `{ clear? }` | GM | `combat:updated` (`null` se `clear: true`) |
 | `ruler:update` | `{ sceneId, ruler: { start, end } \| null }` (pixels do mapa) | todos | `ruler:updated` para os **outros** (efêmero: não persiste; `null` apaga) |
+| `history:undo` / `history:redo` | `{}` | GM | desfaz/refaz o topo da pilha da sala (§9.6); ack `{ summary } \| null` (`null` = pilha vazia); broadcasts normais das entidades afetadas + `history:updated` |
 
 ### Servidor → Cliente
 
@@ -211,6 +215,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `character:created` / `character:updated` | `Character` (jogadores só recebem `kind = "pc"`) |
 | `character:deleted` | `{ characterId }` |
 | `combat:updated` | `Combat \| null` (estado completo, já ordenado e filtrado pela visibilidade de quem recebe — §3.5; `null` = sem combate na cena ativa) |
+| `history:updated` | `{ canUndo, canRedo, undoSummary?, redoSummary? }` — só pro GM (§9.6) |
 | `ruler:updated` | `{ participantId, nickname, sceneId, ruler \| null }` (régua de outro participante; sem eco ao autor) |
 | `server:error` | `{ message }` |
 
@@ -384,3 +389,43 @@ Névoa pintada à mão pelo GM. **Sem** luz dinâmica, paredes ou visão por tok
 - **Renderização**: camadas mapa → tokens que o usuário **não** controla → névoa → tokens que controla → réguas. Jogador vê a névoa preta opaca; GM a vê a 50% (opacidade CSS no canvas da Layer, para o `destination-out` das áreas reveladas continuar exato). Shapes `reveal` apagam com `destination-out`; `hide` pintam preto por cima.
 - **Ferramentas** (só GM, modo Névoa, atalho **F**): sub-modos Revelar / Ocultar; formas Pincel (círculo que segue o arrasto, tamanho ajustável), Retângulo e Polígono (cliques; duplo clique fecha; Esc cancela); botões Desfazer último (Ctrl+Z no modo Névoa), Revelar tudo, Ocultar tudo e o toggle "Fog ativo". O pincel envia ao soltar o mouse, nunca a cada movimento, com os pontos decimados.
 - **Limite de shapes** (decisão): o cliente avisa o GM ao passar de 400 e o servidor recusa `add` acima de 500 (constantes `FOG_SHAPES_WARN` / `FOG_SHAPES_MAX`). Não há mesclagem automática de geometria: unir polígonos com precisão é complexo, e na prática um arrasto já é uma shape só e "Revelar/Ocultar tudo" zera a lista. Cada shape aceita no máximo 2000 pontos.
+
+### 9.6 Desfazer/refazer (Ctrl+Z) para ações do Mestre no mapa
+
+Pilha de histórico por sala, só do GM (setembro/2026). Plano e decisões em `docs/plano-desfazer.md`;
+revisão pós-implementação em `docs/revisao-desfazer.md`.
+
+- **Escopo**: apagar token — um ou vários (`token:delete`/`token:delete-many`), mover e redimensionar
+  — um token ou vários selecionados juntos (`token:update`/`token:update-many`), alternar condição e
+  alterar visibilidade (também `token:update`, mesmos campos rastreados) e soltar criaturas do
+  compêndio (`compendium:spawn-creature`). Fora: chat/rolagens, ações de `combat:*` disparadas pelo
+  usuário, ficha de personagem, criar token em branco, os demais campos de `token:update` (nome, cor,
+  imagem, dono — painel do token) e a Névoa, que mantém seu próprio Ctrl+Z (`fog:update removeLast`,
+  §9.3) — dentro da ferramenta Névoa o atalho continua sendo o dela; fora, é o desfazer geral daqui.
+- **Pilha**: em memória por sala (não persistida — mesmo padrão da presença de conexão e da régua;
+  se perde num restart do servidor), cap de 50 entradas de undo, sem cap próprio no redo; uma ação
+  nova do GM limpa o redo. Só ações com `role === "gm"` empilham (jogador movendo o próprio token
+  não conta — ver `docs/plano-desfazer.md` §6 pela justificativa). Uma entrada cobre tudo que saiu
+  na MESMA chamada de socket: `token:delete-many`/`token:update-many` (lote explícito) e
+  `compendium:spawn-creature` (N cópias) já nascem como uma entrada só; ecos "ao vivo" do arraste
+  (`TokenPatch.live`) nunca empilham, só o patch final do gesto.
+- **Apagar token = soft delete** (`Token.deletedAt`, §4): a linha continua no banco (PV, condições,
+  `characterId`, `Combatant`), então desfazer restaura tudo sem precisar de snapshot manual; se o
+  token era combatente, o desfazer também devolve `round`/`activeCombatantId`/`order` do combate ao
+  que eram antes. Um token soft-deleted conta como "não encontrado" pra qualquer handler normal.
+  Limpeza definitiva: 30 dias depois, `services/cleanup.ts` apaga a linha de vez (sem gatilho de
+  "encerrar sala" — não existe esse conceito no MVP).
+- **Spawn de criatura desfaz com hard delete** (assimetria proposital com o soft delete acima:
+  cópias recém-criadas, sem histórico próprio ainda) — apaga a ficha NPC e o token de vez; refazer
+  recria as mesmas linhas (mesmos ids) a partir do snapshot capturado na hora do spawn.
+  `entryToCharacter`/o restante do fluxo de spawn (§9.5) não mudam. Se o token spawnado entrou num
+  combate depois (`combat:add`, manual — spawn nunca entra sozinho, §9.5), o desfazer roda o mesmo
+  ajuste de `round`/`activeCombatantId`/`order` de sempre antes do hard delete (o combatente cai
+  junto pelo `onDelete: Cascade`, mas o combate não fica com o cursor de turno apontando pra alguém
+  que sumiu); o snapshot devolvido nesse ajuste é descartado (não há "restaurar" num hard delete).
+- **Invalidação**: `revert`/`apply` reconferem premissas (linha ainda existe) antes de escrever; se
+  algo não bate, a entrada é descartada (não vai pro lado oposto da pilha) e o ack devolve erro.
+- **UI**: botões de desfazer/refazer na Toolbar (só GM), desabilitados quando a pilha correspondente
+  está vazia, tooltip com o resumo da entrada no topo ("apagar Goblin 3"); toast "Desfeito/Refeito:
+  <resumo>" ao usar. Atalho Ctrl+Z fora do modo Névoa (Ctrl+Shift+Z/Ctrl+Y refazem), sempre que o
+  foco não está em campo de texto (`isTyping`, mesma proteção dos outros atalhos — cobre o chat).
