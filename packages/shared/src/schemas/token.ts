@@ -80,5 +80,15 @@ export const TokenPatchSchema = TokenSchema.omit({ characterId: true })
      * campo) conta como "o usuário decidiu mover pra cá". Nunca persistido nem serializado de volta.
      */
     live: z.boolean().optional(),
+    /**
+     * Posição capturada pelo CLIENTE no início do gesto de arraste (VttCanvas#handleTokenDragStart),
+     * mandada só no patch final (soltar). Existe porque os ecos `live` acima já escrevem no banco
+     * durante o arraste — se o "antes" do histórico fosse lido do banco no momento do commit final,
+     * seria a posição de ~33ms atrás (o último eco), não a de início do gesto: Ctrl+Z desfaria só o
+     * último pedacinho do arraste, não o arraste inteiro (docs/plano-desfazer.md §3, achado testando
+     * com CDP). Usado SÓ pro diff de histórico (packages/shared não sabe de histórico; quem lê isto
+     * é apps/server/src/socket/token.ts) — nunca entra no `data` do `prisma.token.update`.
+     */
+    dragFrom: z.object({ x: z.number(), y: z.number() }).optional(),
   });
 export type TokenPatch = z.infer<typeof TokenPatchSchema>;

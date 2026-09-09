@@ -67,6 +67,13 @@ const flushMoves = throttle(() => {
   pendingMoves.clear();
 }, 33);
 
+/** Mescla otimista de um patch no token local, sem os campos que são só transporte pro servidor
+ *  (`live`, `dragFrom` — nunca fizeram parte do Token de verdade, ver TokenPatchSchema). */
+function applyPatchLocally(previous: Token, patch: TokenPatch): Token {
+  const { live: _live, dragFrom: _dragFrom, ...fields } = patch;
+  return { ...previous, ...fields };
+}
+
 /** Seleção derivada: selectedId só vale com exatamente um token. */
 const selection = (ids: string[]) => ({ selectedIds: ids, selectedId: ids.length === 1 ? (ids[0] ?? null) : null });
 
@@ -122,7 +129,7 @@ export const useTokens = create<TokensState>((set, get) => ({
       stopDragging(patch.id);
     }
     // 1. otimista
-    set((s) => ({ byId: { ...s.byId, [patch.id]: { ...previous, ...patch } } }));
+    set((s) => ({ byId: { ...s.byId, [patch.id]: applyPatchLocally(previous, patch) } }));
     // 2. ack
     const res = await emitAck("token:update", patch);
     if (!res.ok) {
@@ -148,7 +155,7 @@ export const useTokens = create<TokensState>((set, get) => ({
     // 1. otimista
     set((s) => {
       const byId = { ...s.byId };
-      for (const patch of patches) byId[patch.id] = { ...(byId[patch.id] as Token), ...patch };
+      for (const patch of patches) byId[patch.id] = applyPatchLocally(byId[patch.id] as Token, patch);
       return { byId };
     });
     // 2. ack

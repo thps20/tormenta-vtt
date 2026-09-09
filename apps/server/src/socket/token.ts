@@ -78,12 +78,19 @@ export function broadcastToken(io: TypedServer, roomId: string, token: Token, ev
 // Compartilham a mesma lógica de aplicar UM patch (permissão, campos do jogador, validação de
 // condições) — só muda quem chama e o que fazem com before/after depois (histórico, docs/plano-desfazer.md §3).
 
-/** Aplica um TokenPatch e devolve o token antes/depois (public Token, não a linha crua do Prisma). */
-async function applyTokenUpdate(io: TypedServer, ctx: Ctx, patch: TokenPatch): Promise<{ before: Token; after: Token }> {
+/**
+ * Aplica um TokenPatch e devolve o token antes/depois (public Token, não a linha crua do Prisma).
+ * `historyBefore` é o "antes" pra efeito de DIFF DE HISTÓRICO — normalmente igual a `before`, mas
+ * com x/y trocados por `patch.dragFrom` quando presente: os ecos `live` do arraste já escreveram
+ * no banco antes deste commit final, então `before` (lido agora) é só a posição de ~33ms atrás, não
+ * a de início do gesto (docs/plano-desfazer.md §3). `before` "cru" continua sendo usado por
+ * `maybeReemitCombatForToken` (que precisa do estado real anterior, não do início do gesto).
+ */
+async function applyTokenUpdate(io: TypedServer, ctx: Ctx, patch: TokenPatch): Promise<{ before: Token; after: Token; historyBefore: Token }> {
   const row = await requireToken(patch.id, ctx.roomId);
   if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla este token");
 
-  const { id, sceneId: _ignoreScene, hp, live: _ignoreLive, ...fields } = restrictPatchForRole(ctx, patch);
+  const { id, sceneId: _ignoreScene, hp, live: _ignoreLive, dragFrom, ...fields } = restrictPatchForRole(ctx, patch);
   if (fields.ownerId) {
     const owner = await prisma.participant.findUnique({ where: { id: fields.ownerId } });
     if (!owner || owner.roomId !== ctx.roomId) throw new HandlerError("Dono inválido");
@@ -98,10 +105,12 @@ async function applyTokenUpdate(io: TypedServer, ctx: Ctx, patch: TokenPatch): P
   const fog = toScene(row.scene).fog;
   // A cena já veio junto com o token (requireToken): sem consulta extra a cada movimento.
   broadcastToken(io, ctx.roomId, token, "token:updated", fog);
+  const before = toToken(row);
   // Nome/cor/visível mudaram, ou a posição cruzou a névoa: se este token é um combatente,
   // a lista de combate (e quem pode vê-la) pode ter mudado junto.
-  await maybeReemitCombatForToken(io, ctx.roomId, toToken(row), token, fog);
-  return { before: toToken(row), after: token };
+  await maybeReemitCombatForToken(io, ctx.roomId, before, token, fog);
+  const historyBefore = dragFrom ? { ...before, x: dragFrom.x, y: dragFrom.y } : before;
+  return { before, after: token, historyBefore };
 }
 
 interface TrackableDiffItem {
@@ -241,10 +250,10 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
   socket.on(
     "token:update",
     guarded(socket, TokenPatchSchema, async (patch, ctx) => {
-      const { before, after } = await applyTokenUpdate(io, ctx, patch);
+      const { after, historyBefore } = await applyTokenUpdate(io, ctx, patch);
       // Ecos "ao vivo" do arraste (patch.live) nunca empilham — só o patch final do gesto.
       if (ctx.role === "gm" && !patch.live) {
-        const diff = pickTrackableTokenPatch(before, after);
+        const diff = pickTrackableTokenPatch(historyBefore, after);
         if (diff) {
           pushEntry(ctx.roomId, buildUpdateHistoryEntry(io, ctx.roomId, [{ tokenId: after.id, name: after.name, ...diff }]));
           emitHistoryUpdated(io, ctx.roomId);
@@ -264,8 +273,8 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
 
       const items: TrackableDiffItem[] = [];
       for (const patch of patches) {
-        const { before, after } = await applyTokenUpdate(io, ctx, patch);
-        const diff = pickTrackableTokenPatch(before, after);
+        const { after, historyBefore } = await applyTokenUpdate(io, ctx, patch);
+        const diff = pickTrackableTokenPatch(historyBefore, after);
         if (diff) items.push({ tokenId: after.id, name: after.name, ...diff });
       }
       if (ctx.role === "gm" && items.length > 0) {

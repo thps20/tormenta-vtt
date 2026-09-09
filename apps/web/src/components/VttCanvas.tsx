@@ -231,7 +231,15 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   /** Um arraste de caixa acabou de terminar: o `click` que o Konva dispara em seguida não deve limpar a seleção. */
   const boxJustEndedRef = useRef(false);
   /** Arraste em grupo: posição inicial do líder e dos outros selecionados que eu controlo. */
-  const groupDragRef = useRef<{ leader: { x: number; y: number }; others: Array<{ token: Token; x: number; y: number }> } | null>(null);
+  const groupDragRef = useRef<{
+    leader: { x: number; y: number };
+    /** Posição do líder ANTES do gesto (token.x/y no dragStart — nunca a "ao vivo"), mandada como
+     *  `dragFrom` no patch final: os ecos de moveLive já escreveram no banco durante o arraste, então
+     *  o "antes" que o servidor leria sozinho seria só o penúltimo tick, não o início do gesto
+     *  (docs/plano-desfazer.md §3). */
+    leaderOrigin: { x: number; y: number };
+    others: Array<{ token: Token; x: number; y: number }>;
+  } | null>(null);
   /** Ponto inicial da régua em andamento (pixels do mapa). */
   const rulerStartRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -809,8 +817,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   // --- Arraste em grupo: o token arrastado (líder) puxa os outros selecionados que eu controlo.
   const handleTokenDragStart = (token: Token, node: Konva.Node) => {
     setConditionTooltip(null); // arrastando não há hover; senão o balão fica pendurado
+    const leaderOrigin = { x: token.x, y: token.y };
     if (!selectedIds.includes(token.id) || selectedIds.length < 2) {
-      groupDragRef.current = null;
+      // Token só (sem grupo): ainda guarda leaderOrigin, é o único dado que handleTokenDragEnd precisa.
+      groupDragRef.current = { leader: { x: node.x(), y: node.y() }, leaderOrigin, others: [] };
       return;
     }
     const others = selectedIds
@@ -818,7 +828,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       .map((id) => tokens.find((t) => t.id === id))
       .filter((t): t is Token => t !== undefined && canControl(me, t))
       .map((t) => ({ token: t, x: t.x, y: t.y }));
-    groupDragRef.current = { leader: { x: node.x(), y: node.y() }, others };
+    groupDragRef.current = { leader: { x: node.x(), y: node.y() }, leaderOrigin, others };
   };
 
   const handleTokenDragMove = (token: Token, node: Konva.Node) => {
@@ -841,11 +851,11 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     const dy = node.y() - (g?.leader.y ?? node.y());
     const pos = settle(node.x(), node.y(), token);
     node.position(pos);
-    const patches: TokenPatch[] = [{ id: token.id, x: pos.x, y: pos.y }];
+    const patches: TokenPatch[] = [{ id: token.id, x: pos.x, y: pos.y, dragFrom: g?.leaderOrigin ?? { x: token.x, y: token.y } }];
     for (const o of g?.others ?? []) {
       const p = settle(o.x + dx, o.y + dy, o.token);
       tokenGroup(o.token.id)?.position(p);
-      patches.push({ id: o.token.id, x: p.x, y: p.y });
+      patches.push({ id: o.token.id, x: p.x, y: p.y, dragFrom: { x: o.x, y: o.y } });
     }
     // 2+ tokens (arraste em grupo): uma chamada só (token:update-many), pra virar UMA entrada de
     // histórico em vez de uma por token (docs/plano-desfazer.md §3). Um token só: patch normal.
