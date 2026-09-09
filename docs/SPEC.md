@@ -252,13 +252,14 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 ```
 apps/web/src/
   App.tsx       escolhe a tela pela URL
-  components/   Lobby, RoomPage (liga stores aos componentes), TopBar, Toolbar, VttCanvas,
-                TokenInspector, SidePanel, ChatTab, InitiativeTab (modo de combate), CombatBanner
-                (faixa "rolar iniciativa"/"seu turno"), ViewingSceneBanner (faixa "você está em
-                X" quando o GM visita um mapa que não é o ativo, §9.7), CharactersTab,
-                MapsPanel (aba "Mapas", só GM, §9.7), CarryTokensDialog ("Levar para o mapa"
-                ao ativar, §9.7), MapConfigModal, NicknamePrompt, Toasts,
-                CharacterSheetDrawer (gaveta da ficha)
+  components/   Lobby, RoomPage (liga stores aos componentes), TopBar (inclui o MapSelector, só
+                GM — botão-seletor de mapa com dropdown, atalho M, §9.7), Toolbar, VttCanvas,
+                TokenInspector, SidePanel (3 abas: Chat, Iniciativa, Fichas — responsivas, só
+                ícone com tooltip/badge quando o header fica estreito demais pro rótulo), ChatTab,
+                InitiativeTab (modo de combate), CombatBanner (faixa "rolar iniciativa"/"seu
+                turno"), CharactersTab, MapsPanel (conteúdo do dropdown do MapSelector, §9.7),
+                CarryTokensDialog ("Levar para o mapa" ao ativar, §9.7), MapConfigModal,
+                NicknamePrompt, Toasts, CharacterSheetDrawer (gaveta da ficha)
   components/compendium/  CompendiumPalette (paleta encaixada ou flutuante), EntryPreview, DragGhost (arrasto)
   components/character/  seções da ficha: CharacterHeader, AttributesGrid, ResourcesBlock,
                 DerivedStatsBar, SkillsSection, ItemsSection, ModifiersSection, DetailsSection,
@@ -465,9 +466,9 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   "visitado" independente do ativo (estado do cliente, persistido em `sessionStorage` por sala —
   dois GMs, ou duas abas, podem olhar mapas diferentes ao mesmo tempo). `selectViewedScene`
   substitui `selectActiveScene` em quase todo lugar do web (canvas, névoa, régua, combate, spawn de
-  criatura, `MapConfigModal`); `selectActiveScene` continua valendo pra faixa de aviso e o painel.
-  Faixa "Você está em X. O mapa ativo é Y." (`ViewingSceneBanner`, só GM, só quando os dois
-  divergem) evita o erro mais provável da feature: editar um mapa achando que a mesa está vendo.
+  criatura, `MapConfigModal`); `selectActiveScene` continua valendo pro `MapSelector`. Quando os
+  dois divergem, o botão-seletor da TopBar troca para "Vendo X · ativo: Y" com destaque âmbar — o
+  aviso que evita o erro mais provável da feature: editar um mapa achando que a mesa está vendo.
 - **`scene:enter`**: troca de mapa sem os efeitos colaterais de `room:join` (presença, snapshot
   inteiro) — busca só tokens+combate do mapa pedido. GM entra em qualquer mapa vivo da sala;
   jogador só no ativo. `room:join` continua devolvendo tokens/combate do mapa ATIVO (o que todo
@@ -498,11 +499,17 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   desfizer). É a ÚNICA ação de mapa que entra na pilha de desfazer (§9.6) — criar, renomear,
   duplicar, reordenar e ativar não entram (efeito colateral de mover tokens seria assustador num
   Ctrl+Z; as outras quatro são triviais de desfazer à mão).
-- **Painel "Mapas"** (`MapsPanel`, quarta aba do `SidePanel`, só GM): criar (vazio ou por upload,
-  numa chamada só), card por mapa com miniatura (gerada no cliente, cacheada em `localStorage` —
-  `lib/thumbnails.ts`), contagem de tokens e status de combate (`scene:list`, dados que o cliente
-  não carregou de mapas que não visitou), badges Ativo/Vendo, renomear inline, duplicar, apagar,
-  arrastar para reordenar (`scene:reorder`, mesmo contrato de `combat:reorder`).
+- **Seletor de mapa** (`MapSelector`, na TopBar, só GM): botão "Mapa: <nome visitado> ▾" (ou "Vendo
+  X · ativo: Y" em destaque âmbar quando diverge, ver acima). Clique ou a tecla **M** (fora de campo
+  de texto) abrem um dropdown de ~420 px ancorado abaixo do botão; Esc ou clique fora fecham. Quando
+  divergente, o topo do dropdown ganha "← Ir para o ativo" e "Ativar este". O corpo é o `MapsPanel`:
+  card por mapa com miniatura (gerada no cliente, cacheada em `localStorage` — `lib/thumbnails.ts`),
+  contagem de tokens e status de combate (`scene:list`, buscado ao abrir o dropdown — dados que o
+  cliente não carregou de mapas que não visitou), badges Ativo/Vendo, renomear inline, duplicar,
+  apagar, arrastar para reordenar (`scene:reorder`, mesmo contrato de `combat:reorder`), e no
+  rodapé "+ Novo mapa"/"Novo por upload". Selecionar um mapa ou iniciar "Definir ponto de chegada"
+  fecha o dropdown (o segundo precisa que o clique seguinte chegue ao canvas); as demais ações
+  deixam o dropdown aberto. Jogador só vê o texto "Mapa: <nome do ativo>", sem botão nem dropdown.
 - **Testes puros** (`packages/shared/src/rules/scenes.ts`, `scenes.test.ts`): ordenação
   (`orderScenes`, `nextSceneOrder`), `reorderScenes` (renumera, rejeita conjunto incompleto/
   repetido/estranho), `duplicateScene`/`duplicateSceneName`, `pickTokensToCarry` (pré-marcação),
