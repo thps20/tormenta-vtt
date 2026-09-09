@@ -7,6 +7,7 @@ import { prisma } from "./db.js";
 import { registerRoomRoutes } from "./http/rooms.js";
 import { registerUploadRoutes } from "./http/upload.js";
 import { registerSocketHandlers } from "./socket/index.js";
+import { scheduleTokenTrashCleanup } from "./services/cleanup.js";
 
 const app = Fastify({ logger: true });
 
@@ -43,6 +44,10 @@ const io = new SocketServer<ClientToServerEvents, ServerToClientEvents, Record<s
 
 registerSocketHandlers(io, app.log);
 
+// Limpeza definitiva de tokens apagados há mais de TOKEN_TRASH_RETENTION_DAYS dias
+// (docs/plano-desfazer.md §8): roda uma vez agora e depois a cada 6h.
+const cleanupTimer = scheduleTokenTrashCleanup(app.log);
+
 // --- Start --------------------------------------------------------------
 
 try {
@@ -56,6 +61,7 @@ try {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, async () => {
     app.log.info(`recebido ${signal}, encerrando...`);
+    clearInterval(cleanupTimer);
     io.close();
     await app.close();
     await prisma.$disconnect();
