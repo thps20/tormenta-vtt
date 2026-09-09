@@ -85,7 +85,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       if (fields.conditions) {
         const def = await requireSystem(ctx.roomId);
         const known = new Set(def.conditions.map((c) => c.key));
-        if (fields.conditions.some((key) => !known.has(key))) throw new HandlerError("Condição inexistente no sistema da sala");
+        if (fields.conditions.some((c) => !known.has(c.key))) throw new HandlerError("Condição inexistente no sistema da sala");
       }
       const token = toToken(await prisma.token.update({ where: { id }, data: { ...fields, ...(hp !== undefined ? { hp: hpJson(hp) } : {}) } }));
       const fog = toScene(row.scene).fog;

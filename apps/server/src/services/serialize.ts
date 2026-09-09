@@ -8,6 +8,7 @@ import {
   ChatMessageSchema,
   FogConfigSchema,
   GridConfigSchema,
+  TokenConditionEntrySchema,
   TokenHpSchema,
   type ChatMessage,
   type Participant,
@@ -62,7 +63,9 @@ export function toToken(t: DbToken): Token {
     color: t.color,
     characterId: t.characterId,
     hp: TokenHpSchema.nullable().parse(t.hp),
-    conditions: t.conditions,
+    // `conditions` é Json no banco (sem tipo garantido pelo Prisma): o preprocess do schema aceita
+    // tanto a forma antiga (string, gravada antes desta mudança) quanto { key, expiresRound? }.
+    conditions: TokenConditionEntrySchema.array().parse(t.conditions),
   };
 }
 

@@ -87,8 +87,10 @@ model Token {
   /// PV do token solto (sem characterId), editado no Inspector: { current, max }. Ver TokenHpSchema.
   /// Ignorado enquanto characterId aponta pra uma ficha (quem manda é o recurso `tokenBar` dela).
   hp          Json?
-  /// Chaves de conditions[] do sistema (ex.: "cego", "atordoado"). Só marcador visual por enquanto.
-  conditions  String[] @default([])
+  /// Condições ativas: array de string (chave, permanente) ou { key, expiresRound } (expira em
+  /// combat:next comparado a Combat.round). Ver TokenConditionEntrySchema — Json porque o formato
+  /// mistura os dois (campo flexível, mesma convenção de grid/fog/hp).
+  conditions  Json     @default("[]")
 
   scene        Scene         @relation(fields: [sceneId], references: [id], onDelete: Cascade)
   owner        Participant?  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
