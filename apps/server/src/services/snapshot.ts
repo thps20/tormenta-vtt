@@ -16,7 +16,7 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     prisma.participant.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
     prisma.scene.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
     room.activeSceneId
-      ? prisma.token.findMany({ where: { sceneId: room.activeSceneId }, orderBy: { zIndex: "asc" } })
+      ? prisma.token.findMany({ where: { sceneId: room.activeSceneId, deletedAt: null }, orderBy: { zIndex: "asc" } })
       : Promise.resolve([]),
     prisma.chatMessage.findMany({
       where: { roomId: room.id },

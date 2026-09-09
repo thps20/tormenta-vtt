@@ -68,7 +68,7 @@ export async function requireCharacter(characterId: string, roomId: string): Pro
 export async function findActiveSceneTokenId(characterId: string, roomId: string): Promise<string | undefined> {
   const room = await prisma.room.findUnique({ where: { id: roomId } });
   if (!room?.activeSceneId) return undefined;
-  const token = await prisma.token.findFirst({ where: { characterId, sceneId: room.activeSceneId } });
+  const token = await prisma.token.findFirst({ where: { characterId, sceneId: room.activeSceneId, deletedAt: null } });
   return token?.id;
 }
 

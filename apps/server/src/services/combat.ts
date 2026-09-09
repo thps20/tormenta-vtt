@@ -42,9 +42,17 @@ export interface Viewer {
 export type CombatantRow = DbCombatant & { token: DbToken };
 export type CombatRow = DbCombat & { combatants: CombatantRow[] };
 
-/** Carrega o combate da cena (com combatentes + o token de cada um). null = nenhum combate ali. */
+/**
+ * Carrega o combate da cena (com combatentes + o token de cada um). null = nenhum combate ali.
+ * Combatente cujo token foi apagado (soft delete, docs/plano-desfazer.md §2) some da lista — não
+ * trava turno, não aparece na UI — mesmo a linha do Combatant continuando no banco pro desfazer
+ * restaurar depois (soft delete não mexe nela).
+ */
 export async function loadCombatRow(sceneId: string): Promise<CombatRow | null> {
-  return prisma.combat.findUnique({ where: { sceneId }, include: { combatants: { include: { token: true } } } });
+  return prisma.combat.findUnique({
+    where: { sceneId },
+    include: { combatants: { where: { token: { deletedAt: null } }, include: { token: true } } },
+  });
 }
 
 /** Carrega e confirma que o combate é desta sala. */
@@ -246,7 +254,7 @@ async function applyConditionExpiry(
   strategy: (conditions: TokenCondition[]) => ConditionExpiry,
 ): Promise<void> {
   const [tokens, sceneRow] = await Promise.all([
-    prisma.token.findMany({ where: { sceneId } }),
+    prisma.token.findMany({ where: { sceneId, deletedAt: null } }),
     prisma.scene.findUniqueOrThrow({ where: { id: sceneId } }),
   ]);
   const fog = toScene(sceneRow).fog;

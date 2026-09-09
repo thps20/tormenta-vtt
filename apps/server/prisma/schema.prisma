@@ -91,6 +91,11 @@ model Token {
   /// combat:next comparado a Combat.round). Ver TokenConditionEntrySchema — Json porque o formato
   /// mistura os dois (campo flexível, mesma convenção de grid/fog/hp).
   conditions  Json     @default("[]")
+  /// Soft delete (docs/plano-desfazer.md §2): token:delete/token:delete-many só marcam esta data,
+  /// não apagam a linha — assim PV/condições/characterId/Combatant sobrevivem pro desfazer restaurar
+  /// tudo de graça. null = token "existe" normalmente. Consultas de "tokens da cena agora" filtram
+  /// deletedAt: null; a limpeza definitiva (services/cleanup.ts) apaga de vez depois de N dias.
+  deletedAt   DateTime?
 
   scene        Scene         @relation(fields: [sceneId], references: [id], onDelete: Cascade)
   owner        Participant?  @relation(fields: [ownerId], references: [id], onDelete: SetNull)

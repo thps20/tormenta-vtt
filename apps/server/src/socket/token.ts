@@ -33,10 +33,14 @@ import { emitTokenToPlayers } from "../services/visibility.js";
 import { guarded, HandlerError } from "./ack.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
-/** Carrega o token e confirma que a cena dele é desta sala. */
+/**
+ * Carrega o token e confirma que a cena dele é desta sala. Um token soft-deleted
+ * (docs/plano-desfazer.md §2) conta como "não encontrado" pra todo handler normal — só o
+ * desfazer (services/history.ts) busca por baixo desse filtro, pra poder restaurá-lo.
+ */
 async function requireToken(tokenId: string, roomId: string) {
   const row = await prisma.token.findUnique({ where: { id: tokenId }, include: { scene: true } });
-  if (!row || row.scene.roomId !== roomId) throw new HandlerError("Token não encontrado");
+  if (!row || row.scene.roomId !== roomId || row.deletedAt !== null) throw new HandlerError("Token não encontrado");
   return row;
 }
 
@@ -104,15 +108,18 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       const row = await requireToken(tokenId, ctx.roomId);
       if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla este token");
 
-      // Se o token é combatente de um combate, ajusta o cursor de turno ANTES de apagar: o
-      // cascade da FK apaga a linha do Combatant junto com o token, então depois é tarde.
+      // Se o token é combatente de um combate, ajusta o cursor de turno ANTES de marcar
+      // deletedAt: loadCombatRow (chamado por prepareTokenRemovalFromCombat via o `combat` daqui)
+      // só filtra combatentes com token.deletedAt null, então depois disso ele já teria sumido.
       const combat = await loadCombatRow(row.sceneId);
       if (combat) {
         const def = await requireSystem(ctx.roomId);
         await prepareTokenRemovalFromCombat(def, combat, tokenId);
       }
 
-      await prisma.token.delete({ where: { id: tokenId } });
+      // Soft delete (docs/plano-desfazer.md §2): a linha continua no banco (PV, condições,
+      // characterId, Combatant intactos) para o desfazer restaurar tudo sem precisar de snapshot.
+      await prisma.token.update({ where: { id: tokenId }, data: { deletedAt: new Date() } });
       io.to(rooms.all(ctx.roomId)).emit("token:deleted", { tokenId });
       if (combat) await emitCombat(io, ctx.roomId, { role: ctx.role, participantId: ctx.participantId });
     }),

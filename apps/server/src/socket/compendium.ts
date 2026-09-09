@@ -55,7 +55,7 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
         const map = { width: sceneRow.mapWidth ?? DEFAULT_MAP_SIZE.width, height: sceneRow.mapHeight ?? DEFAULT_MAP_SIZE.height };
         const bounds = { cols: Math.max(1, Math.ceil(map.width / cellSize)), rows: Math.max(1, Math.ceil(map.height / cellSize)) };
 
-        const existingTokens = await prisma.token.findMany({ where: { sceneId: data.sceneId } });
+        const existingTokens = await prisma.token.findMany({ where: { sceneId: data.sceneId, deletedAt: null } });
         const occupied: CellRect[] = existingTokens.map((t) => cellRect(t, scene.grid));
         // Lado em células: arredonda pro grid (tokenCells pode ser fracionário, ex.: Minúsculo =
         // 0,5) — a espiral trabalha em células inteiras; o token continua com o tamanho exato em

@@ -25,7 +25,7 @@ export function registerFogHandlers(io: TypedServer, socket: TypedSocket): void 
       io.to(rooms.all(ctx.roomId)).emit("fog:updated", { sceneId, fog });
 
       // Só a visibilidade para jogadores muda; o GM já tem todos os tokens.
-      const tokens = await prisma.token.findMany({ where: { sceneId }, orderBy: { zIndex: "asc" } });
+      const tokens = await prisma.token.findMany({ where: { sceneId, deletedAt: null }, orderBy: { zIndex: "asc" } });
       for (const t of tokens) emitTokenToPlayers(io, ctx.roomId, toToken(t), "token:updated", fog);
       // A visibilidade do combate (se a cena tiver um) também pode ter mudado.
       await emitCombat(io, ctx.roomId, { role: "gm", participantId: ctx.participantId });
