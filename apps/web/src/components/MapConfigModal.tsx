@@ -217,7 +217,7 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({ isOpen, scene, o
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-serif font-bold text-zinc-100 tracking-wide">Configurar Mapa e Grid</h2>
-              <p className="text-[11px] text-zinc-400">Cena: {scene.name}</p>
+              <p className="text-[11px] text-zinc-400">Mapa: {scene.name}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-100 p-1.5 rounded hover:bg-[#252525] cursor-pointer" title="Fechar (Esc)">

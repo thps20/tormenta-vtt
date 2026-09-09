@@ -53,7 +53,7 @@ export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, o
             <div className="flex items-center gap-3 text-xs text-zinc-400 mt-0.5">
               <span className="flex items-center gap-1 text-zinc-300">
                 <MapPin className="w-3.5 h-3.5 text-[#d4af37]" />
-                {scene?.name ?? "Sem cena"}
+                {scene?.name ?? "Sem mapa"}
               </span>
               <span className="text-zinc-600">•</span>
               <button

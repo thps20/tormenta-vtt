@@ -8,7 +8,9 @@
 VTT (Virtual Tabletop) web para jogar RPG de mesa online com amigos. Primeiro sistema: **Tormenta20**.
 Arquitetura **agnóstica de sistema**: tudo que é regra (atributos, perícias, fórmulas) vive em `packages/shared/systems/<id>.json`, validado pelo `SystemDefinitionSchema`. O código nunca conhece "FOR" ou "Percepção".
 
-**Fora do MVP** (explicitamente): login/contas, fog of war, medição de distância, áudio/vídeo, múltiplos mapas simultâneos, compêndio de magias/itens/classes (entrou depois: §9.4), automação avançada da ficha (efeitos ativos, poderes por nível com escolhas). O que já foi feito além do MVP está em **§9 Fase 2**.
+**Fora do MVP** (explicitamente): login/contas, fog of war, medição de distância, áudio/vídeo, compêndio de magias/itens/classes (entrou depois: §9.4), automação avançada da ficha (efeitos ativos, poderes por nível com escolhas). O que já foi feito além do MVP está em **§9 Fase 2** — inclusive múltiplos mapas por sala (§9.7, setembro/2026).
+
+**Nomenclatura — "mapa" vs. "cena"**: em Tormenta20 **cena** é uma unidade de tempo de jogo ("dura uma cena", "até o fim da cena"), diferente da imagem com grid e tokens onde os personagens estão. Pra não confundir as duas coisas: **tudo que o usuário vê diz "mapa"** (UI, toasts, mensagens de erro do servidor); o nome interno continua `Scene` (modelo Prisma, `SceneSchema`, `sceneId`, eventos `scene:*`) — trocar isso seria um diff gigante sem ganho pra quem joga, e o código já fala inglês por convenção (`cellSize`, `ownerId`). Nos docs, "mapa" na prosa e `Scene`/`sceneId` só quando o texto fala da entidade/coluna. Ver docs/plano-mapas.md §1.
 
 A **ficha básica** (§3.6) entrou no escopo em setembro/2026: atributos, perícias, recursos, stats derivados, modificadores e itens físicos com ataque/dano ligados ao chat. Poderes e magias com ativação (custo de PM, CD de resistência, card no chat) entraram em seguida (fase 3), e classes e raças como itens que alimentam nível, PV/PM e atributos (fase 4). Raciocínio e mapeamento em `docs/modelo-personagem.md`; planos em `docs/plano-passo3.md` e `docs/plano-passo4.md`.
 
@@ -30,7 +32,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Servidor responde com `RoomSnapshot` (estado completo, inclui `sessionToken`) e faz broadcast de `room:participantJoined`.
 - Ao desconectar, o servidor faz broadcast de `room:participantLeft { id }`; o participante **continua** na lista com `connected = false` (jogadores online = `connected = true`).
 - O Lobby (`/`) tem só dois cards: criar sala e entrar com código. Não há lista de salas recentes no MVP.
-- Ao criar a sala, o servidor cria automaticamente uma cena "Cena 1" vazia e a define como ativa.
+- Ao criar a sala, o servidor cria automaticamente um mapa "Mapa 1" vazio e o define como ativo.
 
 ### 3.2 Mapa e grid (GM)
 - `POST /api/upload` (multipart, PNG/JPG/WebP, máx. 20 MB) → salva em `apps/server/uploads/` e devolve `{ url, width, height }`.
@@ -45,7 +47,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - Esc cancela o gesto em andamento e volta para Selecionar. Scroll = zoom em todos os modos.
   - **Desfazer/refazer (Ctrl+Z / Ctrl+Shift+Z ou Ctrl+Y, só GM)**: com a ferramenta Névoa ativa, Ctrl+Z desfaz a última forma pintada (§9.3, sem refazer); fora dela é o desfazer geral descrito em §9.6. Fora de campo de texto (`isTyping`), igual aos outros atalhos.
 - Sem mapa (`mapUrl = null`) o canvas desenha um retângulo escuro de `mapWidth × mapHeight` (padrão 1600×1100) só para o grid e os tokens terem onde ficar.
-- Renomear cena está fora do MVP (o nome é definido em `scene:create`).
+- Renomear, duplicar, apagar e reordenar mapas, e navegar entre vários da mesma sala: §9.7.
 
 ### 3.3 Tokens
 - Criar: GM clica "Novo token" → aparece no centro da viewport com `width = height = cellSize`. Opcional: imagem via `/api/upload`.
@@ -95,7 +97,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 ### 3.5 Modo de combate
 > Substitui o rastreador manual de iniciativa da versão anterior do MVP. Plano e decisões em `docs/plano-combate.md`; divergências encontradas na implementação em `docs/revisao-combate.md`.
 
-- **Combate por cena** (`Combat`, um por cena — `Scene.combat?`, `@@unique` em `sceneId`): `{ id, sceneId, round, status: "rolling" | "active" | "ended", activeCombatantId, combatants[] }`. `Combatant`: `{ id, tokenId, characterId? (cópia do token no momento em que entrou, só informativa), name/color (denormalizados do token na hora de enviar), ownerId (do token), initiative: number | null, rolled, bonus, delayed, surprised, order, addedRound }`.
+- **Combate por mapa** (`Combat`, um por mapa — `Scene.combat?`, `@@unique` em `sceneId`; deixou de exigir "mapa ativo" — §9.7, docs/plano-mapas.md §7 — dois mapas podem ter combate ao mesmo tempo e ativar outro não encerra o anterior): `{ id, sceneId, round, status: "rolling" | "active" | "ended", activeCombatantId, combatants[] }`. Todo evento `combat:*` leva `sceneId`; jogador só age no mapa ATIVO da sala, GM em qualquer um que esteja vendo. `Combatant`: `{ id, tokenId, characterId? (cópia do token no momento em que entrou, só informativa), name/color (denormalizados do token na hora de enviar), ownerId (do token), initiative: number | null, rolled, bonus, delayed, surprised, order, addedRound }`.
 - **Regras do sistema** (`SystemDefinition.combat`, nunca hardcoded): `initiative` (fórmula de quem tem ficha vinculada), `initiativeNoSheet` (token sem ficha, `{bonus}` = valor manual do GM), `tiebreakBonus` (fórmula sem dado gravada em `Combatant.bonus` ao entrar), `tiebreak` (critérios de desempate após o valor, na ordem: T20 usa `["bonus", "order"]`), `surprise.rounds` (combatente surpreso é pulado nas N primeiras rodadas; `0` = sistema sem surpresa).
 - **Fluxo**: GM seleciona tokens no mapa (ferramenta Selecionar) e clica "Iniciar combate" (`combat:start`) — cria o combate com `status: "rolling"`; tokens podem ser adicionados (`combat:add`, reforços, entram sem iniciativa) ou removidos (`combat:remove`) depois. `combat:next` com `status: "rolling"` inicia os turnos (`round = 1`); no último combatente que pode agir, incrementa a rodada e volta ao primeiro; `combat:prev` faz o inverso (rodada mínima 1) e **não restaura condição nenhuma** (decisão deliberada: "prev" corrige um clique errado do GM, não rejoga o combate). Combatente sem iniciativa nunca recebe turno, fica no fim da lista; surpreso é pulado enquanto `round <= surprise.rounds`; adiado (`combat:delay`, só no próprio turno) sai da rotação até "entrar agora" (`combat:resume`) — que copia iniciativa/bônus de quem está agindo e assume o turno na hora, deixando quem foi interrompido para agir em seguida. `combat:end { clear? }` encerra (`status: "ended"`, mantém a ordem visível) ou, com `clear: true`, apaga o combate.
 - **Expiração de condições** (docs/plano-duracao-condicoes.md): quando `combat:next` faz a rodada avançar (`round` maior que antes, inclusive a virada de `"rolling"` pra `round = 1`), os tokens da cena com condição `expiresRound <= round` a perdem — um `token:updated` por token afetado (mesmo com várias condições vencendo juntas) e uma mensagem de chat `kind: "system"` por condição ("Goblin: Atordoado terminou"), com `tokenId` setado (só quem vê o token recebe, mesmo gate de sempre). `combat:end { clear: true }` faz o mesmo pelas condições com duração, não importa o valor de `expiresRound` — o combate acabou, então **não viram permanentes**, são removidas e listadas no chat do mesmo jeito; condição permanente (sem `expiresRound`) nunca é tocada por nenhum dos dois.
@@ -142,9 +144,9 @@ Room 1───* ChatMessage *───? Token
 
 | Entidade | Campos principais | Notas |
 |---|---|---|
-| **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`) |
+| **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`). `activeSceneId` sempre aponta pra um mapa não apagado da sala (invariante mantida por `scene:activate`/`scene:delete`, §9.7) |
 | **Participant** | `id, roomId, nickname, role, sessionToken` | `connected` é estado em memória, não persistido |
-| **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON)` | `grid` e `fog` são JSON para evoluir sem migration. `fog` segue `FogConfigSchema` (§9.3) |
+| **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON), order, arrival(JSON), deletedAt?` | Múltiplos mapas por sala (§9.7). `grid` e `fog` são JSON para evoluir sem migration; `fog` segue `FogConfigSchema` (§9.3). `order`: posição no painel "Mapas", renumerada 0..n-1 a cada `scene:reorder`. `arrival` = `{x,y} \| null` (pixels do mapa): onde tokens levados de outro mapa aparecem ao ativar. `deletedAt` (coluna só do banco, nunca serializada no `Scene` do shared, mesmo padrão de `Token.deletedAt`): soft delete de `scene:delete` — todo lugar que lista "mapas da sala agora" filtra `deletedAt: null`; limpeza definitiva depois de 30 dias (`services/cleanup.ts`) |
 | **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[]), deletedAt?` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto). `deletedAt` (coluna só do banco, nunca serializada no `Token` do shared): soft delete de `token:delete`/`token:delete-many` (§9.6) — todo lugar que lista "tokens da cena agora" filtra `deletedAt: null`; a limpeza definitiva apaga a linha de vez depois de 30 dias (`services/cleanup.ts`) |
 | **Character** | `id, roomId, ownerId?, name, kind, data(JSON)` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration |
 | **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), initiativeBatch?(JSON), visibility, tokenId?` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3); `item` segue `ItemCardSchema` (kind `item`); `initiativeBatch` segue `InitiativeBatchSchema` (kind `initiative-batch`: `{ round, entries: [{ combatantId, tokenId, name, formula?, result? }] }`, `combat:roll` rolando mais de um combatente, §3.5); `visibility` = `all \| gm \| self` (§3.4); `tokenId?` liga a rolagem a um token (combate/ficha), filtrado à parte de `visibility` (§3.4/§3.5) — um `initiative-batch` não usa este campo (várias linhas, vários tokens): o gate é por linha, dentro de `initiativeBatch.entries` |
@@ -166,11 +168,18 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | Evento | Payload | Quem | Efeito / broadcast |
 |---|---|---|---|
 | `room:join` | `{ inviteCode, nickname?, gmSecret?, sessionToken? }` | todos | ack `RoomSnapshot`; `room:participantJoined`. `sessionToken` válido → reconecta o mesmo participante; senão exige `nickname` e cria um novo |
-| `scene:create` | `{ name }` | GM | `scene:created` |
-| `scene:activate` | `{ sceneId }` | GM | `room:activeSceneChanged` (clientes reemitem `room:join` para receber os tokens da nova cena) |
+| `scene:create` | `{ name, mapUrl?, mapWidth?, mapHeight? }` (`mapUrl` opcional: "criar por upload" numa chamada só) | GM | `scene:created` |
+| `scene:activate` | `{ sceneId, moveTokenIds?, dropPoint? }` (§9.7: diálogo "Levar para o mapa") | GM | `token:updated` de cada token movido, `combat:updated` do mapa de origem se ele tinha combate, `room:activeSceneChanged` |
+| `scene:enter` | `{ sceneId }` | GM (qualquer mapa vivo da sala), jogador (só o ativo) | ack `{ tokens, combat }`; sem broadcast — navegar/restaurar sem os efeitos colaterais de `room:join` (§9.7) |
+| `scene:rename` | `{ sceneId, name }` | GM | `scene:updated` |
+| `scene:duplicate` | `{ sceneId, name? }` (nome ausente = gerado, "Cópia de X") | GM | `scene:created` |
+| `scene:delete` | `{ sceneId, confirmMovePlayerTokens? }` | GM | ack `{ status: "deleted" }` ou `{ status: "needs-confirm", playerTokenIds }` (nada apagado ainda); `scene:deleted` + `token:updated` dos tokens de jogador movidos (§9.7) |
+| `scene:reorder` | `{ sceneIds }` (lista completa) | GM | `scene:reordered` |
+| `scene:setArrival` | `{ sceneId, arrival: {x,y} \| null }` | GM | `scene:updated` |
+| `scene:list` | `{}` | GM | ack `{ items: SceneListItem[] }` (contagens/combate de cada mapa, painel "Mapas"); sem broadcast |
 | `scene:setMap` | `{ sceneId, mapUrl, mapWidth, mapHeight }` (`null` remove o mapa) | GM | `scene:updated` |
 | `scene:updateGrid` | `{ sceneId, grid: Partial<GridConfig> }` | GM | `scene:updated` |
-| `fog:update` | `{ sceneId, op }` com `op` = `add {shape}` \| `removeLast` \| `revealAll` \| `hideAll` \| `setEnabled {enabled}` | GM | `fog:updated` + reenvio dos tokens da cena conforme a visibilidade nova (§9.3) |
+| `fog:update` | `{ sceneId, op }` com `op` = `add {shape}` \| `removeLast` \| `revealAll` \| `hideAll` \| `setEnabled {enabled}` | GM | `fog:updated` + reenvio dos tokens do mapa conforme a visibilidade nova (§9.3); jogador só recebe se `sceneId` for o mapa ATIVO (§9.7) |
 | `token:create` | `TokenCreate` | GM | `token:created` |
 | `token:update` | `TokenPatch` (`id` + campos, `live?` marca eco do arraste — §9.6) | GM ou owner | `token:updated` |
 | `token:update-many` | `{ patches: TokenPatch[] }` (min 1) | GM ou owner de cada token (tudo-ou-nada) | `token:updated` de cada um; arraste em grupo (2+ tokens), uma entrada de histórico só (§9.6) |
@@ -187,17 +196,17 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `compendium:spawn-creature` | `{ sceneId, entryId, count (1..20), visible, x, y }` (`x, y` em pixels do mapa) | GM | `character:created` (uma por cópia) + `token:created`; ack com os `Token[]` criados (§9.5) |
 | `chat:send` | `{ text, visibility? }` (`visibility` = modo de rolagem do autor; `/gmr` e `/pr` no texto forçam) | todos | `chat:message` a todos (texto sempre público); rolagem fora de "Pública" vai a todos, mas quem `visibility` não permite recebe sem `roll` (placeholder, §3.4); ack sem `roll` quando o autor não pode ver (às cegas) |
 | `chat:reveal` | `{ messageId }` | GM | `chat:message` da mesma mensagem com `visibility: "all"` para todos (cliente faz upsert) |
-| `combat:start` | `{ sceneId, tokenIds[] }` | GM | `combat:updated`; substitui um combate anterior da cena, se houver |
-| `combat:add` | `{ tokenIds[] }` | GM | `combat:updated`; reforços entram sem iniciativa |
-| `combat:remove` | `{ combatantIds[] }` | GM | `combat:updated`; ajusta o turno se um removido era o ativo |
-| `combat:roll` | `{ scope: self\|one\|npcs\|missing, combatantId?, visibility? }` | `self`/`one`: GM ou dono do combatente; `npcs`/`missing`: GM | Rola no servidor; um alvo publica `chat:message{kind:"roll"}`, mais de um publica um só `chat:message{kind:"initiative-batch"}` (§3.5); `combat:updated` uma vez, no fim do lote |
-| `combat:set-initiative` | `{ combatantId, initiative: number\|null, bonus? }` | GM | `combat:updated` |
-| `combat:set-surprised` | `{ combatantId, surprised }` | GM | `combat:updated` |
-| `combat:next` / `prev` | `{}` | GM | `combat:updated` |
-| `combat:reorder` | `{ combatantIds[] }` (nova ordem completa) | GM | `combat:updated` |
-| `combat:delay` | `{ combatantId }` (só no próprio turno) | GM ou dono do combatente | `combat:updated` |
-| `combat:resume` | `{ combatantId }` | GM ou dono do combatente | `combat:updated` |
-| `combat:end` | `{ clear? }` | GM | `combat:updated` (`null` se `clear: true`) |
+| `combat:start` | `{ sceneId, tokenIds[] }` | GM | `combat:updated`; substitui um combate anterior do mapa, se houver |
+| `combat:add` | `{ sceneId, tokenIds[] }` | GM | `combat:updated`; reforços entram sem iniciativa |
+| `combat:remove` | `{ sceneId, combatantIds[] }` | GM | `combat:updated`; ajusta o turno se um removido era o ativo |
+| `combat:roll` | `{ sceneId, scope: self\|one\|npcs\|missing, combatantId?, visibility? }` | `self`/`one`: GM ou dono do combatente (só no mapa ativo); `npcs`/`missing`: GM | Rola no servidor; um alvo publica `chat:message{kind:"roll"}`, mais de um publica um só `chat:message{kind:"initiative-batch"}` (§3.5); `combat:updated` uma vez, no fim do lote |
+| `combat:set-initiative` | `{ sceneId, combatantId, initiative: number\|null, bonus? }` | GM | `combat:updated` |
+| `combat:set-surprised` | `{ sceneId, combatantId, surprised }` | GM | `combat:updated` |
+| `combat:next` / `prev` | `{ sceneId }` | GM | `combat:updated` |
+| `combat:reorder` | `{ sceneId, combatantIds[] }` (nova ordem completa) | GM | `combat:updated` |
+| `combat:delay` | `{ sceneId, combatantId }` (só no próprio turno, só no mapa ativo) | GM ou dono do combatente | `combat:updated` |
+| `combat:resume` | `{ sceneId, combatantId }` (só no mapa ativo) | GM ou dono do combatente | `combat:updated` |
+| `combat:end` | `{ sceneId, clear? }` | GM | `combat:updated` (`combat: null` se `clear: true`) |
 | `ruler:update` | `{ sceneId, ruler: { start, end } \| null }` (pixels do mapa) | todos | `ruler:updated` para os **outros** (efêmero: não persiste; `null` apaga) |
 | `history:undo` / `history:redo` | `{}` | GM | desfaz/refaz o topo da pilha da sala (§9.6); ack `{ summary } \| null` (`null` = pilha vazia); broadcasts normais das entidades afetadas + `history:updated` |
 
@@ -206,17 +215,19 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | Evento | Payload |
 |---|---|
 | `room:participantJoined` / `room:participantLeft` | `Participant` (novo ou reconectado; cliente faz upsert) / `{ id }` (marca `connected = false`) |
-| `room:activeSceneChanged` | `{ sceneId }` |
+| `room:activeSceneChanged` | `{ sceneId }` (jogador sempre segue, chamando `scene:enter`; GM só se estava vendo o mapa que deixou de ser ativo — §9.7) |
 | `scene:created` / `scene:updated` | `Scene` |
-| `fog:updated` | `{ sceneId, fog: FogConfig }` (estado completo; cliente substitui `scene.fog`) |
-| `token:created` / `token:updated` | `Token` |
+| `scene:deleted` | `{ sceneId }` (quem estava vendo esse mapa cai pro ativo) |
+| `scene:reordered` | `{ order: [{ sceneId, order }] }` (só os pares que mudaram, não a lista inteira) |
+| `fog:updated` | `{ sceneId, fog: FogConfig }` (estado completo; cliente substitui `scene.fog`); jogador só recebe se `sceneId` for o mapa ATIVO (§9.7) |
+| `token:created` / `token:updated` | `Token`; jogador só recebe se `token.sceneId` for o mapa ATIVO da sala (§9.7) |
 | `token:deleted` | `{ tokenId }` |
 | `chat:message` | `ChatMessage` (mensagem nova ou revelada: mesmo `id`, `visibility` nova; cliente faz upsert) |
 | `character:created` / `character:updated` | `Character` (jogadores só recebem `kind = "pc"`) |
 | `character:deleted` | `{ characterId }` |
-| `combat:updated` | `Combat \| null` (estado completo, já ordenado e filtrado pela visibilidade de quem recebe — §3.5; `null` = sem combate na cena ativa) |
+| `combat:updated` | `{ sceneId, combat: Combat \| null }` (estado completo DE UM MAPA, já ordenado e filtrado pela visibilidade de quem recebe — §3.5; `combat: null` = sem combate nesse mapa. GM sempre recebe; jogador só se `sceneId` for o mapa ATIVO — §9.7) |
 | `history:updated` | `{ canUndo, canRedo, undoSummary?, redoSummary? }` — só pro GM (§9.6) |
-| `ruler:updated` | `{ participantId, nickname, sceneId, ruler \| null }` (régua de outro participante; sem eco ao autor) |
+| `ruler:updated` | `{ participantId, nickname, sceneId, ruler \| null }` (régua de outro participante; sem eco ao autor; jogador só recebe se `sceneId` for o mapa ATIVO — §9.7) |
 | `server:error` | `{ message }` |
 
 ### HTTP (fora do socket)
@@ -243,17 +254,24 @@ apps/web/src/
   App.tsx       escolhe a tela pela URL
   components/   Lobby, RoomPage (liga stores aos componentes), TopBar, Toolbar, VttCanvas,
                 TokenInspector, SidePanel, ChatTab, InitiativeTab (modo de combate), CombatBanner
-                (faixa "rolar iniciativa"/"seu turno"), CharactersTab, MapConfigModal,
-                NicknamePrompt, Toasts, CharacterSheetDrawer (gaveta da ficha)
+                (faixa "rolar iniciativa"/"seu turno"), ViewingSceneBanner (faixa "você está em
+                X" quando o GM visita um mapa que não é o ativo, §9.7), CharactersTab,
+                MapsPanel (aba "Mapas", só GM, §9.7), CarryTokensDialog ("Levar para o mapa"
+                ao ativar, §9.7), MapConfigModal, NicknamePrompt, Toasts,
+                CharacterSheetDrawer (gaveta da ficha)
   components/compendium/  CompendiumPalette (paleta encaixada ou flutuante), EntryPreview, DragGhost (arrasto)
   components/character/  seções da ficha: CharacterHeader, AttributesGrid, ResourcesBlock,
                 DerivedStatsBar, SkillsSection, ItemsSection, ModifiersSection, DetailsSection,
                 fields.tsx (inputs "commit on blur")
   store/        connection.ts (socket + emitAck), bindSocket.ts (broadcast → store),
-                room.ts, tokens.ts, chat.ts, combat.ts (modo de combate), characters.ts, ui.ts (toasts),
+                room.ts (viewingSceneId/selectViewedScene, ações de mapa — §9.7), tokens.ts, chat.ts,
+                combat.ts (byScene: combate por mapa, §9.7), characters.ts, ui.ts (toasts),
+                sceneList.ts (contagens/combate de cada mapa pro painel "Mapas", §9.7),
                 tools.ts (ferramenta ativa, régua), compendium.ts (entradas, paleta, arrasto)
   lib/          router.ts (2 rotas, sem lib), api.ts (HTTP), grid.ts (célula↔pixel, puro),
-                session.ts (localStorage), throttle.ts, useImage.ts, system.ts (useSystemDef), ids.ts,
+                session.ts (localStorage/sessionStorage), throttle.ts, useImage.ts,
+                thumbnails.ts (miniatura de mapa gerada no cliente, cacheada — §9.7),
+                system.ts (useSystemDef), ids.ts,
                 useToolShortcuts.ts (V/H/R/Esc/espaço), useTurnTitle.ts (título da aba pisca no seu turno),
                 compendium.ts (regras de inserção, puro), dropTargets.ts (alvos de soltura por data-drop-target)
 apps/server/src/
@@ -273,7 +291,8 @@ packages/shared/src/
   dice/         parser + roller, puro, sem I/O
   rules/        placeholders.ts, modifierTarget.ts (regex do target),
                 compute.ts (computeCharacter), rolls.ts (buildCharacterRoll), combat.ts (ordenação,
-                turno, surpresa — puro, testado), defaults.ts
+                turno, surpresa — puro, testado), scenes.ts (ordem, nomeação de cópia, pré-marcação
+                de "levar para o mapa", quem pode apagar um mapa — puro, testado, §9.7), defaults.ts
   systems.ts    registro dos JSONs (getSystemDefinition)
   compendium/   registro dos compêndios (subpath @tormenta-vtt/shared/compendium, só o servidor importa)
 packages/shared/systems/
@@ -286,7 +305,6 @@ packages/shared/systems/
 Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a ficha básica (§3.6). Limitações conhecidas:
 - Ficha: o compêndio (§9.4) vem dos packs do Foundry e tem lacunas listadas em `scripts/import-report.md` (proficiências e limite de atributo das armaduras pesadas, sentidos/perícias das raças, páginas ausentes, fórmulas com variáveis do Foundry); o compêndio da sala (homebrew) só existe como interface. Deslocamento e sentidos da raça não alimentam `derived[]`; poderes de classe por nível ficam de fora. Consumíveis usam a mesma ativação de poderes/magias, mas a quantidade não é descontada ao usar.
 - `character:update` é um patch raso: editar um item reenvia a lista `items` inteira (fichas são pequenas; ok por ora).
-- Só existe UI para uma cena por sala (`scene:create`/`scene:activate` funcionam no servidor, sem botão no web); combate só existe na cena ativa (`combat:start` recusa outra).
 - A presença (`connected`) se perde ao reiniciar o servidor. O combate (§3.5), diferente da iniciativa manual anterior, agora é **persistido** (tabelas `Combat`/`Combatant`) e sobrevive a um restart.
 - Uploads ficam em disco (`apps/server/uploads/`), sem limpeza de arquivos órfãos.
 - Névoa (§9.3): só "desfazer último" (sem histórico completo nem refazer); sem luz dinâmica, paredes ou visão por token; a visibilidade de um token olha só o centro dele; `fog:updated` sempre manda a lista completa de shapes (limitada a 500).
@@ -397,11 +415,13 @@ revisão pós-implementação em `docs/revisao-desfazer.md`.
 
 - **Escopo**: apagar token — um ou vários (`token:delete`/`token:delete-many`), mover e redimensionar
   — um token ou vários selecionados juntos (`token:update`/`token:update-many`), alternar condição e
-  alterar visibilidade (também `token:update`, mesmos campos rastreados) e soltar criaturas do
-  compêndio (`compendium:spawn-creature`). Fora: chat/rolagens, ações de `combat:*` disparadas pelo
-  usuário, ficha de personagem, criar token em branco, os demais campos de `token:update` (nome, cor,
-  imagem, dono — painel do token) e a Névoa, que mantém seu próprio Ctrl+Z (`fog:update removeLast`,
-  §9.3) — dentro da ferramenta Névoa o atalho continua sendo o dela; fora, é o desfazer geral daqui.
+  alterar visibilidade (também `token:update`, mesmos campos rastreados), soltar criaturas do
+  compêndio (`compendium:spawn-creature`) e apagar mapa (`scene:delete`, §9.7 — a única ação de mapa
+  que entra na pilha). Fora: chat/rolagens, ações de `combat:*` disparadas pelo usuário, ficha de
+  personagem, criar token em branco, os demais campos de `token:update` (nome, cor, imagem, dono —
+  painel do token), criar/renomear/duplicar/reordenar/ativar mapa (§9.7) e a Névoa, que mantém seu
+  próprio Ctrl+Z (`fog:update removeLast`, §9.3) — dentro da ferramenta Névoa o atalho continua sendo
+  o dela; fora, é o desfazer geral daqui.
 - **Pilha**: em memória por sala (não persistida — mesmo padrão da presença de conexão e da régua;
   se perde num restart do servidor), cap de 50 entradas de undo, sem cap próprio no redo; uma ação
   nova do GM limpa o redo. Só ações com `role === "gm"` empilham (jogador movendo o próprio token
@@ -429,3 +449,61 @@ revisão pós-implementação em `docs/revisao-desfazer.md`.
   está vazia, tooltip com o resumo da entrada no topo ("apagar Goblin 3"); toast "Desfeito/Refeito:
   <resumo>" ao usar. Atalho Ctrl+Z fora do modo Névoa (Ctrl+Shift+Z/Ctrl+Y refazem), sempre que o
   foco não está em campo de texto (`isTyping`, mesma proteção dos outros atalhos — cobre o chat).
+
+### 9.7 Múltiplos mapas por sala
+
+Criar, renomear, duplicar, apagar, listar e reordenar mapas numa sala; escolher o mapa ativo; o GM
+navegar e editar qualquer mapa sem ativar; levar tokens de um mapa para outro ao ativar; combate por
+mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-implementação em
+`docs/revisao-mapas.md`. Nomenclatura ("mapa" na UI, `Scene` no código): §1.
+
+- **Modelo**: `Scene` ganhou `order` (posição no painel, renumerada 0..n-1 a cada `scene:reorder`),
+  `arrival` (`{x,y} | null`, ponto de chegada de "Levar para o mapa") e `deletedAt` (soft delete,
+  mesmo padrão de `Token.deletedAt` — §4). `activeSceneId` da sala é uma invariante: sempre aponta
+  pra um mapa vivo (nunca apagado); `scene:delete` recusa apagar o mapa ativo ou o último da sala.
+- **Estado por cliente — `viewingSceneId`**: jogador sempre vê o ativo (derivado). GM tem um mapa
+  "visitado" independente do ativo (estado do cliente, persistido em `sessionStorage` por sala —
+  dois GMs, ou duas abas, podem olhar mapas diferentes ao mesmo tempo). `selectViewedScene`
+  substitui `selectActiveScene` em quase todo lugar do web (canvas, névoa, régua, combate, spawn de
+  criatura, `MapConfigModal`); `selectActiveScene` continua valendo pra faixa de aviso e o painel.
+  Faixa "Você está em X. O mapa ativo é Y." (`ViewingSceneBanner`, só GM, só quando os dois
+  divergem) evita o erro mais provável da feature: editar um mapa achando que a mesa está vendo.
+- **`scene:enter`**: troca de mapa sem os efeitos colaterais de `room:join` (presença, snapshot
+  inteiro) — busca só tokens+combate do mapa pedido. GM entra em qualquer mapa vivo da sala;
+  jogador só no ativo. `room:join` continua devolvendo tokens/combate do mapa ATIVO (o que todo
+  jogador quer no primeiro frame); ao receber `room:activeSceneChanged`, jogador sempre chama
+  `scene:enter` do novo ativo, GM só se estava vendo o que deixou de ser ativo — quem clicou em
+  "Ativar" muda `viewingSceneId` na hora e segue sempre pro destino.
+- **Broadcast de mapa** (`token:*`, `fog:updated`, `combat:updated`, `ruler:updated`): o GM sempre
+  recebe (pode estar preparando um mapa que a mesa não vê); jogador só se o mapa em questão for o
+  ATIVO da sala (`services/visibility.ts#isActiveScene`) — nunca sabe de tokens/combate/névoa de um
+  mapa que não vê.
+- **Combate por mapa** (§3.5): deixou de exigir mapa ativo — `requireActiveScene`/
+  `requireActiveCombat` viraram `requireScene`/`requireCombat(sceneId)`; todo `combat:*` leva
+  `sceneId`. `combat:updated` virou `{ sceneId, combat }`. Jogador só age no mapa ativo da sala
+  (`requirePlayerOnActiveScene`); ativar outro mapa não encerra o combate do anterior.
+- **Ativar com "Levar para o mapa"** (`scene:activate { sceneId, moveTokenIds?, dropPoint? }`):
+  diálogo (`CarryTokensDialog`) pré-marca tokens de jogador (ficha ou dono) e os que estavam
+  selecionados no mapa; o GM ajusta livremente, confirma ("Ativar e levar" ou "Ativar sem levar
+  ninguém") e o servidor, numa transação: tira cada token movido do combate de origem (linha do
+  `Combatant` apagada de vez — diferente do soft delete de `token:delete`, aqui o token não some, só
+  muda de mapa), calcula a posição no destino com `findFreeCells` (mesma espiral do spawn de
+  criatura) a partir de `scene.arrival ?? dropPoint ?? centro do mapa`, e muda `sceneId`/`x`/`y` —
+  PV, condições, ficha, dono e tamanho vão junto de graça. Ponto de chegada definido pelo GM no menu
+  do card do mapa (pino visível só pro GM no canvas, não é token).
+- **Apagar mapa**: bloqueado se for o ativo ou o último da sala. Com token de jogador, a primeira
+  chamada só avisa (`{ status: "needs-confirm", playerTokenIds }`, nada apagado ainda); confirmando,
+  o servidor move esses tokens pro mapa ativo (mesma mecânica de ativar) antes do soft delete.
+  Tokens de NPC/monstro vão junto com o mapa (ficam soft-deletados por tabela, voltam se o GM
+  desfizer). É a ÚNICA ação de mapa que entra na pilha de desfazer (§9.6) — criar, renomear,
+  duplicar, reordenar e ativar não entram (efeito colateral de mover tokens seria assustador num
+  Ctrl+Z; as outras quatro são triviais de desfazer à mão).
+- **Painel "Mapas"** (`MapsPanel`, quarta aba do `SidePanel`, só GM): criar (vazio ou por upload,
+  numa chamada só), card por mapa com miniatura (gerada no cliente, cacheada em `localStorage` —
+  `lib/thumbnails.ts`), contagem de tokens e status de combate (`scene:list`, dados que o cliente
+  não carregou de mapas que não visitou), badges Ativo/Vendo, renomear inline, duplicar, apagar,
+  arrastar para reordenar (`scene:reorder`, mesmo contrato de `combat:reorder`).
+- **Testes puros** (`packages/shared/src/rules/scenes.ts`, `scenes.test.ts`): ordenação
+  (`orderScenes`, `nextSceneOrder`), `reorderScenes` (renumera, rejeita conjunto incompleto/
+  repetido/estranho), `duplicateScene`/`duplicateSceneName`, `pickTokensToCarry` (pré-marcação),
+  `canDeleteScene` (bloqueado/precisa confirmar/ok).

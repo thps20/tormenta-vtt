@@ -47,7 +47,7 @@ interface CombatPanelProps extends Partial<CombatPanelCallbacks> {
   combat: Combat | null;
   viewer: 'gm' | 'player';
   meId: string;
-  /** Cena ativa: precisa pra `combat:start`. null = sem cena (esconde/desabilita "Iniciar combate"). */
+  /** Mapa visitado: precisa pra `combat:start`. null = sem mapa (esconde/desabilita "Iniciar combate"). */
   sceneId: string | null;
   selectedTokenIds?: string[];
   onSelectToken?: (tokenId: string) => void;
@@ -140,7 +140,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
             </button>
             {!sceneId ? (
               <span className="text-[10px] text-zinc-500 mt-2 font-mono">
-                Nenhuma cena ativa.
+                Nenhum mapa ativo.
               </span>
             ) : (
               selectedTokenIds.length === 0 && (

@@ -81,7 +81,7 @@ export const FogToolbar: React.FC<FogToolbarProps> = ({ fog, grid, fogMode, fogS
         id="fog-enabled"
         type="button"
         aria-pressed={fog.enabled}
-        title={fog.enabled ? "Névoa ativa nesta cena (clique para desligar)" : "Névoa desligada nesta cena (clique para ligar)"}
+        title={fog.enabled ? "Névoa ativa neste mapa (clique para desligar)" : "Névoa desligada neste mapa (clique para ligar)"}
         onClick={() => onOp({ type: "setEnabled", enabled: !fog.enabled })}
         className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-serif font-bold uppercase tracking-wider cursor-pointer transition-colors ${
           fog.enabled ? "bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/50" : "text-zinc-400 border border-transparent hover:bg-[#252525]"
@@ -92,7 +92,7 @@ export const FogToolbar: React.FC<FogToolbarProps> = ({ fog, grid, fogMode, fogS
       </button>
       <span
         className={`text-[10px] font-mono px-1.5 tabular-nums ${shapeCount > FOG_SHAPES_WARN ? "text-amber-400" : "text-zinc-500"}`}
-        title="Formas de névoa nesta cena"
+        title="Formas de névoa neste mapa"
       >
         {shapeCount} {shapeCount === 1 ? "forma" : "formas"}
       </span>

@@ -13,7 +13,7 @@ export interface CreateRoomResponse {
 
 /**
  * POST /api/rooms { name, nickname } -> { room, gmSecret, sessionToken }
- * Cria a sala, o participante GM e a "Cena 1" (já ativa), tudo numa transação:
+ * Cria a sala, o participante GM e o "Mapa 1" (já ativo), tudo numa transação:
  * ou cria tudo, ou nada.
  */
 export async function registerRoomRoutes(app: FastifyInstance): Promise<void> {
@@ -31,7 +31,7 @@ export async function registerRoomRoutes(app: FastifyInstance): Promise<void> {
           const room = await tx.room.create({
             data: { name, inviteCode: generateInviteCode(), gmSecret: generateGmSecret() },
           });
-          const scene = await tx.scene.create({ data: { roomId: room.id, name: "Cena 1" } });
+          const scene = await tx.scene.create({ data: { roomId: room.id, name: "Mapa 1" } });
           const updatedRoom = await tx.room.update({
             where: { id: room.id },
             data: { activeSceneId: scene.id },
