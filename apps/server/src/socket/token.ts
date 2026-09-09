@@ -58,6 +58,17 @@ async function requireToken(tokenId: string, roomId: string) {
   return row;
 }
 
+/**
+ * Defesa em profundidade (docs/plano-mapas.md §11): jogador só mexe em token do mapa ATIVO da
+ * sala — o cliente honesto nem tem os ids de token de um mapa que não é o ativo (não carrega esse
+ * mapa), mas nada impede um cliente adulterado de tentar. GM mexe em qualquer mapa que esteja
+ * vendo, sem essa checagem.
+ */
+async function requirePlayerTokenOnActiveScene(ctx: Ctx, sceneId: string): Promise<void> {
+  if (ctx.role === "gm") return;
+  if (!(await isActiveScene(ctx.roomId, sceneId))) throw new HandlerError("Este token não está no mapa atual");
+}
+
 /** Json? do Prisma não aceita `null` cru (precisa de Prisma.JsonNull pra gravar SQL NULL). Também
  *  usado por socket/compendium.ts pra recriar um token no redo do spawn (§4 do plano). */
 export function hpJson(hp: TokenHp | null): Prisma.InputJsonValue | typeof Prisma.JsonNull {
@@ -93,6 +104,7 @@ export function broadcastToken(io: TypedServer, roomId: string, token: Token, ev
 async function applyTokenUpdate(io: TypedServer, ctx: Ctx, patch: TokenPatch): Promise<{ before: Token; after: Token; historyBefore: Token }> {
   const row = await requireToken(patch.id, ctx.roomId);
   if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla este token");
+  await requirePlayerTokenOnActiveScene(ctx, row.sceneId);
 
   const { id, sceneId: _ignoreScene, hp, live: _ignoreLive, dragFrom, ...fields } = restrictPatchForRole(ctx, patch);
   if (fields.ownerId) {
@@ -296,6 +308,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
     guarded(socket, TokenDeleteSchema, async ({ tokenId }, ctx) => {
       const row = await requireToken(tokenId, ctx.roomId);
       if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla este token");
+      await requirePlayerTokenOnActiveScene(ctx, row.sceneId);
       const def = await requireSystem(ctx.roomId);
 
       // Se o token é combatente de um combate, captura o estado (pro undo) e ajusta o cursor de
@@ -323,6 +336,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       // qualquer um.
       const rows = await Promise.all(tokenIds.map((id) => requireToken(id, ctx.roomId)));
       for (const row of rows) if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla um dos tokens selecionados");
+      for (const row of rows) await requirePlayerTokenOnActiveScene(ctx, row.sceneId);
       const def = await requireSystem(ctx.roomId);
 
       const items: DeleteItem[] = [];
@@ -348,6 +362,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
     guarded(socket, TokenLinkCharacterSchema, async ({ tokenId, characterId }, ctx) => {
       const row = await requireToken(tokenId, ctx.roomId);
       if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla este token");
+      await requirePlayerTokenOnActiveScene(ctx, row.sceneId);
       if (characterId) {
         // Jogador só vincula uma ficha que também é dele.
         const character = toCharacter(await requireCharacter(characterId, ctx.roomId));
@@ -377,6 +392,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       for (const tokenRow of tokenRows) {
         const error = checkApplyDamageTarget(ctx, tokenRow, def);
         if (error) throw new HandlerError(error);
+        await requirePlayerTokenOnActiveScene(ctx, tokenRow.sceneId);
       }
 
       // 2. Aplica: recurso `tokenBar` da ficha vinculada (dano gasta temp antes do current),

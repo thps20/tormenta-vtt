@@ -1,6 +1,6 @@
 import { RulerUpdateSchema } from "@tormenta-vtt/shared";
 import { isActiveScene } from "../services/visibility.js";
-import { guarded } from "./ack.js";
+import { guarded, HandlerError } from "./ack.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
 /**
@@ -16,6 +16,11 @@ export function registerRulerHandlers(_io: TypedServer, socket: TypedSocket): vo
   socket.on(
     "ruler:update",
     guarded(socket, RulerUpdateSchema, async ({ sceneId, ruler }, ctx) => {
+      // Defesa em profundidade (docs/plano-mapas.md §11): jogador só mede no mapa ATIVO — o
+      // cliente honesto nem tem o id de outro mapa.
+      if (ctx.role === "player" && !(await isActiveScene(ctx.roomId, sceneId))) {
+        throw new HandlerError("Este mapa não está ativo");
+      }
       const payload = { participantId: ctx.participantId, nickname: socket.data.nickname, sceneId, ruler };
       socket.to(rooms.gm(ctx.roomId)).emit("ruler:updated", payload);
       if (await isActiveScene(ctx.roomId, sceneId)) socket.to(rooms.players(ctx.roomId)).emit("ruler:updated", payload);
