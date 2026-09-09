@@ -113,7 +113,7 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
   return (
     <div
       id="npc-quick-card"
-      className="w-[360px] max-w-[calc(100vw-2rem)] bg-[#14120f] border border-[#3d311f] rounded-lg shadow-2xl text-zinc-200 flex flex-col max-h-[calc(100vh-5.5rem)] select-none z-30"
+      className="absolute bottom-4 right-4 w-[360px] max-w-[calc(100vw-2rem)] bg-[#14120f] border border-[#3d311f] rounded-lg shadow-2xl text-zinc-200 flex flex-col max-h-[calc(100vh-5.5rem)] select-none z-30"
       style={{ boxShadow: "0 12px 36px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(212, 175, 55, 0.15)" }}
     >
       {/* ----------------- CABEÇALHO ----------------- */}
