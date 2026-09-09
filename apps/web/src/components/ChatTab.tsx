@@ -6,6 +6,7 @@ import { useChat } from '../store/chat';
 import { useSystemDef } from '../lib/system';
 import { rollModeInfo } from '../lib/rollMode';
 import { ApplyDamageButton } from './chat/ApplyDamageButton';
+import { InitiativeBatchMessage } from './chat/InitiativeBatchMessage';
 import { ItemCardMessage } from './chat/ItemCardMessage';
 import { RollModeButton } from './chat/RollModeButton';
 import { DamageFormula, DamageTypeBadge } from './DamageTypeBadge';
@@ -131,6 +132,19 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                   // Reenvia os aprimoramentos da conjuração: o servidor monta a fórmula com os efeitos escolhidos.
                   onRollCharacter(card.characterId, { type: 'action', itemId: card.itemId, actionId, enhancements: (card.enhancements ?? []).map((e) => ({ id: e.id, times: e.times })) })
                 }
+              />
+            );
+          }
+
+          // 2.5 CARD DE INICIATIVA EM LOTE (combat:roll com mais de um combatente)
+          if (msg.kind === 'initiative-batch') {
+            return (
+              <InitiativeBatchMessage
+                key={msg.id}
+                msg={msg}
+                time={formatTime(msg.createdAt)}
+                isGm={me.role === 'gm'}
+                onReveal={(messageId) => void revealMessage(messageId)}
               />
             );
           }
