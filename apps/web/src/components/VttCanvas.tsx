@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from "react";
+import React, { forwardRef, useRef, useState, useEffect, useImperativeHandle, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
@@ -15,6 +15,13 @@ import { FogLayer } from "./FogLayer";
 
 /** Tamanho padrão quando a cena ainda não tem mapa. */
 export const DEFAULT_MAP = { width: 1600, height: 1100 };
+
+/** Métodos imperativos expostos por ref: quem monta o canvas (RoomPage) às vezes precisa de um
+ *  dado dele sem virar prop (ex.: onde soltar uma criatura do compêndio ao apertar Enter). */
+export interface VttCanvasHandle {
+  /** Ponto do mapa (pixels) no centro da viewport agora — mesmo cálculo do botão "novo token". */
+  getViewportCenter: () => { x: number; y: number };
+}
 
 interface VttCanvasProps {
   scene: Scene;
@@ -114,7 +121,7 @@ export function canControl(me: Participant, token: Token): boolean {
   return me.role === "gm" || token.ownerId === me.id;
 }
 
-export const VttCanvas: React.FC<VttCanvasProps> = ({
+export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   scene,
   mode,
   tokens,
@@ -145,7 +152,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   tokenBars,
   fogTool,
   onFogShape,
-}) => {
+}, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -302,6 +309,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     x: (dimensions.width / 2 - stagePos.x) / stageScale,
     y: (dimensions.height / 2 - stagePos.y) / stageScale,
   });
+  useImperativeHandle(ref, () => ({ getViewportCenter: viewportCenter }));
 
   const handleCreateToken = () => {
     const size = effectiveCellSize(scene.grid);
@@ -991,7 +999,8 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
       )}
     </div>
   );
-};
+});
+VttCanvas.displayName = "VttCanvas";
 
 /**
  * Evita empilhar tokens novos no mesmo ponto (só o de cima receberia cliques):

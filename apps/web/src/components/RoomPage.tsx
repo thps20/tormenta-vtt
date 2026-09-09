@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { navigate } from "../lib/router";
 import { selectActiveScene, useRoom } from "../store/room";
 import { sceneTokens, useTokens } from "../store/tokens";
@@ -17,7 +17,7 @@ import { type CombatPanelCallbacks } from "./CombatPanel";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
 import { FogToolbar } from "./FogToolbar";
-import { VttCanvas, type TokenBar } from "./VttCanvas";
+import { VttCanvas, type TokenBar, type VttCanvasHandle } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
 import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
 import { SidePanel, type SidePanelTab } from "./SidePanel";
@@ -122,7 +122,9 @@ function Table() {
   const moveLive = useTokens((s) => s.moveLive);
   const patchToken = useTokens((s) => s.patch);
   const createToken = useTokens((s) => s.create);
+  const spawnFromCompendium = useTokens((s) => s.spawnFromCompendium);
   const deleteToken = useTokens((s) => s.delete);
+  const vttCanvasRef = useRef<VttCanvasHandle>(null);
 
   const messages = useChat((s) => s.messages);
   const sendMessage = useChat((s) => s.send);
@@ -300,6 +302,7 @@ function Table() {
           {scene ? (
             <>
               <VttCanvas
+                ref={vttCanvasRef}
                 scene={scene}
                 mode={effectiveMode}
                 tokens={tokens}
@@ -380,7 +383,21 @@ function Table() {
 
           {mapPaletteOpen && systemDef && (
             <>
-              <CompendiumPalette def={systemDef} character={null} mode="map" onClose={closeCompendium} />
+              <CompendiumPalette
+                def={systemDef}
+                character={null}
+                mode="map"
+                onClose={closeCompendium}
+                onSpawnCreature={
+                  isGm && scene
+                    ? async (entryId, opts) => {
+                        const center = vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 };
+                        const result = await spawnFromCompendium({ sceneId: scene.id, entryId, count: opts.count, visible: opts.visible, x: center.x, y: center.y });
+                        return result !== null;
+                      }
+                    : undefined
+                }
+              />
               <DragGhost def={systemDef} />
             </>
           )}

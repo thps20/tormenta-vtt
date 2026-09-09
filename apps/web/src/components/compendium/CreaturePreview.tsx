@@ -1,12 +1,24 @@
 import React, { useMemo } from "react";
+import { Eye, EyeOff, Skull } from "lucide-react";
 import { characterTiebreakBonus, computeCharacter, entryToCharacter, type CompendiumCreatureEntry, type SystemDefinition } from "@tormenta-vtt/shared";
 import { signed } from "../../lib/system";
 import { seeBook } from "../../lib/compendium";
 import { DamageTypeBadge } from "../DamageTypeBadge";
 
+/** Quantidade e toggle "invisível ao soltar" (controlados pela paleta: Enter solta, ver CompendiumPalette). */
+export interface CreatureSpawnControls {
+  count: number;
+  onCountChange: (n: number) => void;
+  invisible: boolean;
+  onInvisibleChange: (v: boolean) => void;
+  onSpawn: () => void;
+}
+
 interface CreaturePreviewProps {
   def: SystemDefinition;
   entry: CompendiumCreatureEntry;
+  /** Ausente fora do contexto "map" (ex.: jogador consultando): esconde quantidade/toggle/botão. */
+  spawn?: CreatureSpawnControls;
 }
 
 /** Só entra na comparação `preview` de useMemo; um id fixo basta (não muda nada da ficha). */
@@ -15,10 +27,10 @@ const PREVIEW_ID = () => "preview";
 /**
  * Resumo mecânico de um bloco de monstro: cabeçalho (ND/tamanho/tipo), recursos, derivados,
  * iniciativa, resistências, ataques (dos itens sem ativação) e nomes de poderes/habilidades (dos
- * itens com ativação, sem o texto). A quantidade e o toggle "invisível ao soltar" entram no
- * próximo passo (docs/plano-criaturas.md §2.3), junto com soltar por Enter.
+ * itens com ativação, sem o texto). Com `spawn` (GM, contexto "map"): quantidade (1..20), toggle
+ * "invisível ao soltar" e botão pra soltar no centro da área visível do mapa (Enter faz o mesmo).
  */
-export const CreaturePreview: React.FC<CreaturePreviewProps> = ({ def, entry }) => {
+export const CreaturePreview: React.FC<CreaturePreviewProps> = ({ def, entry, spawn }) => {
   const sheet = entry.sheet;
   const character = useMemo(() => entryToCharacter(def, entry, PREVIEW_ID).data, [def, entry]);
   const computed = useMemo(() => computeCharacter(def, character), [def, character]);
@@ -60,6 +72,40 @@ export const CreaturePreview: React.FC<CreaturePreviewProps> = ({ def, entry }) 
           {entry.page !== null && <span>· p. {entry.page}</span>}
         </div>
       </div>
+
+      {spawn && (
+        <div className="flex items-center gap-2 p-2 rounded bg-[#161412] border border-[#2d2417]">
+          <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 font-serif">
+            Quantidade
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={spawn.count}
+              onChange={(e) => spawn.onCountChange(Math.min(20, Math.max(1, Math.round(Number(e.target.value) || 1))))}
+              className="w-12 bg-[#0f0e0c] border border-zinc-700 rounded px-1 py-0.5 text-zinc-100 text-xs"
+            />
+          </label>
+          <button
+            onClick={() => spawn.onInvisibleChange(!spawn.invisible)}
+            title="Invisível ao soltar (só o GM vê até revelar)"
+            className={`flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-serif cursor-pointer transition-colors ${
+              spawn.invisible ? "bg-[#2d2417] border-[#d4af37] text-[#d4af37]" : "bg-[#0f0e0c] border-zinc-700 text-zinc-400 hover:border-zinc-500"
+            }`}
+          >
+            {spawn.invisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+            Invisível
+          </button>
+          <button
+            onClick={spawn.onSpawn}
+            title="Soltar no centro da área visível do mapa (Enter)"
+            className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#d4af37] text-zinc-950 font-serif font-bold text-[11px] hover:bg-amber-300 transition-colors cursor-pointer"
+          >
+            <Skull className="w-3.5 h-3.5" />
+            Soltar
+          </button>
+        </div>
+      )}
 
       <div className="space-y-1">
         {def.resources.map((r) => (

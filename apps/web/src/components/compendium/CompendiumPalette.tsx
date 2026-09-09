@@ -9,6 +9,9 @@ import { EntryPreview } from "./EntryPreview";
 import { CreaturePreview } from "./CreaturePreview";
 import { useCompendiumDrag } from "./DragGhost";
 
+/** Toggle "invisível ao soltar": lembrado na sessão (sessionStorage), não por sala nem por criatura. */
+const SPAWN_INVISIBLE_KEY = "tvtt:compendiumSpawnInvisible";
+
 /**
  * "docked": painel lateral encaixado à esquerda da ficha (irmão dela no drawer).
  * "floating": overlay por cima da ficha, alinhado à esquerda (telas estreitas).
@@ -27,6 +30,8 @@ export interface CompendiumPaletteProps {
   mode: PaletteMode;
   /** Única porta de inserção pra ficha (Enter, "+" e soltar). Ausente/ignorado fora do contexto "sheet". */
   onInsert?: (entryId: string, opts?: { replace?: boolean }) => Promise<string | null>;
+  /** Solta N cópias de uma criatura no mapa (Enter/botão no preview). Ausente/ignorado fora do contexto "map". */
+  onSpawnCreature?: (entryId: string, opts: { count: number; visible: boolean }) => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -55,7 +60,7 @@ const NO_SHEET_CHECK: InsertCheck = { ok: false, reason: null, replaces: null };
  * itens (comportamento de sempre); "map" lista itens (só consulta, sem `character`) e, se houver,
  * criaturas — que o GM solta no mapa (fantasma e evento chegam nos passos 8/9).
  */
-export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, character, mode, onInsert, onClose }) => {
+export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, character, mode, onInsert, onSpawnCreature, onClose }) => {
   const entries = useCompendium((s) => s.entries);
   const roomIds = useCompendium((s) => s.roomIds);
   const status = useCompendium((s) => s.status);
@@ -134,6 +139,33 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
     return () => clearTimeout(t);
   }, [justInserted]);
 
+  // Quantidade (reseta a cada criatura focada) e toggle "invisível ao soltar" (lembrado na sessão,
+  // não por criatura). Enter no preview (ou o botão "Soltar") solta no centro da área visível do mapa.
+  const [spawnCount, setSpawnCount] = useState(1);
+  const [spawnInvisible, setSpawnInvisible] = useState(() => {
+    try {
+      return sessionStorage.getItem(SPAWN_INVISIBLE_KEY) !== "false";
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SPAWN_INVISIBLE_KEY, String(spawnInvisible));
+    } catch {
+      /* sessionStorage indisponível (aba privada etc.): só não lembra entre reaberturas. */
+    }
+  }, [spawnInvisible]);
+  const currentCreatureId = current?.kind === "creature" ? current.entry.id : null;
+  useEffect(() => setSpawnCount(1), [currentCreatureId]);
+
+  const spawn = async (row: CreaturePaletteRow, keepOpen: boolean) => {
+    if (!onSpawnCreature) return;
+    const ok = await onSpawnCreature(row.entry.id, { count: spawnCount, visible: !spawnInvisible });
+    if (!ok || keepOpen) return;
+    onClose();
+  };
+
   const toggleKind = (key: string) =>
     setKinds((prev) => {
       const next = new Set(prev);
@@ -154,7 +186,8 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
       setFocused((i) => Math.max(i - 1, 0));
     } else if (e.key === "Enter" && current) {
       e.preventDefault();
-      void insert(current, e.ctrlKey || e.metaKey);
+      if (current.kind === "creature") void spawn(current, e.ctrlKey || e.metaKey);
+      else void insert(current, e.ctrlKey || e.metaKey);
     }
   };
 
@@ -162,7 +195,21 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
     current.kind === "item" ? (
       <EntryPreview def={def} row={current} onReplace={() => void insert(current, false, true)} />
     ) : (
-      <CreaturePreview def={def} entry={current.entry} />
+      <CreaturePreview
+        def={def}
+        entry={current.entry}
+        spawn={
+          onSpawnCreature
+            ? {
+                count: spawnCount,
+                onCountChange: setSpawnCount,
+                invisible: spawnInvisible,
+                onInvisibleChange: setSpawnInvisible,
+                onSpawn: () => void spawn(current, false),
+              }
+            : undefined
+        }
+      />
     )
   ) : (
     <div className="p-4 text-xs text-zinc-600 font-serif flex flex-col items-center gap-2 text-center">
@@ -290,12 +337,19 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
       <div className="px-3 py-1.5 border-t border-[#2d2417] text-[10px] text-zinc-500 font-serif flex items-center gap-x-3 gap-y-0.5 flex-wrap">
         <span><kbd className="font-mono">↑↓</kbd> navegar</span>
         <span><kbd className="font-mono">Esc</kbd> fechar</span>
-        {context === "sheet" && (
+        {context === "sheet" ? (
           <>
             <span><kbd className="font-mono">Enter</kbd> inserir</span>
             <span><kbd className="font-mono">Ctrl+Enter</kbd> inserir e continuar</span>
             <span>arraste uma entrada para a ficha</span>
           </>
+        ) : (
+          onSpawnCreature && (
+            <>
+              <span><kbd className="font-mono">Enter</kbd> soltar no mapa</span>
+              <span><kbd className="font-mono">Ctrl+Enter</kbd> soltar e continuar</span>
+            </>
+          )
         )}
       </div>
     </div>
