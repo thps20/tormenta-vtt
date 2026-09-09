@@ -123,36 +123,6 @@ export const MapsPanel: React.FC<MapsPanelProps> = ({
 
   return (
     <div id="maps-panel" className="flex flex-col h-full bg-[#181614] text-zinc-100 select-none" onClick={() => setOpenMenuId(null)}>
-      <div className="p-2.5 border-b border-[#2d2417] flex items-center gap-1.5 shrink-0">
-        <button
-          id="btn-map-new"
-          onClick={() => onCreate({ name: nextMapName(scenes.map((s) => s.name)) })}
-          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded bg-[#201b15] hover:bg-[#2c241b] border border-[#3b3223] text-amber-200/90 text-[11px] font-serif font-bold transition-colors cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5 text-[#d4af37]" />
-          Novo mapa
-        </button>
-        <button
-          id="btn-map-new-upload"
-          onClick={() => !uploading && fileInputRef.current?.click()}
-          disabled={uploading}
-          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded bg-[#201b15] hover:bg-[#2c241b] border border-[#3b3223] text-amber-200/90 text-[11px] font-serif font-bold transition-colors cursor-pointer disabled:opacity-50"
-        >
-          <Upload className="w-3.5 h-3.5 text-[#d4af37]" />
-          {uploading ? "Enviando…" : "Novo por upload"}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png, image/jpeg, image/webp"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void handleUploadFile(f);
-          }}
-        />
-      </div>
-
       <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
         {ordered.map((scene) => {
           const item = itemsBySceneId[scene.id];
@@ -209,6 +179,36 @@ export const MapsPanel: React.FC<MapsPanelProps> = ({
             />
           );
         })}
+      </div>
+
+      <div className="p-2.5 border-t border-[#2d2417] flex items-center gap-1.5 shrink-0">
+        <button
+          id="btn-map-new"
+          onClick={() => onCreate({ name: nextMapName(scenes.map((s) => s.name)) })}
+          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded bg-[#201b15] hover:bg-[#2c241b] border border-[#3b3223] text-amber-200/90 text-[11px] font-serif font-bold transition-colors cursor-pointer"
+        >
+          <Plus className="w-3.5 h-3.5 text-[#d4af37]" />
+          Novo mapa
+        </button>
+        <button
+          id="btn-map-new-upload"
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          disabled={uploading}
+          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded bg-[#201b15] hover:bg-[#2c241b] border border-[#3b3223] text-amber-200/90 text-[11px] font-serif font-bold transition-colors cursor-pointer disabled:opacity-50"
+        >
+          <Upload className="w-3.5 h-3.5 text-[#d4af37]" />
+          {uploading ? "Enviando…" : "Novo por upload"}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png, image/jpeg, image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleUploadFile(f);
+          }}
+        />
       </div>
     </div>
   );
