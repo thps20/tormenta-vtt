@@ -12,7 +12,9 @@
  *   `{ "$generated": "...", "entries": [...] }` (um array simples também vale).
  * - `descriptions.local.json` (ignorado pelo git): `{ "<id>": "texto" }` com as
  *   descrições e `"<id>#<enhId>": "texto"` com o texto de cada aprimoramento;
- *   quando existe, preenche `description` e `enhancements[].label` das entradas.
+ *   quando existe, preenche `description` e `enhancements[].label` das entradas de item. Numa
+ *   entrada de CRIATURA, `"<id>"` preenche a descrição dela e `"<id>#item<n>"` (1-based, ver
+ *   creatureItemTextKey) a descrição do n-ésimo item embutido no `sheet`.
  * Novo sistema = nova pasta com JSONs; nada para registrar aqui.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -56,6 +58,9 @@ export function listCompendiumFiles(systemId: string): string[] {
 /** Chave do texto de um aprimoramento em descriptions.local.json. */
 export const enhancementTextKey = (entryId: string, enhancementId: string): string => `${entryId}#${enhancementId}`;
 
+/** Chave do texto de um item embutido numa criatura em descriptions.local.json (`index` 1-based). */
+export const creatureItemTextKey = (entryId: string, index: number): string => `${entryId}#item${index}`;
+
 /** Descrições locais (`{ id: texto }`, `{ "id#enh": texto }`), ou um mapa vazio se o arquivo não existe. */
 export function readLocalDescriptions(systemId: string): Record<string, string> {
   const path = join(compendiumDir(systemId), DESCRIPTIONS_FILE);
@@ -89,8 +94,21 @@ export function validateCompendiumEntries(systemId: string, raw: unknown[]): Com
   });
 }
 
-/** Preenche descrição e textos dos aprimoramentos que estiverem vazios com os do arquivo local (sem tocar os já definidos). */
+/**
+ * Preenche textos vazios com os do arquivo local (sem tocar os já definidos). Numa entrada de
+ * item: descrição + `enhancements[].label`. Numa criatura: descrição da criatura + descrição de
+ * cada item embutido no `sheet` (sem aprimoramentos embutidos — ver docs/plano-criaturas.md).
+ */
 export function withLocalTexts(entry: CompendiumEntry, descriptions: Record<string, string>): CompendiumEntry {
+  if (entry.type === "creature") {
+    const description = entry.description || descriptions[entry.id] || "";
+    const items = entry.sheet.items.map((item, i) => {
+      const local = item.description ? undefined : descriptions[creatureItemTextKey(entry.id, i + 1)];
+      return local ? { ...item, description: local } : item;
+    });
+    const changed = description !== entry.description || items.some((it, i) => it !== entry.sheet.items[i]);
+    return changed ? CompendiumEntrySchema.parse({ ...entry, description, sheet: { ...entry.sheet, items } }) : entry;
+  }
   const description = entry.description || descriptions[entry.id] || "";
   const enhancements = entry.enhancements.map((e) => {
     const local = e.label ? undefined : descriptions[enhancementTextKey(entry.id, e.id)];

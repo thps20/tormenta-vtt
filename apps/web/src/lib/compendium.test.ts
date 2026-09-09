@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CharacterDataSchema, CompendiumEntrySchema, createDefaultCharacterData, getSystemDefinition, type Character, type CompendiumEntry } from "@tormenta-vtt/shared";
+import { CharacterDataSchema, CompendiumItemEntrySchema, createDefaultCharacterData, getSystemDefinition, type Character, type CompendiumItemEntry } from "@tormenta-vtt/shared";
 import { buildInsertPatch, checkInsert, isOpenPaletteShortcut, matchesQuery, type ShortcutKey } from "./compendium";
 
 const def = getSystemDefinition("tormenta20");
@@ -8,8 +8,8 @@ function character(items: Character["items"] = []): Pick<Character, "items"> {
   return CharacterDataSchema.parse({ ...createDefaultCharacterData(def), items });
 }
 
-const entry = (patch: Partial<CompendiumEntry> & { id: string; kind: string }): CompendiumEntry =>
-  CompendiumEntrySchema.parse({ name: patch.id, ...patch });
+const entry = (patch: Partial<CompendiumItemEntry> & { id: string; kind: string }): CompendiumItemEntry =>
+  CompendiumItemEntrySchema.parse({ type: "item", name: patch.id, ...patch });
 
 // O teste conhece as chaves do T20 (é o sistema sob teste); o código de lib/ não.
 const classKind = def.level.classes?.kind ?? "";

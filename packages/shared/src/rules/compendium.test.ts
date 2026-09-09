@@ -1,13 +1,43 @@
 import { describe, expect, it } from "vitest";
-import { CompendiumEntrySchema, type CompendiumEntry } from "../schemas/compendium.js";
+import { CompendiumCreatureEntrySchema, CompendiumEntrySchema, CompendiumItemEntrySchema, type CompendiumCreatureEntry, type CompendiumItemEntry } from "../schemas/compendium.js";
 import { getSystemDefinition } from "../systems.js";
-import { entryToItem, mergeCompendium, validateCompendiumEntry } from "./compendium.js";
+import { entryToCharacter, entryToItem, mergeCompendium, validateCompendiumEntry } from "./compendium.js";
 
 const def = getSystemDefinition("tormenta20");
 
+/** Entrada de criatura válida (goblin simplificado); `sheet`/`patch` sobrescrevem para os casos de erro. */
+function creature(sheet: Record<string, unknown> = {}, patch: Record<string, unknown> = {}): CompendiumCreatureEntry {
+  return CompendiumCreatureEntrySchema.parse({
+    type: "creature",
+    id: "goblin",
+    name: "Goblin",
+    sheet: {
+      attributes: { for: { base: 1 }, des: { base: 2 } },
+      resources: { pv: { current: 7, temp: 0, maxOverride: 7 } },
+      skills: { luta: { trained: true, other: 2 } },
+      traits: { tipo: "humanoide", nd: "1/4" },
+      size: "pequeno",
+      items: [
+        {
+          kind: "weapon",
+          name: "Adaga",
+          fields: { proficiency: "simples", purpose: "melee", wield: "one_hand" },
+          actions: [
+            { label: "Ataque", kind: "attack", skill: "luta" },
+            { label: "Dano", kind: "damage", formula: "1d4", damageType: "perfuracao" },
+          ],
+        },
+      ],
+      ...sheet,
+    },
+    ...patch,
+  });
+}
+
 /** Entrada de arma válida; `patch` sobrescreve para os casos de erro. */
-function weapon(patch: Record<string, unknown> = {}): CompendiumEntry {
-  return CompendiumEntrySchema.parse({
+function weapon(patch: Record<string, unknown> = {}): CompendiumItemEntry {
+  return CompendiumItemEntrySchema.parse({
+    type: "item",
     id: "espada-longa",
     name: "Espada longa",
     kind: "weapon",
@@ -94,12 +124,13 @@ describe("entryToItem", () => {
   });
 
   it("tipo com ativação ganha o bloco mesmo quando a entrada não o define", () => {
-    const power = CompendiumEntrySchema.parse({ id: "p", name: "P", kind: "power" });
+    const power = CompendiumItemEntrySchema.parse({ type: "item", id: "p", name: "P", kind: "power" });
     expect(entryToItem(def, power, () => "x").activation).not.toBeNull();
   });
 
   it("copia os aprimoramentos (com texto) para o item", () => {
-    const spell = CompendiumEntrySchema.parse({
+    const spell = CompendiumItemEntrySchema.parse({
+      type: "item",
       id: "s",
       name: "S",
       kind: "spell",
@@ -131,5 +162,70 @@ describe("mergeCompendium", () => {
     const merged = mergeCompendium([system, room]);
     expect(merged.map((e) => e.id).sort()).toEqual(["arco", "espada-longa"]);
     expect(merged.find((e) => e.id === "espada-longa")?.name).toBe("Espada da casa");
+  });
+});
+
+describe("validateCompendiumEntry: criaturas", () => {
+  it("aceita uma criatura coerente com o sistema", () => {
+    expect(validateCompendiumEntry(def, creature())).toBeNull();
+  });
+
+  it("rejeita atributo, perícia, recurso e tamanho desconhecidos", () => {
+    expect(validateCompendiumEntry(def, creature({ attributes: { zzz: { base: 1 } } }))).toMatch(/atributo desconhecido "zzz"/);
+    expect(validateCompendiumEntry(def, creature({ skills: { zzz: { trained: true } } }))).toMatch(/perícia desconhecida "zzz"/);
+    expect(validateCompendiumEntry(def, creature({ resources: { zzz: { current: 1 } } }))).toMatch(/recurso desconhecido "zzz"/);
+    expect(validateCompendiumEntry(def, creature({ size: "gigante" }))).toMatch(/tamanho desconhecido/);
+  });
+
+  it("rejeita tipo de dano desconhecido em damageResponses e tipo de criatura fora das opções do traitField", () => {
+    expect(validateCompendiumEntry(def, creature({ damageResponses: { byType: { sonico: {} } } }))).toMatch(/tipo de dano desconhecido "sonico"/);
+    expect(validateCompendiumEntry(def, creature({ traits: { tipo: "nope" } }))).toMatch(/tipo de criatura desconhecido "nope"/);
+  });
+
+  it("rejeita derivedOverrides desconhecido, e aceita só quando o derivado é editável", () => {
+    expect(validateCompendiumEntry(def, creature({ derivedOverrides: { zzz: 1 } }))).toMatch(/stat derivado desconhecido "zzz"/);
+    expect(validateCompendiumEntry(def, creature({ derivedOverrides: { movement: 12 } }))).toBeNull();
+    const notEditable = { ...def, derived: def.derived.map((d) => (d.key === "movement" ? { ...d, editable: false } : d)) };
+    expect(validateCompendiumEntry(notEditable, creature({ derivedOverrides: { movement: 12 } }))).toMatch(/stat derivado "movement" não é editável/);
+  });
+
+  it("rejeita item embutido inválido com a mesma checagem dos itens avulsos", () => {
+    expect(validateCompendiumEntry(def, creature({ items: [{ kind: "nope", name: "X" }] }))).toMatch(/item #1 \("X"\): tipo de item desconhecido "nope"/);
+  });
+
+  it("rejeita criatura quando o sistema não declara o bloco creatures", () => {
+    const semCreatures = { ...def, creatures: undefined };
+    expect(validateCompendiumEntry(semCreatures, creature())).toMatch(/não declara o bloco creatures/);
+  });
+});
+
+describe("entryToCharacter", () => {
+  it("copia a criatura como ficha NPC nova, com ids novos nos itens e ações", () => {
+    let n = 0;
+    const result = entryToCharacter(def, creature(), () => `id${++n}`);
+    expect(result.kind).toBe("npc");
+    expect(result.name).toBe("Goblin");
+    expect(result.data.imageUrl).toBeNull();
+    expect(result.data.bio).toBe("");
+    expect(result.data.traits.tipo).toBe("humanoide");
+    expect(result.data.items).toHaveLength(1);
+    const [item] = result.data.items;
+    expect(item?.id).toBe("id1");
+    expect(item?.name).toBe("Adaga");
+    expect(item?.actions.map((a) => a.id)).toEqual(["id2", "id3"]);
+  });
+
+  it("opts.name sobrescreve o nome (soltura em lote numerada); sem ele, usa o nome da entrada", () => {
+    expect(entryToCharacter(def, creature(), () => "x").name).toBe("Goblin");
+    expect(entryToCharacter(def, creature(), () => "x", { name: "Goblin 2" }).name).toBe("Goblin 2");
+  });
+
+  it("duas cópias da mesma entrada são independentes", () => {
+    let n = 0;
+    const a = entryToCharacter(def, creature(), () => `a${++n}`);
+    const b = entryToCharacter(def, creature(), () => `b${++n}`);
+    expect(a.data.items[0]?.id).not.toBe(b.data.items[0]?.id);
+    a.data.items[0]!.name = "Adaga enferrujada";
+    expect(b.data.items[0]?.name).toBe("Adaga");
   });
 });

@@ -1,4 +1,4 @@
-import { entryToItem, type Character, type CharacterItem, type CharacterPatch, type CompendiumEntry, type SystemDefinition } from "@tormenta-vtt/shared";
+import { entryToItem, type Character, type CharacterItem, type CharacterPatch, type CompendiumEntry, type CompendiumItemEntry, type SystemDefinition } from "@tormenta-vtt/shared";
 
 /**
  * Regras de inserção de uma entrada do compêndio numa ficha. Funções puras
@@ -15,7 +15,7 @@ export interface InsertCheck {
   replaces: CharacterItem | null;
 }
 
-export function checkInsert(def: SystemDefinition, character: Pick<Character, "items">, entry: CompendiumEntry): InsertCheck {
+export function checkInsert(def: SystemDefinition, character: Pick<Character, "items">, entry: CompendiumItemEntry): InsertCheck {
   const kind = def.itemKinds.find((k) => k.key === entry.kind);
   if (!kind) return { ok: false, reason: `Tipo de item desconhecido: ${entry.kind}`, replaces: null };
   if (kind.maxCount === undefined) return { ok: true, reason: null, replaces: null };
@@ -42,7 +42,7 @@ export interface InsertResult {
 export function buildInsertPatch(
   def: SystemDefinition,
   character: Pick<Character, "items">,
-  entry: CompendiumEntry,
+  entry: CompendiumItemEntry,
   newId: () => string,
   opts: { replace?: CharacterItem | null } = {},
 ): InsertResult {

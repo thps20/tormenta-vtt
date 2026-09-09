@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, Check, Plus, Search, X } from "lucide-react";
-import { type Character, type CompendiumEntry, type SystemDefinition } from "@tormenta-vtt/shared";
+import { type Character, type CompendiumItemEntry, type SystemDefinition } from "@tormenta-vtt/shared";
 import { checkInsert, matchesQuery, type InsertCheck } from "../../lib/compendium";
 import { useCompendium } from "../../store/compendium";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -28,7 +28,7 @@ export interface CompendiumPaletteProps {
 
 /** Entrada + resultado de checkInsert, calculado uma vez por render da lista. */
 export interface PaletteRow {
-  entry: CompendiumEntry;
+  entry: CompendiumItemEntry;
   check: InsertCheck;
 }
 
@@ -58,9 +58,13 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
 
   useEffect(() => inputRef.current?.focus(), []);
 
+  // Entradas de item (esta paleta, modo "sheet", só insere itens na ficha; o modo "map", que lista
+  // criaturas, é uma paleta contextual à parte — ver docs/plano-criaturas.md §2).
+  const items = useMemo(() => entries.filter((e): e is CompendiumItemEntry => e.type === "item"), [entries]);
+
   // Linhas visíveis, agrupadas na ordem de itemKinds[] (uma lista plana para o teclado).
   const groups = useMemo(() => {
-    const visible = entries.filter((e) => (kinds.size === 0 || kinds.has(e.kind)) && matchesQuery(e, query));
+    const visible = items.filter((e) => (kinds.size === 0 || kinds.has(e.kind)) && matchesQuery(e, query));
     return def.itemKinds
       .map((kind, index) => ({
         kind,
@@ -71,7 +75,7 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
           .map((entry): PaletteRow => ({ entry, check: checkInsert(def, character, entry) })),
       }))
       .filter((g) => g.rows.length > 0);
-  }, [def, character, entries, kinds, query]);
+  }, [def, character, items, kinds, query]);
   const flat = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
   const current = flat[Math.min(focused, Math.max(0, flat.length - 1))] ?? null;
 
@@ -192,7 +196,7 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
           {def.itemKinds.map((kind, index) => {
             const Icon = kindIcon(index);
             const active = kinds.has(kind.key);
-            const count = entries.filter((e) => e.kind === kind.key).length;
+            const count = items.filter((e) => e.kind === kind.key).length;
             return (
               <button
                 key={kind.key}

@@ -114,6 +114,8 @@ export const useCharacters = create<CharactersState>((set, get) => ({
     const character = get().byId[characterId];
     const entry = useCompendium.getState().entries.find((e) => e.id === entryId);
     if (!character || !entry) return null;
+    // Criatura não se insere na ficha (vai para o mapa por compendium:spawn-creature).
+    if (entry.type !== "item") return null;
     const check = checkInsert(def, character, entry);
     const replace = opts.replace ? check.replaces : null;
     if (!check.ok && !replace) {

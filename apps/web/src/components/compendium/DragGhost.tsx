@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import type { SystemDefinition } from "@tormenta-vtt/shared";
 import { useCompendium } from "../../store/compendium";
-import { kindIcon } from "../character/kindIcons";
+import { creatureIcon, kindIcon } from "../character/kindIcons";
 
 /** Distância (px) a partir da qual um pressionar-e-mover vira arrasto, e não clique. */
 const DRAG_THRESHOLD = 4;
@@ -66,9 +66,9 @@ export const DragGhost: React.FC<{ def: SystemDefinition }> = ({ def }) => {
   const drag = useCompendium((s) => s.drag);
   const entry = useCompendium((s) => (s.drag ? s.entries.find((e) => e.id === s.drag?.entryId) : undefined));
   if (!drag || !entry) return null;
-  const index = def.itemKinds.findIndex((k) => k.key === entry.kind);
-  const Icon = kindIcon(Math.max(0, index));
-  const kindLabel = def.itemKinds[index]?.label ?? entry.kind;
+  const index = entry.type === "item" ? def.itemKinds.findIndex((k) => k.key === entry.kind) : -1;
+  const Icon = entry.type === "item" ? kindIcon(Math.max(0, index)) : creatureIcon;
+  const kindLabel = entry.type === "item" ? (def.itemKinds[index]?.label ?? entry.kind) : "Criatura";
   const overTarget = drag.targetId !== null;
   return (
     <div

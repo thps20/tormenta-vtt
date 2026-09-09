@@ -29,7 +29,7 @@ import { CUSTOM_FILE, DESCRIPTIONS_FILE, compendiumDir, enhancementTextKey, read
 import { parseFormula } from "../packages/shared/src/dice/index.js";
 import { saveSkills } from "../packages/shared/src/rules/activation.js";
 import type { ActionTemplate, Activation, EnhancementEffect, Save, SkillGrantsValue } from "../packages/shared/src/schemas/character.js";
-import { CompendiumEntrySchema, type CompendiumEntry } from "../packages/shared/src/schemas/compendium.js";
+import type { CompendiumItemEntry } from "../packages/shared/src/schemas/compendium.js";
 import type { ItemKindDef, SystemDefinition } from "../packages/shared/src/schemas/system.js";
 import { getSystemDefinition } from "../packages/shared/src/systems.js";
 
@@ -347,11 +347,11 @@ const SAVE_TYPOS: Record<string, string> = { relfexos: "reflexos" };
 const NUMBER_WORDS: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8 };
 
 // ---------------------------------------------------------------------------
-// Conversor: um documento do Foundry → CompendiumEntry
+// Conversor: um documento do Foundry → CompendiumItemEntry
 // ---------------------------------------------------------------------------
 
-/** Entrada em construção: CompendiumEntry sem os defaults, mais `$source` para rastrear. */
-type Draft = Partial<CompendiumEntry> & { id: string; name: string; kind: string; $source: string };
+/** Entrada de item em construção: CompendiumItemEntry sem os defaults, mais `$source` para rastrear. */
+type Draft = Partial<CompendiumItemEntry> & { id: string; name: string; kind: string; $source: string };
 
 class Converter {
   private readonly optionKeys = new Map<string, Set<string>>();

@@ -54,6 +54,7 @@ describe("compêndios (packages/shared/systems/<id>/compendium/*.json)", () => {
       { id: "s", name: "S", kind: "spell", fields: { circle: 1, school: "evocacao", type: "arcana" }, enhancements: [{ id: "e1", cost: 1 }, { id: "e2", cost: 2, label: "já tinha" }] },
     ]);
     const filled = withLocalTexts(entry!, { s: "Descrição", [enhancementTextKey("s", "e1")]: "+1d6", [enhancementTextKey("s", "e2")]: "ignorado" });
+    if (filled.type !== "item") throw new Error("esperava entrada de item");
     expect(filled.description).toBe("Descrição");
     expect(filled.enhancements.map((e) => e.label)).toEqual(["+1d6", "já tinha"]);
     // Sem texto local, a entrada volta igual (mesma referência).
@@ -71,6 +72,7 @@ describe("tormenta20 seed", () => {
 
   it("raça sem bônus à escolha não deixa escolha pendente", () => {
     const anao = entries.find((e) => e.id === "anao");
-    expect(anao?.fields.flexibleBonuses).toMatchObject({ count: 0 });
+    if (anao?.type !== "item") throw new Error("esperava entrada de item");
+    expect(anao.fields.flexibleBonuses).toMatchObject({ count: 0 });
   });
 });
