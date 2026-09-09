@@ -1,4 +1,4 @@
-import type { CellRect, GridConfig } from "@tormenta-vtt/shared";
+import { convertSizeToCellSize, type CellRect, type GridConfig } from "@tormenta-vtt/shared";
 
 /**
  * Conversões célula <-> pixel do lado do SERVIDOR (mesma conta de apps/web/src/lib/grid.ts, que o
@@ -39,4 +39,23 @@ export function cellToPoint(cell: { col: number; row: number }, grid: GridConfig
 export function cellRect(token: { x: number; y: number; width: number }, grid: GridConfig): CellRect {
   const size = effectiveCellSize(grid);
   return { ...cellAt(token, grid), cells: Math.max(1, Math.round(token.width / size)) };
+}
+
+/**
+ * Posição e tamanho (pixels) de um token depois de uma troca de grid na MESMA cena
+ * (`scene:updateGrid`, docs/plano-mapas.md): mantém a mesma célula (col/row, recalculada com o
+ * grid novo) e o mesmo número de células de lado (`convertSizeToCellSize`, packages/shared) — sem
+ * isso, mudar `cellSize`/offset deixaria os tokens existentes menores/maiores que a célula nova, ou
+ * desalinhados dela. Devolve o MESMO objeto de entrada (mesma referência) quando nada muda — quem
+ * chama usa isso pra decidir se vale a pena escrever/emitir esse token.
+ */
+export function resnapToken<T extends { x: number; y: number; width: number; height: number }>(
+  token: T,
+  fromGrid: GridConfig,
+  toGrid: GridConfig,
+): T {
+  const point = cellToPoint(cellAt(token, fromGrid), toGrid);
+  const size = convertSizeToCellSize(token, effectiveCellSize(fromGrid), effectiveCellSize(toGrid));
+  if (point.x === token.x && point.y === token.y && size.width === token.width && size.height === token.height) return token;
+  return { ...token, ...point, ...size };
 }
