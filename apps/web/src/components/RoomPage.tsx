@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { navigate } from "../lib/router";
-import { selectActiveScene, useRoom } from "../store/room";
+import { selectActiveScene, selectViewedScene, useRoom } from "../store/room";
 import { sceneTokens, useTokens } from "../store/tokens";
 import { useChat } from "../store/chat";
-import { activeCombatant, isMyTurn, useCombat } from "../store/combat";
+import { activeCombatant, isMyTurn, sceneCombat, useCombat } from "../store/combat";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
 import { useSystemDef } from "../lib/system";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
@@ -78,7 +78,11 @@ function Table() {
   const room = useRoom((s) => s.room);
   const me = useRoom((s) => s.me);
   const participants = useRoom((s) => s.participants);
-  const scene = useRoom(selectActiveScene);
+  // "scene" = mapa que ESTE cliente está vendo (docs/plano-mapas.md §4): dirige o canvas, a névoa,
+  // a régua, o combate e o spawn de criatura. `selectActiveScene` continua existindo pra faixa de
+  // aviso e o painel "Mapas" (que precisam saber qual é o ativo de verdade da mesa).
+  const scene = useRoom(selectViewedScene);
+  const activeScene = useRoom(selectActiveScene);
   const leave = useRoom((s) => s.leave);
   const setMap = useRoom((s) => s.setMap);
   const updateGrid = useRoom((s) => s.updateGrid);
@@ -146,7 +150,10 @@ function Table() {
   const messages = useChat((s) => s.messages);
   const sendMessage = useChat((s) => s.send);
 
-  const combat = useCombat((s) => s.state);
+  // Combate do mapa VISITADO (docs/plano-mapas.md §7): não existe mais "o combate da sala" — cada
+  // mapa tem o seu (ou nenhum), independente do que os outros mapas têm.
+  const combatByScene = useCombat((s) => s.byScene);
+  const combat = useMemo(() => sceneCombat(combatByScene, scene?.id), [combatByScene, scene?.id]);
   const combatStart = useCombat((s) => s.start);
   const combatAddCombatants = useCombat((s) => s.addCombatants);
   const combatRemove = useCombat((s) => s.remove);
@@ -160,27 +167,30 @@ function Table() {
   const combatResume = useCombat((s) => s.resume);
   const combatEnd = useCombat((s) => s.end);
   // Callbacks do CombatPanel: cada um reempacota os argumentos "soltos" da UI no payload
-  // que o evento combat:* espera e chama a ação correspondente da store (server = fonte da verdade,
-  // sem otimismo — ver store/combat.ts).
+  // que o evento combat:* espera (agora sempre com o sceneId do mapa VISITADO) e chama a ação
+  // correspondente da store (server = fonte da verdade, sem otimismo — ver store/combat.ts).
+  const viewedSceneId = scene?.id ?? null;
   const combatCallbacks: CombatPanelCallbacks = useMemo(
     () => ({
       onStart: (sceneId, tokenIds) => void combatStart({ sceneId, tokenIds }),
-      onRoll: (scope, combatantId, visibility) => void combatRoll({ scope, combatantId, visibility }),
-      onSetInitiative: (combatantId, initiative, bonus) => void combatSetInitiative({ combatantId, initiative, bonus }),
-      onNext: () => void combatNext(),
-      onPrev: () => void combatPrev(),
-      onReorder: (combatantIds) => void combatReorder(combatantIds),
-      onAdd: (tokenIds) => void combatAddCombatants({ tokenIds }),
-      onRemove: (combatantIds) => void combatRemove(combatantIds),
-      onDelay: (combatantId) => void combatDelay(combatantId),
-      onResume: (combatantId) => void combatResume(combatantId),
+      onRoll: (scope, combatantId, visibility) => viewedSceneId && void combatRoll({ sceneId: viewedSceneId, scope, combatantId, visibility }),
+      onSetInitiative: (combatantId, initiative, bonus) =>
+        viewedSceneId && void combatSetInitiative({ sceneId: viewedSceneId, combatantId, initiative, bonus }),
+      onNext: () => viewedSceneId && void combatNext(viewedSceneId),
+      onPrev: () => viewedSceneId && void combatPrev(viewedSceneId),
+      onReorder: (combatantIds) => viewedSceneId && void combatReorder(viewedSceneId, combatantIds),
+      onAdd: (tokenIds) => viewedSceneId && void combatAddCombatants({ sceneId: viewedSceneId, tokenIds }),
+      onRemove: (combatantIds) => viewedSceneId && void combatRemove(viewedSceneId, combatantIds),
+      onDelay: (combatantId) => viewedSceneId && void combatDelay(viewedSceneId, combatantId),
+      onResume: (combatantId) => viewedSceneId && void combatResume(viewedSceneId, combatantId),
       // Sem evento combat:skip no servidor: só faz sentido pular quem está agindo agora, e
       // aí equivale a avançar o turno (CombatPanel só mostra "Pular turno" pro combatente ativo).
-      onSkip: () => void combatNext(),
-      onSetSurprised: (combatantId, surprised) => void combatSetSurprised({ combatantId, surprised }),
-      onEnd: (clear) => void combatEnd(clear),
+      onSkip: () => viewedSceneId && void combatNext(viewedSceneId),
+      onSetSurprised: (combatantId, surprised) => viewedSceneId && void combatSetSurprised({ sceneId: viewedSceneId, combatantId, surprised }),
+      onEnd: (clear) => viewedSceneId && void combatEnd(viewedSceneId, clear),
     }),
     [
+      viewedSceneId,
       combatStart,
       combatRoll,
       combatSetInitiative,
@@ -312,9 +322,9 @@ function Table() {
             combat={combat}
             meId={me.id}
             viewer={isGm ? "gm" : "player"}
-            onRollSelf={() => combatRoll({ scope: "self" })}
-            onDelay={combatDelay}
-            onResume={combatResume}
+            onRollSelf={() => viewedSceneId && void combatRoll({ sceneId: viewedSceneId, scope: "self" })}
+            onDelay={(combatantId) => viewedSceneId && void combatDelay(viewedSceneId, combatantId)}
+            onResume={(combatantId) => viewedSceneId && void combatResume(viewedSceneId, combatantId)}
           />
           {scene ? (
             <>

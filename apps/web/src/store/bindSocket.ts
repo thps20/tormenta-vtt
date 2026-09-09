@@ -33,6 +33,8 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
 
   socket.on("scene:created", (scene) => useRoom.getState().upsertScene(scene));
   socket.on("scene:updated", (scene) => useRoom.getState().upsertScene(scene));
+  socket.on("scene:deleted", ({ sceneId }) => useRoom.getState().removeScene(sceneId));
+  socket.on("scene:reordered", ({ order }) => useRoom.getState().applyReorder(order));
   socket.on("fog:updated", ({ sceneId, fog }) => useRoom.getState().applyFog(sceneId, fog));
 
   socket.on("token:created", (token) => useTokens.getState().upsert(token));
@@ -41,7 +43,7 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
 
   socket.on("chat:message", (msg) => useChat.getState().append(msg));
 
-  socket.on("combat:updated", (combat) => useCombat.getState().setState(combat));
+  socket.on("combat:updated", ({ sceneId, combat }) => useCombat.getState().setSceneState(sceneId, combat));
 
   socket.on("ruler:updated", (p) => useTools.getState().setRemoteRuler(p));
 

@@ -50,3 +50,27 @@ export function setLastNickname(nickname: string): void {
     /* ignora */
   }
 }
+
+/**
+ * Mapa que o GM estava vendo (docs/plano-mapas.md §4): `sessionStorage`, não `localStorage` —
+ * cada aba tem sua própria "onde eu estava", igual à sessão de jogador poder ser diferente em
+ * abas diferentes. Um F5 no meio da preparação volta pro mesmo mapa; se ele foi apagado nesse
+ * meio-tempo, o chamador cai para o ativo (o id salvo simplesmente não bate com nenhum mapa vivo).
+ */
+const viewingKey = (roomId: string) => `tvtt:viewing:${roomId}`;
+
+export function getViewingScene(roomId: string): string | null {
+  try {
+    return sessionStorage.getItem(viewingKey(roomId));
+  } catch {
+    return null;
+  }
+}
+
+export function setViewingScene(roomId: string, sceneId: string): void {
+  try {
+    sessionStorage.setItem(viewingKey(roomId), sceneId);
+  } catch {
+    /* ignora */
+  }
+}

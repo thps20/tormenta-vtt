@@ -16,6 +16,13 @@ interface TokensState {
   draggingIds: Record<string, true>;
 
   setAll: (tokens: Token[]) => void;
+  /**
+   * `scene:enter` (docs/plano-mapas.md §5): substitui os tokens de UM mapa — tira do store os que
+   * ele tinha daquele `sceneId` e insere os que vieram, nunca faz merge (senão um token apagado
+   * enquanto o GM estava fora ficaria fantasma). Tokens de outros mapas (o GM pode ter visitado
+   * vários) não são tocados.
+   */
+  replaceScene: (sceneId: string, tokens: Token[]) => void;
   upsert: (token: Token) => void;
   remove: (tokenId: string) => void;
   select: (tokenId: string | null) => void;
@@ -92,6 +99,14 @@ export const useTokens = create<TokensState>((set, get) => ({
   draggingIds: {},
 
   setAll: (tokens) => set({ byId: Object.fromEntries(tokens.map((t) => [t.id, t])) }),
+  replaceScene: (sceneId, tokens) =>
+    set((s) => {
+      const kept: Record<string, Token> = {};
+      for (const [id, t] of Object.entries(s.byId)) if (t.sceneId !== sceneId) kept[id] = t;
+      for (const t of tokens) kept[t.id] = t;
+      const stillThere = new Set(Object.keys(kept));
+      return { byId: kept, ...selection(s.selectedIds.filter((id) => stillThere.has(id))) };
+    }),
   upsert: (token) =>
     set((s) => {
       // Enquanto arrastamos, o servidor devolve (eco) posições já antigas; se aplicássemos,

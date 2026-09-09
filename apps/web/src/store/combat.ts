@@ -12,25 +12,33 @@ import type {
 import { emitAck } from "./connection";
 import { toast } from "./ui";
 
+/**
+ * Combate por mapa (docs/plano-mapas.md §7): não existe mais "o combate da sala" — cada mapa tem o
+ * seu, e mais de um pode estar rolando ao mesmo tempo (ativar outro mapa não encerra o anterior).
+ * `byScene[sceneId]` = combate daquele mapa (`undefined` = nunca chegou nenhum; `null` = chegou e
+ * não há combate ali). Componentes leem o do mapa que estão VENDO (`selectViewedScene`, store/room.ts).
+ */
 interface CombatStoreState {
-  state: Combat | null;
-  setState: (state: Combat | null) => void;
+  byScene: Record<string, Combat | null>;
+  setSceneState: (sceneId: string, combat: Combat | null) => void;
+  /** room:join / leave: substitui tudo (só a cena ativa vem no snapshot; as demais o GM carrega ao visitar). */
+  setSnapshot: (activeSceneId: string | null, combat: Combat | null) => void;
 
   // Ações do GM. Todas devolvem o estado completo (visão de quem chamou) no ack e no
   // broadcast; usamos o broadcast (bindSocket.ts). Sem otimismo: a ordem é regra de
   // sistema, calculada no servidor — não vale a pena reimplementar aqui.
   start: (payload: CombatStartPayload) => Promise<boolean>;
   addCombatants: (payload: CombatAddPayload) => Promise<boolean>;
-  remove: (combatantIds: string[]) => Promise<boolean>;
+  remove: (sceneId: string, combatantIds: string[]) => Promise<boolean>;
   roll: (payload: CombatRollPayload) => Promise<boolean>;
   setInitiative: (payload: CombatSetInitiativePayload) => Promise<boolean>;
   setSurprised: (payload: CombatSetSurprisedPayload) => Promise<boolean>;
-  next: () => Promise<boolean>;
-  prev: () => Promise<boolean>;
-  reorder: (combatantIds: string[]) => Promise<boolean>;
-  delay: (combatantId: string) => Promise<boolean>;
-  resume: (combatantId: string) => Promise<boolean>;
-  end: (clear?: boolean) => Promise<boolean>;
+  next: (sceneId: string) => Promise<boolean>;
+  prev: (sceneId: string) => Promise<boolean>;
+  reorder: (sceneId: string, combatantIds: string[]) => Promise<boolean>;
+  delay: (sceneId: string, combatantId: string) => Promise<boolean>;
+  resume: (sceneId: string, combatantId: string) => Promise<boolean>;
+  end: (sceneId: string, clear?: boolean) => Promise<boolean>;
 }
 
 async function run<T>(p: Promise<{ ok: true; data: T } | { ok: false; error: string }>): Promise<boolean> {
@@ -40,21 +48,28 @@ async function run<T>(p: Promise<{ ok: true; data: T } | { ok: false; error: str
 }
 
 export const useCombat = create<CombatStoreState>((set) => ({
-  state: null,
-  setState: (state) => set({ state }),
+  byScene: {},
+  setSceneState: (sceneId, combat) => set((s) => ({ byScene: { ...s.byScene, [sceneId]: combat } })),
+  setSnapshot: (activeSceneId, combat) => set({ byScene: activeSceneId ? { [activeSceneId]: combat } : {} }),
   start: (payload) => run(emitAck("combat:start", payload)),
   addCombatants: (payload) => run(emitAck("combat:add", payload)),
-  remove: (combatantIds) => run(emitAck("combat:remove", { combatantIds })),
+  remove: (sceneId, combatantIds) => run(emitAck("combat:remove", { sceneId, combatantIds })),
   roll: (payload) => run(emitAck("combat:roll", payload)),
   setInitiative: (payload) => run(emitAck("combat:set-initiative", payload)),
   setSurprised: (payload) => run(emitAck("combat:set-surprised", payload)),
-  next: () => run(emitAck("combat:next", {})),
-  prev: () => run(emitAck("combat:prev", {})),
-  reorder: (combatantIds) => run(emitAck("combat:reorder", { combatantIds })),
-  delay: (combatantId) => run(emitAck("combat:delay", { combatantId })),
-  resume: (combatantId) => run(emitAck("combat:resume", { combatantId })),
-  end: (clear) => run(emitAck("combat:end", { clear: clear ?? false })),
+  next: (sceneId) => run(emitAck("combat:next", { sceneId })),
+  prev: (sceneId) => run(emitAck("combat:prev", { sceneId })),
+  reorder: (sceneId, combatantIds) => run(emitAck("combat:reorder", { sceneId, combatantIds })),
+  delay: (sceneId, combatantId) => run(emitAck("combat:delay", { sceneId, combatantId })),
+  resume: (sceneId, combatantId) => run(emitAck("combat:resume", { sceneId, combatantId })),
+  end: (sceneId, clear) => run(emitAck("combat:end", { sceneId, clear: clear ?? false })),
 }));
+
+/** Combate do mapa `sceneId` (ou null se nunca chegou nenhum). Função pura para useMemo. */
+export function sceneCombat(byScene: Record<string, Combat | null>, sceneId: string | null | undefined): Combat | null {
+  if (!sceneId) return null;
+  return byScene[sceneId] ?? null;
+}
 
 /** Combatente que está agindo agora, ou null. O servidor já manda a lista ordenada. */
 export function activeCombatant(state: Combat | null): Combatant | null {

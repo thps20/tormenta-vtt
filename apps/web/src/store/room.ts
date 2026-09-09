@@ -1,6 +1,18 @@
 import { create } from "zustand";
-import { applyFogOp, FOG_SHAPES_WARN, type FogConfig, type FogOp, type GridConfig, type Participant, type RoomPublic, type RoomSnapshot, type Scene } from "@tormenta-vtt/shared";
-import { getSessionToken, setLastNickname, setSessionToken, clearSessionToken } from "../lib/session";
+import {
+  applyFogOp,
+  FOG_SHAPES_WARN,
+  type ArrivalPoint,
+  type FogConfig,
+  type FogOp,
+  type GridConfig,
+  type Participant,
+  type RoomPublic,
+  type RoomSnapshot,
+  type Scene,
+  type SceneDeleteResult,
+} from "@tormenta-vtt/shared";
+import { getSessionToken, getViewingScene, setLastNickname, setSessionToken, setViewingScene, clearSessionToken } from "../lib/session";
 import { emitAck, getSocket, type AckOf } from "./connection";
 import { useTokens } from "./tokens";
 import { useChat } from "./chat";
@@ -28,6 +40,12 @@ interface RoomState {
   me: Participant | null;
   participants: Participant[];
   scenes: Scene[];
+  /**
+   * Mapa que ESTE cliente está vendo (docs/plano-mapas.md §4). Jogador: sempre igual ao ativo
+   * (derivado, ver `selectViewedScene`); este campo só importa de verdade pro GM, que pode navegar
+   * mapas sem ativar. Persistido por aba em `sessionStorage` (`lib/session.ts`).
+   */
+  viewingSceneId: string | null;
   /** Últimos parâmetros de join, para reconectar automaticamente. */
   lastJoin: JoinParams | null;
 
@@ -39,14 +57,32 @@ interface RoomState {
   upsertParticipant: (p: Participant) => void;
   markDisconnected: (id: string) => void;
   upsertScene: (scene: Scene) => void;
+  removeScene: (sceneId: string) => void;
+  applyReorder: (order: { sceneId: string; order: number }[]) => void;
   setActiveScene: (sceneId: string) => void;
   /** fog:updated: substitui a névoa da cena pelo estado completo do servidor. */
   applyFog: (sceneId: string, fog: FogConfig) => void;
 
-  // Ações do GM
+  /**
+   * Navega para um mapa sem os efeitos colaterais de `room:join` (docs/plano-mapas.md §5): busca
+   * só tokens+combate daquele mapa, faz `replaceScene`/`setSceneState` e atualiza `viewingSceneId`.
+   * GM: qualquer mapa não apagado da sala. Jogador: só o mapa ativo (ack de erro caso contrário).
+   */
+  enterScene: (sceneId: string) => Promise<boolean>;
+
+  // Ações do GM (mapas)
+  createScene: (payload: { name: string; mapUrl?: string | null; mapWidth?: number | null; mapHeight?: number | null }) => Promise<Scene | null>;
+  /** Ativar: opcionalmente leva tokens do mapa ativo atual (diálogo "Levar para o mapa", §8). */
+  activateScene: (payload: { sceneId: string; moveTokenIds?: string[]; dropPoint?: ArrivalPoint }) => Promise<boolean>;
+  renameScene: (sceneId: string, name: string) => Promise<boolean>;
+  duplicateScene: (sceneId: string, name?: string) => Promise<Scene | null>;
+  /** Ver SceneDeleteResult: "needs-confirm" ainda não apagou nada. */
+  deleteScene: (sceneId: string, confirmMovePlayerTokens?: boolean) => Promise<SceneDeleteResult | null>;
+  reorderScenes: (sceneIds: string[]) => Promise<boolean>;
+  setSceneArrival: (sceneId: string, arrival: ArrivalPoint | null) => Promise<boolean>;
   setMap: (patch: { mapUrl: string | null; mapWidth: number | null; mapHeight: number | null }) => Promise<boolean>;
   updateGrid: (grid: Partial<GridConfig>) => Promise<boolean>;
-  /** Névoa da cena ativa: aplica a operação local (otimista), emite e reverte se o ack falhar. */
+  /** Névoa da cena visitada: aplica a operação local (otimista), emite e reverte se o ack falhar. */
   fogOp: (op: FogOp) => Promise<boolean>;
 }
 
@@ -56,6 +92,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   me: null,
   participants: [],
   scenes: [],
+  viewingSceneId: null,
   lastJoin: null,
 
   join: async (params) => {
@@ -97,10 +134,10 @@ export const useRoom = create<RoomState>((set, get) => ({
   },
 
   leave: () => {
-    set({ status: { kind: "idle" }, room: null, me: null, participants: [], scenes: [], lastJoin: null });
+    set({ status: { kind: "idle" }, room: null, me: null, participants: [], scenes: [], viewingSceneId: null, lastJoin: null });
     useTokens.getState().setAll([]);
     useChat.getState().setAll([]);
-    useCombat.getState().setState(null);
+    useCombat.getState().setSnapshot(null, null);
     useCharacters.getState().setAll([]);
     useCompendium.getState().reset();
     // Desconectar e reconectar é o jeito simples de sair das salas do Socket.io.
@@ -113,8 +150,20 @@ export const useRoom = create<RoomState>((set, get) => ({
     set({ room: snap.room, me: snap.me, participants: snap.participants, scenes: snap.scenes });
     useTokens.getState().setAll(snap.tokens);
     useChat.getState().setAll(snap.chat);
-    useCombat.getState().setState(snap.combat);
+    useCombat.getState().setSnapshot(snap.room.activeSceneId, snap.combat);
     useCharacters.getState().setAll(snap.characters);
+
+    // Jogador sempre vê o ativo (derivado, sem sessionStorage). GM: restaura o mapa que estava
+    // visitando (F5 no meio da preparação); se o id salvo não existe mais (mapa apagado) ou é o
+    // próprio ativo (já veio no snapshot), fica nele sem round-trip extra.
+    if (snap.me.role !== "gm") {
+      set({ viewingSceneId: snap.room.activeSceneId });
+      return;
+    }
+    const saved = getViewingScene(snap.room.id);
+    const target = saved && snap.scenes.some((sc) => sc.id === saved) ? saved : snap.room.activeSceneId;
+    if (target && target !== snap.room.activeSceneId) void get().enterScene(target);
+    else set({ viewingSceneId: snap.room.activeSceneId });
   },
 
   upsertParticipant: (p) =>
@@ -132,17 +181,133 @@ export const useRoom = create<RoomState>((set, get) => ({
       scenes: s.scenes.some((x) => x.id === scene.id) ? s.scenes.map((x) => (x.id === scene.id ? scene : x)) : [...s.scenes, scene],
     })),
 
+  removeScene: (sceneId) =>
+    set((s) => ({
+      scenes: s.scenes.filter((sc) => sc.id !== sceneId),
+      // Quem estava vendo o mapa apagado cai pro ativo (sempre existe: invariante do §3 do plano).
+      viewingSceneId: s.viewingSceneId === sceneId ? (s.room?.activeSceneId ?? null) : s.viewingSceneId,
+    })),
+
+  applyReorder: (order) => {
+    const orderById = new Map(order.map((o) => [o.sceneId, o.order]));
+    set((s) => ({ scenes: s.scenes.map((sc) => (orderById.has(sc.id) ? { ...sc, order: orderById.get(sc.id)! } : sc)) }));
+  },
+
   setActiveScene: (sceneId) => {
-    set((s) => (s.room ? { room: { ...s.room, activeSceneId: sceneId } } : {}));
-    // Tokens são da cena ativa: pede um snapshot novo.
-    const last = get().lastJoin;
-    if (last) void get().join(last);
+    const s = get();
+    const wasViewingPreviousActive = s.viewingSceneId === s.room?.activeSceneId;
+    const isPlayer = s.me?.role === "player";
+    set((st) => (st.room ? { room: { ...st.room, activeSceneId: sceneId } } : {}));
+    // Jogador sempre segue; GM só se estava vendo o mapa que era ativo (quem clicou em "Ativar"
+    // já mudou viewingSceneId otimisticamente em activateScene, então cai aqui de qualquer jeito;
+    // quem estava visitando outro mapa fica onde está — a faixa de aviso muda pra apontar pro novo).
+    if (isPlayer || wasViewingPreviousActive) void get().enterScene(sceneId);
   },
 
   applyFog: (sceneId, fog) => set((s) => ({ scenes: s.scenes.map((sc) => (sc.id === sceneId ? { ...sc, fog } : sc)) })),
 
+  enterScene: async (sceneId) => {
+    const res = await emitAck("scene:enter", { sceneId });
+    if (!res.ok) {
+      toast(res.error);
+      return false;
+    }
+    useTokens.getState().replaceScene(sceneId, res.data.tokens);
+    useCombat.getState().setSceneState(sceneId, res.data.combat);
+    set({ viewingSceneId: sceneId });
+    const roomId = get().room?.id;
+    if (roomId) setViewingScene(roomId, sceneId);
+    return true;
+  },
+
+  createScene: async (payload) => {
+    const res = await emitAck("scene:create", payload);
+    if (!res.ok) {
+      toast(res.error);
+      return null;
+    }
+    get().upsertScene(res.data);
+    return res.data;
+  },
+
+  activateScene: async (payload) => {
+    const res = await emitAck("scene:activate", payload);
+    if (!res.ok) {
+      toast(res.error);
+      return false;
+    }
+    // Quem ativou segue sempre pro destino, mesmo que estivesse visitando um terceiro mapa.
+    void get().enterScene(payload.sceneId);
+    return true;
+  },
+
+  renameScene: async (sceneId, name) => {
+    const res = await emitAck("scene:rename", { sceneId, name });
+    if (!res.ok) toast(res.error);
+    else get().upsertScene(res.data);
+    return res.ok;
+  },
+
+  duplicateScene: async (sceneId, name) => {
+    const res = await emitAck("scene:duplicate", { sceneId, name });
+    if (!res.ok) {
+      toast(res.error);
+      return null;
+    }
+    get().upsertScene(res.data);
+    return res.data;
+  },
+
+  deleteScene: async (sceneId, confirmMovePlayerTokens) => {
+    const res = await emitAck("scene:delete", { sceneId, confirmMovePlayerTokens });
+    if (!res.ok) {
+      toast(res.error);
+      return null;
+    }
+    // "deleted": scene:deleted já chega pelo broadcast (removeScene). "needs-confirm": nada mudou
+    // ainda, a UI decide se pergunta e reenvia com confirmMovePlayerTokens: true.
+    return res.data;
+  },
+
+  reorderScenes: async (sceneIds) => {
+    const previous = get().scenes.map((s) => ({ sceneId: s.id, order: s.order }));
+    // 1. otimista
+    get().applyReorder(sceneIds.map((sceneId, order) => ({ sceneId, order })));
+    const res = await emitAck("scene:reorder", { sceneIds });
+    if (!res.ok) {
+      get().applyReorder(previous);
+      toast(res.error);
+      return false;
+    }
+    get().applyReorder(res.data.order);
+    return true;
+  },
+
+  setSceneArrival: async (sceneId, arrival) => {
+    const res = await emitAck("scene:setArrival", { sceneId, arrival });
+    if (!res.ok) toast(res.error);
+    else get().upsertScene(res.data);
+    return res.ok;
+  },
+
+  setMap: async (patch) => {
+    const sceneId = selectViewedScene(get())?.id;
+    if (!sceneId) return false;
+    const res = await emitAck("scene:setMap", { sceneId, ...patch });
+    if (!res.ok) toast(res.error);
+    return res.ok;
+  },
+
+  updateGrid: async (grid) => {
+    const sceneId = selectViewedScene(get())?.id;
+    if (!sceneId) return false;
+    const res = await emitAck("scene:updateGrid", { sceneId, grid });
+    if (!res.ok) toast(res.error);
+    return res.ok;
+  },
+
   fogOp: async (op) => {
-    const scene = selectActiveScene(get());
+    const scene = selectViewedScene(get());
     if (!scene) return false;
     const previous = scene.fog;
     // 1. otimista, com a mesma função pura que o servidor usa.
@@ -168,26 +333,21 @@ export const useRoom = create<RoomState>((set, get) => ({
     get().applyFog(scene.id, res.data);
     return true;
   },
-
-  setMap: async (patch) => {
-    const sceneId = get().room?.activeSceneId;
-    if (!sceneId) return false;
-    const res = await emitAck("scene:setMap", { sceneId, ...patch });
-    if (!res.ok) toast(res.error);
-    return res.ok;
-  },
-
-  updateGrid: async (grid) => {
-    const sceneId = get().room?.activeSceneId;
-    if (!sceneId) return false;
-    const res = await emitAck("scene:updateGrid", { sceneId, grid });
-    if (!res.ok) toast(res.error);
-    return res.ok;
-  },
 }));
 
-/** Cena ativa (derivada). Use dentro de componentes: `useRoom(selectActiveScene)`. */
+/** Mapa ATIVO da sala (derivado). Use para a faixa de aviso e o painel "Mapas". */
 export const selectActiveScene = (s: RoomState): Scene | null =>
   s.scenes.find((sc) => sc.id === s.room?.activeSceneId) ?? null;
+
+/**
+ * Mapa que ESTE cliente está VENDO (docs/plano-mapas.md §4): substitui `selectActiveScene` em
+ * quase todo lugar (canvas, névoa, régua, combate, seletor de alvos, MapConfigModal, spawn de
+ * criatura). Jogador: sempre o ativo. GM: `viewingSceneId`, com o ativo como reserva enquanto o
+ * primeiro `scene:enter` ainda não voltou.
+ */
+export const selectViewedScene = (s: RoomState): Scene | null => {
+  if (s.me?.role !== "gm") return selectActiveScene(s);
+  return s.scenes.find((sc) => sc.id === s.viewingSceneId) ?? selectActiveScene(s);
+};
 
 export const selectIsGm = (s: RoomState): boolean => s.me?.role === "gm";
