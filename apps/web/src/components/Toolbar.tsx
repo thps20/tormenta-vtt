@@ -62,8 +62,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ isGm, mode, effectiveMode, onC
     {isGm && (
       <>
         <div className="h-[1px] w-full bg-[#2d2417] my-0.5" />
-        <HistoryButton icon={Undo2} label="Desfazer" shortcut="Ctrl+Z" summary={undoSummary} disabled={!canUndo} onClick={onUndo} />
-        <HistoryButton icon={Redo2} label="Refazer" shortcut="Ctrl+Shift+Z" summary={redoSummary} disabled={!canRedo} onClick={onRedo} />
+        <HistoryButton id="history-undo" icon={Undo2} label="Desfazer" shortcut="Ctrl+Z" summary={undoSummary} disabled={!canUndo} onClick={onUndo} />
+        <HistoryButton id="history-redo" icon={Redo2} label="Refazer" shortcut="Ctrl+Shift+Z" summary={redoSummary} disabled={!canRedo} onClick={onRedo} />
       </>
     )}
   </div>
@@ -75,6 +75,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ isGm, mode, effectiveMode, onC
  * ferramenta (docs/plano-desfazer.md §9).
  */
 function HistoryButton({
+  id,
   icon: Icon,
   label,
   shortcut,
@@ -82,6 +83,7 @@ function HistoryButton({
   disabled,
   onClick,
 }: {
+  id: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   shortcut: string;
@@ -92,6 +94,7 @@ function HistoryButton({
   const tip = summary ? `${label}: ${summary}` : label;
   return (
     <button
+      id={id}
       type="button"
       onClick={onClick}
       disabled={disabled}
