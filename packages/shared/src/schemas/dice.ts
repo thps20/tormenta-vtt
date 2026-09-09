@@ -82,16 +82,43 @@ export const DiceRollSchema = z.object({
 });
 export type DiceRoll = z.infer<typeof DiceRollSchema>;
 
+/**
+ * Uma linha de um card de iniciativa em lote (`ChatMessage{kind:"initiative-batch"}`,
+ * combat:roll rolando mais de um combatente de uma vez). `formula`/`result` ausentes = o
+ * viewer não pode ver o valor (mesma regra all/gm/self de sempre); a linha em si só existe
+ * na cópia de quem vê o token (`tokenId`) — quem não vê, a linha nem chega (não vira
+ * placeholder), ver services/chatVisibility.ts.
+ */
+export const InitiativeBatchEntrySchema = z.object({
+  combatantId: IdSchema,
+  tokenId: IdSchema,
+  name: z.string().max(64),
+  formula: z.string().min(1).max(200).optional(),
+  result: z.number().int().optional(),
+});
+export type InitiativeBatchEntry = z.infer<typeof InitiativeBatchEntrySchema>;
+
+/** Entradas já ordenadas pelo resultado (maior primeiro). */
+export const InitiativeBatchSchema = z.object({
+  round: z.number().int(),
+  entries: z.array(InitiativeBatchEntrySchema),
+});
+export type InitiativeBatch = z.infer<typeof InitiativeBatchSchema>;
+
 export const ChatMessageSchema = z.object({
   id: IdSchema,
   roomId: IdSchema,
   participantId: IdSchema,
   nickname: z.string(),
-  /** Texto puro, rolagem, aviso do sistema ou card de item usado (character:use-item). */
-  kind: z.enum(["text", "roll", "system", "item"]),
+  /**
+   * Texto puro, rolagem, aviso do sistema, card de item usado (character:use-item) ou lote de
+   * iniciativa (combat:roll rolando vários combatentes de uma vez, ver `initiativeBatch`).
+   */
+  kind: z.enum(["text", "roll", "system", "item", "initiative-batch"]),
   text: z.string().max(2000).optional(),
   roll: DiceRollSchema.optional(),
   item: ItemCardSchema.optional(),
+  initiativeBatch: InitiativeBatchSchema.optional(),
   /**
    * Token ao qual esta rolagem está ligada (combatente de combat:roll, ou personagem com
    * token vinculado na cena ativa). Quem não pode ver esse token (oculto ou sob a névoa) não

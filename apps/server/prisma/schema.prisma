@@ -125,17 +125,22 @@ model ChatMessage {
   roomId        String
   participantId String
   nickname      String
-  kind          String // "text" | "roll" | "system" | "item"
+  kind          String // "text" | "roll" | "system" | "item" | "initiative-batch"
   text          String?
   /// DiceRoll serializado (ver DiceRollSchema) quando kind == "roll".
   roll          Json?
   /// ItemCard serializado (ver ItemCardSchema) quando kind == "item".
   item          Json?
+  /// InitiativeBatch serializado (ver InitiativeBatchSchema) quando kind == "initiative-batch":
+  /// combat:roll rolando mais de um combatente publica um card só, em vez de um por combatente.
+  initiativeBatch Json?
   /// Quem vê: "all" | "gm" | "self" (ver RollVisibilitySchema). Filtrado no broadcast e no snapshot.
   visibility    String   @default("all")
   /// Token ao qual a rolagem está ligada (combatente de combat:roll, ou personagem com token
   /// vinculado na cena ativa). Quem não vê esse token não recebe a mensagem, nem placeholder
-  /// (ver services/chatVisibility.ts). null = sem token, regra normal de visibility.
+  /// (ver services/chatVisibility.ts). null = sem token, regra normal de visibility. Cards de
+  /// iniciativa em lote citam vários tokens dentro de `initiativeBatch`, não aqui (o gate deles
+  /// é por linha, não pela mensagem inteira).
   tokenId       String?
   createdAt     DateTime @default(now())
 
