@@ -27,6 +27,7 @@ import type {
   CombatReorderPayload,
   CombatResumePayload,
   CombatRollPayload,
+  CombatScenePayload,
   CombatSetInitiativePayload,
   CombatSetSurprisedPayload,
   CombatStartPayload,
@@ -40,6 +41,16 @@ import type {
   Ruler,
   RulerUpdatePayload,
   Scene,
+  SceneActivatePayload,
+  SceneCreatePayload,
+  SceneDeletePayload,
+  SceneDeleteResult,
+  SceneDuplicatePayload,
+  SceneEnterPayload,
+  SceneListItem,
+  SceneRenamePayload,
+  SceneReorderPayload,
+  SceneSetArrivalPayload,
   SceneSetMapPayload,
   SceneUpdateGridPayload,
   Token,
@@ -91,12 +102,33 @@ export interface ClientToServerEvents {
   // Sala
   "room:join": (payload: RoomJoinPayload, ack: Ack<RoomSnapshot>) => void;
 
-  // Cena (GM)
-  "scene:create": (payload: { name: string }, ack: Ack<Scene>) => void;
-  "scene:activate": (payload: { sceneId: string }, ack: Ack) => void;
+  // Mapas (docs/plano-mapas.md) — GM, exceto scene:enter (todos)
+  /** `mapUrl`/`mapWidth`/`mapHeight` opcionais: "criar por upload" numa chamada só. */
+  "scene:create": (payload: SceneCreatePayload, ack: Ack<Scene>) => void;
+  /**
+   * `moveTokenIds`/`dropPoint`: diálogo "Levar para o mapa" (§8). Broadcast:
+   * `token:updated` de cada token movido, `combat:updated` do mapa de origem se ele tinha combate,
+   * e por fim `room:activeSceneChanged`.
+   */
+  "scene:activate": (payload: SceneActivatePayload, ack: Ack) => void;
   "scene:updateGrid": (payload: SceneUpdateGridPayload, ack: Ack<Scene>) => void;
   /** mapUrl vem do upload HTTP (POST /api/upload) feito antes. null remove o mapa. */
   "scene:setMap": (payload: SceneSetMapPayload, ack: Ack<Scene>) => void;
+  /**
+   * Navega para um mapa sem os efeitos colaterais de `room:join` (presença, snapshot inteiro):
+   * GM entra em qualquer mapa não apagado da sala; jogador só no mapa ativo. Sem broadcast.
+   */
+  "scene:enter": (payload: SceneEnterPayload, ack: Ack<{ tokens: Token[]; combat: Combat | null }>) => void;
+  "scene:rename": (payload: SceneRenamePayload, ack: Ack<Scene>) => void;
+  /** Copia mapUrl/mapWidth/mapHeight/grid/fog/arrival; NÃO copia tokens nem combate. */
+  "scene:duplicate": (payload: SceneDuplicatePayload, ack: Ack<Scene>) => void;
+  /** Ver SceneDeleteResultSchema: "needs-confirm" ainda não apaga nada (reenviar com confirmMovePlayerTokens). */
+  "scene:delete": (payload: SceneDeletePayload, ack: Ack<SceneDeleteResult>) => void;
+  /** Lista completa nova (arrastar no painel "Mapas"): renumera 0..n-1, tudo ou nada. */
+  "scene:reorder": (payload: SceneReorderPayload, ack: Ack<{ order: { sceneId: string; order: number }[] }>) => void;
+  "scene:setArrival": (payload: SceneSetArrivalPayload, ack: Ack<Scene>) => void;
+  /** Contagens/combate de cada mapa pro painel "Mapas" (dados que o cliente não carregou). */
+  "scene:list": (payload: Record<string, never>, ack: Ack<{ items: SceneListItem[] }>) => void;
   /** Névoa manual da cena: add / removeLast / revealAll / hideAll / setEnabled. Ack devolve o estado completo. */
   "fog:update": (payload: FogUpdatePayload, ack: Ack<FogConfig>) => void;
 
@@ -169,8 +201,10 @@ export interface ClientToServerEvents {
   /** GM torna pública uma mensagem secreta/própria: `chat:message` com visibility "all" para todos (upsert no cliente). */
   "chat:reveal": (payload: ChatRevealPayload, ack: Ack<ChatMessage>) => void;
 
-  // Combate (modo de combate por cena; ver docs/plano-combate.md)
-  /** GM seleciona tokens e inicia: substitui um combate anterior da cena, se houver. */
+  // Combate (modo de combate por mapa; ver docs/plano-combate.md e docs/plano-mapas.md §7)
+  // Combate deixou de exigir "mapa ativo": todo payload leva `sceneId` (o mapa que o cliente está
+  // vendo). Jogador só controla/rola no mapa ATIVO da sala; o GM em qualquer mapa que esteja vendo.
+  /** GM seleciona tokens e inicia: substitui um combate anterior do mapa, se houver. */
   "combat:start": (payload: CombatStartPayload, ack: Ack<Combat | null>) => void;
   /** Reforços: entram sem iniciativa, no fim da ordem. */
   "combat:add": (payload: CombatAddPayload, ack: Ack<Combat | null>) => void;
@@ -185,8 +219,8 @@ export interface ClientToServerEvents {
   "combat:set-initiative": (payload: CombatSetInitiativePayload, ack: Ack<Combat | null>) => void;
   "combat:set-surprised": (payload: CombatSetSurprisedPayload, ack: Ack<Combat | null>) => void;
   /** Com status "rolling", inicia os turnos (round 1). Senão avança/volta na ordem. */
-  "combat:next": (payload: Record<string, never>, ack: Ack<Combat | null>) => void;
-  "combat:prev": (payload: Record<string, never>, ack: Ack<Combat | null>) => void;
+  "combat:next": (payload: CombatScenePayload, ack: Ack<Combat | null>) => void;
+  "combat:prev": (payload: CombatScenePayload, ack: Ack<Combat | null>) => void;
   /** Nova ordem manual completa (arrastar na lista). */
   "combat:reorder": (payload: CombatReorderPayload, ack: Ack<Combat | null>) => void;
   /** Só no próprio turno: sai da rotação até "entrar agora". GM, ou dono do combatente. */
@@ -207,10 +241,16 @@ export interface ServerToClientEvents {
   "room:participantJoined": (p: Participant) => void;
   /** Participante desconectou. Ele continua na sala com connected = false. */
   "room:participantLeft": (p: { id: string }) => void;
+  /** Mapa ativo mudou (`scene:activate`). Jogador sempre segue; GM segue só se estava vendo o mapa
+   *  que era ativo — em ambos os casos, chamando `scene:enter`, não mais reemitindo `room:join`. */
   "room:activeSceneChanged": (p: { sceneId: string }) => void;
 
   "scene:created": (scene: Scene) => void;
   "scene:updated": (scene: Scene) => void;
+  /** Mapa apagado (soft delete): quem estava vendo esse mapa cai para o ativo. */
+  "scene:deleted": (p: { sceneId: string }) => void;
+  /** `scene:reorder`: só os pares (sceneId, order) que mudaram de posição, não a lista inteira. */
+  "scene:reordered": (p: { order: { sceneId: string; order: number }[] }) => void;
   /** Estado completo da névoa após uma operação (cliente só substitui `scene.fog`). */
   "fog:updated": (p: { sceneId: string; fog: FogConfig }) => void;
 
@@ -225,8 +265,13 @@ export interface ServerToClientEvents {
   "character:updated": (character: Character) => void;
   "character:deleted": (p: { characterId: string }) => void;
 
-  /** Estado completo do combate da cena ativa (já ordenado e filtrado por quem recebe). null = nenhum combate na cena. */
-  "combat:updated": (combat: Combat | null) => void;
+  /**
+   * Estado completo do combate DE UM MAPA (já ordenado e filtrado por quem recebe). `combat: null`
+   * = esse mapa não tem combate (ex.: `combat:end { clear: true }`). Combate deixou de estar preso
+   * ao mapa ativo (docs/plano-mapas.md §7): ativar outro mapa não encerra o anterior, então mais de
+   * um `combat:updated` (de mapas diferentes) pode chegar sem relação um com o outro.
+   */
+  "combat:updated": (p: { sceneId: string; combat: Combat | null }) => void;
 
   /** Régua de outro participante (o autor não recebe eco: já desenha a própria). ruler null = apagar. */
   "ruler:updated": (p: { participantId: string; nickname: string; sceneId: string; ruler: Ruler | null }) => void;

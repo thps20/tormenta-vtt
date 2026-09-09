@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { IdSchema } from "./common.js";
-import { GridConfigSchema } from "./scene.js";
+import { ArrivalPointSchema, GridConfigSchema } from "./scene.js";
 import { FogShapeSchema } from "./fog.js";
 import { CharacterDataSchema, CharacterKindSchema, CharacterRollRequestSchema, EnhancementUseSchema } from "./character.js";
 import { CompendiumIdSchema } from "./compendium.js";
@@ -44,10 +44,32 @@ export const RoomJoinSchema = z.object({
 });
 export type RoomJoinPayload = z.infer<typeof RoomJoinSchema>;
 
-// --- Cena ------------------------------------------------------------------
+// --- Cena / mapas (docs/plano-mapas.md) -------------------------------------
 
-export const SceneCreateSchema = z.object({ name: z.string().trim().min(1).max(80) });
-export const SceneActivateSchema = z.object({ sceneId: IdSchema });
+/**
+ * `mapUrl`/`mapWidth`/`mapHeight` opcionais: "criar por upload" vira uma chamada só (em vez de
+ * `create` + `setMap`, que deixaria um mapa vazio piscando na lista). Ausentes = mapa sem imagem.
+ */
+export const SceneCreateSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  mapUrl: z.string().min(1).nullable().optional(),
+  mapWidth: z.number().int().positive().nullable().optional(),
+  mapHeight: z.number().int().positive().nullable().optional(),
+});
+export type SceneCreatePayload = z.infer<typeof SceneCreateSchema>;
+
+/**
+ * `moveTokenIds`/`dropPoint`: diálogo "Levar para o mapa" (docs/plano-mapas.md §8). Tokens do mapa
+ * ATIVO ATUAL escolhidos pelo GM pra levar junto; `dropPoint` é só uma sugestão de onde a espiral de
+ * posicionamento começa no destino (o servidor sempre recalcula, nunca confia no cliente).
+ */
+export const SceneActivateSchema = z.object({
+  sceneId: IdSchema,
+  moveTokenIds: z.array(IdSchema).max(200).optional(),
+  dropPoint: ArrivalPointSchema.optional(),
+});
+export type SceneActivatePayload = z.infer<typeof SceneActivateSchema>;
+
 export const SceneSetMapSchema = z.object({
   sceneId: IdSchema,
   mapUrl: z.string().min(1).nullable(),
@@ -60,6 +82,40 @@ export const SceneUpdateGridSchema = z.object({
 });
 export type SceneSetMapPayload = z.infer<typeof SceneSetMapSchema>;
 export type SceneUpdateGridPayload = z.infer<typeof SceneUpdateGridSchema>;
+
+/** Navegar (GM, qualquer mapa) ou seguir o ativo (jogador, só o ativo) sem os efeitos de `room:join`. */
+export const SceneEnterSchema = z.object({ sceneId: IdSchema });
+export type SceneEnterPayload = z.infer<typeof SceneEnterSchema>;
+
+export const SceneRenameSchema = z.object({ sceneId: IdSchema, name: z.string().trim().min(1).max(80) });
+export type SceneRenamePayload = z.infer<typeof SceneRenameSchema>;
+
+/** `name` ausente: o servidor gera com `duplicateSceneName` (rules/scenes.ts). */
+export const SceneDuplicateSchema = z.object({ sceneId: IdSchema, name: z.string().trim().min(1).max(80).optional() });
+export type SceneDuplicatePayload = z.infer<typeof SceneDuplicateSchema>;
+
+/**
+ * Apagar mapa (docs/plano-mapas.md §10). Sem `confirmMovePlayerTokens`, um mapa com token de
+ * jogador só devolve `{ status: "needs-confirm", ... }` (ver SceneDeleteResultSchema) — nada é
+ * apagado ainda. Reenviar com `true` confirma e move os tokens de jogador pro mapa ativo antes de
+ * apagar.
+ */
+export const SceneDeleteSchema = z.object({ sceneId: IdSchema, confirmMovePlayerTokens: z.boolean().optional() });
+export type SceneDeletePayload = z.infer<typeof SceneDeleteSchema>;
+
+export const SceneDeleteResultSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("deleted") }),
+  /** Nada foi apagado ainda: a UI pergunta e reenvia com `confirmMovePlayerTokens: true`. */
+  z.object({ status: z.literal("needs-confirm"), playerTokenIds: z.array(IdSchema) }),
+]);
+export type SceneDeleteResult = z.infer<typeof SceneDeleteResultSchema>;
+
+/** Nova ordem manual completa (arrastar no painel "Mapas"): mesmo contrato de `combat:reorder`. */
+export const SceneReorderSchema = z.object({ sceneIds: z.array(IdSchema).min(1).max(200) });
+export type SceneReorderPayload = z.infer<typeof SceneReorderSchema>;
+
+export const SceneSetArrivalSchema = z.object({ sceneId: IdSchema, arrival: ArrivalPointSchema.nullable() });
+export type SceneSetArrivalPayload = z.infer<typeof SceneSetArrivalSchema>;
 
 // --- Névoa (fog of war manual) ----------------------------------------------
 
@@ -189,18 +245,25 @@ export type ChatRevealPayload = z.infer<typeof ChatRevealSchema>;
 export const EmptySchema = z.object({}).strict();
 
 // --- Combate -----------------------------------------------------------
+// Todo payload ganhou `sceneId` (docs/plano-mapas.md §7): combate deixou de exigir "cena ativa" —
+// dois mapas podem ter combate ao mesmo tempo, então o cliente precisa dizer qual mapa quer dizer
+// (o mapa que está vendo). Permissão de jogador: só vale no mapa ATIVO da sala (ver §11 do plano).
 
 const TokenIdListSchema = z.array(IdSchema).min(1).max(100);
 
-/** GM seleciona tokens e inicia o combate na cena ativa. Substitui um combate anterior da cena, se houver. */
+/** GM seleciona tokens e inicia o combate no mapa indicado. Substitui um combate anterior dele, se houver. */
 export const CombatStartSchema = z.object({ sceneId: IdSchema, tokenIds: TokenIdListSchema });
 export type CombatStartPayload = z.infer<typeof CombatStartSchema>;
 
+/** `combat:next`/`combat:prev`: payload é só o mapa (não há mais "a cena ativa da sala"). */
+export const CombatSceneSchema = z.object({ sceneId: IdSchema });
+export type CombatScenePayload = z.infer<typeof CombatSceneSchema>;
+
 /** Reforços: entram sem iniciativa, no fim da ordem. Token já no combate é ignorado. */
-export const CombatAddSchema = z.object({ tokenIds: TokenIdListSchema });
+export const CombatAddSchema = z.object({ sceneId: IdSchema, tokenIds: TokenIdListSchema });
 export type CombatAddPayload = z.infer<typeof CombatAddSchema>;
 
-export const CombatRemoveSchema = z.object({ combatantIds: z.array(IdSchema).min(1).max(100) });
+export const CombatRemoveSchema = z.object({ sceneId: IdSchema, combatantIds: z.array(IdSchema).min(1).max(100) });
 export type CombatRemovePayload = z.infer<typeof CombatRemoveSchema>;
 
 /**
@@ -210,6 +273,7 @@ export type CombatRemovePayload = z.infer<typeof CombatRemoveSchema>;
  */
 export const CombatRollSchema = z
   .object({
+    sceneId: IdSchema,
     scope: z.enum(["self", "one", "npcs", "missing"]),
     combatantId: IdSchema.optional(),
     visibility: RollVisibilitySchema.optional(),
@@ -219,27 +283,28 @@ export type CombatRollPayload = z.infer<typeof CombatRollSchema>;
 
 /** Valor digitado à mão pelo GM. `initiative: null` volta para "não rolou". */
 export const CombatSetInitiativeSchema = z.object({
+  sceneId: IdSchema,
   combatantId: IdSchema,
   initiative: z.number().nullable(),
   bonus: z.number().optional(),
 });
 export type CombatSetInitiativePayload = z.infer<typeof CombatSetInitiativeSchema>;
 
-export const CombatSetSurprisedSchema = z.object({ combatantId: IdSchema, surprised: z.boolean() });
+export const CombatSetSurprisedSchema = z.object({ sceneId: IdSchema, combatantId: IdSchema, surprised: z.boolean() });
 export type CombatSetSurprisedPayload = z.infer<typeof CombatSetSurprisedSchema>;
 
 /** Nova ordem manual completa (arrastar na lista): grava `order` na sequência recebida. */
-export const CombatReorderSchema = z.object({ combatantIds: z.array(IdSchema).min(1).max(100) });
+export const CombatReorderSchema = z.object({ sceneId: IdSchema, combatantIds: z.array(IdSchema).min(1).max(100) });
 export type CombatReorderPayload = z.infer<typeof CombatReorderSchema>;
 
-export const CombatDelaySchema = z.object({ combatantId: IdSchema });
+export const CombatDelaySchema = z.object({ sceneId: IdSchema, combatantId: IdSchema });
 export type CombatDelayPayload = z.infer<typeof CombatDelaySchema>;
 
-export const CombatResumeSchema = z.object({ combatantId: IdSchema });
+export const CombatResumeSchema = z.object({ sceneId: IdSchema, combatantId: IdSchema });
 export type CombatResumePayload = z.infer<typeof CombatResumeSchema>;
 
 /** `clear` ausente/false: encerra mas mantém a ordem visível. `clear: true`: apaga o combate. */
-export const CombatEndSchema = z.object({ clear: z.boolean().default(false) });
+export const CombatEndSchema = z.object({ sceneId: IdSchema, clear: z.boolean().default(false) });
 export type CombatEndPayload = z.infer<typeof CombatEndSchema>;
 
 // --- Compêndio: soltar criatura no mapa (docs/plano-criaturas.md) ----------

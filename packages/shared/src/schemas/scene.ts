@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { IdSchema } from "./common.js";
 import { FogConfigSchema } from "./fog.js";
+import { CombatStatusSchema } from "./combat.js";
 
 export const GridTypeSchema = z.enum(["square", "none"]);
 
@@ -25,6 +26,10 @@ export type GridConfig = z.infer<typeof GridConfigSchema>;
  */
 export const DEFAULT_MAP_SIZE = { width: 1600, height: 1100 };
 
+/** Ponto de chegada de "Levar para o mapa" (docs/plano-mapas.md §9), em pixels do mapa de destino. */
+export const ArrivalPointSchema = z.object({ x: z.number(), y: z.number() });
+export type ArrivalPoint = z.infer<typeof ArrivalPointSchema>;
+
 export const SceneSchema = z.object({
   id: IdSchema,
   roomId: IdSchema,
@@ -36,5 +41,26 @@ export const SceneSchema = z.object({
   grid: GridConfigSchema,
   /** Névoa manual (fase 2). JSON no banco, como `grid`. */
   fog: FogConfigSchema,
+  /** Ordem no painel "Mapas" (arrastar reordena, `scene:reorder`). Renumerado 0..n-1 a cada reorder. */
+  order: z.number().int().default(0),
+  /** Onde tokens levados de outro mapa aparecem ao ativar (espiral a partir daí). null = sem marcador. */
+  arrival: ArrivalPointSchema.nullable().default(null),
+  createdAt: z.string().datetime(),
 });
 export type Scene = z.infer<typeof SceneSchema>;
+
+/**
+ * Item de lista do painel "Mapas" (docs/plano-mapas.md §3): dados que o cliente não tem porque
+ * nunca carregou os tokens/combate daquele mapa (só o GM entra em mapa que não é o ativo,
+ * `scene:enter`). Calculado sob demanda (`scene:list`), não desnormalizado em `Scene`.
+ */
+export const SceneListItemSchema = z.object({
+  sceneId: IdSchema,
+  /** Tokens não apagados do mapa. */
+  tokenCount: z.number().int(),
+  /** Tokens com `ownerId != null` (o "pede confirmação" de apagar mapa). */
+  playerTokenCount: z.number().int(),
+  /** null = sem combate no mapa. */
+  combatStatus: CombatStatusSchema.nullable(),
+});
+export type SceneListItem = z.infer<typeof SceneListItemSchema>;
