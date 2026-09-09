@@ -1,47 +1,65 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, Check, Plus, Search, X } from "lucide-react";
-import { type Character, type CompendiumItemEntry, type SystemDefinition } from "@tormenta-vtt/shared";
-import { checkInsert, matchesQuery, type InsertCheck } from "../../lib/compendium";
+import { type Character, type CompendiumCreatureEntry, type CompendiumItemEntry, type SystemDefinition } from "@tormenta-vtt/shared";
+import { checkInsert, matchesQuery, CREATURE_FILTER, ROOM_FILTER, type InsertCheck } from "../../lib/compendium";
 import { useCompendium } from "../../store/compendium";
 import { useMediaQuery } from "../../lib/useMediaQuery";
-import { kindIcon } from "../character/kindIcons";
+import { creatureIcon, kindIcon } from "../character/kindIcons";
 import { EntryPreview } from "./EntryPreview";
+import { CreaturePreview } from "./CreaturePreview";
 import { useCompendiumDrag } from "./DragGhost";
 
 /**
  * "docked": painel lateral encaixado à esquerda da ficha (irmão dela no drawer).
  * "floating": overlay por cima da ficha, alinhado à esquerda (telas estreitas).
+ * "map": flutuante à esquerda da ÁREA DO MAPA, sem escurecer o resto — o mapa continua visível e
+ * utilizável (é o alvo da soltura de criaturas, ver docs/plano-criaturas.md §2.2).
  */
-export type PaletteMode = "docked" | "floating";
+export type PaletteMode = "docked" | "floating" | "map";
 
 /** Largura da paleta (Tailwind w-96). O drawer usa este valor para decidir o modo. */
 export const PALETTE_WIDTH_PX = 384;
 
 export interface CompendiumPaletteProps {
   def: SystemDefinition;
-  character: Character;
+  /** null no contexto "map" sem ficha aberta: itens ficam só de consulta (sem inserir). */
+  character: Character | null;
   mode: PaletteMode;
-  /** Única porta de inserção (Enter, "+" e soltar). Devolve o id do item novo ou null. */
-  onInsert: (entryId: string, opts?: { replace?: boolean }) => Promise<string | null>;
+  /** Única porta de inserção pra ficha (Enter, "+" e soltar). Ausente/ignorado fora do contexto "sheet". */
+  onInsert?: (entryId: string, opts?: { replace?: boolean }) => Promise<string | null>;
   onClose: () => void;
 }
 
-/** Entrada + resultado de checkInsert, calculado uma vez por render da lista. */
-export interface PaletteRow {
+/** Uma linha de item, com o resultado de checkInsert (null = sem ficha aberta: só consulta). */
+export interface ItemPaletteRow {
+  kind: "item";
   entry: CompendiumItemEntry;
   check: InsertCheck;
 }
+/** Uma linha de criatura: sem checkInsert (não se insere na ficha; solta no mapa, passo 9). */
+interface CreaturePaletteRow {
+  kind: "creature";
+  entry: CompendiumCreatureEntry;
+}
+export type PaletteRow = ItemPaletteRow | CreaturePaletteRow;
+
+const NO_SHEET_CHECK: InsertCheck = { ok: false, reason: null, replaces: null };
 
 /**
  * Paleta de comandos do compêndio, sempre em coluna: busca com foco automático,
- * chips por tipo (itemKinds[] do sistema), resultados agrupados por tipo, preview
- * abaixo da lista (ou em aba "Detalhes" quando a janela é baixa) e teclado: setas,
- * Enter (insere e fecha), Ctrl+Enter (insere e mantém), Esc (fecha).
- * O invólucro muda com `mode`: encaixada ao lado da ficha ou flutuando por cima.
+ * chips por tipo (itemKinds[] do sistema, mais "Criaturas" e "Sala" quando fizer sentido),
+ * resultados agrupados, preview abaixo da lista (ou em aba "Detalhes" quando a janela é baixa) e
+ * teclado: setas, Enter, Ctrl+Enter, Esc. O invólucro muda com `mode`.
+ *
+ * O CONTEÚDO muda com `context` (da store, definido em quem chamou `open`): "sheet" só lista/insere
+ * itens (comportamento de sempre); "map" lista itens (só consulta, sem `character`) e, se houver,
+ * criaturas — que o GM solta no mapa (fantasma e evento chegam nos passos 8/9).
  */
 export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, character, mode, onInsert, onClose }) => {
   const entries = useCompendium((s) => s.entries);
+  const roomIds = useCompendium((s) => s.roomIds);
   const status = useCompendium((s) => s.status);
+  const context = useCompendium((s) => s.context);
   const initialKind = useCompendium((s) => s.initialKind);
 
   const [query, setQuery] = useState("");
@@ -58,24 +76,35 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
 
   useEffect(() => inputRef.current?.focus(), []);
 
-  // Entradas de item (esta paleta, modo "sheet", só insere itens na ficha; o modo "map", que lista
-  // criaturas, é uma paleta contextual à parte — ver docs/plano-criaturas.md §2).
   const items = useMemo(() => entries.filter((e): e is CompendiumItemEntry => e.type === "item"), [entries]);
+  // Só aparecem no contexto "map" (o servidor já nem manda pra jogador — ver compendium:list).
+  const creatureEntries = useMemo(
+    () => (context === "map" ? entries.filter((e): e is CompendiumCreatureEntry => e.type === "creature") : []),
+    [context, entries],
+  );
 
-  // Linhas visíveis, agrupadas na ordem de itemKinds[] (uma lista plana para o teclado).
+  // Linhas visíveis, agrupadas: Criaturas primeiro (quando há alguma), depois itemKinds[] na ordem
+  // do sistema. Os chips "Criaturas"/"Sala" filtram por tipo/origem, não por itemKinds[].key.
   const groups = useMemo(() => {
-    const visible = items.filter((e) => (kinds.size === 0 || kinds.has(e.kind)) && matchesQuery(e, query));
-    return def.itemKinds
-      .map((kind, index) => ({
-        kind,
-        Icon: kindIcon(index),
-        rows: visible
-          .filter((e) => e.kind === kind.key)
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((entry): PaletteRow => ({ entry, check: checkInsert(def, character, entry) })),
-      }))
-      .filter((g) => g.rows.length > 0);
-  }, [def, character, items, kinds, query]);
+    const matchesChips = (id: string, roomOnly: boolean) => kinds.size === 0 || (kinds.has(ROOM_FILTER) && roomIds.includes(id)) || roomOnly;
+    const out: { key: string; label: string; Icon: typeof creatureIcon; rows: PaletteRow[] }[] = [];
+
+    if (creatureEntries.length > 0) {
+      const rows: PaletteRow[] = creatureEntries
+        .filter((e) => matchesChips(e.id, kinds.has(CREATURE_FILTER)) && matchesQuery(e, query))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((entry) => ({ kind: "creature", entry }));
+      if (rows.length > 0) out.push({ key: CREATURE_FILTER, label: "Criaturas", Icon: creatureIcon, rows });
+    }
+    def.itemKinds.forEach((kind, index) => {
+      const rows: PaletteRow[] = items
+        .filter((e) => e.kind === kind.key && matchesChips(e.id, kinds.has(kind.key)) && matchesQuery(e, query))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((entry) => ({ kind: "item", entry, check: character ? checkInsert(def, character, entry) : NO_SHEET_CHECK }));
+      if (rows.length > 0) out.push({ key: kind.key, label: kind.label, Icon: kindIcon(index), rows });
+    });
+    return out;
+  }, [def, character, items, creatureEntries, kinds, roomIds, query]);
   const flat = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
   const current = flat[Math.min(focused, Math.max(0, flat.length - 1))] ?? null;
 
@@ -88,6 +117,7 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
   }, [current]);
 
   const insert = async (row: PaletteRow, keepOpen: boolean, replace = false) => {
+    if (row.kind !== "item" || !onInsert) return;
     if (!row.check.ok && !(replace && row.check.replaces)) return;
     const itemId = await onInsert(row.entry.id, { replace });
     if (!itemId) return;
@@ -129,7 +159,11 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
   };
 
   const preview = current ? (
-    <EntryPreview def={def} row={current} onReplace={() => void insert(current, false, true)} />
+    current.kind === "item" ? (
+      <EntryPreview def={def} row={current} onReplace={() => void insert(current, false, true)} />
+    ) : (
+      <CreaturePreview def={def} entry={current.entry} />
+    )
   ) : (
     <div className="p-4 text-xs text-zinc-600 font-serif flex flex-col items-center gap-2 text-center">
       <BookOpen className="w-6 h-6" />
@@ -142,22 +176,26 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
       {status === "loading" && <div className="p-4 text-xs text-zinc-500 font-serif">Carregando compêndio…</div>}
       {status === "error" && <div className="p-4 text-xs text-red-300 font-serif">Não foi possível carregar o compêndio.</div>}
       {status === "ready" && flat.length === 0 && <div className="p-4 text-xs text-zinc-500 font-serif">Nada encontrado.</div>}
-      {groups.map(({ kind, Icon, rows }) => (
-        <div key={kind.key} className="mb-1">
+      {groups.map(({ key, label, Icon, rows }) => (
+        <div key={key} className="mb-1">
           <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] uppercase tracking-widest text-zinc-500 font-serif">
-            <Icon className="w-3 h-3" /> {kind.label}
+            <Icon className="w-3 h-3" /> {label}
           </div>
-          {rows.map((row) => (
-            <PaletteRowView
-              key={row.entry.id}
-              row={row}
-              focused={current?.entry.id === row.entry.id}
-              inserted={justInserted === row.entry.id}
-              onFocus={() => setFocused(flat.indexOf(row))}
-              onInsert={() => void insert(row, true)}
-              onPointerDown={(e) => row.check.ok && onRowPointerDown(e, row.entry.id)}
-            />
-          ))}
+          {rows.map((row) =>
+            row.kind === "item" ? (
+              <PaletteRowView
+                key={row.entry.id}
+                row={row}
+                focused={current?.entry.id === row.entry.id}
+                inserted={justInserted === row.entry.id}
+                onFocus={() => setFocused(flat.indexOf(row))}
+                onInsert={() => void insert(row, true)}
+                onPointerDown={(e) => row.check.ok && onRowPointerDown(e, row.entry.id)}
+              />
+            ) : (
+              <CreatureRowView key={row.entry.id} entry={row.entry} focused={current?.entry.id === row.entry.id} onFocus={() => setFocused(flat.indexOf(row))} />
+            ),
+          )}
         </div>
       ))}
     </div>
@@ -193,25 +231,30 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
           </button>
         </div>
         <div className="flex items-center gap-1 flex-wrap">
-          {def.itemKinds.map((kind, index) => {
-            const Icon = kindIcon(index);
-            const active = kinds.has(kind.key);
-            const count = items.filter((e) => e.kind === kind.key).length;
-            return (
-              <button
-                key={kind.key}
-                id={`compendium-chip-${kind.key}`}
-                onClick={() => toggleKind(kind.key)}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-serif transition-colors cursor-pointer ${
-                  active ? "bg-[#2d2417] border-[#d4af37] text-[#d4af37] font-bold" : "bg-[#141414] border-zinc-700 text-zinc-400 hover:border-zinc-500"
-                }`}
-              >
-                <Icon className="w-3 h-3" />
-                {kind.label}
-                <span className="font-mono text-[9px] opacity-70">{count}</span>
-              </button>
-            );
-          })}
+          {creatureEntries.length > 0 && (
+            <ChipButton
+              id={`compendium-chip-${CREATURE_FILTER}`}
+              Icon={creatureIcon}
+              label="Criaturas"
+              count={creatureEntries.length}
+              active={kinds.has(CREATURE_FILTER)}
+              onClick={() => toggleKind(CREATURE_FILTER)}
+            />
+          )}
+          {def.itemKinds.map((kind, index) => (
+            <ChipButton
+              key={kind.key}
+              id={`compendium-chip-${kind.key}`}
+              Icon={kindIcon(index)}
+              label={kind.label}
+              count={items.filter((e) => e.kind === kind.key).length}
+              active={kinds.has(kind.key)}
+              onClick={() => toggleKind(kind.key)}
+            />
+          ))}
+          {roomIds.length > 0 && (
+            <ChipButton id={`compendium-chip-${ROOM_FILTER}`} Icon={BookOpen} label="Sala" count={roomIds.length} active={kinds.has(ROOM_FILTER)} onClick={() => toggleKind(ROOM_FILTER)} />
+          )}
           {kinds.size > 0 && (
             <button onClick={() => setKinds(new Set())} className="text-[10px] text-zinc-500 hover:text-zinc-300 underline cursor-pointer ml-1">
               todos
@@ -246,10 +289,14 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
 
       <div className="px-3 py-1.5 border-t border-[#2d2417] text-[10px] text-zinc-500 font-serif flex items-center gap-x-3 gap-y-0.5 flex-wrap">
         <span><kbd className="font-mono">↑↓</kbd> navegar</span>
-        <span><kbd className="font-mono">Enter</kbd> inserir</span>
-        <span><kbd className="font-mono">Ctrl+Enter</kbd> inserir e continuar</span>
         <span><kbd className="font-mono">Esc</kbd> fechar</span>
-        <span>arraste uma entrada para a ficha</span>
+        {context === "sheet" && (
+          <>
+            <span><kbd className="font-mono">Enter</kbd> inserir</span>
+            <span><kbd className="font-mono">Ctrl+Enter</kbd> inserir e continuar</span>
+            <span>arraste uma entrada para a ficha</span>
+          </>
+        )}
       </div>
     </div>
   );
@@ -259,6 +306,16 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
     return (
       <div id="compendium-palette" data-mode="docked" className="relative z-10 h-full shrink-0 palette-dock-in" style={{ width: PALETTE_WIDTH_PX }}>
         {panel}
+      </div>
+    );
+  }
+  if (mode === "map") {
+    // Flutua à esquerda do mapa, sem escurecer o resto: o mapa continua visível e utilizável (é o
+    // alvo da soltura de criaturas). O wrapper é pointer-events-none pra não bloquear cliques no
+    // mapa fora do painel; só o painel em si captura eventos.
+    return (
+      <div id="compendium-palette" data-mode="map" className="absolute inset-0 z-30 flex items-stretch justify-start p-4 pointer-events-none">
+        <div className={`h-full transition-opacity ${dragging ? "opacity-25 pointer-events-none" : "pointer-events-auto"}`}>{panel}</div>
       </div>
     );
   }
@@ -275,8 +332,29 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
   );
 };
 
+const ChipButton: React.FC<{ id: string; Icon: typeof creatureIcon; label: string; count: number; active: boolean; onClick: () => void }> = ({
+  id,
+  Icon,
+  label,
+  count,
+  active,
+  onClick,
+}) => (
+  <button
+    id={id}
+    onClick={onClick}
+    className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-serif transition-colors cursor-pointer ${
+      active ? "bg-[#2d2417] border-[#d4af37] text-[#d4af37] font-bold" : "bg-[#141414] border-zinc-700 text-zinc-400 hover:border-zinc-500"
+    }`}
+  >
+    <Icon className="w-3 h-3" />
+    {label}
+    <span className="font-mono text-[9px] opacity-70">{count}</span>
+  </button>
+);
+
 interface PaletteRowViewProps {
-  row: PaletteRow;
+  row: ItemPaletteRow;
   focused: boolean;
   inserted: boolean;
   onFocus: () => void;
@@ -306,20 +384,38 @@ const PaletteRowView: React.FC<PaletteRowViewProps> = ({ row, focused, inserted,
       {inserted ? (
         <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-serif"><Check className="w-3.5 h-3.5" /> inserido</span>
       ) : (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onInsert();
-          }}
-          disabled={!check.ok}
-          title={check.ok ? "Inserir na ficha (mantém a paleta aberta)" : (check.reason ?? "")}
-          className={`p-1 rounded border border-[#d4af37]/50 text-[#d4af37] hover:bg-[#2d2417] transition-opacity cursor-pointer disabled:cursor-not-allowed ${
-            focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-          }`}
-        >
-          <Plus className="w-3.5 h-3.5" />
-        </button>
+        // Sem ficha aberta (contexto "map"), check é só o sentinel NO_SHEET_CHECK (ok=false,
+        // reason=null): não há onde inserir, então o botão nem aparece (nada a explicar num hover).
+        (check.ok || check.reason !== null) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onInsert();
+            }}
+            disabled={!check.ok}
+            title={check.ok ? "Inserir na ficha (mantém a paleta aberta)" : (check.reason ?? "")}
+            className={`p-1 rounded border border-[#d4af37]/50 text-[#d4af37] hover:bg-[#2d2417] transition-opacity cursor-pointer disabled:cursor-not-allowed ${
+              focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            }`}
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        )
       )}
     </div>
   );
 };
+
+const CreatureRowView: React.FC<{ entry: CompendiumCreatureEntry; focused: boolean; onFocus: () => void }> = ({ entry, focused, onFocus }) => (
+  <div
+    data-entry-id={entry.id}
+    onPointerEnter={onFocus}
+    onClick={onFocus}
+    className={`flex items-center gap-2 mx-1 px-2 py-1.5 rounded transition-colors cursor-pointer ${focused ? "bg-[#1e1a14] ring-1 ring-[#d4af37]/60" : "hover:bg-[#161412]"}`}
+  >
+    <div className="min-w-0 flex-1">
+      <div className="text-sm font-serif truncate text-zinc-100">{entry.name}</div>
+      {entry.tags.length > 0 && <div className="text-[10px] text-zinc-500 truncate">{entry.tags.join(" · ")}</div>}
+    </div>
+  </div>
+);

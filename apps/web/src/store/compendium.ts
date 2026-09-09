@@ -4,6 +4,9 @@ import { dropTargetAt, type DropPoint } from "../lib/dropTargets";
 import { emitAck } from "./connection";
 import { toast } from "./ui";
 
+/** Onde a paleta foi aberta: "sheet" (ficha, insere item) ou "map" (mesa em foco, GM solta criatura). */
+export type PaletteContext = "sheet" | "map";
+
 /**
  * Compêndio da sala (entradas vindas de compendium:list) e estado da paleta.
  * As entradas são carregadas uma vez, na primeira abertura, e ficam em memória.
@@ -13,9 +16,10 @@ interface CompendiumState {
   /** Ids que vieram do compêndio da SALA (homebrew do GM): o chip "Sala" da paleta só aparece com algum. */
   roomIds: string[];
   status: "idle" | "loading" | "ready" | "error";
-  /** Paleta aberta por cima da ficha. */
+  /** Paleta aberta (por cima da ficha, ou flutuando sobre o mapa). */
   isOpen: boolean;
-  /** Filtro inicial (tipo da aba de onde a paleta foi aberta). null = todos. */
+  context: PaletteContext;
+  /** Filtro inicial (aba ativa da ficha, ou o chip "Criaturas" ao abrir sobre o mapa). null = todos. */
   initialKind: string | null;
   /** Último item inserido: a ficha troca para a aba dele e o destaca por um instante. */
   lastInserted: { itemId: string; kind: string; at: number } | null;
@@ -26,7 +30,7 @@ interface CompendiumState {
   drag: { entryId: string; point: DropPoint; targetId: string | null } | null;
 
   load: () => Promise<void>;
-  open: (kind?: string | null) => void;
+  open: (context: PaletteContext, kind?: string | null) => void;
   close: () => void;
   markInserted: (itemId: string, kind: string) => void;
   startDrag: (entryId: string, point: DropPoint) => void;
@@ -43,6 +47,7 @@ export const useCompendium = create<CompendiumState>((set, get) => ({
   roomIds: [],
   status: "idle",
   isOpen: false,
+  context: "sheet",
   initialKind: null,
   lastInserted: null,
   drag: null,
@@ -59,8 +64,8 @@ export const useCompendium = create<CompendiumState>((set, get) => ({
     set({ entries: res.data.entries, roomIds: res.data.roomIds, status: "ready" });
   },
 
-  open: (kind = null) => {
-    set({ isOpen: true, initialKind: kind });
+  open: (context, kind = null) => {
+    set({ isOpen: true, context, initialKind: kind });
     void get().load();
   },
   close: () => set({ isOpen: false }),
@@ -83,5 +88,5 @@ export const useCompendium = create<CompendiumState>((set, get) => ({
     return true;
   },
   cancelDrag: () => set({ drag: null }),
-  reset: () => set({ entries: [], roomIds: [], status: "idle", isOpen: false, initialKind: null, lastInserted: null, drag: null }),
+  reset: () => set({ entries: [], roomIds: [], status: "idle", isOpen: false, context: "sheet", initialKind: null, lastInserted: null, drag: null }),
 }));

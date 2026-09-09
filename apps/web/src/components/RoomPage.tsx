@@ -7,6 +7,7 @@ import { activeCombatant, isMyTurn, useCombat } from "../store/combat";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
 import { useSystemDef } from "../lib/system";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
+import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
 import { useTurnTitle } from "../lib/useTurnTitle";
 import { selectEffectiveMode, useTools } from "../store/tools";
 import { computeCharacter, isPointRevealed, tokenCenter } from "@tormenta-vtt/shared";
@@ -22,6 +23,10 @@ import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
 import { SidePanel, type SidePanelTab } from "./SidePanel";
 import { CharacterMenu } from "./CharacterMenu";
 import { NicknamePrompt } from "./NicknamePrompt";
+import { CompendiumPalette } from "./compendium/CompendiumPalette";
+import { DragGhost } from "./compendium/DragGhost";
+import { useCompendium } from "../store/compendium";
+import { CREATURE_FILTER } from "../lib/compendium";
 
 const CENTER_ON_TURN_KEY = "tvtt:centerOnActiveTurn";
 
@@ -211,6 +216,13 @@ function Table() {
   const linkCharacter = useTokens((s) => s.linkCharacter);
   const systemDef = useSystemDef();
 
+  // Paleta do compêndio sobre o mapa (Mesa em foco, nenhuma ficha aberta — docs/plano-criaturas.md §2.2).
+  const compendiumOpen = useCompendium((s) => s.isOpen);
+  const compendiumContext = useCompendium((s) => s.context);
+  const closeCompendium = useCompendium((s) => s.close);
+  const mapPaletteOpen = compendiumOpen && compendiumContext === "map";
+  useMapPaletteShortcut((openCharacterId !== null || emptySheetOpen) || isMapConfigOpen, me?.role === "gm" ? CREATURE_FILTER : null);
+
   // Réguas dos outros só valem na cena que estou vendo.
   const remoteRulers = useMemo(() => Object.values(remoteRulersById).filter((r) => r.sceneId === scene?.id), [remoteRulersById, scene?.id]);
 
@@ -364,6 +376,13 @@ function Table() {
             <Centered>
               <p className="text-zinc-500 text-sm">Nenhuma cena ativa.</p>
             </Centered>
+          )}
+
+          {mapPaletteOpen && systemDef && (
+            <>
+              <CompendiumPalette def={systemDef} character={null} mode="map" onClose={closeCompendium} />
+              <DragGhost def={systemDef} />
+            </>
           )}
         </main>
 

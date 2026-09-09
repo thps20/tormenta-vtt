@@ -4,12 +4,12 @@ import { describeActivation, entryToItem, pendingChoices, type SystemDefinition 
 import { signed } from "../../lib/system";
 import { summarizeField } from "../character/StructuredFields";
 import { seeBook } from "../../lib/compendium";
-import type { PaletteRow } from "./CompendiumPalette";
+import type { ItemPaletteRow } from "./CompendiumPalette";
 import { DamageTypeBadge } from "../DamageTypeBadge";
 
 interface EntryPreviewProps {
   def: SystemDefinition;
-  row: PaletteRow;
+  row: ItemPaletteRow;
   /** Confirmação de troca (tipos com maxCount = 1): o clique é a confirmação. */
   onReplace: () => void;
 }

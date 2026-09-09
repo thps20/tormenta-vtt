@@ -6,6 +6,15 @@ import { entryToItem, type Character, type CharacterItem, type CharacterPatch, t
  * conhece "classe" ou "raça": lê level.classes e itemKinds[].maxCount.
  */
 
+/**
+ * Chips virtuais da paleta (docs/plano-criaturas.md §2.1): filtram por ALGO QUE NÃO É
+ * itemKinds[].key, então usam um id fora do alfabeto de chave do sistema (KeySchema não aceita
+ * "_"  no início) — nunca colidem com uma chave real de itemKinds[].
+ */
+export const CREATURE_FILTER = "__creature__";
+/** Filtra por ORIGEM (id veio do compêndio da sala), não por tipo — junta itens e criaturas homebrew. */
+export const ROOM_FILTER = "__room__";
+
 export interface InsertCheck {
   /** Pode inserir direto (Enter, "+", soltar). */
   ok: boolean;
