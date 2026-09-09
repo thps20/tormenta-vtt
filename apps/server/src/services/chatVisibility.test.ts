@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage, FogConfig, Token } from "@tormenta-vtt/shared";
-import { emitChatMessage, messageVisibleTo, redactForAuthor, tokenGateOk } from "./chatVisibility.js";
+import { emitChatMessage, initiativeBatchForViewer, messageVisibleTo, redactForAuthor, tokenGateOk } from "./chatVisibility.js";
 import { rooms, type TypedServer } from "../socket/types.js";
 
 const base: ChatMessage = {
@@ -174,5 +174,84 @@ describe("emitChatMessage", () => {
     expect(calls[0]!.room).toBe(rooms.all("r1"));
     expect(calls[0]!.msg.roll).toBeDefined();
     expect(calls[0]!.msg.id).toBe("m1");
+  });
+});
+
+const batchBase: ChatMessage = {
+  ...base,
+  id: "b1",
+  kind: "initiative-batch",
+  roll: undefined,
+  initiativeBatch: {
+    round: 2,
+    entries: [
+      { combatantId: "c1", tokenId: "t1", name: "Goblin", formula: "1d20+2", result: 15 },
+      { combatantId: "c2", tokenId: "t2", name: "Orc", formula: "1d20+1", result: 9 },
+    ],
+  },
+};
+
+const visibleOrc: Token = { ...tokenFixture, id: "t2", name: "Orc" };
+const hiddenOrc: Token = { ...visibleOrc, visible: false };
+
+describe("initiativeBatchForViewer", () => {
+  it("token oculto: a linha some da cópia do jogador, as outras ficam", () => {
+    const tokenInfoById = new Map([
+      ["t1", { token: tokenFixture, fog: openFog }],
+      ["t2", { token: hiddenOrc, fog: openFog }],
+    ]);
+    const view = initiativeBatchForViewer(batchBase, other, tokenInfoById);
+    expect(view?.initiativeBatch?.entries).toEqual([{ combatantId: "c1", tokenId: "t1", name: "Goblin", formula: "1d20+2", result: 15 }]);
+  });
+
+  it("GM vê todas as linhas, mesmo com token oculto de jogador", () => {
+    const tokenInfoById = new Map([
+      ["t1", { token: tokenFixture, fog: openFog }],
+      ["t2", { token: hiddenOrc, fog: openFog }],
+    ]);
+    const view = initiativeBatchForViewer(batchBase, gm, tokenInfoById);
+    expect(view?.initiativeBatch?.entries).toHaveLength(2);
+  });
+
+  it("nenhuma linha sobra: o jogador não recebe o card", () => {
+    const tokenInfoById = new Map([
+      ["t1", { token: { ...tokenFixture, visible: false }, fog: openFog }],
+      ["t2", { token: hiddenOrc, fog: openFog }],
+    ]);
+    expect(initiativeBatchForViewer(batchBase, other, tokenInfoById)).toBeUndefined();
+  });
+
+  it("rolagem secreta (visibility gm): jogador vê a linha (nome), mas sem fórmula/resultado", () => {
+    const secret = { ...batchBase, visibility: "gm" as const };
+    const tokenInfoById = new Map([
+      ["t1", { token: tokenFixture, fog: openFog }],
+      ["t2", { token: visibleOrc, fog: openFog }],
+    ]);
+    const view = initiativeBatchForViewer(secret, other, tokenInfoById);
+    expect(view?.initiativeBatch?.entries).toEqual([
+      { combatantId: "c1", tokenId: "t1", name: "Goblin" },
+      { combatantId: "c2", tokenId: "t2", name: "Orc" },
+    ]);
+  });
+
+  it("rolagem secreta: o GM vê fórmula e resultado normalmente", () => {
+    const secret = { ...batchBase, visibility: "gm" as const };
+    const tokenInfoById = new Map([
+      ["t1", { token: tokenFixture, fog: openFog }],
+      ["t2", { token: visibleOrc, fog: openFog }],
+    ]);
+    const view = initiativeBatchForViewer(secret, gm, tokenInfoById);
+    expect(view?.initiativeBatch?.entries).toEqual(batchBase.initiativeBatch!.entries);
+  });
+
+  it("revelar (visibility -> all): jogador passa a ver fórmula/resultado, mas o gate de token oculto continua valendo", () => {
+    const revealed = { ...batchBase, visibility: "all" as const };
+    const tokenInfoById = new Map([
+      ["t1", { token: tokenFixture, fog: openFog }],
+      ["t2", { token: hiddenOrc, fog: openFog }],
+    ]);
+    const view = initiativeBatchForViewer(revealed, other, tokenInfoById);
+    // t2 (Orc) continua oculto pro jogador mesmo revelado: o Revelar só muda visibility, não o token.
+    expect(view?.initiativeBatch?.entries).toEqual([{ combatantId: "c1", tokenId: "t1", name: "Goblin", formula: "1d20+2", result: 15 }]);
   });
 });

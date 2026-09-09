@@ -7,6 +7,12 @@
  *      (ele vê todo token); o AUTOR também nunca é bloqueado por isso — sempre recebe a própria
  *      rolagem, mesmo que o GM tenha escondido o token dele depois. O gate vale só para os
  *      demais jogadores. Usada no broadcast (emitChatMessage) e no snapshot (histórico).
+ *
+ * Um card de iniciativa em lote (`kind: "initiative-batch"`, combat:roll rolando vários
+ * combatentes de uma vez) tem várias linhas, cada uma com o seu próprio token: aí a regra 2 vira
+ * por linha em vez de pela mensagem inteira (linha de token oculto some da cópia do jogador, sem
+ * derrubar as outras), e a regra 1 decide só se `formula`/`result` aparecem em cada linha, não se
+ * a linha existe — ver `initiativeBatchForViewer`.
  */
 import { FogConfigSchema, type ChatMessage, type FogConfig, type Token } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
@@ -47,6 +53,17 @@ async function blockedPlayerIds(roomId: string, tokenId: string, authorParticipa
 }
 
 /**
+ * Token + névoa da cena de cada um de `tokenIds`, pronto pra `tokenVisibleTo`. Usado pro gate por
+ * linha de um card de iniciativa em lote (`initiativeBatchForViewer`) e reaproveitável pelo
+ * snapshot (histórico), que já refaz essa consulta pra mensagens com `tokenId` único.
+ */
+export async function loadTokenInfo(tokenIds: string[]): Promise<Map<string, { token: Token; fog: FogConfig }>> {
+  if (tokenIds.length === 0) return new Map();
+  const rows = await prisma.token.findMany({ where: { id: { in: tokenIds } }, include: { scene: true } });
+  return new Map(rows.map((t) => [t.id, { token: toToken(t), fog: FogConfigSchema.parse(t.scene.fog ?? {}) }]));
+}
+
+/**
  * Mesma regra de `blockedPlayerIds`, mas para filtrar uma lista já carregada (histórico do
  * snapshot): passa `authorParticipantId` da própria mensagem (`msg.participantId`) — o autor
  * nunca é bloqueado por essa regra, mesmo que o token dele esteja oculto.
@@ -74,8 +91,14 @@ export function tokenGateOk(
  *
  * Quando a mensagem tem `tokenId`, quem não vê esse token fica de fora de TUDO
  * (nem o placeholder) — daí o `.except(...)` nos dois envios abaixo.
+ *
+ * Um card de iniciativa em lote (`kind: "initiative-batch"`) não tem um `tokenId` só: cada
+ * linha cita o seu, e o gate é por linha (não pela mensagem inteira) — delega pra
+ * `emitInitiativeBatchMessage`, que manda uma cópia calculada pra cada participante.
  */
 export async function emitChatMessage(io: TypedServer, roomId: string, msg: ChatMessage): Promise<void> {
+  if (msg.kind === "initiative-batch") return emitInitiativeBatchMessage(io, roomId, msg);
+
   const blocked = msg.tokenId ? await blockedPlayerIds(roomId, msg.tokenId, msg.participantId) : [];
   const exceptRooms = blocked.map(rooms.participant);
   const withExcept = (target: ReturnType<TypedServer["to"]>) => (exceptRooms.length ? target.except(exceptRooms) : target);
@@ -87,6 +110,42 @@ export async function emitChatMessage(io: TypedServer, roomId: string, msg: Chat
   withExcept(io.to(rooms.all(roomId))).emit("chat:message", redactMessage(msg));
   const visibleRoom = msg.visibility === "gm" ? rooms.gm(roomId) : rooms.participant(msg.participantId);
   withExcept(io.to(visibleRoom)).emit("chat:message", msg);
+}
+
+/**
+ * Card de iniciativa em lote do ponto de vista de UM viewer: linha a linha, quem não vê o token
+ * daquela linha (oculto/névoa) fica sem ela — a linha simplesmente não existe pra ele, não um
+ * placeholder (diferente do `tokenId` único de cima, que bloqueia a mensagem inteira). Nas linhas
+ * que sobram, `formula`/`result` só aparecem se `visibility` (all/gm/self) permite a este viewer
+ * (mesma regra de sempre); os demais recebem só `name`/`tokenId`/`combatantId` (a UI mostra
+ * "rolou"). `undefined` = nenhuma linha sobrou — o viewer não recebe o card.
+ */
+export function initiativeBatchForViewer(
+  msg: ChatMessage,
+  viewer: Viewer,
+  tokenInfoById: Map<string, { token: Token; fog: FogConfig }>,
+): ChatMessage | undefined {
+  if (!msg.initiativeBatch) return undefined;
+  const showValues = messageVisibleTo(msg, viewer);
+  const entries = msg.initiativeBatch.entries
+    .filter((e) => {
+      const info = tokenInfoById.get(e.tokenId);
+      return !info || tokenVisibleTo(info.token, viewer, info.fog); // referência órfã: não trava (mesma regra do resto)
+    })
+    .map((e) => (showValues ? e : { combatantId: e.combatantId, tokenId: e.tokenId, name: e.name }));
+  if (entries.length === 0) return undefined;
+  return { ...msg, initiativeBatch: { round: msg.initiativeBatch.round, entries } };
+}
+
+/** Manda a cópia de `initiativeBatchForViewer` pra cada participante que tem alguma linha a ver. */
+async function emitInitiativeBatchMessage(io: TypedServer, roomId: string, msg: ChatMessage): Promise<void> {
+  if (!msg.initiativeBatch) return;
+  const tokenInfoById = await loadTokenInfo([...new Set(msg.initiativeBatch.entries.map((e) => e.tokenId))]);
+  const participants = await prisma.participant.findMany({ where: { roomId } });
+  for (const p of participants) {
+    const view = initiativeBatchForViewer(msg, { role: p.role === "gm" ? "gm" : "player", participantId: p.id }, tokenInfoById);
+    if (view) io.to(rooms.participant(p.id)).emit("chat:message", view);
+  }
 }
 
 /** Tira o conteúdo (`roll`/`item`/`text`) de uma mensagem, sem checar permissão. */

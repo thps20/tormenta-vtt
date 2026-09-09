@@ -6,7 +6,7 @@ import { loadCombatRow, toCombat } from "./combat.js";
 import { toChatMessage, toParticipant, toRoomPublic, toScene, toToken } from "./serialize.js";
 import { characterVisibleTo, toCharacter } from "./characters.js";
 import { tokenVisibleTo } from "./visibility.js";
-import { messageVisibleTo, tokenGateOk } from "./chatVisibility.js";
+import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, tokenGateOk } from "./chatVisibility.js";
 
 const CHAT_HISTORY_LIMIT = 100;
 
@@ -35,14 +35,20 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
 
   const combat: Combat | null = combatRow ? toCombat(combatRow, def, viewer, fog) : null;
 
-  // Mensagens ligadas a um token (combate/ficha): quem não vê esse token não recebe a mensagem
-  // (nem histórico), mesmo que ele já tenha sido revelado/escondido depois de ela ser criada —
-  // o snapshot sempre reavalia com o token/névoa de AGORA (ver docs/plano-combate.md, acréscimo).
-  const tokenIds = [...new Set(messages.map((m) => m.tokenId).filter((id): id is string => id !== null))];
-  const tokenRows = tokenIds.length
-    ? await prisma.token.findMany({ where: { id: { in: tokenIds } }, include: { scene: true } })
-    : [];
-  const tokenInfoById = new Map(tokenRows.map((t) => [t.id, { token: toToken(t), fog: FogConfigSchema.parse(t.scene.fog ?? {}) }]));
+  // Mensagens ligadas a um token (combate/ficha) ou cujas linhas citam tokens (card de
+  // iniciativa em lote): quem não vê esses tokens não recebe a mensagem (nem histórico), mesmo
+  // que eles já tenham sido revelados/escondidos depois de ela ser criada — o snapshot sempre
+  // reavalia com o token/névoa de AGORA (ver docs/plano-combate.md, acréscimo).
+  const chatMessages = messages.reverse().map(toChatMessage);
+  const tokenIds = [
+    ...new Set(
+      chatMessages.flatMap((m) => [
+        ...(m.tokenId ? [m.tokenId] : []),
+        ...(m.initiativeBatch?.entries.map((e) => e.tokenId) ?? []),
+      ]),
+    ),
+  ];
+  const tokenInfoById = await loadTokenInfo(tokenIds);
 
   return {
     room: toRoomPublic(room),
@@ -52,10 +58,13 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     scenes: scenes.map(toScene),
     tokens: tokens.map(toToken).filter((t) => tokenVisibleTo(t, viewer, fog)),
     combat,
-    chat: messages
-      .reverse()
-      .map(toChatMessage)
-      .filter((m) => tokenGateOk(m.tokenId, viewer, m.participantId, tokenInfoById.get(m.tokenId ?? "")) && messageVisibleTo(m, viewer)),
+    chat: chatMessages.flatMap((m) => {
+      if (m.kind === "initiative-batch") {
+        const view = initiativeBatchForViewer(m, viewer, tokenInfoById);
+        return view ? [view] : [];
+      }
+      return tokenGateOk(m.tokenId, viewer, m.participantId, tokenInfoById.get(m.tokenId ?? "")) && messageVisibleTo(m, viewer) ? [m] : [];
+    }),
     characters: characters.map(toCharacter).filter((c) => characterVisibleTo(c, me.role)),
   };
 }
