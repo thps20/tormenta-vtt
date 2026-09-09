@@ -2,9 +2,9 @@ import React, { useRef, useState, useEffect, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
-import { conditionIconDataUrl, measureDistance, type Character, type Combat, type ConditionDef, type FogShape, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenCondition, type TokenPatch } from "@tormenta-vtt/shared";
+import { conditionIconDataUrl, findFreeCells, measureDistance, type Character, type Combat, type ConditionDef, type FogShape, type GridConfig, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenCondition, type TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
-import { clampToMap, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
+import { cellAt, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
 import { useImage } from "../lib/useImage";
 import { newId } from "../lib/ids";
@@ -304,11 +304,11 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   });
 
   const handleCreateToken = () => {
-    const size = scene.grid.type === "square" ? scene.grid.cellSize : 70;
+    const size = effectiveCellSize(scene.grid);
     const c = viewportCenter();
     let pos = { x: c.x - size / 2, y: c.y - size / 2 };
     if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
-    pos = findFreeSpot(pos, size, tokens, map);
+    pos = findFreeSpot(pos, scene.grid, tokens, map);
     onTokenCreate(pos, size);
   };
 
@@ -997,23 +997,23 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
  * Evita empilhar tokens novos no mesmo ponto (só o de cima receberia cliques):
  * anda em espiral pelas células vizinhas até achar uma sem token.
  */
+/**
+ * Evita empilhar tokens novos no mesmo ponto: espiral em CÉLULAS a partir do ponto pedido
+ * (findFreeCells, shared), devolvendo o canto superior esquerdo em pixels do mapa. Caso particular
+ * de 1 célula de lado — o botão "novo token" só cria 1x1; a soltura de criaturas (docs/plano-criaturas.md)
+ * usa findFreeCells direto, com o lado do tamanho da criatura.
+ */
 function findFreeSpot(
   start: { x: number; y: number },
-  size: number,
+  grid: GridConfig,
   tokens: Token[],
   map: { width: number; height: number },
 ): { x: number; y: number } {
-  const occupied = (x: number, y: number) =>
-    tokens.some((t) => Math.abs(t.x - x) < size * 0.75 && Math.abs(t.y - y) < size * 0.75);
-  const offsets: Array<[number, number]> = [[0, 0]];
-  for (let r = 1; r <= 6; r++) {
-    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r) offsets.push([dx, dy]);
-  }
-  for (const [dx, dy] of offsets) {
-    const p = clampToMap(start.x + dx * size, start.y + dy * size, { width: size, height: size }, map);
-    if (!occupied(p.x, p.y)) return p;
-  }
-  return clampToMap(start.x, start.y, { width: size, height: size }, map);
+  const size = effectiveCellSize(grid);
+  const bounds = { cols: Math.max(1, Math.ceil(map.width / size)), rows: Math.max(1, Math.ceil(map.height / size)) };
+  const occupied = tokens.map((t) => cellRect(t, grid));
+  const [cell] = findFreeCells({ start: cellAt(start, grid), cells: 1, count: 1, occupied, bounds });
+  return cell ? cellToPoint(cell, grid) : clampToMap(start.x, start.y, { width: size, height: size }, map);
 }
 
 // --- Token ------------------------------------------------------------------

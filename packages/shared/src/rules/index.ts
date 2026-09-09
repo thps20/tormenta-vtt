@@ -13,3 +13,4 @@ export * from "./resources.js";
 export * from "./conditionIcon.js";
 export * from "./conditions.js";
 export * from "./combat.js";
+export * from "./placement.js";
