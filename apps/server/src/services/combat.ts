@@ -14,6 +14,7 @@ import {
   normalizeOrder,
   sortCombatants,
   stateAfterRemoval,
+  stripTimedConditions,
   tokenCenter,
   TokenConditionEntrySchema,
   type Combat,
@@ -289,4 +290,15 @@ export async function expireConditionsOnRoundChange(
   round: number,
 ): Promise<void> {
   await applyConditionExpiry(io, roomId, sceneId, def, actorParticipantId, (conditions) => expireConditions(conditions, round));
+}
+
+/** `combat:end { clear: true }`: remove toda condição com duração (não vira permanente). */
+export async function stripTimedConditionsOnCombatEnd(
+  io: TypedServer,
+  roomId: string,
+  sceneId: string,
+  def: SystemDefinition,
+  actorParticipantId: string,
+): Promise<void> {
+  await applyConditionExpiry(io, roomId, sceneId, def, actorParticipantId, stripTimedConditions);
 }

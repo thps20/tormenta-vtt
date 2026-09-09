@@ -27,6 +27,7 @@ import {
   persistNormalizedOrder,
   requireActiveCombat,
   requireActiveScene,
+  stripTimedConditionsOnCombatEnd,
   emitCombat as sendCombat,
   type CombatantRow,
   type CombatRow,
@@ -364,6 +365,9 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
       async ({ clear }, ctx) => {
         const combat = await requireActiveCombat(ctx.roomId);
         if (clear) {
+          // Combate acabou: condição com duração não vira permanente, some (permanente fica).
+          const def = await requireSystem(ctx.roomId);
+          await stripTimedConditionsOnCombatEnd(io, ctx.roomId, combat.sceneId, def, ctx.participantId);
           await prisma.combat.delete({ where: { id: combat.id } });
         } else {
           await prisma.combat.update({ where: { id: combat.id }, data: { status: "ended", activeCombatantId: null } });
