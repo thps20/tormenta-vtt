@@ -20,7 +20,8 @@ if (import.meta.env.DEV) {
     import("./store/characters"),
     import("./store/tools"),
     import("./store/compendium"),
-  ]).then(([c, r, t, ch, cb, ca, tl, co]) => {
+    import("./store/history"),
+  ]).then(([c, r, t, ch, cb, ca, tl, co, h]) => {
     Object.assign(window, {
       __vtt: {
         useConnection: c.useConnection,
@@ -31,6 +32,7 @@ if (import.meta.env.DEV) {
         useCharacters: ca.useCharacters,
         useTools: tl.useTools,
         useCompendium: co.useCompendium,
+        useHistory: h.useHistory,
       },
     });
   });
