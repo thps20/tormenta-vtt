@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findFreeCells, numberedNames } from "./placement.js";
+import { convertSizeToCellSize, findFreeCells, numberedNames } from "./placement.js";
 
 const bounds = { cols: 20, rows: 20 };
 
@@ -83,5 +83,38 @@ describe("numberedNames", () => {
 
   it("ignora nomes de outras criaturas e pega o maior número já usado", () => {
     expect(numberedNames("Goblin", 1, ["Orc 1", "Goblin 4", "Goblin 2"])).toEqual(["Goblin 5"]);
+  });
+});
+
+describe("convertSizeToCellSize (docs/plano-mapas.md — token não pode ficar menor/maior que a célula ao trocar de grid)", () => {
+  it("token 1x1 de 70px (grid padrão) pra um grid de 100px: vira 100px, não fica menor que a célula", () => {
+    expect(convertSizeToCellSize({ width: 70, height: 70 }, 70, 100)).toEqual({ width: 100, height: 100 });
+  });
+
+  it("token 1x1 de 100px pra um grid de 70px: vira 70px, não fica maior que a célula", () => {
+    expect(convertSizeToCellSize({ width: 100, height: 100 }, 100, 70)).toEqual({ width: 70, height: 70 });
+  });
+
+  it("token 2x2 preserva as 2 células no grid novo", () => {
+    expect(convertSizeToCellSize({ width: 140, height: 140 }, 70, 100)).toEqual({ width: 200, height: 200 });
+  });
+
+  it("largura e altura convertem independentes (token 1x2, não quadrado)", () => {
+    expect(convertSizeToCellSize({ width: 70, height: 140 }, 70, 100)).toEqual({ width: 100, height: 200 });
+  });
+
+  it("grid \"none\" usa a célula virtual de 70px de cada lado (quem chama já resolveu effectiveCellSize)", () => {
+    // Saindo de um mapa com grid "none" (70 virtual) pra um mapa square de 50: 70px -> 1 célula -> 50px.
+    expect(convertSizeToCellSize({ width: 70, height: 70 }, 70, 50)).toEqual({ width: 50, height: 50 });
+    // E o caminho contrário: mapa square de 50 (token 2x2 = 100px) pra um mapa "none" (70 virtual).
+    expect(convertSizeToCellSize({ width: 100, height: 100 }, 50, 70)).toEqual({ width: 140, height: 140 });
+  });
+
+  it("nunca arredonda pra 0 célula: um token bem menor que uma célula continua com pelo menos 1", () => {
+    expect(convertSizeToCellSize({ width: 10, height: 10 }, 70, 100)).toEqual({ width: 100, height: 100 });
+  });
+
+  it("arredonda pro inteiro mais próximo (token quase-mas-não-exatamente 2 células continua 2x2)", () => {
+    expect(convertSizeToCellSize({ width: 145, height: 145 }, 70, 100)).toEqual({ width: 200, height: 200 });
   });
 });

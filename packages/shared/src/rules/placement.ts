@@ -95,3 +95,27 @@ export function numberedNames(base: string, count: number, existing: string[]): 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+// --- Redimensionar entre grids -----------------------------------------------------------------
+
+/**
+ * Tamanho (pixels) equivalente ao trocar de um grid com `fromCellSize` px por célula para outro
+ * com `toCellSize`: primeiro descobre o lado em células na origem (arredondando — um token
+ * quase-mas-não-exatamente 2 células continua sendo 2x2, mesma conta de `cellRect` em cada app),
+ * depois multiplica pelo cellSize novo. Mínimo 1 célula por eixo (nunca deixa um token
+ * "desaparecer"). Recebe só números (não `GridConfig`, que só o web/servidor conhecem — ver
+ * comentário no topo do arquivo): quem chama já resolveu `effectiveCellSize` dos dois grids
+ * (inclusive o virtual de 70px do grid "none"). Usada ao mover um token entre mapas com grid
+ * diferente (`scene:activate`/`scene:delete`) e ao editar `cellSize`/offset de um mapa
+ * (`scene:updateGrid`) — os dois lugares que, sem isso, deixariam um token menor/maior que a
+ * célula ao trocar de grid.
+ */
+export function convertSizeToCellSize(
+  size: { width: number; height: number },
+  fromCellSize: number,
+  toCellSize: number,
+): { width: number; height: number } {
+  const cellsW = Math.max(1, Math.round(size.width / fromCellSize));
+  const cellsH = Math.max(1, Math.round(size.height / fromCellSize));
+  return { width: cellsW * toCellSize, height: cellsH * toCellSize };
+}
