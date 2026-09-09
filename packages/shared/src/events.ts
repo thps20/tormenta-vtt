@@ -68,6 +68,14 @@ export interface RoomSnapshot {
   characters: Character[];
 }
 
+/** Resposta de `compendium:list`. */
+export interface CompendiumList {
+  /** Sistema + sala mescladas. Entradas `type: "creature"` só vêm para o GM (filtro no servidor). */
+  entries: CompendiumEntry[];
+  /** Ids que vieram do compêndio da SALA (homebrew do GM): a paleta mostra o chip "Sala" só quando houver algum. */
+  roomIds: string[];
+}
+
 export interface ClientToServerEvents {
   // Sala
   "room:join": (payload: RoomJoinPayload, ack: Ack<RoomSnapshot>) => void;
@@ -113,11 +121,11 @@ export interface ClientToServerEvents {
 
   // Compêndio
   /**
-   * Entradas do compêndio do sistema da sala (e, no futuro, as da própria sala,
-   * que têm prioridade quando o id coincide). Sem broadcast: o cliente pede ao
-   * abrir a paleta e guarda em memória.
+   * Entradas do compêndio do sistema da sala + as da própria sala (homebrew do GM, que tem
+   * prioridade quando o id coincide). Sem broadcast: o cliente pede ao abrir a paleta e guarda em
+   * memória. Criaturas (`type: "creature"`) só vêm para o GM — o servidor filtra, não só a UI.
    */
-  "compendium:list": (payload: Record<string, never>, ack: Ack<CompendiumEntry[]>) => void;
+  "compendium:list": (payload: Record<string, never>, ack: Ack<CompendiumList>) => void;
 
   // Régua (efêmera: só broadcast, nada vai ao banco)
   /** Enviado com throttle enquanto o participante arrasta a régua; `ruler: null` ao soltar. */

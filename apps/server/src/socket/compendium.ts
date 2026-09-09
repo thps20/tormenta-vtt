@@ -10,7 +10,7 @@ export function registerCompendiumHandlers(_io: TypedServer, socket: TypedSocket
     guarded(socket, EmptySchema, async (_input, ctx) => {
       const room = await prisma.room.findUnique({ where: { id: ctx.roomId } });
       if (!room) throw new HandlerError("Sala não encontrada");
-      return listCompendium(room.systemId, room.id);
+      return listCompendium(room.systemId, room.id, ctx.role);
     }),
   );
 }

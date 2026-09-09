@@ -10,6 +10,8 @@ import { toast } from "./ui";
  */
 interface CompendiumState {
   entries: CompendiumEntry[];
+  /** Ids que vieram do compêndio da SALA (homebrew do GM): o chip "Sala" da paleta só aparece com algum. */
+  roomIds: string[];
   status: "idle" | "loading" | "ready" | "error";
   /** Paleta aberta por cima da ficha. */
   isOpen: boolean;
@@ -38,6 +40,7 @@ interface CompendiumState {
 
 export const useCompendium = create<CompendiumState>((set, get) => ({
   entries: [],
+  roomIds: [],
   status: "idle",
   isOpen: false,
   initialKind: null,
@@ -53,7 +56,7 @@ export const useCompendium = create<CompendiumState>((set, get) => ({
       toast(res.error);
       return;
     }
-    set({ entries: res.data, status: "ready" });
+    set({ entries: res.data.entries, roomIds: res.data.roomIds, status: "ready" });
   },
 
   open: (kind = null) => {
@@ -80,5 +83,5 @@ export const useCompendium = create<CompendiumState>((set, get) => ({
     return true;
   },
   cancelDrag: () => set({ drag: null }),
-  reset: () => set({ entries: [], status: "idle", isOpen: false, initialKind: null, lastInserted: null, drag: null }),
+  reset: () => set({ entries: [], roomIds: [], status: "idle", isOpen: false, initialKind: null, lastInserted: null, drag: null }),
 }));
