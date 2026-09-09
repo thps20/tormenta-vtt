@@ -45,8 +45,10 @@ import type {
   Token,
   TokenApplyDamagePayload,
   TokenCreate,
+  TokenDeleteManyPayload,
   TokenLinkCharacterPayload,
   TokenPatch,
+  TokenUpdateManyPayload,
 } from "./schemas/index.js";
 
 export type AckResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -67,6 +69,14 @@ export interface RoomSnapshot {
   chat: ChatMessage[];
   /** Fichas da sala (jogadores não recebem as de kind = "npc"). */
   characters: Character[];
+}
+
+/**
+ * Resultado de `history:undo`/`history:redo` (docs/plano-desfazer.md). `null` = pilha vazia (nada
+ * pra desfazer/refazer). `summary` é o texto pronto pro toast ("apagar Goblin 3", "mover 5 tokens").
+ */
+export interface HistoryActionResult {
+  summary: string;
 }
 
 /** Resposta de `compendium:list`. */
@@ -92,9 +102,19 @@ export interface ClientToServerEvents {
 
   // Tokens
   "token:create": (payload: TokenCreate, ack: Ack<Token>) => void;
-  /** Usado para arrastar/redimensionar. Cliente envia throttled (~30/s) enquanto arrasta. */
+  /** Usado para arrastar/redimensionar. Cliente envia throttled (~30/s) enquanto arrasta (`live: true`). */
   "token:update": (payload: TokenPatch, ack: Ack<Token>) => void;
+  /**
+   * Atualiza vários tokens de uma vez, tudo-ou-nada (arraste em grupo ao soltar): uma entrada de
+   * histórico só, em vez de uma por token (docs/plano-desfazer.md §3). `token:updated` normal por id.
+   */
+  "token:update-many": (payload: TokenUpdateManyPayload, ack: Ack) => void;
   "token:delete": (payload: { tokenId: string }, ack: Ack) => void;
+  /**
+   * Apaga vários tokens de uma vez, tudo-ou-nada (Delete/Backspace em lote, NpcQuickCard): uma
+   * entrada de histórico só (docs/plano-desfazer.md §2). `token:deleted` normal por id.
+   */
+  "token:delete-many": (payload: TokenDeleteManyPayload, ack: Ack) => void;
   /** GM, ou dono do token que também é dono da ficha. characterId null desvincula. */
   "token:link-character": (payload: TokenLinkCharacterPayload, ack: Ack<Token>) => void;
   /**
@@ -174,6 +194,12 @@ export interface ClientToServerEvents {
   "combat:resume": (payload: CombatResumePayload, ack: Ack<Combat | null>) => void;
   /** clear=false: encerra mas mantém a ordem visível; clear=true: apaga o combate. */
   "combat:end": (payload: CombatEndPayload, ack: Ack) => void;
+
+  // Desfazer/refazer (docs/plano-desfazer.md): pilha por sala, só do GM, em memória no servidor.
+  /** Desfaz o topo da pilha da sala. `null` no ack = pilha vazia (nada pra desfazer). */
+  "history:undo": (payload: Record<string, never>, ack: Ack<HistoryActionResult | null>) => void;
+  /** Refaz o topo da pilha de redo (esvaziada por qualquer ação nova desde o último undo). */
+  "history:redo": (payload: Record<string, never>, ack: Ack<HistoryActionResult | null>) => void;
 }
 
 export interface ServerToClientEvents {
@@ -207,6 +233,13 @@ export interface ServerToClientEvents {
 
   /** Erros não relacionados a um ack específico. */
   "server:error": (p: { message: string }) => void;
+
+  /**
+   * Estado da pilha de histórico da sala, só pro GM (`rooms.gm`) — jogador não tem UI disso
+   * (docs/plano-desfazer.md §6). Emitido depois de qualquer push/pop (uma ação nova desfazível,
+   * um undo, um redo), pra Toolbar habilitar/desabilitar os botões e mostrar o resumo no tooltip.
+   */
+  "history:updated": (p: { canUndo: boolean; canRedo: boolean; undoSummary?: string; redoSummary?: string }) => void;
 }
 
 /** Dados guardados no socket no servidor (socket.data). */

@@ -69,5 +69,16 @@ export const TokenCreateSchema = TokenSchema.omit({ id: true, characterId: true 
 export type TokenCreate = z.infer<typeof TokenCreateSchema>;
 
 /** Atualização parcial (arrastar manda só x/y; redimensionar manda width/height). */
-export const TokenPatchSchema = TokenSchema.omit({ characterId: true }).partial().required({ id: true });
+export const TokenPatchSchema = TokenSchema.omit({ characterId: true })
+  .partial()
+  .required({ id: true })
+  .extend({
+    /**
+     * true só nos ecos "ao vivo" do arraste (~30/s, sem ack — store/tokens.ts#flushMoves): o
+     * servidor aplica e faz broadcast normalmente, mas NUNCA empilha histórico por causa disso
+     * (docs/plano-desfazer.md §3) — só o patch final do gesto (soltar/redimensionar, sem este
+     * campo) conta como "o usuário decidiu mover pra cá". Nunca persistido nem serializado de volta.
+     */
+    live: z.boolean().optional(),
+  });
 export type TokenPatch = z.infer<typeof TokenPatchSchema>;

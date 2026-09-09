@@ -5,6 +5,7 @@ import { FogShapeSchema } from "./fog.js";
 import { CharacterDataSchema, CharacterKindSchema, CharacterRollRequestSchema, EnhancementUseSchema } from "./character.js";
 import { CompendiumIdSchema } from "./compendium.js";
 import { RollVisibilitySchema } from "./dice.js";
+import { TokenPatchSchema } from "./token.js";
 
 /**
  * Schemas dos payloads que entram no servidor (socket e HTTP).
@@ -84,6 +85,17 @@ export type FogUpdatePayload = z.infer<typeof FogUpdateSchema>;
 // --- Tokens ----------------------------------------------------------------
 
 export const TokenDeleteSchema = z.object({ tokenId: IdSchema });
+
+/** Apaga vários tokens de uma vez, tudo-ou-nada (mesmo molde de TokenApplyDamageSchema abaixo) —
+ *  usado pelo Delete/Backspace em lote e pelo NpcQuickCard, para virar UMA entrada de histórico
+ *  em vez de uma por token (docs/plano-desfazer.md §2). */
+export const TokenDeleteManySchema = z.object({ tokenIds: z.array(IdSchema).min(1).max(100) });
+export type TokenDeleteManyPayload = z.infer<typeof TokenDeleteManySchema>;
+
+/** Atualiza vários tokens de uma vez, tudo-ou-nada — hoje só o arraste em grupo usa (soltar vários
+ *  tokens selecionados vira UMA entrada de histórico, docs/plano-desfazer.md §3). */
+export const TokenUpdateManySchema = z.object({ patches: z.array(TokenPatchSchema).min(1).max(100) });
+export type TokenUpdateManyPayload = z.infer<typeof TokenUpdateManySchema>;
 /** Vincula (ou desvincula, com null) uma ficha ao token. */
 export const TokenLinkCharacterSchema = z.object({ tokenId: IdSchema, characterId: IdSchema.nullable() });
 export type TokenLinkCharacterPayload = z.infer<typeof TokenLinkCharacterSchema>;
