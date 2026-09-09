@@ -403,24 +403,25 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
       if (slot === null) continue;
 
       if (layout.mode === "counter") {
-        const text = entries.map((e) => e.def.label).join("\n");
+        const text = entries.map((e) => e.def.label + roundsSuffix(e.cond.expiresRound, badgeCombatRound)).join("\n");
         return { key: `${t.id}:__counter`, x: t.x + layout.cx, y: t.y + layout.cy, anchorRadius: layout.screenRadius, text };
       }
       const pos = layout.slots[slot];
       if (!pos) continue;
       const anchorRadius = layout.r * stageScale;
       if (isOverflowSlot(layout, slot)) {
-        const text = entries.slice(layout.visibleCount).map((e) => e.def.label).join("\n");
+        const text = entries.slice(layout.visibleCount).map((e) => e.def.label + roundsSuffix(e.cond.expiresRound, badgeCombatRound)).join("\n");
         return { key: `${t.id}:__overflow`, x: t.x + pos.x, y: t.y + pos.y, anchorRadius, text };
       }
       const entry = entries[slot];
       if (!entry) continue;
+      const label = entry.def.label + roundsSuffix(entry.cond.expiresRound, badgeCombatRound);
       return {
         key: `${t.id}:${entry.def.key}`,
         x: t.x + pos.x,
         y: t.y + pos.y,
         anchorRadius,
-        text: entry.def.description ? `${entry.def.label}\n${entry.def.description}` : entry.def.label,
+        text: entry.def.description ? `${label}\n${entry.def.description}` : label,
       };
     }
     return null;
@@ -736,8 +737,10 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   const conditionByKey = useMemo(() => new Map((systemDef?.conditions ?? []).map((c) => [c.key, c])), [systemDef]);
 
   // A duração do ConditionMenu (marcar/editar) só faz sentido com combate de verdade em andamento
-  // — "ended" esconde o campo (vira permanente).
+  // — "ended" esconde o campo (vira permanente). Já o badge de rodadas restantes usa a rodada do
+  // combate mesmo "ended" sem clear (fica congelado no valor de quando encerrou).
   const menuCombatRound = combat && combat.status !== "ended" ? combat.round : null;
+  const badgeCombatRound = combat?.round ?? null;
 
   // Tooltip da condição em hover: mora AQUI (e é desenhado na última camada) porque dentro do Group
   // do token qualquer token desenhado depois pintava por cima dele. Ver ConditionTooltipLayerContent.
@@ -749,6 +752,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
       token={token}
       bar={tokenBars[token.id] ?? null}
       conditionByKey={conditionByKey}
+      combatRound={badgeCombatRound}
       stageScale={stageScale}
       draggable={mode === "select" && canControl(me, token)}
       selectable={mode === "select"}
@@ -992,6 +996,8 @@ interface TokenNodeProps {
   bar: TokenBar | null;
   /** conditions[] do sistema, indexadas por key, pra resolver ícone/cor/descrição das do token. */
   conditionByKey: Map<string, ConditionDef>;
+  /** Rodada do combate da cena, pro número de rodadas restantes no badge. null = sem combate. */
+  combatRound: number | null;
   draggable: boolean;
   /** Modo Selecionar: clique seleciona. Nos outros modos o clique sobe para o Stage (ex.: vértice do polígono da névoa). */
   selectable: boolean;
@@ -1011,7 +1017,7 @@ interface TokenNodeProps {
   stageScale: number;
 }
 
-const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu, stageScale }) => {
+const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, combatRound, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu, stageScale }) => {
   const image = useImage(assetUrl(token.imageUrl));
   const radius = tokenRadius(token);
   const cx = token.width / 2;
@@ -1129,6 +1135,7 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, dragg
           width={token.width}
           height={token.height}
           stageScale={stageScale}
+          combatRound={combatRound}
           entries={token.conditions
             .map((cond) => ({ cond, def: conditionByKey.get(cond.key) }))
             .filter((e): e is { cond: (typeof token.conditions)[number]; def: ConditionDef } => e.def !== undefined)}
@@ -1148,7 +1155,7 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, dragg
 // depender do canvas de hit do Konva, que navegadores com proteção anti-fingerprinting embaralham
 // (docs/debug-token.md) — medido: com o hit sabotado, 0 de 6 badges disparavam mouseenter.
 
-type ConditionSlot = { key: string; label: string; description: string; icon?: string; color: string };
+type ConditionSlot = { key: string; label: string; description: string; icon?: string; color: string; roundsLeft?: number };
 
 /** Tooltip de condição, desenhado numa camada ACIMA de todos os tokens (ver ConditionTooltipLayerContent). */
 export interface ConditionTooltip {
@@ -1162,24 +1169,39 @@ export interface ConditionTooltip {
   text: string;
 }
 
+/** Rodadas restantes de uma condição com `expiresRound`, ou undefined (permanente, ou sem rodada
+ *  do combate pra comparar). Nunca negativo — se já passou do previsto, mostra 0. */
+function roundsLeft(expiresRound: number | undefined, combatRound: number | null): number | undefined {
+  if (expiresRound === undefined || combatRound === null) return undefined;
+  return Math.max(0, expiresRound - combatRound);
+}
+
+/** Sufixo " · N rodada(s)" pro tooltip; "" se a condição é permanente (ou sem combate ativo). */
+function roundsSuffix(expiresRound: number | undefined, combatRound: number | null): string {
+  const left = roundsLeft(expiresRound, combatRound);
+  return left === undefined ? "" : ` · ${left} rodada${left === 1 ? "" : "s"}`;
+}
+
 const ConditionMarkers: React.FC<{
   width: number;
   height: number;
   stageScale: number;
+  combatRound: number | null;
   entries: { cond: TokenCondition; def: ConditionDef }[];
-}> = ({ width, height, stageScale, entries }) => {
+}> = ({ width, height, stageScale, combatRound, entries }) => {
   const layout = conditionLayout(width, height, stageScale, entries.length);
 
   if (layout.mode === "counter") {
     return <ConditionCounter cx={layout.cx} cy={layout.cy} count={entries.length} stageScale={stageScale} />;
   }
 
-  const slots: ConditionSlot[] = entries.slice(0, layout.visibleCount).map(({ def }) => ({
+  const slots: ConditionSlot[] = entries.slice(0, layout.visibleCount).map(({ cond, def }) => ({
     key: def.key,
     label: def.label,
     description: def.description,
     icon: def.icon,
     color: def.color,
+    roundsLeft: roundsLeft(cond.expiresRound, combatRound),
   }));
   if (layout.hiddenCount > 0) {
     slots.push({ key: "__overflow", label: `+${layout.hiddenCount}`, description: "", color: "#71717a" });
@@ -1198,7 +1220,9 @@ const ConditionMarkers: React.FC<{
 /**
  * Um badge: fundo circular escuro semitransparente + ícone (SVG do JSON, rasterizado com a cor da
  * condição), ou "+N". Ícone que falha no load cai na INICIAL da condição — nunca no rótulo inteiro,
- * que quebraria em várias linhas e vazaria pra fora do círculo.
+ * que quebraria em várias linhas e vazaria pra fora do círculo. Condição com duração ganha um
+ * selinho pequeno no canto inferior direito com as rodadas restantes (o tooltip tem o texto por
+ * extenso — o número aqui é só um lembrete rápido, fica minúsculo em zoom baixo).
  */
 const ConditionBadge: React.FC<{ slot: ConditionSlot; x: number; y: number; r: number }> = ({ slot, x, y, r }) => {
   const iconUrl = useMemo(() => (slot.icon ? conditionIconDataUrl(slot.icon, slot.color) : null), [slot.icon, slot.color]);
@@ -1215,6 +1239,23 @@ const ConditionBadge: React.FC<{ slot: ConditionSlot; x: number; y: number; r: n
         <KonvaImage image={icon} x={-iconSize / 2} y={-iconSize / 2} width={iconSize} height={iconSize} />
       ) : (
         <Text x={-r} y={-r * 0.45} width={r * 2} text={fallback} align="center" fontSize={r * 0.85} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" wrap="none" ellipsis />
+      )}
+      {slot.roundsLeft !== undefined && (
+        <Group x={r * 0.62} y={r * 0.62}>
+          <Circle radius={Math.max(4, r * 0.46)} fill="#0c0c0c" stroke="#d4af37" strokeWidth={1} />
+          <Text
+            x={-r}
+            y={-r * 0.32}
+            width={r * 2}
+            text={String(slot.roundsLeft)}
+            align="center"
+            fontSize={Math.max(6, r * 0.6)}
+            fontFamily="monospace"
+            fontStyle="bold"
+            fill="#d4af37"
+            wrap="none"
+          />
+        </Group>
       )}
     </Group>
   );
