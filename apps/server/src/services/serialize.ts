@@ -76,6 +76,7 @@ export function toChatMessage(m: DbChatMessage): ChatMessage {
     text: m.text ?? undefined,
     roll: m.roll ?? undefined,
     item: m.item ?? undefined,
+    initiativeBatch: m.initiativeBatch ?? undefined,
     visibility: m.visibility,
     tokenId: m.tokenId,
     createdAt: m.createdAt.toISOString(),

@@ -92,3 +92,60 @@ export async function createRollMessage(io: TypedServer, roomId: string, me: DbP
   const message = redactForAuthor(msg, { role: me.role === "gm" ? "gm" : "player", participantId: me.id });
   return { message, total: outcome.total };
 }
+
+export interface InitiativeBatchEntryInput {
+  combatantId: string;
+  tokenId: string;
+  name: string;
+  /** Fórmula já sem placeholders (buildCombatantInitiativeRoll). */
+  formula: string;
+}
+
+export interface InitiativeBatchRollInput {
+  round: number;
+  visibility: RollVisibility;
+  entries: InitiativeBatchEntryInput[];
+}
+
+/**
+ * Rola VÁRIOS combatentes de uma vez no servidor e publica um único
+ * `ChatMessage{kind:"initiative-batch"}` (combat:roll com mais de um alvo), em vez de um card por
+ * combatente. Devolve `combatantId -> total` (o servidor sempre sabe, mesmo que a visibilidade
+ * esconda o valor de algum viewer) pra combat:roll gravar `Combatant.initiative`.
+ */
+export async function createInitiativeBatchRoll(
+  io: TypedServer,
+  roomId: string,
+  me: DbParticipant,
+  input: InitiativeBatchRollInput,
+): Promise<{ results: Map<string, number> }> {
+  let rolled: { entry: InitiativeBatchEntryInput; total: number }[];
+  try {
+    rolled = input.entries.map((entry) => ({ entry, total: rollParsed(parseFormula(entry.formula, { requireDice: false })).total }));
+  } catch (err) {
+    if (err instanceof DiceParseError) throw new HandlerError(`Fórmula inválida: ${err.message}`);
+    throw err;
+  }
+
+  // Card mostra do maior pro menor (ordem de ação).
+  const sorted = [...rolled].sort((a, b) => b.total - a.total);
+
+  const msg = toChatMessage(
+    await prisma.chatMessage.create({
+      data: {
+        roomId,
+        participantId: me.id,
+        nickname: me.nickname,
+        kind: "initiative-batch",
+        visibility: input.visibility,
+        initiativeBatch: {
+          round: input.round,
+          entries: sorted.map(({ entry, total }) => ({ combatantId: entry.combatantId, tokenId: entry.tokenId, name: entry.name, formula: entry.formula, result: total })),
+        },
+      },
+    }),
+  );
+
+  await emitChatMessage(io, roomId, msg);
+  return { results: new Map(rolled.map(({ entry, total }) => [entry.combatantId, total])) };
+}

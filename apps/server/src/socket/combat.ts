@@ -32,7 +32,7 @@ import {
   type Viewer,
 } from "../services/combat.js";
 import { requireSystem } from "../services/characters.js";
-import { createRollMessage } from "../services/rolls.js";
+import { createInitiativeBatchRoll, createRollMessage } from "../services/rolls.js";
 import { guarded, HandlerError } from "./ack.js";
 import { type TypedServer, type TypedSocket } from "./types.js";
 
@@ -166,19 +166,36 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
       }
 
       const rollVisibility = visibility ?? "all";
-      for (const row of targets) {
-        const built = await buildCombatantInitiativeRoll(def, row);
-        const { total } = await createRollMessage(io, ctx.roomId, me, {
-          formula: built.formula,
-          label: built.label,
+
+      // Mais de um combatente de uma vez: um card só (initiative-batch), não um por combatente
+      // (§3.5). Um combatente só (o caso comum de scope self/one) continua como card individual.
+      if (targets.length > 1) {
+        const built = await Promise.all(targets.map((row) => buildCombatantInitiativeRoll(def, row)));
+        const { results } = await createInitiativeBatchRoll(io, ctx.roomId, me, {
+          round: combat.round,
           visibility: rollVisibility,
-          characterId: built.characterId,
-          tokenId: row.tokenId,
-          allowNoDice: true,
+          entries: targets.map((row, i) => ({ combatantId: row.id, tokenId: row.tokenId, name: row.token.name, formula: built[i]!.formula })),
         });
         // lastRollVisibility: "gm" (rolagem às cegas) esconde o valor até do próprio dono na lista
         // (toCombat) — mesma regra do chat: quem rolou não vê o próprio resultado.
-        await prisma.combatant.update({ where: { id: row.id }, data: { initiative: total, lastRollVisibility: rollVisibility } });
+        await Promise.all(
+          targets.map((row) =>
+            prisma.combatant.update({ where: { id: row.id }, data: { initiative: results.get(row.id)!, lastRollVisibility: rollVisibility } }),
+          ),
+        );
+      } else {
+        for (const row of targets) {
+          const built = await buildCombatantInitiativeRoll(def, row);
+          const { total } = await createRollMessage(io, ctx.roomId, me, {
+            formula: built.formula,
+            label: built.label,
+            visibility: rollVisibility,
+            characterId: built.characterId,
+            tokenId: row.tokenId,
+            allowNoDice: true,
+          });
+          await prisma.combatant.update({ where: { id: row.id }, data: { initiative: total, lastRollVisibility: rollVisibility } });
+        }
       }
 
       return sendCombat(io, ctx.roomId, viewerOf(ctx));
