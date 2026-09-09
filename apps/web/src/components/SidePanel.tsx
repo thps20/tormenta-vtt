@@ -1,12 +1,11 @@
 import React from 'react';
-import { Map as MapIcon, MessageSquare, Swords, Users } from 'lucide-react';
+import { MessageSquare, Swords, Users } from 'lucide-react';
 import { ChatTab } from './ChatTab';
 import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
 import { CharactersTab } from './CharactersTab';
-import { MapsPanel, type MapsPanelProps } from './MapsPanel';
 import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, Participant, Token } from '@tormenta-vtt/shared';
 
-export type SidePanelTab = 'chat' | 'initiative' | 'characters' | 'maps';
+export type SidePanelTab = 'chat' | 'initiative' | 'characters';
 
 interface SidePanelProps {
   /** Aba ativa (controlada pela página, para outros botões poderem abrir uma aba). */
@@ -36,8 +35,14 @@ interface SidePanelProps {
   onDeleteCharacter: (characterId: string) => void;
   /** Botões de ação nos cards de item do chat (dano, cura) rolam pela ficha. */
   onRollCharacter: (characterId: string, request: CharacterRollRequest) => void;
-  /** Aba "Mapas" (só GM) — props repassadas direto pro MapsPanel. */
-  maps: MapsPanelProps;
+}
+
+/** Uma aba, com o rótulo e a contagem já formatados em texto pra virar tooltip/rodapé do ícone. */
+interface TabDef {
+  id: SidePanelTab;
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  badge: string;
 }
 
 export const SidePanel: React.FC<SidePanelProps> = ({
@@ -64,97 +69,26 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   onCreateCharacter,
   onDeleteCharacter,
   onRollCharacter,
-  maps,
 }) => {
   const setActiveTab = onTabChange;
+
+  const tabs: TabDef[] = [
+    { id: 'chat', label: 'Chat', Icon: MessageSquare, badge: String(messages.length) },
+    { id: 'initiative', label: 'Iniciativa', Icon: Swords, badge: `R${combat?.round ?? 0}` },
+    { id: 'characters', label: 'Fichas', Icon: Users, badge: String(characters.length) },
+  ];
 
   return (
     <aside
       id="vtt-sidepanel"
       className="w-80 md:w-96 bg-[#1a1a1a] border-l border-[#2d2417] flex flex-col h-full shrink-0 select-none z-10 shadow-2xl"
     >
-      {/* Tab Navigation Header - Elegant Dark Style */}
-      <div className="flex h-11 border-b border-[#2d2417] bg-[#141414] shrink-0">
-        <button
-          id="tab-btn-chat"
-          onClick={() => setActiveTab('chat')}
-          className={`flex-1 flex items-center justify-center gap-2 text-xs font-serif font-bold tracking-widest uppercase transition-all cursor-pointer ${
-            activeTab === 'chat'
-              ? 'border-b-2 border-[#d4af37] bg-[#222222] text-[#d4af37]'
-              : 'border-b border-[#2d2417] text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a1a]'
-          }`}
-        >
-          <MessageSquare className="w-3.5 h-3.5" />
-          <span>Chat</span>
-          <span
-            className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
-              activeTab === 'chat'
-                ? 'bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40'
-                : 'bg-zinc-800 text-zinc-500'
-            }`}
-          >
-            {messages.length}
-          </span>
-        </button>
-
-        <button
-          id="tab-btn-initiative"
-          onClick={() => setActiveTab('initiative')}
-          className={`flex-1 flex items-center justify-center gap-2 text-xs font-serif font-bold tracking-widest uppercase transition-all cursor-pointer ${
-            activeTab === 'initiative'
-              ? 'border-b-2 border-[#d4af37] bg-[#222222] text-[#d4af37]'
-              : 'border-b border-[#2d2417] text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a1a]'
-          }`}
-        >
-          <Swords className="w-3.5 h-3.5" />
-          <span>Iniciativa</span>
-          <span
-            className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
-              activeTab === 'initiative'
-                ? 'bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40'
-                : 'bg-zinc-800 text-zinc-500'
-            }`}
-          >
-            R{combat?.round ?? 0}
-          </span>
-        </button>
-
-        <button
-          id="tab-btn-characters"
-          onClick={() => setActiveTab('characters')}
-          className={`flex-1 flex items-center justify-center gap-2 text-xs font-serif font-bold tracking-widest uppercase transition-all cursor-pointer ${
-            activeTab === 'characters'
-              ? 'border-b-2 border-[#d4af37] bg-[#222222] text-[#d4af37]'
-              : 'border-b border-[#2d2417] text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a1a]'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          <span>Fichas</span>
-          <span
-            className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
-              activeTab === 'characters'
-                ? 'bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40'
-                : 'bg-zinc-800 text-zinc-500'
-            }`}
-          >
-            {characters.length}
-          </span>
-        </button>
-
-        {isGm && (
-          <button
-            id="tab-btn-maps"
-            onClick={() => setActiveTab('maps')}
-            className={`flex-1 flex items-center justify-center gap-2 text-xs font-serif font-bold tracking-widest uppercase transition-all cursor-pointer ${
-              activeTab === 'maps'
-                ? 'border-b-2 border-[#d4af37] bg-[#222222] text-[#d4af37]'
-                : 'border-b border-[#2d2417] text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a1a]'
-            }`}
-          >
-            <MapIcon className="w-3.5 h-3.5" />
-            <span>Mapas</span>
-          </button>
-        )}
+      {/* Tab Navigation Header - Elegant Dark Style. `@container` deixa cada TabButton decidir, pela
+          própria largura disponível, entre ícone+rótulo e só ícone (com tooltip e badge no canto). */}
+      <div className="flex h-11 border-b border-[#2d2417] bg-[#141414] shrink-0 @container">
+        {tabs.map((tab) => (
+          <TabButton key={tab.id} id={`tab-btn-${tab.id}`} tab={tab} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} />
+        ))}
       </div>
 
       {/* Tab Content Container */}
@@ -178,8 +112,6 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             onCreate={onCreateCharacter}
             onDelete={onDeleteCharacter}
           />
-        ) : activeTab === 'maps' && isGm ? (
-          <MapsPanel {...maps} />
         ) : (
           <CombatPanel
             combat={combat}
@@ -200,3 +132,39 @@ export const SidePanel: React.FC<SidePanelProps> = ({
     </aside>
   );
 };
+
+/**
+ * Um botão de aba: ícone + rótulo + badge inline quando cabe (`@[350px]:`, largura do próprio header
+ * de abas — que é sempre 320 ou 384 px, os dois estados fixos do SidePanel); abaixo disso, só o
+ * ícone (com `title` de tooltip) e o badge encolhe para um selo sobreposto no canto superior direito
+ * do ícone. `min-w-0`/`truncate` no rótulo garantem que texto nunca é cortado por estourar a largura.
+ */
+const TabButton: React.FC<{ id: string; tab: TabDef; active: boolean; onClick: () => void }> = ({ id, tab: { label, Icon, badge }, active, onClick }) => (
+  <button
+    id={id}
+    onClick={onClick}
+    title={`${label} (${badge})`}
+    className={`relative flex-1 min-w-0 flex items-center justify-center gap-2 px-1 text-xs font-serif font-bold tracking-widest uppercase transition-all cursor-pointer ${
+      active
+        ? 'border-b-2 border-[#d4af37] bg-[#222222] text-[#d4af37]'
+        : 'border-b border-[#2d2417] text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a1a]'
+    }`}
+  >
+    <Icon className="w-3.5 h-3.5 shrink-0" />
+    <span className="hidden @[350px]:inline truncate">{label}</span>
+    <span
+      className={`hidden @[350px]:inline-block shrink-0 text-[10px] font-mono px-1.5 py-0.2 rounded ${
+        active ? 'bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40' : 'bg-zinc-800 text-zinc-500'
+      }`}
+    >
+      {badge}
+    </span>
+    <span
+      className={`flex @[350px]:hidden absolute top-0.5 right-1.5 min-w-[15px] h-[15px] px-0.5 items-center justify-center rounded-full text-[8px] font-mono leading-none ${
+        active ? 'bg-[#d4af37] text-black' : 'bg-zinc-700 text-zinc-300'
+      }`}
+    >
+      {badge}
+    </span>
+  </button>
+);
