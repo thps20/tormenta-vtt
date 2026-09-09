@@ -358,6 +358,9 @@ function Table() {
                   const characterId = byId[tokenId]?.characterId;
                   if (characterId && charById[characterId]) openCharacter(characterId);
                 }}
+                onCharacterPatch={(characterId, patch) => void updateCharacter(characterId, patch)}
+                onCharacterRoll={(characterId, request) => void rollCharacter(characterId, request)}
+                onCharacterUseItem={(characterId, itemId) => void useCharacterItem(characterId, itemId)}
                 tokenBars={tokenBars}
                 fogTool={isGm ? { mode: fogMode, shape: fogShape, brushSize: fogBrushSize } : null}
                 onFogShape={(shape) => {

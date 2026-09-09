@@ -2,7 +2,7 @@ import React, { forwardRef, useRef, useState, useEffect, useImperativeHandle, us
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
-import { conditionIconDataUrl, creatureColor, DEFAULT_MAP_SIZE, findFreeCells, measureDistance, type Character, type Combat, type ConditionDef, type FogShape, type GridConfig, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenCondition, type TokenPatch } from "@tormenta-vtt/shared";
+import { applyResourceDelta, computeCharacter, conditionIconDataUrl, creatureColor, DEFAULT_MAP_SIZE, findFreeCells, measureDistance, type Character, type CharacterPatch, type CharacterRollRequest, type Combat, type ConditionDef, type FogShape, type GridConfig, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenCondition, type TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
 import { cellAt, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
@@ -12,6 +12,7 @@ import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
 import { useCompendium } from "../store/compendium";
 import type { FogToolMode, FogToolShape, RemoteRuler, ToolMode } from "../store/tools";
 import { TokenInspector } from "./TokenInspector";
+import { NpcQuickCard } from "./NpcQuickCard";
 import { ConditionMenu } from "./ConditionMenu";
 import { FogLayer } from "./FogLayer";
 
@@ -69,6 +70,14 @@ interface VttCanvasProps {
   /** Duplo clique num token vinculado a uma ficha (padrão Foundry): RoomPage decide se o usuário
    *  pode vê-la e abre. Token sem ficha: não é chamado. */
   onTokenOpenSheet: (tokenId: string) => void;
+  /**
+   * Ficha rápida do NPC (docs/plano-criaturas.md §3, docs/tipos-ficha-rapida.md): clique simples
+   * num token NPC do GM abre o NpcQuickCard no lugar do TokenInspector. Patch raso de recurso
+   * (PV), rolagem de ação e uso de item — os mesmos três caminhos que a ficha completa já usa.
+   */
+  onCharacterPatch: (characterId: string, patch: CharacterPatch) => void;
+  onCharacterRoll: (characterId: string, request: CharacterRollRequest) => void;
+  onCharacterUseItem: (characterId: string, itemId: string) => void;
   /** Barra de vida por token (tokenBar do sistema, lida da ficha vinculada). */
   tokenBars: Record<string, TokenBar>;
   /** Modo Névoa (GM): o que desenhar e com qual forma. null para jogadores. */
@@ -160,6 +169,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   onLinkCharacter,
   onOpenCharacter,
   onTokenOpenSheet,
+  onCharacterPatch,
+  onCharacterRoll,
+  onCharacterUseItem,
   tokenBars,
   fogTool,
   onFogShape,
@@ -307,6 +319,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   // Liga o Transformer (alças de redimensionar) ao token selecionado, se pudermos controlá-lo.
   const selectedToken = tokens.find((t) => t.id === selectedTokenId) ?? null;
   const canResize = selectedToken !== null && canControl(me, selectedToken);
+
+  // Ficha rápida do NPC (docs/plano-criaturas.md §3): clique simples num token NPC do GM mostra o
+  // NpcQuickCard no lugar do TokenInspector. O botão "Token" do card força o inspector genérico
+  // até trocar de seleção — reselecionar o mesmo token volta pra ficha rápida.
+  const [forceInspector, setForceInspector] = useState(false);
+  useEffect(() => setForceInspector(false), [selectedTokenId]);
+  const selectedCharacter = selectedToken?.characterId ? linkableCharacters.find((c) => c.id === selectedToken.characterId) : undefined;
+  const showQuickCard = me.role === "gm" && selectedCharacter?.kind === "npc" && !forceInspector;
   useEffect(() => {
     const tr = transformerRef.current;
     const stage = stageRef.current;
@@ -1028,7 +1048,37 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         )}
       </div>
 
-      {selectedToken && (
+      {selectedToken && showQuickCard && systemDef && selectedCharacter && (
+        <NpcQuickCard
+          token={selectedToken}
+          character={selectedCharacter}
+          computed={computeCharacter(systemDef, selectedCharacter)}
+          def={systemDef}
+          conditions={systemDef.conditions}
+          activeConditions={selectedToken.conditions}
+          onHpChange={(delta) => {
+            const tokenBar = systemDef.tokenBar;
+            if (!tokenBar) return;
+            const bounds = computeCharacter(systemDef, selectedCharacter).resources[tokenBar] ?? { max: 0, min: 0, detail: null };
+            const current = selectedCharacter.resources[tokenBar] ?? { current: 0, temp: 0, maxOverride: null };
+            const next = applyResourceDelta({ current: current.current, temp: current.temp }, delta, { min: bounds.min, max: bounds.max });
+            onCharacterPatch(selectedCharacter.id, {
+              resources: { ...selectedCharacter.resources, [tokenBar]: { ...current, current: next.current, temp: next.temp } },
+            });
+          }}
+          onRoll={(ref) => onCharacterRoll(selectedCharacter.id, { type: "action", itemId: ref.itemId, actionId: ref.actionId })}
+          onUseItem={(itemId) => onCharacterUseItem(selectedCharacter.id, itemId)}
+          onToggleCondition={(key) => {
+            const has = selectedToken.conditions.some((c) => c.key === key);
+            const next = has ? selectedToken.conditions.filter((c) => c.key !== key) : [...selectedToken.conditions, { key }];
+            onTokenPatch({ id: selectedToken.id, conditions: next });
+          }}
+          onOpenFullSheet={() => onOpenCharacter(selectedCharacter.id)}
+          onOpenTokenInspector={() => setForceInspector(true)}
+          onClose={() => onSelectToken(null)}
+        />
+      )}
+      {selectedToken && !showQuickCard && (
         <TokenInspector
           token={selectedToken}
           participants={participants}
