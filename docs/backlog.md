@@ -31,6 +31,12 @@ comprometido — só um lugar para não perder a ideia até o dono do projeto pr
   mapa. Para entrar de verdade seria preciso ou blocos conferidos no livro em `custom.json`, ou um
   conceito novo de "criatura que escala" (valor em função de um nível informado na hora de soltar),
   que hoje não existe nem no schema nem na ficha. Anotado em 08/09/2026 (`docs/plano-criaturas.md` §1.5).
+- **Avisar no toast quando `compendium:spawn-creature` criar menos cópias que o pedido.** O
+  servidor já pode devolver menos tokens do que `count` (espiral de posicionamento estourou o raio
+  máximo, ou não sobrou célula livre no mapa pro token caber — `apps/server/src/socket/compendium.ts`),
+  sem erro: o ack só traz o `Token[]` menor. Hoje o cliente aplica o que veio e não avisa o GM que
+  pediu 10 e ganhou 6, por exemplo. Precisa comparar `payload.count` com `res.length` em
+  `apps/web/src/store/tokens.ts` (spawnCreature) e mostrar um toast quando forem diferentes.
 - **Aplicar resistências/imunidades/vulnerabilidades automaticamente no dano.** `CharacterData.damageResponses`
   guarda RD, "reduz à metade", imunidade e vulnerabilidade por tipo de dano, mas `token:apply-damage`
   continua aplicando o valor que o cliente manda: o ajuste é só uma **sugestão de UI** no seletor de
