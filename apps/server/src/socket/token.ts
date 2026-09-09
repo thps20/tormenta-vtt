@@ -42,7 +42,7 @@ import {
 } from "../services/history.js";
 import { canEditToken, restrictPatchForRole } from "../services/permissions.js";
 import { toChatMessage, toScene, toToken } from "../services/serialize.js";
-import { emitTokenToPlayers, isActiveScene } from "../services/visibility.js";
+import { canAccessScene, emitTokenToPlayers, isActiveScene } from "../services/visibility.js";
 import { guarded, HandlerError, type Ctx } from "./ack.js";
 import { emitHistoryUpdated } from "./history.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
@@ -66,7 +66,8 @@ async function requireToken(tokenId: string, roomId: string) {
  */
 async function requirePlayerTokenOnActiveScene(ctx: Ctx, sceneId: string): Promise<void> {
   if (ctx.role === "gm") return;
-  if (!(await isActiveScene(ctx.roomId, sceneId))) throw new HandlerError("Este token não está no mapa atual");
+  const active = await isActiveScene(ctx.roomId, sceneId);
+  if (!canAccessScene(ctx.role, active)) throw new HandlerError("Este token não está no mapa atual");
 }
 
 /** Json? do Prisma não aceita `null` cru (precisa de Prisma.JsonNull pra gravar SQL NULL). Também

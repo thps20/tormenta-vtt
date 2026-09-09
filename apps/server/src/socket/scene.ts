@@ -44,11 +44,22 @@ import { emitHistoryUpdated } from "./history.js";
 import { broadcastToken } from "./token.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
+/**
+ * Existe, não está apagado e é desta sala. É a checagem que sustenta o invariante "`activeSceneId`
+ * sempre aponta pra um mapa vivo da sala" (docs/plano-mapas.md §15): `scene:activate` só troca o
+ * ativo pra um mapa que passa aqui (via `requireScene`); do outro lado, `scene:delete` nunca deixa
+ * apagar o mapa que já é o ativo (`canDeleteScene`, packages/shared) — as duas pontas juntas
+ * garantem que o invariante nunca quebra. Separada de `requireScene` pra testar sem banco.
+ */
+export function isLiveSceneInRoom(scene: { roomId: string; deletedAt: Date | null } | null, roomId: string): boolean {
+  return scene !== null && scene.roomId === roomId && scene.deletedAt === null;
+}
+
 /** Garante que o mapa existe, não está apagado e pertence à sala do socket. */
 export async function requireScene(sceneId: string, roomId: string) {
   const scene = await prisma.scene.findUnique({ where: { id: sceneId } });
-  if (!scene || scene.roomId !== roomId || scene.deletedAt !== null) throw new HandlerError("Mapa não encontrado");
-  return scene;
+  if (!isLiveSceneInRoom(scene, roomId)) throw new HandlerError("Mapa não encontrado");
+  return scene!;
 }
 
 /**
@@ -85,10 +96,20 @@ async function placeTokensAtArrival(
   return points;
 }
 
-interface SceneDeleteMove {
+export interface SceneDeleteMove {
   tokenId: string;
   before: { sceneId: string; x: number; y: number };
   after: { sceneId: string; x: number; y: number };
+}
+
+/**
+ * Pra onde um token movido ao apagar mapa deve ir em cada direção: `revert` (undo) devolve
+ * `before` (posição/mapa de origem); `apply` (redo) refaz `after`. Extraída pra testar sem banco
+ * que as duas metades de `buildSceneDeleteHistoryEntry` não trocam a direção entre si — um
+ * copy-paste errado aqui moveria o token pro lado contrário do esperado (docs/plano-mapas.md §15).
+ */
+export function sceneDeleteMoveTarget(move: SceneDeleteMove, direction: "revert" | "apply"): { sceneId: string; x: number; y: number } {
+  return direction === "revert" ? move.before : move.after;
 }
 
 /**
@@ -117,9 +138,10 @@ function buildSceneDeleteHistoryEntry(
       for (const move of moves) {
         const row = await prisma.token.findUnique({ where: { id: move.tokenId } });
         if (!row || row.deletedAt !== null) throw new Error("um token movido não existe mais");
-        const scene = await prisma.scene.findUniqueOrThrow({ where: { id: move.before.sceneId } });
+        const target = sceneDeleteMoveTarget(move, "revert");
+        const scene = await prisma.scene.findUniqueOrThrow({ where: { id: target.sceneId } });
         const updated = toToken(
-          await prisma.token.update({ where: { id: move.tokenId }, data: { sceneId: move.before.sceneId, x: move.before.x, y: move.before.y } }),
+          await prisma.token.update({ where: { id: move.tokenId }, data: { sceneId: target.sceneId, x: target.x, y: target.y } }),
         );
         broadcastToken(io, roomId, updated, "token:updated", toScene(scene).fog);
         affectedScenes.add(move.after.sceneId);
@@ -136,9 +158,10 @@ function buildSceneDeleteHistoryEntry(
       for (const move of moves) {
         const row = await prisma.token.findUnique({ where: { id: move.tokenId } });
         if (!row || row.deletedAt !== null) throw new Error("um token movido não existe mais");
-        const scene = await prisma.scene.findUniqueOrThrow({ where: { id: move.after.sceneId } });
+        const target = sceneDeleteMoveTarget(move, "apply");
+        const scene = await prisma.scene.findUniqueOrThrow({ where: { id: target.sceneId } });
         const updated = toToken(
-          await prisma.token.update({ where: { id: move.tokenId }, data: { sceneId: move.after.sceneId, x: move.after.x, y: move.after.y } }),
+          await prisma.token.update({ where: { id: move.tokenId }, data: { sceneId: target.sceneId, x: target.x, y: target.y } }),
         );
         broadcastToken(io, roomId, updated, "token:updated", toScene(scene).fog);
         affectedScenes.add(move.before.sceneId);

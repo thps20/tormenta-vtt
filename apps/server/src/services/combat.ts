@@ -32,7 +32,7 @@ import { rooms, type TypedServer } from "../socket/types.js";
 import { toCharacter } from "./characters.js";
 import { emitChatMessage } from "./chatVisibility.js";
 import { toChatMessage, toScene, toToken } from "./serialize.js";
-import { emitTokenToPlayers, isActiveScene, tokenVisibleTo } from "./visibility.js";
+import { canAccessScene, emitTokenToPlayers, isActiveScene, tokenVisibleTo } from "./visibility.js";
 
 export interface Viewer {
   role: "gm" | "player";
@@ -71,7 +71,7 @@ export async function requireCombat(sceneId: string, roomId: string): Promise<Co
 export async function requirePlayerOnActiveScene(roomId: string, sceneId: string, role: "gm" | "player"): Promise<void> {
   if (role === "gm") return;
   const room = await prisma.room.findUnique({ where: { id: roomId } });
-  if (!room || room.activeSceneId !== sceneId) throw new HandlerError("Este mapa não está ativo");
+  if (!canAccessScene(role, room?.activeSceneId === sceneId)) throw new HandlerError("Este mapa não está ativo");
 }
 
 /**

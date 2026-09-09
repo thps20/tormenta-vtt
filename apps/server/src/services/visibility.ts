@@ -18,6 +18,17 @@ export async function isActiveScene(roomId: string, sceneId: string): Promise<bo
 }
 
 /**
+ * Regra pura por trás da checagem acima combinada com o papel: GM sempre pode agir/receber;
+ * jogador só quando `isActive` já confirmou (via `isActiveScene`) que o mapa é o ATIVO da sala.
+ * Separada pra testar a tabela "GM/jogador × ativo/inativo" sem banco (docs/plano-mapas.md §15) —
+ * usada por `requirePlayerOnActiveScene` (combat.ts), `requirePlayerTokenOnActiveScene` (token.ts)
+ * e `ruler:update`.
+ */
+export function canAccessScene(role: "gm" | "player", isActive: boolean): boolean {
+  return role === "gm" || isActive;
+}
+
+/**
  * Quem pode ver um token. GM vê tudo. Jogador vê se o token é `visible` e
  * (é dono dele, ou a névoa está desligada, ou o CENTRO do token está em área revelada).
  * A mesma função pura `isPointRevealed` roda no cliente (packages/shared).
