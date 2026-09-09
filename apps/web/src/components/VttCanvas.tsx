@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
-import { conditionIconDataUrl, measureDistance, type Character, type ConditionDef, type FogShape, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenPatch } from "@tormenta-vtt/shared";
+import { conditionIconDataUrl, measureDistance, type Character, type Combat, type ConditionDef, type FogShape, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenCondition, type TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
 import { clampToMap, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
@@ -24,6 +24,9 @@ interface VttCanvasProps {
   participants: Participant[];
   me: Participant;
   activeTurnTokenId: string | null;
+  /** Combate da cena (round/status), pro campo de duração do ConditionMenu e pro badge de rodadas
+   *  restantes no token. null = sem combate na cena. */
+  combat: Combat | null;
   /** Único selecionado (inspector, redimensionar); null com 0 ou vários. */
   selectedTokenId: string | null;
   /** Todos os selecionados (anel dourado, movimento em grupo). */
@@ -115,6 +118,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   participants,
   me,
   activeTurnTokenId,
+  combat,
   selectedTokenId,
   selectedIds,
   focusRequest,
@@ -389,32 +393,34 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     for (let i = tokens.length - 1; i >= 0; i--) {
       const t = tokens[i];
       if (!t || t.conditions.length === 0) continue;
-      const defs = t.conditions.map((k) => conditionByKey.get(k)).filter((c): c is ConditionDef => c !== undefined);
-      if (defs.length === 0) continue;
+      const entries = t.conditions
+        .map((cond) => ({ cond, def: conditionByKey.get(cond.key) }))
+        .filter((e): e is { cond: (typeof t.conditions)[number]; def: ConditionDef } => e.def !== undefined);
+      if (entries.length === 0) continue;
 
-      const layout = conditionLayout(t.width, t.height, stageScale, defs.length);
+      const layout = conditionLayout(t.width, t.height, stageScale, entries.length);
       const slot = conditionSlotAtPoint(layout, p.x - t.x, p.y - t.y, stageScale);
       if (slot === null) continue;
 
       if (layout.mode === "counter") {
-        const text = defs.map((c) => c.label).join("\n");
+        const text = entries.map((e) => e.def.label).join("\n");
         return { key: `${t.id}:__counter`, x: t.x + layout.cx, y: t.y + layout.cy, anchorRadius: layout.screenRadius, text };
       }
       const pos = layout.slots[slot];
       if (!pos) continue;
       const anchorRadius = layout.r * stageScale;
       if (isOverflowSlot(layout, slot)) {
-        const text = defs.slice(layout.visibleCount).map((c) => c.label).join("\n");
+        const text = entries.slice(layout.visibleCount).map((e) => e.def.label).join("\n");
         return { key: `${t.id}:__overflow`, x: t.x + pos.x, y: t.y + pos.y, anchorRadius, text };
       }
-      const def = defs[slot];
-      if (!def) continue;
+      const entry = entries[slot];
+      if (!entry) continue;
       return {
-        key: `${t.id}:${def.key}`,
+        key: `${t.id}:${entry.def.key}`,
         x: t.x + pos.x,
         y: t.y + pos.y,
         anchorRadius,
-        text: def.description ? `${def.label}\n${def.description}` : def.label,
+        text: entry.def.description ? `${entry.def.label}\n${entry.def.description}` : entry.def.label,
       };
     }
     return null;
@@ -726,8 +732,12 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   const tokensAboveFog = tokens.filter((t) => canControl(me, t));
   const tokensBelowFog = tokens.filter((t) => !canControl(me, t));
 
-  // Pra cada token resolver `conditions: string[]` (chaves) nas definições cheias (ícone, cor, descrição).
+  // Pra cada token resolver `conditions[].key` nas definições cheias (ícone, cor, descrição).
   const conditionByKey = useMemo(() => new Map((systemDef?.conditions ?? []).map((c) => [c.key, c])), [systemDef]);
+
+  // A duração do ConditionMenu (marcar/editar) só faz sentido com combate de verdade em andamento
+  // — "ended" esconde o campo (vira permanente).
+  const menuCombatRound = combat && combat.status !== "ended" ? combat.round : null;
 
   // Tooltip da condição em hover: mora AQUI (e é desenhado na última camada) porque dentro do Group
   // do token qualquer token desenhado depois pintava por cima dele. Ver ConditionTooltipLayerContent.
@@ -935,10 +945,8 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
             y={conditionMenu.y}
             conditions={systemDef.conditions}
             active={target.conditions}
-            onToggle={(key) => {
-              const has = target.conditions.includes(key);
-              onTokenPatch({ id: target.id, conditions: has ? target.conditions.filter((k) => k !== key) : [...target.conditions, key] });
-            }}
+            combatRound={menuCombatRound}
+            onChange={(next) => onTokenPatch({ id: target.id, conditions: next })}
             onClose={() => setConditionMenu(null)}
           />
         );
@@ -1121,7 +1129,9 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, dragg
           width={token.width}
           height={token.height}
           stageScale={stageScale}
-          conditions={token.conditions.map((k) => conditionByKey.get(k)).filter((c): c is ConditionDef => c !== undefined)}
+          entries={token.conditions
+            .map((cond) => ({ cond, def: conditionByKey.get(cond.key) }))
+            .filter((e): e is { cond: (typeof token.conditions)[number]; def: ConditionDef } => e.def !== undefined)}
         />
       )}
     </Group>
@@ -1152,21 +1162,25 @@ export interface ConditionTooltip {
   text: string;
 }
 
-const ConditionMarkers: React.FC<{ width: number; height: number; stageScale: number; conditions: ConditionDef[] }> = ({
-  width,
-  height,
-  stageScale,
-  conditions,
-}) => {
-  const layout = conditionLayout(width, height, stageScale, conditions.length);
+const ConditionMarkers: React.FC<{
+  width: number;
+  height: number;
+  stageScale: number;
+  entries: { cond: TokenCondition; def: ConditionDef }[];
+}> = ({ width, height, stageScale, entries }) => {
+  const layout = conditionLayout(width, height, stageScale, entries.length);
 
   if (layout.mode === "counter") {
-    return <ConditionCounter cx={layout.cx} cy={layout.cy} count={conditions.length} stageScale={stageScale} />;
+    return <ConditionCounter cx={layout.cx} cy={layout.cy} count={entries.length} stageScale={stageScale} />;
   }
 
-  const slots: ConditionSlot[] = conditions
-    .slice(0, layout.visibleCount)
-    .map((c) => ({ key: c.key, label: c.label, description: c.description, icon: c.icon, color: c.color }));
+  const slots: ConditionSlot[] = entries.slice(0, layout.visibleCount).map(({ def }) => ({
+    key: def.key,
+    label: def.label,
+    description: def.description,
+    icon: def.icon,
+    color: def.color,
+  }));
   if (layout.hiddenCount > 0) {
     slots.push({ key: "__overflow", label: `+${layout.hiddenCount}`, description: "", color: "#71717a" });
   }

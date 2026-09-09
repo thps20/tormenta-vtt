@@ -294,6 +294,7 @@ function Table() {
                 participants={participants}
                 me={me}
                 activeTurnTokenId={activeTurnTokenId}
+                combat={combat}
                 selectedTokenId={selectedTokenId}
                 selectedIds={selectedIds}
                 focusRequest={focusRequest}
