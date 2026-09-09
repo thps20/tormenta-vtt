@@ -78,6 +78,7 @@ export const CreaturePreview: React.FC<CreaturePreviewProps> = ({ def, entry, sp
           <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 font-serif">
             Quantidade
             <input
+              id="creature-spawn-count"
               type="number"
               min={1}
               max={20}
@@ -87,6 +88,7 @@ export const CreaturePreview: React.FC<CreaturePreviewProps> = ({ def, entry, sp
             />
           </label>
           <button
+            id="creature-spawn-invisible"
             onClick={() => spawn.onInvisibleChange(!spawn.invisible)}
             title="Invisível ao soltar (só o GM vê até revelar)"
             className={`flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-serif cursor-pointer transition-colors ${
@@ -97,6 +99,7 @@ export const CreaturePreview: React.FC<CreaturePreviewProps> = ({ def, entry, sp
             Invisível
           </button>
           <button
+            id="creature-spawn-button"
             onClick={spawn.onSpawn}
             title="Soltar no centro da área visível do mapa (Enter)"
             className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#d4af37] text-zinc-950 font-serif font-bold text-[11px] hover:bg-amber-300 transition-colors cursor-pointer"

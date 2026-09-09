@@ -240,6 +240,19 @@ export function entryToCharacter(
 }
 
 /**
+ * Cor do token de uma cópia desta criatura: `creatures.typeColors[tipo]` (do JSON do sistema), ou
+ * `defaultColor` quando o tipo não está mapeado. Usada pelo servidor ao criar o token e pelo
+ * cliente no fantasma de soltura (docs/plano-criaturas.md §2.4/2.6) — mesma conta nos dois, pra não
+ * "piscar" uma cor diferente entre o fantasma e o token que nasce.
+ */
+export function creatureColor(def: SystemDefinition, entry: CompendiumCreatureEntry): string {
+  const creatures = def.creatures;
+  if (!creatures) return "#71717a";
+  const typeValue = entry.sheet.traits[creatures.typeField];
+  return (typeValue && creatures.typeColors[typeValue]) || creatures.defaultColor;
+}
+
+/**
  * Junta várias fontes (sistema, sala...) numa lista só. Quando dois ids
  * coincidem, vence a fonte de maior prioridade; a ordem de saída segue a
  * fonte de maior prioridade primeiro.

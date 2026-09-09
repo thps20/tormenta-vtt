@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CompendiumCreatureEntrySchema, CompendiumEntrySchema, CompendiumItemEntrySchema, type CompendiumCreatureEntry, type CompendiumItemEntry } from "../schemas/compendium.js";
 import { getSystemDefinition } from "../systems.js";
-import { entryToCharacter, entryToItem, mergeCompendium, validateCompendiumEntry } from "./compendium.js";
+import { creatureColor, entryToCharacter, entryToItem, mergeCompendium, validateCompendiumEntry } from "./compendium.js";
 
 const def = getSystemDefinition("tormenta20");
 
@@ -227,5 +227,15 @@ describe("entryToCharacter", () => {
     expect(a.data.items[0]?.id).not.toBe(b.data.items[0]?.id);
     a.data.items[0]!.name = "Adaga enferrujada";
     expect(b.data.items[0]?.name).toBe("Adaga");
+  });
+});
+
+describe("creatureColor", () => {
+  it("usa a cor do tipo quando mapeada", () => {
+    expect(creatureColor(def, creature({ traits: { tipo: "humanoide" } }))).toBe(def.creatures?.typeColors.humanoide);
+  });
+
+  it("cai no defaultColor quando o tipo não está em typeColors (ou não foi definido)", () => {
+    expect(creatureColor(def, creature({ traits: {} }))).toBe(def.creatures?.defaultColor);
   });
 });

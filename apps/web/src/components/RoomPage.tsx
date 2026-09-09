@@ -125,6 +125,12 @@ function Table() {
   const spawnFromCompendium = useTokens((s) => s.spawnFromCompendium);
   const deleteToken = useTokens((s) => s.delete);
   const vttCanvasRef = useRef<VttCanvasHandle>(null);
+  /** Solta na cena ativa (Enter/botão no preview usam o centro da viewport; arrastar no mapa usa o ponto largado). */
+  const spawnCreatureAt = async (entryId: string, point: { x: number; y: number }, opts: { count: number; visible: boolean }): Promise<boolean> => {
+    if (!scene) return false;
+    const result = await spawnFromCompendium({ sceneId: scene.id, entryId, count: opts.count, visible: opts.visible, x: point.x, y: point.y });
+    return result !== null;
+  };
 
   const messages = useChat((s) => s.messages);
   const sendMessage = useChat((s) => s.send);
@@ -359,6 +365,7 @@ function Table() {
                   if (!scene.fog.enabled) void fogOp({ type: "setEnabled", enabled: true });
                   void fogOp({ type: "add", shape });
                 }}
+                onSpawnCreature={isGm ? (entryId, point, opts) => void spawnCreatureAt(entryId, point, opts) : undefined}
               />
               <Toolbar isGm={isGm} mode={toolMode} effectiveMode={effectiveMode} onChange={setToolMode} />
               {isGm && toolMode === "fog" && (
@@ -388,15 +395,7 @@ function Table() {
                 character={null}
                 mode="map"
                 onClose={closeCompendium}
-                onSpawnCreature={
-                  isGm && scene
-                    ? async (entryId, opts) => {
-                        const center = vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 };
-                        const result = await spawnFromCompendium({ sceneId: scene.id, entryId, count: opts.count, visible: opts.visible, x: center.x, y: center.y });
-                        return result !== null;
-                      }
-                    : undefined
-                }
+                onSpawnCreature={isGm ? (entryId, opts) => spawnCreatureAt(entryId, vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 }, opts) : undefined}
               />
               <DragGhost def={systemDef} />
             </>

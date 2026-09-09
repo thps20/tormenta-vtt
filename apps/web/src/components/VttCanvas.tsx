@@ -2,19 +2,21 @@ import React, { forwardRef, useRef, useState, useEffect, useImperativeHandle, us
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
-import { conditionIconDataUrl, findFreeCells, measureDistance, type Character, type Combat, type ConditionDef, type FogShape, type GridConfig, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenCondition, type TokenPatch } from "@tormenta-vtt/shared";
+import { conditionIconDataUrl, creatureColor, DEFAULT_MAP_SIZE, findFreeCells, measureDistance, type Character, type Combat, type ConditionDef, type FogShape, type GridConfig, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenCondition, type TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
 import { cellAt, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
 import { useImage } from "../lib/useImage";
 import { newId } from "../lib/ids";
+import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
+import { useCompendium } from "../store/compendium";
 import type { FogToolMode, FogToolShape, RemoteRuler, ToolMode } from "../store/tools";
 import { TokenInspector } from "./TokenInspector";
 import { ConditionMenu } from "./ConditionMenu";
 import { FogLayer } from "./FogLayer";
 
-/** Tamanho padrão quando a cena ainda não tem mapa. */
-export const DEFAULT_MAP = { width: 1600, height: 1100 };
+/** Tamanho padrão quando a cena ainda não tem mapa (shared: o servidor usa o mesmo, ver compendium:spawn-creature). */
+export const DEFAULT_MAP = DEFAULT_MAP_SIZE;
 
 /** Métodos imperativos expostos por ref: quem monta o canvas (RoomPage) às vezes precisa de um
  *  dado dele sem virar prop (ex.: onde soltar uma criatura do compêndio ao apertar Enter). */
@@ -73,6 +75,12 @@ interface VttCanvasProps {
   fogTool: FogTool | null;
   /** Forma pronta (pincel solto, retângulo solto, polígono fechado), em pixels do mapa. */
   onFogShape: (shape: FogShape) => void;
+  /**
+   * Solta uma criatura do compêndio no ponto (pixels do mapa) — arrastar da paleta contextual até
+   * o mapa (docs/plano-criaturas.md §2.4). GM only; ausente = o mapa não aceita o drop (a paleta
+   * segue funcionando por Enter/botão, que usam o centro da viewport em vez do ponto de soltura).
+   */
+  onSpawnCreature?: (entryId: string, point: { x: number; y: number }, opts: { count: number; visible: boolean }) => void;
 }
 
 export interface FogTool {
@@ -110,6 +118,9 @@ const BODY_STROKE = 3;
 
 /** Alças de redimensionar habilitadas no Transformer (sem cantos de rotação: `rotateEnabled={false}`). */
 const RESIZE_ANCHOR_NAMES = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
+
+/** Id do alvo de soltura do mapa (lib/dropTargets) — só criaturas do compêndio, ver docs/plano-criaturas.md §2.4. */
+const MAP_DROP_TARGET = "map";
 
 /** Raio do círculo do token em pixels do mapa (o token é desenhado a partir de width/height). */
 function tokenRadius(t: { width: number; height: number }): number {
@@ -152,6 +163,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   tokenBars,
   fogTool,
   onFogShape,
+  onSpawnCreature,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -319,6 +331,48 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     pos = findFreeSpot(pos, scene.grid, tokens, map);
     onTokenCreate(pos, size);
   };
+
+  /** Ponto de TELA (clientX/Y — arrasto vem de fora do Konva, da paleta do compêndio) em pixels do mapa. */
+  const mapPointFromClient = (point: { x: number; y: number }): { x: number; y: number } => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const stage = stageRef.current;
+    if (!rect || !stage) return { x: 0, y: 0 };
+    return { x: (point.x - rect.left - stage.x()) / stage.scaleX(), y: (point.y - rect.top - stage.y()) / stage.scaleY() };
+  };
+
+  // Alvo de soltura "mapa": só criaturas do compêndio (docs/plano-criaturas.md §2.4), só quando o
+  // RoomPage ligou onSpawnCreature (GM, com cena). A quantidade/toggle vêm da store (a paleta e o
+  // fantasma abaixo leem o mesmo estado).
+  useEffect(() => {
+    if (!onSpawnCreature) return;
+    return registerDropTarget({
+      id: MAP_DROP_TARGET,
+      accepts: (entry) => entry.type === "creature",
+      onDrop: (entry, point) => {
+        if (entry.type !== "creature") return;
+        const { spawnCount, spawnInvisible } = useCompendium.getState();
+        onSpawnCreature(entry.id, mapPointFromClient(point), { count: spawnCount, visible: !spawnInvisible });
+      },
+    });
+  }, [onSpawnCreature]);
+
+  // Fantasma de soltura: N retângulos de célula, na cor do tipo da criatura, seguindo o arrasto —
+  // MESMA findFreeCells que o servidor roda ao criar, então onde você vê é onde os tokens caem.
+  const dragEntry = useCompendium((s) => (s.drag ? s.entries.find((e) => e.id === s.drag?.entryId) : undefined));
+  const dragOverMap = useCompendium((s) => s.drag?.targetId === MAP_DROP_TARGET);
+  const dragPoint = useCompendium((s) => s.drag?.point ?? null);
+  const spawnCount = useCompendium((s) => s.spawnCount);
+  const creatureGhost = useMemo(() => {
+    if (!dragOverMap || !dragPoint || !dragEntry || dragEntry.type !== "creature" || !systemDef) return null;
+    const cellSize = effectiveCellSize(scene.grid);
+    const cellsPerSide = Math.max(1, Math.round(systemDef.sizes.find((s) => s.key === dragEntry.sheet.size)?.tokenCells ?? 1));
+    const bounds = { cols: Math.max(1, Math.ceil(map.width / cellSize)), rows: Math.max(1, Math.ceil(map.height / cellSize)) };
+    const occupied = tokens.map((t) => cellRect(t, scene.grid));
+    const start = cellAt(mapPointFromClient(dragPoint), scene.grid);
+    const cells = findFreeCells({ start, cells: cellsPerSide, count: spawnCount, occupied, bounds });
+    return { color: creatureColor(systemDef, dragEntry), size: cellsPerSide * cellSize, cells: cells.map((c) => cellToPoint(c, scene.grid)) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragOverMap, dragPoint, dragEntry, systemDef, scene.grid, tokens, map.width, map.height, spawnCount, stagePos.x, stagePos.y, stageScale]);
 
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
@@ -825,6 +879,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     <div
       ref={containerRef}
       id="vtt-canvas-container"
+      {...(onSpawnCreature ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
       className={`relative flex-1 h-full w-full bg-stone-950 overflow-hidden select-none ${mode === "pan" ? "cursor-grab" : mode === "select" ? "cursor-default" : "cursor-crosshair"}`}
     >
       <Stage
@@ -917,6 +972,20 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
               dash={[6 / stageScale, 4 / stageScale]}
             />
           )}
+          {/* Fantasma de soltura de criatura: por cima de tudo, só desenho (listening={false} no Layer). */}
+          {creatureGhost?.cells.map((p, i) => (
+            <Rect
+              key={i}
+              x={p.x}
+              y={p.y}
+              width={creatureGhost.size}
+              height={creatureGhost.size}
+              fill={`${creatureGhost.color}33`}
+              stroke={creatureGhost.color}
+              strokeWidth={2 / stageScale}
+              dash={[8 / stageScale, 4 / stageScale]}
+            />
+          ))}
           {/* Tooltip de condição por último de todos: nenhum token pode cobri-lo. */}
           {conditionTooltip && <ConditionTooltipLayerContent tip={conditionTooltip} stageScale={stageScale} />}
         </Layer>

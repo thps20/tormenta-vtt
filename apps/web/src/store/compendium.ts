@@ -7,6 +7,17 @@ import { toast } from "./ui";
 /** Onde a paleta foi aberta: "sheet" (ficha, insere item) ou "map" (mesa em foco, GM solta criatura). */
 export type PaletteContext = "sheet" | "map";
 
+/** Toggle "invisível ao soltar": lembrado na sessão (sessionStorage), não por sala nem por criatura. */
+const SPAWN_INVISIBLE_KEY = "tvtt:compendiumSpawnInvisible";
+
+function readSpawnInvisible(): boolean {
+  try {
+    return sessionStorage.getItem(SPAWN_INVISIBLE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Compêndio da sala (entradas vindas de compendium:list) e estado da paleta.
  * As entradas são carregadas uma vez, na primeira abertura, e ficam em memória.
@@ -28,6 +39,13 @@ interface CompendiumState {
    * registrado sob o cursor (lib/dropTargets), para o feedback da zona de soltura.
    */
   drag: { entryId: string; point: DropPoint; targetId: string | null } | null;
+  /**
+   * Quantidade e toggle "invisível ao soltar" de uma criatura (preview no contexto "map").
+   * Vivem aqui, não como estado local da paleta, porque o fantasma de células do VttCanvas
+   * (docs/plano-criaturas.md §2.4) também precisa da quantidade durante o arrasto.
+   */
+  spawnCount: number;
+  spawnInvisible: boolean;
 
   load: () => Promise<void>;
   open: (context: PaletteContext, kind?: string | null) => void;
@@ -38,6 +56,9 @@ interface CompendiumState {
   /** Solta: chama onDrop do alvo sob o cursor (se houver) e devolve se caiu em algum. */
   endDrag: () => boolean;
   cancelDrag: () => void;
+  setSpawnCount: (n: number) => void;
+  /** Persiste em sessionStorage. */
+  setSpawnInvisible: (v: boolean) => void;
   /** Limpa o estado ao sair da sala (as entradas dependem do sistema da sala). */
   reset: () => void;
 }
@@ -51,6 +72,8 @@ export const useCompendium = create<CompendiumState>((set, get) => ({
   initialKind: null,
   lastInserted: null,
   drag: null,
+  spawnCount: 1,
+  spawnInvisible: readSpawnInvisible(),
 
   load: async () => {
     if (get().status === "loading" || get().status === "ready") return;
@@ -88,5 +111,14 @@ export const useCompendium = create<CompendiumState>((set, get) => ({
     return true;
   },
   cancelDrag: () => set({ drag: null }),
-  reset: () => set({ entries: [], roomIds: [], status: "idle", isOpen: false, context: "sheet", initialKind: null, lastInserted: null, drag: null }),
+  setSpawnCount: (n) => set({ spawnCount: n }),
+  setSpawnInvisible: (v) => {
+    set({ spawnInvisible: v });
+    try {
+      sessionStorage.setItem(SPAWN_INVISIBLE_KEY, String(v));
+    } catch {
+      /* sessionStorage indisponível (aba privada etc.): só não lembra entre reaberturas. */
+    }
+  },
+  reset: () => set({ entries: [], roomIds: [], status: "idle", isOpen: false, context: "sheet", initialKind: null, lastInserted: null, drag: null, spawnCount: 1 }),
 }));

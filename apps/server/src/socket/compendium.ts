@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import {
   CompendiumSpawnCreatureSchema,
+  DEFAULT_MAP_SIZE,
   EmptySchema,
+  creatureColor,
   entryToCharacter,
   findFreeCells,
   getSystemDefinition,
@@ -47,8 +49,10 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
 
         const scene = toScene(sceneRow);
         const cellSize = effectiveCellSize(scene.grid);
-        // Mapa sem imagem (mapWidth/Height null): usa 1 célula de bounds, como um mapa vazio.
-        const map = { width: sceneRow.mapWidth ?? cellSize, height: sceneRow.mapHeight ?? cellSize };
+        // Mapa sem imagem (mapWidth/Height null): mesmo tamanho padrão que o cliente desenha
+        // (DEFAULT_MAP_SIZE) — usar outro aqui faria o servidor confinar tudo num canto que o
+        // cliente nem mostra como limite.
+        const map = { width: sceneRow.mapWidth ?? DEFAULT_MAP_SIZE.width, height: sceneRow.mapHeight ?? DEFAULT_MAP_SIZE.height };
         const bounds = { cols: Math.max(1, Math.ceil(map.width / cellSize)), rows: Math.max(1, Math.ceil(map.height / cellSize)) };
 
         const existingTokens = await prisma.token.findMany({ where: { sceneId: data.sceneId } });
@@ -68,9 +72,7 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
           existingTokens.map((t) => t.name),
         );
 
-        const creatures = def.creatures;
-        const typeValue = creatures ? entry.sheet.traits[creatures.typeField] : undefined;
-        const color = (typeValue && creatures?.typeColors[typeValue]) || creatures?.defaultColor || "#e11d48";
+        const color = creatureColor(def, entry);
 
         const results: { character: Character; token: Token }[] = await prisma.$transaction(async (tx) => {
           const created: { character: Character; token: Token }[] = [];

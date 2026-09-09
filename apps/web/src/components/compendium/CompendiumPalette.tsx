@@ -9,9 +9,6 @@ import { EntryPreview } from "./EntryPreview";
 import { CreaturePreview } from "./CreaturePreview";
 import { useCompendiumDrag } from "./DragGhost";
 
-/** Toggle "invisível ao soltar": lembrado na sessão (sessionStorage), não por sala nem por criatura. */
-const SPAWN_INVISIBLE_KEY = "tvtt:compendiumSpawnInvisible";
-
 /**
  * "docked": painel lateral encaixado à esquerda da ficha (irmão dela no drawer).
  * "floating": overlay por cima da ficha, alinhado à esquerda (telas estreitas).
@@ -140,24 +137,14 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
   }, [justInserted]);
 
   // Quantidade (reseta a cada criatura focada) e toggle "invisível ao soltar" (lembrado na sessão,
-  // não por criatura). Enter no preview (ou o botão "Soltar") solta no centro da área visível do mapa.
-  const [spawnCount, setSpawnCount] = useState(1);
-  const [spawnInvisible, setSpawnInvisible] = useState(() => {
-    try {
-      return sessionStorage.getItem(SPAWN_INVISIBLE_KEY) !== "false";
-    } catch {
-      return true;
-    }
-  });
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(SPAWN_INVISIBLE_KEY, String(spawnInvisible));
-    } catch {
-      /* sessionStorage indisponível (aba privada etc.): só não lembra entre reaberturas. */
-    }
-  }, [spawnInvisible]);
+  // não por criatura — ver store: o fantasma de células do VttCanvas também lê a quantidade daqui
+  // durante o arrasto). Enter no preview (ou o botão "Soltar") solta no centro da área visível do mapa.
+  const spawnCount = useCompendium((s) => s.spawnCount);
+  const setSpawnCount = useCompendium((s) => s.setSpawnCount);
+  const spawnInvisible = useCompendium((s) => s.spawnInvisible);
+  const setSpawnInvisible = useCompendium((s) => s.setSpawnInvisible);
   const currentCreatureId = current?.kind === "creature" ? current.entry.id : null;
-  useEffect(() => setSpawnCount(1), [currentCreatureId]);
+  useEffect(() => setSpawnCount(1), [currentCreatureId, setSpawnCount]);
 
   const spawn = async (row: CreaturePaletteRow, keepOpen: boolean) => {
     if (!onSpawnCreature) return;
@@ -240,7 +227,13 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
                 onPointerDown={(e) => row.check.ok && onRowPointerDown(e, row.entry.id)}
               />
             ) : (
-              <CreatureRowView key={row.entry.id} entry={row.entry} focused={current?.entry.id === row.entry.id} onFocus={() => setFocused(flat.indexOf(row))} />
+              <CreatureRowView
+                key={row.entry.id}
+                entry={row.entry}
+                focused={current?.entry.id === row.entry.id}
+                onFocus={() => setFocused(flat.indexOf(row))}
+                onPointerDown={(e) => !!onSpawnCreature && onRowPointerDown(e, row.entry.id)}
+              />
             ),
           )}
         </div>
@@ -460,12 +453,22 @@ const PaletteRowView: React.FC<PaletteRowViewProps> = ({ row, focused, inserted,
   );
 };
 
-const CreatureRowView: React.FC<{ entry: CompendiumCreatureEntry; focused: boolean; onFocus: () => void }> = ({ entry, focused, onFocus }) => (
+interface CreatureRowViewProps {
+  entry: CompendiumCreatureEntry;
+  focused: boolean;
+  onFocus: () => void;
+  /** Início de um possível arrasto pro mapa (docs/plano-criaturas.md §2.4). */
+  onPointerDown: (e: React.PointerEvent) => void;
+}
+
+const CreatureRowView: React.FC<CreatureRowViewProps> = ({ entry, focused, onFocus, onPointerDown }) => (
   <div
     data-entry-id={entry.id}
     onPointerEnter={onFocus}
+    onPointerDown={onPointerDown}
     onClick={onFocus}
-    className={`flex items-center gap-2 mx-1 px-2 py-1.5 rounded transition-colors cursor-pointer ${focused ? "bg-[#1e1a14] ring-1 ring-[#d4af37]/60" : "hover:bg-[#161412]"}`}
+    title="Arraste para o mapa ou pressione Enter"
+    className={`flex items-center gap-2 mx-1 px-2 py-1.5 rounded transition-colors cursor-grab active:cursor-grabbing ${focused ? "bg-[#1e1a14] ring-1 ring-[#d4af37]/60" : "hover:bg-[#161412]"}`}
   >
     <div className="min-w-0 flex-1">
       <div className="text-sm font-serif truncate text-zinc-100">{entry.name}</div>
