@@ -13,9 +13,11 @@ interface TopBarProps {
   onOpenMapConfig?: () => void;
   /** Botão de ficha ("Meu personagem" / "Fichas"), montado pela página. */
   characterMenu?: React.ReactNode;
+  /** Seletor de mapa (`MapSelector`), montado pela página — só GM. Sem ele, mostra só o nome do mapa ativo. */
+  mapSelector?: React.ReactNode;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, onLeaveToLobby, onOpenMapConfig, characterMenu }) => {
+export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, onLeaveToLobby, onOpenMapConfig, characterMenu, mapSelector }) => {
   const [copied, setCopied] = useState(false);
   const isGM = me.role === "gm";
 
@@ -51,10 +53,12 @@ export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, o
               </span>
             </div>
             <div className="flex items-center gap-3 text-xs text-zinc-400 mt-0.5">
-              <span className="flex items-center gap-1 text-zinc-300">
-                <MapPin className="w-3.5 h-3.5 text-[#d4af37]" />
-                {scene?.name ?? "Sem mapa"}
-              </span>
+              {mapSelector ?? (
+                <span className="flex items-center gap-1 text-zinc-300">
+                  <MapPin className="w-3.5 h-3.5 text-[#d4af37]" />
+                  Mapa: {scene?.name ?? "Sem mapa"}
+                </span>
+              )}
               <span className="text-zinc-600">•</span>
               <button
                 onClick={handleCopyInvite}

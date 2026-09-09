@@ -18,7 +18,7 @@ import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { CombatBanner } from "./CombatBanner";
 import { type CombatPanelCallbacks } from "./CombatPanel";
 import { CarryTokensDialog, type CarryTokenRow } from "./CarryTokensDialog";
-import { ViewingSceneBanner } from "./ViewingSceneBanner";
+import { MapSelector } from "./MapSelector";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
 import { FogToolbar } from "./FogToolbar";
@@ -82,8 +82,8 @@ function Table() {
   const me = useRoom((s) => s.me);
   const participants = useRoom((s) => s.participants);
   // "scene" = mapa que ESTE cliente está vendo (docs/plano-mapas.md §4): dirige o canvas, a névoa,
-  // a régua, o combate e o spawn de criatura. `selectActiveScene` continua existindo pra faixa de
-  // aviso e o painel "Mapas" (que precisam saber qual é o ativo de verdade da mesa).
+  // a régua, o combate e o spawn de criatura. `selectActiveScene` continua existindo pro
+  // `MapSelector` (que precisa saber qual é o ativo de verdade da mesa, além do que o GM está vendo).
   const scene = useRoom(selectViewedScene);
   const activeScene = useRoom(selectActiveScene);
   const scenes = useRoom((s) => s.scenes);
@@ -127,11 +127,6 @@ function Table() {
   const fogOp = useRoom((s) => s.fogOp);
   useToolShortcuts();
   useDeleteSelectionShortcut();
-
-  // Aba "Mapas": busca a lista sob demanda (contagens/combate que o cliente não carregou).
-  useEffect(() => {
-    if (sidePanelTab === "maps") void loadSceneList();
-  }, [sidePanelTab, loadSceneList]);
 
   // Esc cancela o modo "definir ponto de chegada" em andamento (mesmo gesto de cancelar de sempre).
   useEffect(() => {
@@ -380,6 +375,23 @@ function Table() {
       })()
     : [];
 
+  const mapsProps = {
+    scenes,
+    activeSceneId: room.activeSceneId,
+    viewingSceneId,
+    itemsBySceneId: sceneListItems,
+    onEnter: (sceneId: string) => void enterScene(sceneId),
+    onActivateRequest: handleActivateRequest,
+    onCreate: (payload: { name: string; mapUrl?: string | null; mapWidth?: number | null; mapHeight?: number | null }) => void createScene(payload),
+    onRename: (sceneId: string, name: string) => void renameScene(sceneId, name),
+    onDuplicate: (sceneId: string) => void duplicateSceneAction(sceneId),
+    onDeleteRequest: (sceneId: string) => void handleDeleteMapRequest(sceneId),
+    onReorder: (sceneIds: string[]) => void reorderScenesAction(sceneIds),
+    onSetArrivalMode: handleSetArrivalMode,
+    onClearArrival: (sceneId: string) => void setSceneArrival(sceneId, null),
+    arrivalPickingSceneId: settingArrivalSceneId,
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0c0c0c] text-zinc-100 antialiased">
       <TopBar
@@ -402,27 +414,23 @@ function Table() {
             onNewCharacter={() => setSidePanelTab("characters")}
           />
         }
+        mapSelector={
+          isGm ? (
+            <MapSelector viewingScene={scene} activeScene={activeScene} maps={mapsProps} onOpen={() => void loadSceneList()} />
+          ) : undefined
+        }
       />
 
       <div className="flex-1 flex overflow-hidden relative">
         <main className="flex-1 h-full relative overflow-hidden">
-          {isGm && scene && activeScene && scene.id !== activeScene.id ? (
-            <ViewingSceneBanner
-              viewingName={scene.name}
-              activeName={activeScene.name}
-              onGoToActive={() => void enterScene(activeScene.id)}
-              onActivateThis={() => handleActivateRequest(scene.id)}
-            />
-          ) : (
-            <CombatBanner
-              combat={combat}
-              meId={me.id}
-              viewer={isGm ? "gm" : "player"}
-              onRollSelf={() => viewedSceneId && void combatRoll({ sceneId: viewedSceneId, scope: "self" })}
-              onDelay={(combatantId) => viewedSceneId && void combatDelay(viewedSceneId, combatantId)}
-              onResume={(combatantId) => viewedSceneId && void combatResume(viewedSceneId, combatantId)}
-            />
-          )}
+          <CombatBanner
+            combat={combat}
+            meId={me.id}
+            viewer={isGm ? "gm" : "player"}
+            onRollSelf={() => viewedSceneId && void combatRoll({ sceneId: viewedSceneId, scope: "self" })}
+            onDelay={(combatantId) => viewedSceneId && void combatDelay(viewedSceneId, combatantId)}
+            onResume={(combatantId) => viewedSceneId && void combatResume(viewedSceneId, combatantId)}
+          />
           {scene ? (
             <>
               <VttCanvas
@@ -562,22 +570,6 @@ function Table() {
           onOpenCharacter={openCharacter}
           onCreateCharacter={(payload) => void createCharacter(payload).then((c) => c && openCharacter(c.id))}
           onDeleteCharacter={(id) => void deleteCharacter(id)}
-          maps={{
-            scenes,
-            activeSceneId: room.activeSceneId,
-            viewingSceneId,
-            itemsBySceneId: sceneListItems,
-            onEnter: (sceneId) => void enterScene(sceneId),
-            onActivateRequest: handleActivateRequest,
-            onCreate: (payload) => void createScene(payload),
-            onRename: (sceneId, name) => void renameScene(sceneId, name),
-            onDuplicate: (sceneId) => void duplicateSceneAction(sceneId),
-            onDeleteRequest: (sceneId) => void handleDeleteMapRequest(sceneId),
-            onReorder: (sceneIds) => void reorderScenesAction(sceneIds),
-            onSetArrivalMode: handleSetArrivalMode,
-            onClearArrival: (sceneId) => void setSceneArrival(sceneId, null),
-            arrivalPickingSceneId: settingArrivalSceneId,
-          }}
         />
       </div>
 
