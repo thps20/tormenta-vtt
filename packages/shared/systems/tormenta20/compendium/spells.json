@@ -628,7 +628,8 @@
         {
           "label": "Enjoado",
           "kind": "formula",
-          "formula": "1d4"
+          "formula": "1d4",
+          "damageType": null
         }
       ],
       "activation": {
@@ -1867,7 +1868,8 @@
         {
           "label": "Rodadas Cego",
           "kind": "formula",
-          "formula": "1d4"
+          "formula": "1d4",
+          "damageType": null
         }
       ],
       "activation": {
