@@ -178,7 +178,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `scene:setArrival` | `{ sceneId, arrival: {x,y} \| null }` | GM | `scene:updated` |
 | `scene:list` | `{}` | GM | ack `{ items: SceneListItem[] }` (contagens/combate de cada mapa, painel "Mapas"); sem broadcast |
 | `scene:setMap` | `{ sceneId, mapUrl, mapWidth, mapHeight }` (`null` remove o mapa) | GM | `scene:updated` |
-| `scene:updateGrid` | `{ sceneId, grid: Partial<GridConfig> }` | GM | `scene:updated` |
+| `scene:updateGrid` | `{ sceneId, grid: Partial<GridConfig> }` | GM | `scene:updated`; se a troca reencaixou algum token, `token:updated` de cada um + `history:updated` (§9.6/§9.7) |
 | `fog:update` | `{ sceneId, op }` com `op` = `add {shape}` \| `removeLast` \| `revealAll` \| `hideAll` \| `setEnabled {enabled}` | GM | `fog:updated` + reenvio dos tokens do mapa conforme a visibilidade nova (§9.3); jogador só recebe se `sceneId` for o mapa ATIVO (§9.7) |
 | `token:create` | `TokenCreate` | GM | `token:created` |
 | `token:update` | `TokenPatch` (`id` + campos, `live?` marca eco do arraste — §9.6) | GM ou owner | `token:updated` |
@@ -417,10 +417,12 @@ revisão pós-implementação em `docs/revisao-desfazer.md`.
 - **Escopo**: apagar token — um ou vários (`token:delete`/`token:delete-many`), mover e redimensionar
   — um token ou vários selecionados juntos (`token:update`/`token:update-many`), alternar condição e
   alterar visibilidade (também `token:update`, mesmos campos rastreados), soltar criaturas do
-  compêndio (`compendium:spawn-creature`) e apagar mapa (`scene:delete`, §9.7 — a única ação de mapa
-  que entra na pilha). Fora: chat/rolagens, ações de `combat:*` disparadas pelo usuário, ficha de
-  personagem, criar token em branco, os demais campos de `token:update` (nome, cor, imagem, dono —
-  painel do token), criar/renomear/duplicar/reordenar/ativar mapa (§9.7) e a Névoa, que mantém seu
+  compêndio (`compendium:spawn-creature`), apagar mapa (`scene:delete`, §9.7) e editar o grid de um
+  mapa quando isso reencaixa/redimensiona algum token (`scene:updateGrid`, §9.7 — só quando há
+  token pra reencaixar; um patch que só muda cor/`snap` não entra na pilha). Fora: chat/rolagens,
+  ações de `combat:*` disparadas pelo usuário, ficha de personagem, criar token em branco, os
+  demais campos de `token:update` (nome, cor, imagem, dono — painel do token),
+  criar/renomear/duplicar/reordenar/ativar mapa sem apagar nada (§9.7) e a Névoa, que mantém seu
   próprio Ctrl+Z (`fog:update removeLast`, §9.3) — dentro da ferramenta Névoa o atalho continua sendo
   o dela; fora, é o desfazer geral daqui.
 - **Pilha**: em memória por sala (não persistida — mesmo padrão da presença de conexão e da régua;
@@ -490,15 +492,31 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   `Combatant` apagada de vez — diferente do soft delete de `token:delete`, aqui o token não some, só
   muda de mapa), calcula a posição no destino com `findFreeCells` (mesma espiral do spawn de
   criatura) a partir de `scene.arrival ?? dropPoint ?? centro do mapa`, e muda `sceneId`/`x`/`y` —
-  PV, condições, ficha, dono e tamanho vão junto de graça. Ponto de chegada definido pelo GM no menu
-  do card do mapa (pino visível só pro GM no canvas, não é token).
+  PV, condições, ficha, dono, rotação e imagem vão junto de graça; **tamanho é convertido pro
+  `cellSize` do mapa de destino** (`convertSizeToCellSize`, `packages/shared/src/rules/placement.ts`):
+  descobre quantas células o token ocupava na origem (`round(width|height / cellSize da origem)`,
+  mínimo 1) e multiplica pelo `cellSize` do destino — sem isso, um token nasceria menor/maior que a
+  célula sempre que os dois mapas tivessem `cellSize` diferente. Ponto de chegada definido pelo GM
+  no menu do card do mapa (pino visível só pro GM no canvas, não é token).
 - **Apagar mapa**: bloqueado se for o ativo ou o último da sala. Com token de jogador, a primeira
   chamada só avisa (`{ status: "needs-confirm", playerTokenIds }`, nada apagado ainda); confirmando,
-  o servidor move esses tokens pro mapa ativo (mesma mecânica de ativar) antes do soft delete.
-  Tokens de NPC/monstro vão junto com o mapa (ficam soft-deletados por tabela, voltam se o GM
-  desfizer). É a ÚNICA ação de mapa que entra na pilha de desfazer (§9.6) — criar, renomear,
-  duplicar, reordenar e ativar não entram (efeito colateral de mover tokens seria assustador num
-  Ctrl+Z; as outras quatro são triviais de desfazer à mão).
+  o servidor move esses tokens pro mapa ativo (mesma mecânica de ativar, tamanho incluso) antes do
+  soft delete. Tokens de NPC/monstro vão junto com o mapa (ficam soft-deletados por tabela, voltam
+  se o GM desfizer). É uma das duas ações de mapa que entram na pilha de desfazer (§9.6, a outra é
+  `scene:updateGrid` quando reencaixa tokens, ver abaixo) — criar, renomear, duplicar, reordenar e
+  ativar sem apagar nada não entram (efeito colateral de mover tokens seria assustador num Ctrl+Z;
+  as outras quatro são triviais de desfazer à mão).
+- **Editar o grid** (`scene:updateGrid { sceneId, grid: Partial<GridConfig> }`): merge parcial no
+  `grid` da cena. Se a troca muda a geometria efetiva (`cellSize`, `offsetX/Y` ou `type` — inclusive
+  a célula virtual de 70px do grid "none") de um jeito que desalinha ou redimensiona algum token já
+  no mapa, o servidor reencaixa TODOS os tokens da cena na mesma chamada: mesma célula (col/row,
+  recalculada no grid novo) e mesmo número de células de lado (`resnapToken`,
+  `apps/server/src/services/grid.ts`, que usa `convertSizeToCellSize` acima) — sem isso, mudar o
+  grid de um mapa com tokens deixaria cada um desalinhado ou fora do tamanho da célula nova. Um
+  patch que só muda cor/`snap` não reencaixa ninguém (`resnapToken` detecta que nada mudou). Cada
+  token reencaixado sai num `token:updated` (mesma visibilidade de sempre); se algum foi, a troca
+  inteira (grid + tokens) entra na pilha de desfazer como UMA entrada — reencaixar não é trivial de
+  desfazer à mão, diferente de só mudar cor/snap.
 - **Seletor de mapa** (`MapSelector`, na TopBar, só GM): botão "Mapa: <nome visitado> ▾" (ou "Vendo
   X · ativo: Y" em destaque âmbar quando diverge, ver acima). Clique ou a tecla **M** (fora de campo
   de texto) abrem um dropdown de ~420 px ancorado abaixo do botão; Esc ou clique fora fecham. Quando
@@ -513,4 +531,9 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
 - **Testes puros** (`packages/shared/src/rules/scenes.ts`, `scenes.test.ts`): ordenação
   (`orderScenes`, `nextSceneOrder`), `reorderScenes` (renumera, rejeita conjunto incompleto/
   repetido/estranho), `duplicateScene`/`duplicateSceneName`, `pickTokensToCarry` (pré-marcação),
-  `canDeleteScene` (bloqueado/precisa confirmar/ok).
+  `canDeleteScene` (bloqueado/precisa confirmar/ok). A conversão de tamanho entre grids
+  (`convertSizeToCellSize`, `packages/shared/src/rules/placement.ts`, `placement.test.ts`: 70→100,
+  100→70, token 2×2, largura/altura independentes, grid "none" com a célula virtual de 70px) e o
+  reencaixe posição+tamanho (`resnapToken`, `apps/server/src/services/grid.ts`, `grid.test.ts`:
+  troca de `cellSize`, só offset, grid "none" ↔ square, sem mudança nenhuma) são testados à parte,
+  sem banco.

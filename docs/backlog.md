@@ -53,3 +53,44 @@ comprometido — só um lugar para não perder a ideia até o dono do projeto pr
   marcar "esta duração é por cena" no que hoje só sabe contar rodadas — provavelmente uma duração
   simbólica no `TokenCondition` e no card de item, mais o gatilho no servidor com aviso no chat, no
   mesmo estilo da expiração por rodada. Anotado em 09/09/2026.
+- **Snapshot de mapas para jogador: enviar só o mapa ativo.** Hoje `RoomSnapshot.scenes` manda
+  `Scene[]` inteiro (nome, grid e a névoa completa — todas as `FogShape`) de **todos** os mapas da
+  sala pra **todos** os participantes, jogador incluso; só `token:*`/`combat:*` são filtrados pelo
+  mapa ativo (docs/plano-mapas.md §5). Não vaza o que está atrás da névoa, mas um jogador curioso no
+  DevTools vê nome e forma da névoa de mapas que o GM ainda nem mostrou — situação que já existia
+  antes de múltiplos mapas (era uma cena só), mas ficou bem mais visível na prática agora que há
+  vários mapas de verdade por sala. Anotado em 09/09/2026 (`docs/revisao-mapas.md` §5).
+- **`requireToken` deve rejeitar token de mapa soft-deleted.** `apps/server/src/socket/token.ts`
+  confere `row.scene.roomId` e `row.deletedAt` (do próprio token), mas não `row.scene.deletedAt`: um
+  token cujo mapa foi apagado continua editável via id direto. Não há UI pra chegar nesse id (o mapa
+  some da lista de mapas, então o cliente honesto nunca carrega esses tokens), mas um cliente
+  adulterado que já tivesse o id de antes do apagar poderia tentar. Checagem barata de acrescentar
+  (mais um campo no mesmo `if`), mas fora do §11 do plano (que fala de "mapa ativo", não "mapa
+  apagado") — não corrigido nesta rodada. Anotado em 09/09/2026 (`docs/revisao-mapas.md` §5).
+- **Período de graça ao ativar mapa para não recusar o commit final de um arraste em andamento.**
+  `requirePlayerTokenOnActiveScene` (defesa em profundidade do §11 do plano, commit `b3f1570`) passa
+  a recusar `token:update` de um jogador pro token que ficou no mapa que **acabou de** deixar de ser
+  o ativo — inclusive o commit final de um arraste que já estava em curso quando o GM clicou
+  "Ativar" no mapa novo. Sem corrupção de dado: o servidor fica com a posição do último eco `live`
+  que passou antes da troca (no pior caso, dezenas de ms antes do solto do mouse), o jogador só vê
+  um toast de erro e o token some da tela dele (segue o mapa ativo). Corrigir exigiria um jeito de
+  distinguir "este token acabou de ficar inativo, no meio do gesto de quem está mandando o commit"
+  de "cliente adulterado insistindo num mapa antigo" — por exemplo, aceitar por alguns segundos
+  depois da troca um `token:update` de um jogador que era dono do token quando o mapa ainda era o
+  ativo. O §11 do plano não previa essa distinção. Anotado em 09/09/2026 (`docs/revisao-mapas.md`
+  §4, "Ativar um mapa enquanto um jogador está no meio de um arraste").
+- **Tamanho de token em células (`Token.cells`) como fonte da verdade, pixels derivados do grid do
+  mapa — refatoração que elimina essa classe de bug.** Hoje `Token.width/height` são pixels fixos;
+  toda vez que o token muda de grid (`scene:activate`/`scene:delete` levando pra outro mapa,
+  `scene:updateGrid` trocando o `cellSize` do mapa atual) alguém precisa lembrar de converter
+  (`convertSizeToCellSize`, `packages/shared/src/rules/placement.ts`) e recalcular pixels de novo —
+  esqueceu uma vez (docs/plano-mapas.md, corrigido em 09/09/2026: os dois handlers de mapa moviam
+  token sem tocar no tamanho, então ele ficava do jeito que estava no mapa de origem, menor/maior
+  que a célula do destino). Se `Token` guardasse `cells` (nº de células de lado, análogo ao que já
+  existe pra criaturas do compêndio) em vez de `width/height`, os pixels seriam sempre `cells ×
+  cellSize do grid ATUAL` — calculado on-the-fly em qualquer lugar que precisa (canvas, findFreeCells,
+  serialização), nunca gravado errado. Não corrigido agora: é uma migration de schema (`Token.width/
+  height` → `Token.cells`, mais decidir o que fazer com token redimensionado livremente — hoje os
+  handles do canto permitem qualquer pixel, não só múltiplos de `cellSize`; ou perde essa liberdade,
+  ou `cells` vira fracionário) que toca client (Konva, handles de resize) e servidor a fundo — fora
+  do escopo de um fix pontual.
