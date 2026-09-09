@@ -19,6 +19,7 @@ import {
   SceneSetMapSchema,
   SceneUpdateGridSchema,
   canDeleteScene,
+  convertSizeToCellSize,
   duplicateScene,
   duplicateSceneName,
   findFreeCells,
@@ -28,6 +29,7 @@ import {
   type CellRect,
   type CharacterKind,
   type CombatStatus,
+  type GridConfig,
   type Scene,
   type SceneDeleteResult,
   type SceneListItem,
@@ -35,7 +37,7 @@ import {
 import { prisma } from "../db.js";
 import { requireSystem } from "../services/characters.js";
 import { emitCombat, loadCombatRow, removeTokenFromSceneCombat, toCombat } from "../services/combat.js";
-import { cellAt, cellRect, cellToPoint, effectiveCellSize } from "../services/grid.js";
+import { cellAt, cellRect, cellToPoint, effectiveCellSize, resnapToken } from "../services/grid.js";
 import { pushEntry, type HistoryEntry } from "../services/history.js";
 import { toScene, toToken } from "../services/serialize.js";
 import { tokenVisibleTo } from "../services/visibility.js";
@@ -67,13 +69,19 @@ export async function requireScene(sceneId: string, roomId: string) {
  * mapa de destino: mesma espiral do spawn de criaturas (`findFreeCells`), a partir de
  * `destScene.arrival ?? dropPoint ?? centro do mapa`, pulando os tokens que já estão lá E os que
  * a própria função já posicionou nesta chamada (pra dois tokens movidos juntos não caírem um em
- * cima do outro). Devolve o ponto (pixels) de cada token, na mesma ordem de `tokenRows`.
+ * cima do outro). `originCellSize` é o cellSize (já resolvido, ver `effectiveCellSize`) do mapa de
+ * ONDE os tokens estão vindo — cada `width`/`height` de `tokenRows` está em pixels DESSE grid, não
+ * do destino; sem converter pra `convertSizeToCellSize` (packages/shared), um token nasceria
+ * menor/maior que a célula sempre que os dois mapas tiverem `cellSize` diferente
+ * (docs/plano-mapas.md). Devolve o ponto e o tamanho (pixels, já no grid do destino) de cada
+ * token, na mesma ordem de `tokenRows`.
  */
 async function placeTokensAtArrival(
   destScene: Scene,
-  tokenRows: Pick<DbToken, "id" | "width">[],
+  originCellSize: number,
+  tokenRows: Pick<DbToken, "id" | "width" | "height">[],
   dropPoint: ArrivalPoint | null | undefined,
-): Promise<Map<string, { x: number; y: number }>> {
+): Promise<Map<string, { x: number; y: number; width: number; height: number }>> {
   const destGrid = destScene.grid;
   const destCellSize = effectiveCellSize(destGrid);
   const destExisting = await prisma.token.findMany({ where: { sceneId: destScene.id, deletedAt: null } });
@@ -83,32 +91,44 @@ async function placeTokensAtArrival(
   const arrivalPoint = destScene.arrival ?? dropPoint ?? { x: destMap.width / 2, y: destMap.height / 2 };
   const startCell = cellAt(arrivalPoint, destGrid);
 
-  const points = new Map<string, { x: number; y: number }>();
+  const points = new Map<string, { x: number; y: number; width: number; height: number }>();
   for (const row of tokenRows) {
-    const cells = Math.max(1, Math.round(row.width / destCellSize));
+    const size = convertSizeToCellSize(row, originCellSize, destCellSize);
+    const cells = Math.max(1, Math.round(size.width / destCellSize));
     const [pos] = findFreeCells({ start: startCell, cells, count: 1, occupied, bounds });
     // Estourou o raio máximo (12 anéis): cai no próprio ponto de chegada, nunca fora do mapa
     // (mesmo comportamento de compendium:spawn-creature).
     const point = pos ? cellToPoint(pos, destGrid) : arrivalPoint;
     if (pos) occupied = [...occupied, { ...pos, cells }];
-    points.set(row.id, point);
+    points.set(row.id, { ...point, ...size });
   }
   return points;
 }
 
+interface SceneDeleteMoveTarget {
+  sceneId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface SceneDeleteMove {
   tokenId: string;
-  before: { sceneId: string; x: number; y: number };
-  after: { sceneId: string; x: number; y: number };
+  before: SceneDeleteMoveTarget;
+  after: SceneDeleteMoveTarget;
 }
 
 /**
  * Pra onde um token movido ao apagar mapa deve ir em cada direção: `revert` (undo) devolve
- * `before` (posição/mapa de origem); `apply` (redo) refaz `after`. Extraída pra testar sem banco
- * que as duas metades de `buildSceneDeleteHistoryEntry` não trocam a direção entre si — um
- * copy-paste errado aqui moveria o token pro lado contrário do esperado (docs/plano-mapas.md §15).
+ * `before` (posição/tamanho/mapa de origem); `apply` (redo) refaz `after`. `width`/`height` entram
+ * junto porque `after` pode ter um tamanho diferente de `before` — o mapa de destino pode ter
+ * `cellSize` diferente do de origem (`convertSizeToCellSize`, docs/plano-mapas.md). Extraída pra
+ * testar sem banco que as duas metades de `buildSceneDeleteHistoryEntry` não trocam a direção
+ * entre si — um copy-paste errado aqui moveria o token pro lado contrário do esperado
+ * (docs/plano-mapas.md §15).
  */
-export function sceneDeleteMoveTarget(move: SceneDeleteMove, direction: "revert" | "apply"): { sceneId: string; x: number; y: number } {
+export function sceneDeleteMoveTarget(move: SceneDeleteMove, direction: "revert" | "apply"): SceneDeleteMoveTarget {
   return direction === "revert" ? move.before : move.after;
 }
 
@@ -141,7 +161,7 @@ function buildSceneDeleteHistoryEntry(
         const target = sceneDeleteMoveTarget(move, "revert");
         const scene = await prisma.scene.findUniqueOrThrow({ where: { id: target.sceneId } });
         const updated = toToken(
-          await prisma.token.update({ where: { id: move.tokenId }, data: { sceneId: target.sceneId, x: target.x, y: target.y } }),
+          await prisma.token.update({ where: { id: move.tokenId }, data: { sceneId: target.sceneId, x: target.x, y: target.y, width: target.width, height: target.height } }),
         );
         broadcastToken(io, roomId, updated, "token:updated", toScene(scene).fog);
         affectedScenes.add(move.after.sceneId);
@@ -161,7 +181,7 @@ function buildSceneDeleteHistoryEntry(
         const target = sceneDeleteMoveTarget(move, "apply");
         const scene = await prisma.scene.findUniqueOrThrow({ where: { id: target.sceneId } });
         const updated = toToken(
-          await prisma.token.update({ where: { id: move.tokenId }, data: { sceneId: target.sceneId, x: target.x, y: target.y } }),
+          await prisma.token.update({ where: { id: move.tokenId }, data: { sceneId: target.sceneId, x: target.x, y: target.y, width: target.width, height: target.height } }),
         );
         broadcastToken(io, roomId, updated, "token:updated", toScene(scene).fog);
         affectedScenes.add(move.before.sceneId);
@@ -170,6 +190,55 @@ function buildSceneDeleteHistoryEntry(
       io.to(rooms.all(roomId)).emit("scene:deleted", { sceneId });
       affectedScenes.add(sceneId);
       for (const sid of affectedScenes) await emitCombat(io, roomId, sid, { role: "gm", participantId: "" });
+    },
+  };
+}
+
+interface GridTokenMove {
+  tokenId: string;
+  before: { x: number; y: number; width: number; height: number };
+  after: { x: number; y: number; width: number; height: number };
+}
+
+/**
+ * Entrada de histórico de trocar o grid de um mapa (docs/plano-mapas.md): `revert` devolve o grid
+ * anterior e a posição/tamanho de cada token que foi reencaixado por causa da troca; `apply`
+ * (redo) refaz os dois juntos — nunca só um dos dois, senão o grid e os tokens ficam
+ * inconsistentes entre si. Só é empilhada quando a troca de fato reencaixou algum token
+ * (`moves.length > 0`, ver `scene:updateGrid`) — cor/`snap` sozinhos continuam triviais de
+ * desfazer à mão (§9.6 do SPEC).
+ */
+function buildUpdateGridHistoryEntry(
+  io: TypedServer,
+  roomId: string,
+  sceneId: string,
+  sceneName: string,
+  beforeGrid: GridConfig,
+  afterGrid: GridConfig,
+  moves: GridTokenMove[],
+): HistoryEntry {
+  async function writeGrid(grid: GridConfig): Promise<Scene> {
+    const sceneRow = await prisma.scene.findUnique({ where: { id: sceneId } });
+    if (!sceneRow || sceneRow.deletedAt !== null) throw new Error("o mapa não existe mais");
+    const scene = toScene(await prisma.scene.update({ where: { id: sceneId }, data: { grid } }));
+    io.to(rooms.all(roomId)).emit("scene:updated", scene);
+    return scene;
+  }
+  async function writeMoves(scene: Scene, pick: (m: GridTokenMove) => GridTokenMove["before"]): Promise<void> {
+    for (const move of moves) {
+      const row = await prisma.token.findUnique({ where: { id: move.tokenId } });
+      if (!row || row.deletedAt !== null) throw new Error("um token reencaixado não existe mais");
+      const updated = toToken(await prisma.token.update({ where: { id: move.tokenId }, data: pick(move) }));
+      broadcastToken(io, roomId, updated, "token:updated", scene.fog);
+    }
+  }
+  return {
+    summary: `ajustar o grid do mapa "${sceneName}"`,
+    async revert() {
+      await writeMoves(await writeGrid(beforeGrid), (m) => m.before);
+    },
+    async apply() {
+      await writeMoves(await writeGrid(afterGrid), (m) => m.after);
     },
   };
 }
@@ -209,18 +278,30 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
         const uniqueMoveIds = [...new Set(moveTokenIds)];
         if (uniqueMoveIds.length > 0) {
           if (!originSceneId) throw new HandlerError("Não há mapa ativo para levar tokens dele");
-          const rows = await prisma.token.findMany({ where: { id: { in: uniqueMoveIds }, sceneId: originSceneId, deletedAt: null } });
+          const [rows, originSceneRow] = await Promise.all([
+            prisma.token.findMany({ where: { id: { in: uniqueMoveIds }, sceneId: originSceneId, deletedAt: null } }),
+            prisma.scene.findUniqueOrThrow({ where: { id: originSceneId } }),
+          ]);
           if (rows.length !== uniqueMoveIds.length) throw new HandlerError("Token não encontrado no mapa ativo atual");
 
           const def = await requireSystem(ctx.roomId);
-          const points = await placeTokensAtArrival(destScene, rows, dropPoint);
+          // Cada `width`/`height` de `rows` está em pixels do grid de ORIGEM: sem essa conversão,
+          // um token nasceria menor/maior que a célula no destino sempre que os `cellSize` dos dois
+          // mapas fossem diferentes (docs/plano-mapas.md).
+          const originCellSize = effectiveCellSize(toScene(originSceneRow).grid);
+          const points = await placeTokensAtArrival(destScene, originCellSize, rows, dropPoint);
           // Ativa o mapa novo ANTES de emitir: assim os broadcasts de token abaixo já refletem
           // "o destino é o mapa ativo" (jogadores que vão seguir pra lá recebem os tokens levados).
           await prisma.room.update({ where: { id: ctx.roomId }, data: { activeSceneId: sceneId } });
           for (const row of rows) {
             await removeTokenFromSceneCombat(def, originSceneId, row.id);
             const point = points.get(row.id)!;
-            const updated = toToken(await prisma.token.update({ where: { id: row.id }, data: { sceneId, x: point.x, y: point.y } }));
+            const updated = toToken(
+              await prisma.token.update({
+                where: { id: row.id },
+                data: { sceneId, x: point.x, y: point.y, width: point.width, height: point.height },
+              }),
+            );
             broadcastToken(io, ctx.roomId, updated, "token:updated", destScene.fog);
           }
           // O combate de origem pode ter perdido combatentes (ou sumido de vez, se ficou vazio) —
@@ -347,15 +428,23 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
         if (playerTokenIds.length > 0) {
           const def = await requireSystem(ctx.roomId);
           const destScene = toScene(await prisma.scene.findUniqueOrThrow({ where: { id: destSceneId } }));
+          // O mapa apagado é a ORIGEM (`sceneRow`, já em mãos via requireScene) — mesma conversão
+          // de tamanho de `scene:activate` (docs/plano-mapas.md).
+          const originCellSize = effectiveCellSize(toScene(sceneRow).grid);
           const movingRows = tokens.filter((t) => playerTokenIds.includes(t.id));
-          const points = await placeTokensAtArrival(destScene, movingRows, null);
+          const points = await placeTokensAtArrival(destScene, originCellSize, movingRows, null);
           for (const row of movingRows) {
-            const before = { sceneId: row.sceneId, x: row.x, y: row.y };
+            const before = { sceneId: row.sceneId, x: row.x, y: row.y, width: row.width, height: row.height };
             await removeTokenFromSceneCombat(def, sceneId, row.id);
             const point = points.get(row.id)!;
-            const updated = toToken(await prisma.token.update({ where: { id: row.id }, data: { sceneId: destSceneId, x: point.x, y: point.y } }));
+            const updated = toToken(
+              await prisma.token.update({
+                where: { id: row.id },
+                data: { sceneId: destSceneId, x: point.x, y: point.y, width: point.width, height: point.height },
+              }),
+            );
             broadcastToken(io, ctx.roomId, updated, "token:updated", destScene.fog);
-            moves.push({ tokenId: row.id, before, after: { sceneId: destSceneId, x: point.x, y: point.y } });
+            moves.push({ tokenId: row.id, before, after: { sceneId: destSceneId, ...point } });
           }
         }
 
@@ -445,8 +534,39 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
       const current = toScene(await requireScene(sceneId, ctx.roomId));
       // Merge parcial: só os campos enviados mudam.
       const merged = { ...current.grid, ...grid };
+
+      // cellSize/offset (ou o tipo) pode ter mudado de um jeito que afeta a geometria — reencaixa
+      // e redimensiona cada token da cena pra continuar na mesma célula/nº de células
+      // (`resnapToken`, services/grid.ts): sem isso, os tokens ficariam desalinhados do grid novo,
+      // ou menores/maiores que a célula (docs/plano-mapas.md). Um patch que só muda cor/`snap`
+      // não move token nenhum (`resnapToken` devolve a mesma referência), então isto não tem custo
+      // nesse caso além da própria consulta.
+      const tokenRows = await prisma.token.findMany({ where: { sceneId, deletedAt: null } });
+      const moves: GridTokenMove[] = [];
+      for (const row of tokenRows) {
+        const resnapped = resnapToken(row, current.grid, merged);
+        if (resnapped === row) continue;
+        moves.push({
+          tokenId: row.id,
+          before: { x: row.x, y: row.y, width: row.width, height: row.height },
+          after: { x: resnapped.x, y: resnapped.y, width: resnapped.width, height: resnapped.height },
+        });
+      }
+
       const scene = toScene(await prisma.scene.update({ where: { id: sceneId }, data: { grid: merged } }));
       io.to(rooms.all(ctx.roomId)).emit("scene:updated", scene);
+      for (const move of moves) {
+        const updated = toToken(await prisma.token.update({ where: { id: move.tokenId }, data: move.after }));
+        broadcastToken(io, ctx.roomId, updated, "token:updated", scene.fog);
+      }
+
+      // Reencaixar tokens não é trivial de desfazer à mão (diferente de só mudar cor/snap) —
+      // ganha uma entrada de histórico só quando isso de fato aconteceu.
+      if (moves.length > 0) {
+        pushEntry(ctx.roomId, buildUpdateGridHistoryEntry(io, ctx.roomId, sceneId, current.name, current.grid, merged, moves));
+        emitHistoryUpdated(io, ctx.roomId);
+      }
+
       return scene;
     }, gmOnly),
   );
