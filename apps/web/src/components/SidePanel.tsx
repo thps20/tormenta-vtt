@@ -3,7 +3,7 @@ import { MessageSquare, Swords, Users } from 'lucide-react';
 import { ChatTab } from './ChatTab';
 import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
 import { CharactersTab } from './CharactersTab';
-import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, Participant, Token } from '@tormenta-vtt/shared';
+import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, Participant, Token } from '@tormenta-vtt/shared';
 
 export type SidePanelTab = 'chat' | 'initiative' | 'characters';
 
@@ -21,6 +21,8 @@ interface SidePanelProps {
   centerOnActiveTurn: boolean;
   onToggleCenterOnActiveTurn: () => void;
   tokens: Token[];
+  /** conditions[] do sistema da sala, pro CombatPanel resolver ícone/cor/duração da linha do combatente. */
+  conditions: ConditionDef[];
   isGm: boolean;
   onSendMessage: (text: string) => void;
   onSelectToken: (tokenId: string) => void;
@@ -48,6 +50,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   centerOnActiveTurn,
   onToggleCenterOnActiveTurn,
   tokens,
+  conditions,
   isGm,
   onSendMessage,
   onSelectToken,
@@ -162,6 +165,8 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             viewer={isGm ? 'gm' : 'player'}
             meId={me.id}
             sceneId={activeSceneId}
+            tokens={tokens}
+            conditions={conditions}
             selectedTokenIds={selectedIds}
             onSelectToken={onSelectToken}
             selectedTokenId={selectedTokenId}

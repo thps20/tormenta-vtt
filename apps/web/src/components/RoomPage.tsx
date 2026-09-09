@@ -380,6 +380,7 @@ function Table() {
           centerOnActiveTurn={centerOnActiveTurn}
           onToggleCenterOnActiveTurn={() => setCenterOnActiveTurn((v) => !v)}
           tokens={tokens}
+          conditions={systemDef?.conditions ?? []}
           onRollCharacter={(characterId, request) => void rollCharacter(characterId, request)}
           isGm={isGm}
           onSendMessage={(text) => void sendMessage(text)}

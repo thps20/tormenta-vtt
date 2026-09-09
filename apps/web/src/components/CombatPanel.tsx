@@ -19,7 +19,7 @@ import {
   FastForward,
   CheckCircle2,
 } from 'lucide-react';
-import type { Combat, Combatant, RollVisibility } from '@tormenta-vtt/shared';
+import type { Combat, Combatant, ConditionDef, RollVisibility, Token, TokenCondition } from '@tormenta-vtt/shared';
 
 /**
  * Callbacks do painel, um por ação de UI. Cada um reempacota seus argumentos no payload de um
@@ -55,6 +55,10 @@ interface CombatPanelProps extends Partial<CombatPanelCallbacks> {
   /** Preferência (por usuário) de centralizar o mapa no token da vez. */
   centerOnActiveTurn: boolean;
   onToggleCenterOnActiveTurn: () => void;
+  /** Tokens da sala (pra resolver as condições do token de cada combatente, ver Combatant.tokenId). */
+  tokens: Token[];
+  /** conditions[] do sistema da sala, pra resolver ícone/cor/duração de cada condição. */
+  conditions: ConditionDef[];
 }
 
 export const CombatPanel: React.FC<CombatPanelProps> = ({
@@ -67,6 +71,8 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
   selectedTokenId,
   centerOnActiveTurn,
   onToggleCenterOnActiveTurn,
+  tokens,
+  conditions,
   onStart,
   onRoll,
   onSetInitiative,
@@ -94,6 +100,12 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
   // Drag and Drop state (for GM reordering)
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  // Pra cada combatente resolver as condições do TOKEN dele (Combatant não carrega conditions —
+  // só tokenId) nas definições cheias (ícone, cor). Combat.round pro número de rodadas restantes.
+  const tokenById = new Map(tokens.map((t) => [t.id, t]));
+  const conditionByKey = new Map(conditions.map((c) => [c.key, c]));
+  const combatRound = combat?.round ?? null;
 
   // -------------------------------------------------------------
   // Case 1: No combat active
@@ -475,6 +487,14 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                         {combatant.name}
                       </span>
 
+                      {/* Condições do token deste combatente (ícone + rodadas restantes, ver
+                          ConditionMenu/VttCanvas — mesma fonte, Token.conditions). */}
+                      <ConditionRowIcons
+                        conditions={tokenById.get(combatant.tokenId)?.conditions ?? []}
+                        conditionByKey={conditionByKey}
+                        combatRound={combatRound}
+                      />
+
                       {/* Turn indicator */}
                       {isActive && (
                         <span className="text-[9px] font-serif font-bold px-1.5 py-0.2 rounded bg-[#d4af37] text-black shrink-0 tracking-wider">
@@ -825,13 +845,18 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                           style={{ backgroundColor: combatant.color || '#71717a' }}
                         />
 
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 flex items-center gap-1.5 flex-wrap">
                           <span
-                            className="text-xs font-serif text-zinc-400 truncate block"
+                            className="text-xs font-serif text-zinc-400 truncate"
                             title={combatant.name}
                           >
                             {combatant.name}
                           </span>
+                          <ConditionRowIcons
+                            conditions={tokenById.get(combatant.tokenId)?.conditions ?? []}
+                            conditionByKey={conditionByKey}
+                            combatRound={combatRound}
+                          />
                         </div>
                       </div>
 
@@ -984,6 +1009,40 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
           {viewer === 'gm' ? 'Arraste para reordenar' : 'Visão do Jogador'}
         </span>
       </div>
+    </div>
+  );
+};
+
+/**
+ * Ícones de condição de UMA linha do painel — mesma fonte que o badge do token no mapa
+ * (`Token.conditions`, ver `VttCanvas`/`ConditionMenu`), só que em DOM em vez de Konva. Condição
+ * com duração ganha um selinho com as rodadas restantes, igual ao badge do token; tooltip por
+ * extenso ("Atordoado · 2 rodadas").
+ */
+const ConditionRowIcons: React.FC<{
+  conditions: TokenCondition[];
+  conditionByKey: Map<string, ConditionDef>;
+  combatRound: number | null;
+}> = ({ conditions, conditionByKey, combatRound }) => {
+  if (conditions.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1 shrink-0">
+      {conditions.map((cond) => {
+        const def = conditionByKey.get(cond.key);
+        if (!def) return null;
+        const roundsLeft = cond.expiresRound !== undefined && combatRound !== null ? Math.max(0, cond.expiresRound - combatRound) : undefined;
+        const title = roundsLeft !== undefined ? `${def.label} · ${roundsLeft} rodada${roundsLeft === 1 ? '' : 's'}` : def.label;
+        return (
+          <span key={cond.key} title={title} className="relative inline-flex w-3.5 h-3.5 shrink-0" style={{ color: def.color }}>
+            <span className="w-full h-full [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: def.icon }} />
+            {roundsLeft !== undefined && (
+              <span className="absolute -bottom-1 -right-1 min-w-[10px] h-[10px] px-[2px] rounded-full bg-[#0c0c0c] border border-[#d4af37] text-[7px] leading-[9px] text-center text-[#d4af37] font-mono font-bold">
+                {roundsLeft}
+              </span>
+            )}
+          </span>
+        );
+      })}
     </div>
   );
 };
