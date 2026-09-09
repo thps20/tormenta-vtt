@@ -264,6 +264,28 @@ export type CharacterResource = z.infer<typeof CharacterResourceSchema>;
 export const CharacterKindSchema = z.enum(["pc", "npc"]);
 export type CharacterKind = z.infer<typeof CharacterKindSchema>;
 
+/**
+ * Resposta a um tipo de dano (RD, imunidade, vulnerabilidade...). Só dado + exibição por enquanto:
+ * `token:apply-damage` continua aplicando o valor que o cliente manda; `rules/damageResponse.ts`
+ * usa isto para SUGERIR o multiplicador no seletor de "Aplicar" (o Mestre confirma).
+ */
+export const DamageResponseSchema = z.object({
+  /** Redução de dano (RD): subtrai do total (piso 0). */
+  reduction: z.number().int().min(0).default(0),
+  /** "Reduz o dano à metade" (não vem do Foundry; existe em bloco escrito à mão). */
+  half: z.boolean().default(false),
+  immune: z.boolean().default(false),
+  vulnerable: z.boolean().default(false),
+});
+export type DamageResponse = z.infer<typeof DamageResponseSchema>;
+
+/** `all` vale para qualquer tipo de dano (RD geral); `byType` é por damageTypes[].key do sistema. */
+export const DamageResponsesSchema = z.object({
+  all: DamageResponseSchema.default({}),
+  byType: z.record(KeySchema, DamageResponseSchema).default({}),
+});
+export type DamageResponses = z.infer<typeof DamageResponsesSchema>;
+
 /** Conteúdo da coluna `data` + campos editáveis. */
 export const CharacterDataSchema = z.object({
   imageUrl: z.string().nullable().default(null),
@@ -285,6 +307,7 @@ export const CharacterDataSchema = z.object({
   spellcastingAttribute: KeySchema.nullable().default(null),
   bio: z.string().max(20000).default(""),
   items: z.array(CharacterItemSchema).default([]),
+  damageResponses: DamageResponsesSchema.default({}),
 });
 export type CharacterData = z.infer<typeof CharacterDataSchema>;
 

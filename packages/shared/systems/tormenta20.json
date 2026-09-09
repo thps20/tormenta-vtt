@@ -122,7 +122,9 @@
       { "key": "morto_vivo", "label": "Morto-vivo" }
     ] },
     { "key": "idiomas",   "label": "Idiomas" },
-    { "key": "sentidos",  "label": "Sentidos" }
+    { "key": "sentidos",  "label": "Sentidos" },
+    { "key": "nd",            "label": "Nível de desafio" },
+    { "key": "deslocamentos", "label": "Outros deslocamentos" }
   ],
 
   "equipStats": [
@@ -292,6 +294,21 @@
     { "key": "sustentando",    "label": "Sustentando",    "color": "#d4af37", "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 2h12M6 22h12M6 2c0 6 6 6 6 10s-6 4-6 10M18 2c0 6-6 6-6 10s6 4 6 10'/></svg>" },
     { "key": "vulneravel",     "label": "Vulnerável",     "color": "#dc2626", "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3 19 6v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V6Z'/><path d='M12 6l-2 4 3 2-3 4 2 4'/></svg>" }
   ],
+
+  "creatures": {
+    "$comment": "Como ler um bloco de criatura no compêndio (docs/plano-criaturas.md). typeField/ndField apontam para traitFields[] acima; typeColors dá a cor do token por opção de typeField.",
+    "typeField": "tipo",
+    "ndField": "nd",
+    "defaultColor": "#7f1d1d",
+    "typeColors": {
+      "humanoide": "#b45309",
+      "animal": "#4d7c0f",
+      "construto": "#57534e",
+      "espirito": "#7e22ce",
+      "monstro": "#991b1b",
+      "morto_vivo": "#065f46"
+    }
+  },
 
   "$rules": "Em Tormenta20 o valor do atributo já é o modificador. Perícia = metade do nível + atributo + treino (+2/+4/+6) + tamanho (só algumas) + penalidade de armadura (só algumas).",
   "attackSkills": ["luta", "pontaria"],

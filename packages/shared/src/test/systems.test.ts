@@ -172,6 +172,17 @@ describe("validateSystemDefinition (integridade)", () => {
     expect(() => validateSystemDefinition(withPatch({ itemKinds }))).toThrow(/não aceita default/);
     expect(() => validateSystemDefinition(withPatch({ sizes: [] }))).toThrow(/não declara sizes/);
   });
+
+  it("rejeita creatures.typeField/ndField apontando para traitField inexistente", () => {
+    const creatures = base.creatures as Record<string, unknown>;
+    expect(() => validateSystemDefinition(withPatch({ creatures: { ...creatures, typeField: "nope" } }))).toThrow(/creatures.typeField/);
+    expect(() => validateSystemDefinition(withPatch({ creatures: { ...creatures, ndField: "nope" } }))).toThrow(/creatures.ndField/);
+  });
+
+  it("rejeita creatures.typeColors com opção que não existe no traitField", () => {
+    const creatures = { ...(base.creatures as Record<string, unknown>), typeColors: { nope: "#ffffff" } };
+    expect(() => validateSystemDefinition(withPatch({ creatures }))).toThrow(/typeColors.*"nope"/);
+  });
 });
 
 describe("conditions[] (todas as definições de sistema)", () => {
