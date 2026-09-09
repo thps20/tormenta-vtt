@@ -25,7 +25,11 @@ export const useHistory = create<HistoryState>((set, get) => ({
   undoSummary: undefined,
   redoSummary: undefined,
 
-  setState: (p) => set(p),
+  // set(p) faria merge raso: como o servidor OMITE undoSummary/redoSummary quando a pilha
+  // correspondente está vazia (peekSummaries, services/history.ts), a chave nem chega no `p` — um
+  // merge raso deixaria o valor antigo "preso" pra sempre (ex.: tooltip do botão desabilitado ainda
+  // mostrando o resumo da última entrada desfeita). Reconstrói os 4 campos por inteiro toda vez.
+  setState: (p) => set({ canUndo: p.canUndo, canRedo: p.canRedo, undoSummary: p.undoSummary, redoSummary: p.redoSummary }),
 
   undo: async () => {
     if (!get().canUndo) return;
