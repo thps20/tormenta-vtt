@@ -208,6 +208,12 @@ export const ConditionDefSchema = z.object({
   color: HexColorSchema,
   description: z.string().default(""),
   modifiers: z.array(ConditionModifierSchema).default([]),
+  /**
+   * Duração inicial (em rodadas) sugerida no campo de duração do ConditionMenu ao marcar esta
+   * condição com combate ativo (ex.: Surpreendido = 1). Só um default de UI — o GM ainda escolhe
+   * outro valor ou deixa permanente; ver rules/conditions.ts (deriveExpiresRound).
+   */
+  defaultDuration: z.number().int().min(1).optional(),
 });
 export type ConditionDef = z.infer<typeof ConditionDefSchema>;
 
