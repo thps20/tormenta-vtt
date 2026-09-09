@@ -63,6 +63,12 @@ interface VttCanvasProps {
   /** GM: criar token no ponto (pixels do mapa) com o tamanho de uma célula. */
   onTokenCreate: (pos: { x: number; y: number }, size: number) => void;
   onTokenDelete: (tokenId: string) => void;
+  /**
+   * Apaga os tokens selecionados agora (mesma função do atalho Delete/Backspace — ver
+   * lib/useDeleteSelectionShortcut). Usada pelo botão de lixeira do NpcQuickCard; o TokenInspector
+   * continua com seu próprio onDelete/confirmação (token único, por id).
+   */
+  onDeleteSelected: () => void;
   /** Fichas que o usuário pode vincular a um token (ver TokenInspector). */
   linkableCharacters: Character[];
   onLinkCharacter: (tokenId: string, characterId: string | null) => void;
@@ -165,6 +171,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   onTokenPatch,
   onTokenCreate,
   onTokenDelete,
+  onDeleteSelected,
   linkableCharacters,
   onLinkCharacter,
   onOpenCharacter,
@@ -1075,6 +1082,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           }}
           onOpenFullSheet={() => onOpenCharacter(selectedCharacter.id)}
           onOpenTokenInspector={() => setForceInspector(true)}
+          onDelete={onDeleteSelected}
           onClose={() => onSelectToken(null)}
         />
       )}

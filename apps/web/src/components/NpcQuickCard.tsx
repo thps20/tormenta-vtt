@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Anchor, Check, FileText, Heart, Info, Plus, Shield, SlidersHorizontal, Sparkles, Swords, X, Zap } from "lucide-react";
+import { Anchor, Check, FileText, Heart, Info, Plus, Shield, SlidersHorizontal, Sparkles, Swords, Trash2, X, Zap } from "lucide-react";
 import type { Character, CharacterItem, ComputedCharacter, ConditionDef, SystemDefinition, Token, TokenCondition } from "@tormenta-vtt/shared";
 import { DamageTypeBadge } from "./DamageTypeBadge";
 
 /**
- * Contrato completo em docs/tipos-ficha-rapida.md. `onOpenTokenInspector` é um acréscimo desta
- * implementação (o botão "Token" do card) — não faz parte do contrato pensado pro AI Studio, que
- * provavelmente não vai precisar de um TokenInspector separado.
+ * Contrato completo em docs/tipos-ficha-rapida.md. `onOpenTokenInspector` e `onDelete` são
+ * acréscimos desta implementação (botões "Token" e a lixeira do cabeçalho) — não fazem parte do
+ * contrato pensado pro AI Studio. `onDelete` é a MESMA função do atalho Delete/Backspace do canvas
+ * (ver lib/useDeleteSelectionShortcut): decide sozinha se apaga direto ou confirma antes; o card só
+ * chama, sem duplicar a regra.
  */
 export interface NpcQuickCardProps {
   token: Token;
@@ -21,6 +23,7 @@ export interface NpcQuickCardProps {
   onToggleCondition: (key: string) => void;
   onOpenFullSheet: () => void;
   onOpenTokenInspector: () => void;
+  onDelete: () => void;
   onClose: () => void;
 }
 
@@ -83,6 +86,7 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
   onToggleCondition,
   onOpenFullSheet,
   onOpenTokenInspector,
+  onDelete,
   onClose,
 }) => {
   const [deltaInput, setDeltaInput] = useState("");
@@ -271,6 +275,14 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
             className="p-1.5 rounded text-zinc-400 hover:text-amber-300 hover:bg-[#25201a] border border-transparent hover:border-[#3d311f] transition-all cursor-pointer"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
+          </button>
+          <button
+            id="npc-btn-delete"
+            onClick={onDelete}
+            title="Apagar token"
+            className="p-1.5 rounded text-zinc-400 hover:text-red-400 hover:bg-red-950/30 border border-transparent hover:border-red-900/40 transition-all cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
           <button
             id="npc-btn-close"

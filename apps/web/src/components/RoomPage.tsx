@@ -7,7 +7,7 @@ import { activeCombatant, isMyTurn, useCombat } from "../store/combat";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
 import { useSystemDef } from "../lib/system";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
-import { useDeleteSelectionShortcut } from "../lib/useDeleteSelectionShortcut";
+import { deleteSelectedTokens, useDeleteSelectionShortcut } from "../lib/useDeleteSelectionShortcut";
 import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
 import { useTurnTitle } from "../lib/useTurnTitle";
 import { selectEffectiveMode, useTools } from "../store/tools";
@@ -352,6 +352,7 @@ function Table() {
                   }).then((created) => created && selectToken(created.id));
                 }}
                 onTokenDelete={(id) => void deleteToken(id)}
+                onDeleteSelected={deleteSelectedTokens}
                 linkableCharacters={linkableCharacters}
                 onLinkCharacter={(tokenId, characterId) => void linkCharacter(tokenId, characterId)}
                 onOpenCharacter={openCharacter}
