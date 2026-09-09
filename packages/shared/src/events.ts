@@ -31,6 +31,7 @@ import type {
   CombatSetSurprisedPayload,
   CombatStartPayload,
   CompendiumEntry,
+  CompendiumSpawnCreaturePayload,
   FogConfig,
   FogUpdatePayload,
   Participant,
@@ -126,6 +127,13 @@ export interface ClientToServerEvents {
    * memória. Criaturas (`type: "creature"`) só vêm para o GM — o servidor filtra, não só a UI.
    */
   "compendium:list": (payload: Record<string, never>, ack: Ack<CompendiumList>) => void;
+  /**
+   * Solta `count` cópias de uma criatura do compêndio na cena (GM). Uma transação (ficha NPC nova
+   * + token vinculado por cópia); ack devolve os tokens criados (pode ser menos que `count`, se a
+   * espiral de posicionamento estourar o raio máximo). Broadcast de character:created (só GM,
+   * NPC) e token:created (visibilidade normal) para cada um, feito separadamente deste ack.
+   */
+  "compendium:spawn-creature": (payload: CompendiumSpawnCreaturePayload, ack: Ack<Token[]>) => void;
 
   // Régua (efêmera: só broadcast, nada vai ao banco)
   /** Enviado com throttle enquanto o participante arrasta a régua; `ruler: null` ao soltar. */
