@@ -60,6 +60,9 @@ interface VttCanvasProps {
   onTokenMoveLive: (tokenId: string, x: number, y: number) => void;
   /** Ao soltar / redimensionar / editar: patch com ack e reversão. */
   onTokenPatch: (patch: TokenPatch) => void;
+  /** Arraste em grupo ao soltar (2+ tokens selecionados movidos juntos): um patch por token, mas
+   *  UMA chamada só (token:update-many), pra virar uma entrada de histórico só — ver handleTokenDragEnd. */
+  onTokenPatchMany: (patches: TokenPatch[]) => void;
   /** GM: criar token no ponto (pixels do mapa) com o tamanho de uma célula. */
   onTokenCreate: (pos: { x: number; y: number }, size: number) => void;
   onTokenDelete: (tokenId: string) => void;
@@ -169,6 +172,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   onToggleSelect,
   onTokenMoveLive,
   onTokenPatch,
+  onTokenPatchMany,
   onTokenCreate,
   onTokenDelete,
   onDeleteSelected,
@@ -837,12 +841,16 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     const dy = node.y() - (g?.leader.y ?? node.y());
     const pos = settle(node.x(), node.y(), token);
     node.position(pos);
-    onTokenPatch({ id: token.id, x: pos.x, y: pos.y });
+    const patches: TokenPatch[] = [{ id: token.id, x: pos.x, y: pos.y }];
     for (const o of g?.others ?? []) {
       const p = settle(o.x + dx, o.y + dy, o.token);
       tokenGroup(o.token.id)?.position(p);
-      onTokenPatch({ id: o.token.id, x: p.x, y: p.y });
+      patches.push({ id: o.token.id, x: p.x, y: p.y });
     }
+    // 2+ tokens (arraste em grupo): uma chamada só (token:update-many), pra virar UMA entrada de
+    // histórico em vez de uma por token (docs/plano-desfazer.md §3). Um token só: patch normal.
+    if (patches.length > 1) onTokenPatchMany(patches);
+    else onTokenPatch(patches[0]!);
   };
 
   // Partição das camadas de tokens (ver comentário no JSX). Ordem por zIndex é mantida dentro de cada uma.

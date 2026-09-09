@@ -8,12 +8,14 @@ import { isTyping } from "./isTyping";
  * Apaga os tokens selecionados agora. Compartilhada pelo atalho Delete/Backspace (useDeleteSelectionShortcut,
  * abaixo) e pelo botão de lixeira do NpcQuickCard — os dois chamam esta MESMA função, nunca duplicam a
  * regra. Só o GM; jogador não apaga nada por aqui (TokenInspector.onDelete é outro caminho, com sua
- * própria confirmação, sem mudar). Sem confirmação para até 3 tokens (o Ctrl+Z de tokens vem depois);
- * confirma se são mais de 3 ou se algum está vinculado a uma ficha de jogador (delete mais sensível).
+ * própria confirmação, sem mudar). Sem confirmação para até 3 tokens; confirma se são mais de 3 ou se
+ * algum está vinculado a uma ficha de jogador (delete mais sensível). Um único token:delete-many
+ * (não um loop de token:delete): o servidor empilha UMA entrada de histórico pro lote inteiro,
+ * então Ctrl+Z desfaz todos de uma vez (docs/plano-desfazer.md §2).
  */
 export function deleteSelectedTokens(): void {
   if (!selectIsGm(useRoom.getState())) return;
-  const { selectedIds, byId, delete: deleteToken } = useTokens.getState();
+  const { selectedIds, byId, deleteMany } = useTokens.getState();
   if (selectedIds.length === 0) return;
 
   const charById = useCharacters.getState().byId;
@@ -32,7 +34,7 @@ export function deleteSelectedTokens(): void {
     if (!window.confirm(`Apagar ${label}?${warn}`)) return;
   }
 
-  for (const id of selectedIds) void deleteToken(id);
+  void deleteMany(selectedIds);
 }
 
 /**

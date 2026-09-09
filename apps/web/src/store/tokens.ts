@@ -28,6 +28,12 @@ interface TokensState {
   moveLive: (tokenId: string, x: number, y: number) => void;
   /** Ao soltar / redimensionar / editar: otimista com ack e reversão. */
   patch: (patch: TokenPatch) => Promise<boolean>;
+  /**
+   * Arraste em grupo ao soltar (2+ tokens selecionados movidos juntos): um único token:update-many,
+   * tudo-ou-nada, em vez de N chamadas de patch() — o servidor empilha UMA entrada de histórico pro
+   * lote inteiro (docs/plano-desfazer.md §3). Otimista com ack e reversão de todos.
+   */
+  patchMany: (patches: TokenPatch[]) => Promise<boolean>;
   create: (data: TokenCreate) => Promise<Token | null>;
   /**
    * Solta N cópias de uma criatura do compêndio na cena (GM). O servidor decide as posições
@@ -37,6 +43,12 @@ interface TokensState {
    */
   spawnFromCompendium: (payload: CompendiumSpawnCreaturePayload) => Promise<Token[] | null>;
   delete: (tokenId: string) => Promise<boolean>;
+  /**
+   * Apagar em lote (Delete/Backspace com vários selecionados, lixeira do NpcQuickCard): um único
+   * token:delete-many, tudo-ou-nada — o servidor empilha UMA entrada de histórico pro lote inteiro
+   * (docs/plano-desfazer.md §2), em vez de uma por token.
+   */
+  deleteMany: (tokenIds: string[]) => Promise<boolean>;
   /** Vincula/desvincula uma ficha (otimista com reversão). */
   linkCharacter: (tokenId: string, characterId: string | null) => Promise<boolean>;
 }
@@ -48,7 +60,10 @@ interface TokensState {
  */
 const pendingMoves = new Map<string, { x: number; y: number }>();
 const flushMoves = throttle(() => {
-  for (const [id, { x, y }] of pendingMoves) void emitAck("token:update", { id, x, y });
+  // live: true — eco "ao vivo" do arraste: o servidor aplica e faz broadcast normalmente, mas
+  // nunca empilha histórico por causa disso (docs/plano-desfazer.md §3). Só o patch final do
+  // gesto (patch()/patchMany() abaixo, sem live) conta como "o usuário decidiu mover pra cá".
+  for (const [id, { x, y }] of pendingMoves) void emitAck("token:update", { id, x, y, live: true });
   pendingMoves.clear();
 }, 33);
 
@@ -119,6 +134,38 @@ export const useTokens = create<TokensState>((set, get) => ({
     return true;
   },
 
+  patchMany: async (patches) => {
+    const ids = patches.map((p) => p.id);
+    const previous = new Map(ids.map((id) => [id, get().byId[id]]));
+    if ([...previous.values()].some((t) => t === undefined)) return false;
+    for (const id of ids) {
+      if (get().draggingIds[id]) {
+        pendingMoves.delete(id);
+        stopDragging(id);
+      }
+    }
+    if (pendingMoves.size === 0) flushMoves.cancel();
+    // 1. otimista
+    set((s) => {
+      const byId = { ...s.byId };
+      for (const patch of patches) byId[patch.id] = { ...(byId[patch.id] as Token), ...patch };
+      return { byId };
+    });
+    // 2. ack
+    const res = await emitAck("token:update-many", { patches });
+    if (!res.ok) {
+      // 3. reverte todos
+      set((s) => {
+        const byId = { ...s.byId };
+        for (const [id, t] of previous) if (t) byId[id] = t;
+        return { byId };
+      });
+      toast(res.error);
+      return false;
+    }
+    return true;
+  },
+
   create: async (data) => {
     const res = await emitAck("token:create", data);
     if (!res.ok) {
@@ -167,6 +214,26 @@ export const useTokens = create<TokensState>((set, get) => ({
     const res = await emitAck("token:delete", { tokenId });
     if (!res.ok) {
       get().upsert(previous);
+      toast(res.error);
+      return false;
+    }
+    return true;
+  },
+
+  deleteMany: async (tokenIds) => {
+    const previous = tokenIds.map((id) => get().byId[id]).filter((t): t is Token => t !== undefined);
+    if (previous.length === 0) return false;
+    for (const id of tokenIds) {
+      if (get().draggingIds[id]) {
+        pendingMoves.delete(id);
+        stopDragging(id);
+      }
+    }
+    if (pendingMoves.size === 0) flushMoves.cancel();
+    for (const id of tokenIds) get().remove(id);
+    const res = await emitAck("token:delete-many", { tokenIds });
+    if (!res.ok) {
+      for (const t of previous) get().upsert(t);
       toast(res.error);
       return false;
     }

@@ -1,15 +1,23 @@
 import React from "react";
-import { CloudFog, Hand, MousePointer2, Pencil, Ruler } from "lucide-react";
+import { CloudFog, Hand, MousePointer2, Pencil, Redo2, Ruler, Undo2 } from "lucide-react";
 import type { ToolMode } from "../store/tools";
 
 interface ToolbarProps {
-  /** GM vê a ferramenta Névoa; jogador só a lista básica. */
+  /** GM vê a ferramenta Névoa e os botões de desfazer/refazer; jogador só a lista básica. */
   isGm: boolean;
   /** Modo escolhido pelo usuário (não o temporário do espaço). */
   mode: ToolMode;
   /** Modo em vigor (espaço segurado mostra "Mover mapa" aceso). */
   effectiveMode: ToolMode;
   onChange: (mode: ToolMode) => void;
+  /** Desfazer/refazer (docs/plano-desfazer.md) — pilha do GM, fora do modo Névoa. */
+  canUndo: boolean;
+  canRedo: boolean;
+  /** Resumo da entrada no topo de cada pilha, pro tooltip ("apagar Goblin 3"). */
+  undoSummary?: string;
+  redoSummary?: string;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 interface ToolDef {
@@ -33,7 +41,7 @@ const GM_TOOLS: ToolDef[] = [{ mode: "fog", label: "Névoa", shortcut: "F", Icon
 const FUTURE_TOOLS: ToolDef[] = [{ mode: "draw", label: "Desenho", shortcut: null, Icon: Pencil, soon: true }];
 
 /** Barra vertical de ferramentas do canvas (canto superior esquerdo da mesa). */
-export const Toolbar: React.FC<ToolbarProps> = ({ isGm, mode, effectiveMode, onChange }) => (
+export const Toolbar: React.FC<ToolbarProps> = ({ isGm, mode, effectiveMode, onChange, canUndo, canRedo, undoSummary, redoSummary, onUndo, onRedo }) => (
   <div
     id="vtt-toolbar"
     role="toolbar"
@@ -51,8 +59,55 @@ export const Toolbar: React.FC<ToolbarProps> = ({ isGm, mode, effectiveMode, onC
     {FUTURE_TOOLS.map((t) => (
       <ToolButton key={t.mode} tool={t} active={false} chosen={false} onClick={() => undefined} />
     ))}
+    {isGm && (
+      <>
+        <div className="h-[1px] w-full bg-[#2d2417] my-0.5" />
+        <HistoryButton icon={Undo2} label="Desfazer" shortcut="Ctrl+Z" summary={undoSummary} disabled={!canUndo} onClick={onUndo} />
+        <HistoryButton icon={Redo2} label="Refazer" shortcut="Ctrl+Shift+Z" summary={redoSummary} disabled={!canRedo} onClick={onRedo} />
+      </>
+    )}
   </div>
 );
+
+/**
+ * Desfazer/refazer: visual parecido com ToolButton, mas não é "modo" (sem aria-pressed/chosen) —
+ * dispara na hora. Tooltip mostra o resumo da entrada no topo da pilha em vez do rótulo fixo da
+ * ferramenta (docs/plano-desfazer.md §9).
+ */
+function HistoryButton({
+  icon: Icon,
+  label,
+  shortcut,
+  summary,
+  disabled,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  shortcut: string;
+  summary: string | undefined;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const tip = summary ? `${label}: ${summary}` : label;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={tip}
+      className={`group relative w-9 h-9 flex items-center justify-center rounded transition-colors ${
+        disabled ? "text-zinc-700 cursor-not-allowed" : "text-zinc-400 hover:bg-[#252525] hover:text-[#d4af37] cursor-pointer"
+      }`}
+    >
+      <Icon className="w-4 h-4" />
+      <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 whitespace-nowrap rounded bg-[#1a1a1a] border border-[#2d2417] px-2 py-1 text-[11px] text-zinc-200 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
+        {tip}
+        <kbd className="px-1 rounded bg-[#252525] border border-[#3d3d3d] font-mono text-[10px] text-zinc-400">{shortcut}</kbd>
+      </span>
+    </button>
+  );
+}
 
 function ToolButton({ tool, active, chosen, onClick }: { tool: ToolDef; active: boolean; chosen: boolean; onClick: () => void }) {
   const { Icon } = tool;

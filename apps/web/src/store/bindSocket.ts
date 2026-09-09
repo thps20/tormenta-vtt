@@ -5,6 +5,7 @@ import { useTokens } from "./tokens";
 import { useChat } from "./chat";
 import { useCombat } from "./combat";
 import { useCharacters } from "./characters";
+import { useHistory } from "./history";
 import { useTools } from "./tools";
 import { toast } from "./ui";
 
@@ -47,6 +48,8 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("character:created", (c) => useCharacters.getState().upsert(c));
   socket.on("character:updated", (c) => useCharacters.getState().upsert(c));
   socket.on("character:deleted", ({ characterId }) => useCharacters.getState().remove(characterId));
+
+  socket.on("history:updated", (p) => useHistory.getState().setState(p));
 
   socket.on("server:error", ({ message }) => toast(message));
 }

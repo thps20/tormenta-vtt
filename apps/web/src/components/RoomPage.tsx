@@ -10,6 +10,7 @@ import { useToolShortcuts } from "../lib/useToolShortcuts";
 import { deleteSelectedTokens, useDeleteSelectionShortcut } from "../lib/useDeleteSelectionShortcut";
 import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
 import { useTurnTitle } from "../lib/useTurnTitle";
+import { useHistory } from "../store/history";
 import { selectEffectiveMode, useTools } from "../store/tools";
 import { computeCharacter, isPointRevealed, tokenCenter } from "@tormenta-vtt/shared";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
@@ -123,7 +124,15 @@ function Table() {
   const focusToken = useTokens((s) => s.focus);
   const moveLive = useTokens((s) => s.moveLive);
   const patchToken = useTokens((s) => s.patch);
+  const patchTokenMany = useTokens((s) => s.patchMany);
   const createToken = useTokens((s) => s.create);
+  // Desfazer/refazer (docs/plano-desfazer.md): estado espelhado de history:updated (bindSocket.ts).
+  const canUndo = useHistory((s) => s.canUndo);
+  const canRedo = useHistory((s) => s.canRedo);
+  const undoSummary = useHistory((s) => s.undoSummary);
+  const redoSummary = useHistory((s) => s.redoSummary);
+  const undoHistory = useHistory((s) => s.undo);
+  const redoHistory = useHistory((s) => s.redo);
   const spawnFromCompendium = useTokens((s) => s.spawnFromCompendium);
   const deleteToken = useTokens((s) => s.delete);
   const vttCanvasRef = useRef<VttCanvasHandle>(null);
@@ -332,6 +341,7 @@ function Table() {
                 onSelectToken={selectToken}
                 onTokenMoveLive={moveLive}
                 onTokenPatch={(patch) => void patchToken(patch)}
+                onTokenPatchMany={(patches) => void patchTokenMany(patches)}
                 onTokenCreate={(pos, size) => {
                   const n = tokens.length + 1;
                   void createToken({
@@ -373,7 +383,18 @@ function Table() {
                 }}
                 onSpawnCreature={isGm ? (entryId, point, opts) => void spawnCreatureAt(entryId, point, opts) : undefined}
               />
-              <Toolbar isGm={isGm} mode={toolMode} effectiveMode={effectiveMode} onChange={setToolMode} />
+              <Toolbar
+                isGm={isGm}
+                mode={toolMode}
+                effectiveMode={effectiveMode}
+                onChange={setToolMode}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                undoSummary={undoSummary}
+                redoSummary={redoSummary}
+                onUndo={() => void undoHistory()}
+                onRedo={() => void redoHistory()}
+              />
               {isGm && toolMode === "fog" && (
                 <FogToolbar
                   fog={scene.fog}
