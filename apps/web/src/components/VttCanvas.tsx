@@ -57,6 +57,9 @@ interface VttCanvasProps {
   linkableCharacters: Character[];
   onLinkCharacter: (tokenId: string, characterId: string | null) => void;
   onOpenCharacter: (characterId: string) => void;
+  /** Duplo clique num token vinculado a uma ficha (padrão Foundry): RoomPage decide se o usuário
+   *  pode vê-la e abre. Token sem ficha: não é chamado. */
+  onTokenOpenSheet: (tokenId: string) => void;
   /** Barra de vida por token (tokenBar do sistema, lida da ficha vinculada). */
   tokenBars: Record<string, TokenBar>;
   /** Modo Névoa (GM): o que desenhar e com qual forma. null para jogadores. */
@@ -81,7 +84,7 @@ export interface TokenBar {
 
 /** Texto de ajuda do canto superior direito, por ferramenta. */
 const MODE_HINTS: Record<ToolMode, string> = {
-  select: "Arraste tokens para mover • Espaço + arrastar = navegar • Scroll = zoom",
+  select: "Arraste tokens para mover • Duplo clique = ficha • Espaço + arrastar = navegar • Scroll = zoom",
   pan: "Arraste para navegar pelo mapa • Scroll = zoom",
   ruler: "Clique e arraste para medir • Scroll = zoom",
   fog: "Névoa: escolha Revelar/Ocultar e uma forma no painel • Scroll = zoom",
@@ -138,6 +141,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   linkableCharacters,
   onLinkCharacter,
   onOpenCharacter,
+  onTokenOpenSheet,
   tokenBars,
   fogTool,
   onFogShape,
@@ -188,6 +192,10 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   const groupDragRef = useRef<{ leader: { x: number; y: number }; others: Array<{ token: Token; x: number; y: number }> } | null>(null);
   /** Ponto inicial da régua em andamento (pixels do mapa). */
   const rulerStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  /** Último mousedown num token (id + instante), pro duplo clique por geometria (ver registerTokenClick). */
+  const lastTokenMouseDownRef = useRef<{ tokenId: string; time: number } | null>(null);
+  const DOUBLE_CLICK_MS = 300;
 
   // --- Névoa (GM): gesto em andamento. Nada vai ao servidor antes de soltar/fechar.
   /** Pincel: pontos [x1,y1,x2,y2,...] acumulados no arrasto (já decimados). null = não está pintando. */
@@ -581,6 +589,24 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   };
 
   /**
+   * Duplo clique num token, por GEOMETRIA (não pelo `dblclick` nativo do Konva: como ele só dispara
+   * quando os DOIS cliques acertam a mesma shape pelo canvas de hit, o mesmo embaralhamento
+   * anti-fingerprinting que quebra hover/clique de token quebraria isto também — ver
+   * docs/debug-condicoes.md). Mora no `onMouseDown` do Stage, que roda sempre (é o handler do
+   * próprio Stage, não depende do hit chegar num Group): dois mousedown no mesmo token dentro da
+   * janela contam como duplo clique. Token com ficha (que o usuário pode ver — RoomPage decide):
+   * abre a ficha. Sem ficha: nada — o primeiro clique já selecionou e mostra o TokenInspector.
+   */
+  const registerTokenClick = (token: Token) => {
+    const now = performance.now();
+    const last = lastTokenMouseDownRef.current;
+    const isDoubleClick = last !== null && last.tokenId === token.id && now - last.time <= DOUBLE_CLICK_MS;
+    // Um terceiro clique rápido não vira "outro duplo clique": exige um mousedown novo primeiro.
+    lastTokenMouseDownRef.current = isDoubleClick ? null : { tokenId: token.id, time: now };
+    if (isDoubleClick && token.characterId) onTokenOpenSheet(token.id);
+  };
+
+  /**
    * Modo Selecionar: sobre uma alça de redimensionar, repassa o mousedown pra ela; sobre um token,
    * repassa pro Group — nos dois casos, só se o canvas de hit não reconheceu (pra o Konva iniciar o
    * drag/resize normalmente a partir daí); no mapa vazio, começa a caixa de seleção.
@@ -610,6 +636,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     }
     const t = tokenAtPointer();
     if (t) {
+      registerTokenClick(t);
       if (!hitLandedOnToken(e.target, t.id)) tokenGroup(t.id)?.fire("mousedown", { evt: e.evt, pointerId: e.pointerId }, false);
       return;
     }

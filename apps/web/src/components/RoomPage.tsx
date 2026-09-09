@@ -306,12 +306,7 @@ function Table() {
                 onRulerClear={() => clearRuler(scene.id)}
                 onSelectMany={selectMany}
                 onToggleSelect={toggleSelect}
-                onSelectToken={(tokenId) => {
-                  selectToken(tokenId);
-                  // Clique num token vinculado a uma ficha que eu vejo abre a ficha.
-                  const characterId = tokenId ? byId[tokenId]?.characterId : null;
-                  if (characterId && charById[characterId]) openCharacter(characterId);
-                }}
+                onSelectToken={selectToken}
                 onTokenMoveLive={moveLive}
                 onTokenPatch={(patch) => void patchToken(patch)}
                 onTokenCreate={(pos, size) => {
@@ -337,6 +332,11 @@ function Table() {
                 linkableCharacters={linkableCharacters}
                 onLinkCharacter={(tokenId, characterId) => void linkCharacter(tokenId, characterId)}
                 onOpenCharacter={openCharacter}
+                onTokenOpenSheet={(tokenId) => {
+                  // Duplo clique num token vinculado a uma ficha que eu vejo abre a ficha.
+                  const characterId = byId[tokenId]?.characterId;
+                  if (characterId && charById[characterId]) openCharacter(characterId);
+                }}
                 tokenBars={tokenBars}
                 fogTool={isGm ? { mode: fogMode, shape: fogShape, brushSize: fogBrushSize } : null}
                 onFogShape={(shape) => {
