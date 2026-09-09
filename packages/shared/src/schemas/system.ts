@@ -344,6 +344,22 @@ export const SystemGridDefSchema = z.object({
 });
 export type SystemGridDef = z.infer<typeof SystemGridDefSchema>;
 
+/**
+ * Como o app lê um bloco de criatura (compêndio, `docs/plano-criaturas.md`). Sistema sem este
+ * bloco não tem criaturas: `compendium:list` não filtra nem oferece o chip "Criaturas".
+ */
+export const CreatureDefSchema = z.object({
+  /** Chave em traitFields[] com o tipo de criatura (ex.: "tipo": Humanoide, Animal...). */
+  typeField: KeySchema,
+  /** Chave em traitFields[] com o nível de desafio. Só exibição (texto: "1/4", "1/2", "20"...). */
+  ndField: KeySchema,
+  /** Cor do token quando o tipo da criatura não estiver em `typeColors`. */
+  defaultColor: HexColorSchema,
+  /** Cor do token por opção de `typeField` (a chave é uma options[].key daquele traitField). */
+  typeColors: z.record(KeySchema, HexColorSchema).default({}),
+});
+export type CreatureDef = z.infer<typeof CreatureDefSchema>;
+
 export const SystemDefinitionSchema = z.object({
   /** Versão deste formato de arquivo (para migrar JSONs antigos no futuro). */
   schemaVersion: z.literal(2),
@@ -368,6 +384,8 @@ export const SystemDefinitionSchema = z.object({
   activation: ActivationDefSchema.default({}),
   /** Marcadores de condição (T20: Abalado, Cego...) exibidos no token. Sem automação de regra por enquanto. */
   conditions: z.array(ConditionDefSchema).default([]),
+  /** Como ler um bloco de criatura no compêndio (ver CreatureDefSchema). Ausente = sistema sem criaturas. */
+  creatures: CreatureDefSchema.optional(),
 
   /** Perícias que podem ser usadas em ações de ataque (ex.: luta, pontaria). */
   attackSkills: z.array(KeySchema).default([]),
@@ -489,6 +507,15 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
   }
   if (def.activation.saveSkillTag !== undefined && !def.skills.some((s) => s.tags.includes(def.activation.saveSkillTag ?? ""))) {
     fail(def, `activation.saveSkillTag "${def.activation.saveSkillTag}" não é tag de nenhuma perícia`);
+  }
+  if (def.creatures) {
+    const { typeField, ndField, typeColors } = def.creatures;
+    const typeFieldDef = def.traitFields.find((f) => f.key === typeField);
+    if (!typeFieldDef) fail(def, `creatures.typeField referencia traitField inexistente "${typeField}"`);
+    if (!def.traitFields.some((f) => f.key === ndField)) fail(def, `creatures.ndField referencia traitField inexistente "${ndField}"`);
+    for (const key of Object.keys(typeColors)) {
+      if (!typeFieldDef?.options?.some((o) => o.key === key)) fail(def, `creatures.typeColors: opção "${key}" não existe em traitField "${typeField}"`);
+    }
   }
   for (const kind of def.itemKinds) {
     for (const stat of kind.statBonuses) {

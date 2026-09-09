@@ -25,11 +25,13 @@ import { homedir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
-import { CUSTOM_FILE, DESCRIPTIONS_FILE, compendiumDir, enhancementTextKey, readCompendiumFile, validateCompendiumEntries } from "../packages/shared/src/compendium/index.js";
+import { CUSTOM_FILE, DESCRIPTIONS_FILE, compendiumDir, creatureItemTextKey, enhancementTextKey, readCompendiumFile, validateCompendiumEntries } from "../packages/shared/src/compendium/index.js";
 import { parseFormula } from "../packages/shared/src/dice/index.js";
 import { saveSkills } from "../packages/shared/src/rules/activation.js";
-import type { ActionTemplate, Activation, EnhancementEffect, Save, SkillGrantsValue } from "../packages/shared/src/schemas/character.js";
-import { CompendiumEntrySchema, type CompendiumEntry } from "../packages/shared/src/schemas/compendium.js";
+import { computeCharacter } from "../packages/shared/src/rules/compute.js";
+import { createDefaultCharacterData } from "../packages/shared/src/rules/defaults.js";
+import { CharacterDataSchema, type ActionTemplate, type Activation, type EnhancementEffect, type Save, type SkillGrantsValue } from "../packages/shared/src/schemas/character.js";
+import type { CompendiumItemBody, CompendiumItemEntry } from "../packages/shared/src/schemas/compendium.js";
 import type { ItemKindDef, SystemDefinition } from "../packages/shared/src/schemas/system.js";
 import { getSystemDefinition } from "../packages/shared/src/systems.js";
 
@@ -73,6 +75,8 @@ interface FoundryDoc {
   /** Pack (primeira pasta) e caminho relativo dentro dele. */
   pack: string;
   path: string;
+  /** Itens embutidos (só atores, `type: npc`, têm; nos demais é sempre []). */
+  items: Record<string, unknown>[];
 }
 
 interface FoundryEffect {
@@ -82,12 +86,16 @@ interface FoundryEffect {
   flags?: { tormenta20?: { custo?: string | number; aumenta?: boolean; onuse?: boolean; self?: boolean } };
 }
 
-/** Packs que ficam fora do compêndio de personagem (criaturas, convocações, macros, tabelas, journals). */
+/**
+ * Packs que ficam fora do compêndio (macros, tabelas, journals) ou fora do ESCOPO desta fase
+ * (convocações: atributos escalam com o nível do conjurador, o bloco no Foundry vem quase vazio —
+ * ver docs/backlog.md). `ameacas` (criaturas/NPCs) SAI desta lista: tratado à parte em main(),
+ * como `doc.type === "npc"`, e não passa por kindOf/convert (que são de ITEM).
+ */
 const SKIPPED_PACKS: Record<string, string> = {
-  ameacas: "criaturas (NPCs)",
   basico: "journals de condições e perícias",
-  convocacoes: "criaturas convocadas",
-  "habilidades-de-criaturas": "habilidades e armas naturais de criaturas",
+  convocacoes: "criaturas convocadas (atributos escalam com o nível do conjurador; ver docs/backlog.md)",
+  "habilidades-de-criaturas": "habilidades e armas naturais de criaturas, num pack à parte (os itens do pack ameacas já vêm embutidos no ator, sem depender deste)",
   macros: "macros",
   parceiros: "parceiros (regra de NPC)",
   "tabelas-de-tesouro": "tabelas de rolagem",
@@ -117,6 +125,7 @@ function readPacks(source: string): FoundryDoc[] {
       effects: Array.isArray(raw.effects) ? (raw.effects as FoundryEffect[]) : [],
       pack: rel.split("/")[0] ?? "",
       path: rel,
+      items: Array.isArray(raw.items) ? (raw.items as Record<string, unknown>[]) : [],
     });
   }
   return docs;
@@ -309,6 +318,8 @@ const MAP = {
   powerType: { classe: "classe", ability: "habilidade", geral: "geral", concedido: "concedido", racial: "racial", origem: "origem", distincao: "distincao" },
   size: { min: "minusculo", peq: "pequeno", med: "medio", gra: "grande", eno: "enorme", col: "colossal" },
   damageType: { dano: "normal", curapv: "cura" },
+  /** `system.detalhes.tipo` de um ator. Só os códigos vistos nos 83 atores `npc` do pack `ameacas`. */
+  creatureType: { hum: "humanoide", ani: "animal", con: "construto", esp: "espirito", mon: "monstro" },
 } as const;
 
 /** Propriedades booleanas de arma (o Foundry tem chaves curtas e longas duplicadas). */
@@ -347,11 +358,39 @@ const SAVE_TYPOS: Record<string, string> = { relfexos: "reflexos" };
 const NUMBER_WORDS: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8 };
 
 // ---------------------------------------------------------------------------
-// Conversor: um documento do Foundry → CompendiumEntry
+// Conversor: um documento do Foundry → CompendiumItemEntry
 // ---------------------------------------------------------------------------
 
-/** Entrada em construção: CompendiumEntry sem os defaults, mais `$source` para rastrear. */
-type Draft = Partial<CompendiumEntry> & { id: string; name: string; kind: string; $source: string };
+/** Entrada de item em construção: CompendiumItemEntry sem os defaults, mais `$source` para rastrear. */
+type Draft = Partial<CompendiumItemEntry> & { id: string; name: string; kind: string; $source: string };
+
+/** Resposta a um tipo de dano, já no formato de saída de DamageResponseSchema (sem defaults a repor). */
+type DamageResponseDraft = { reduction: number; half: boolean; immune: boolean; vulnerable: boolean };
+const EMPTY_DAMAGE_RESPONSE: DamageResponseDraft = { reduction: 0, half: false, immune: false, vulnerable: false };
+
+/**
+ * Entrada de criatura em construção (bloco de monstro, ator `type: npc`). Diferente de `Draft`
+ * (item): não tem `kind`/`tags`/página do livro no nível da entrada (o Foundry não guarda página
+ * no ator, só nos itens) e carrega a ficha inteira em `sheet`.
+ */
+interface CreatureDraft {
+  id: string;
+  name: string;
+  page: number | null;
+  $source: string;
+  sheet: {
+    attributes: Record<string, { base: number }>;
+    resources: Record<string, { current: number; temp: number; maxOverride: number | null }>;
+    skills: Record<string, { trained: boolean; other: number; attribute: null }>;
+    traits: Record<string, string>;
+    size: string | null;
+    derivedOverrides: Record<string, number>;
+    damageResponses: { all: DamageResponseDraft; byType: Record<string, DamageResponseDraft> };
+    level: number;
+    manualProgression: boolean;
+    items: CompendiumItemBody[];
+  };
+}
 
 class Converter {
   private readonly optionKeys = new Map<string, Set<string>>();
@@ -787,6 +826,187 @@ class Converter {
     choices.push({ count, from, chosen: [] });
     return { fixed, choices };
   }
+
+  // --- criatura (ator `type: npc` do pack ameacas) --------------------------
+
+  /**
+   * Bloco de monstro → CompendiumCreatureEntry. Diferente dos itens: não passa por kindOf/convert
+   * (formato bem diferente) nem por `base()` (o Foundry não guarda página do livro no ATOR, só nos
+   * itens embutidos — `page` fica sempre null aqui, ver report.notes em main()).
+   */
+  creature(doc: FoundryDoc, id: string, unknownEntities: Set<string>, resolvers: EffectResolvers, descriptions: Record<string, string> | null): CreatureDraft {
+    const s = doc.system;
+    const atributos = obj(s.atributos);
+    const attrs = obj(s.attributes);
+    const detalhes = obj(s.detalhes);
+    const tracos = obj(s.tracos);
+    const creatures = this.def.creatures;
+
+    const attributes: Record<string, { base: number }> = {};
+    for (const [k, v] of Object.entries(atributos)) {
+      if (!this.attrKeys.has(k)) continue; // defensivo: no T20 as 6 chaves sempre batem.
+      attributes[k] = { base: Math.round(num(obj(v).base)) };
+    }
+
+    const resources: Record<string, { current: number; temp: number; maxOverride: number | null }> = {};
+    for (const key of ["pv", "pm"] as const) {
+      if (!this.def.resources.some((r) => r.key === key)) continue;
+      const max = Math.round(num(obj(attrs[key]).max));
+      resources[key] = { current: max, temp: 0, maxOverride: max };
+    }
+
+    const derivedOverrides: Record<string, number> = {};
+    const editableDerived = (key: string) => this.def.derived.find((d) => d.key === key)?.editable !== false && this.def.derived.some((d) => d.key === key);
+    if (editableDerived("defense")) derivedOverrides.defense = Math.round(num(obj(attrs.defesa).base));
+    if (editableDerived("dc")) derivedOverrides.dc = Math.round(num(attrs.cd));
+    if (editableDerived("movement")) derivedOverrides.movement = Math.round(num(obj(attrs.movement).walk));
+
+    const traits: Record<string, string> = {};
+    if (creatures) {
+      const typeCode = str(detalhes.tipo).trim();
+      const type = (MAP.creatureType as Record<string, string>)[typeCode];
+      if (type) traits[creatures.typeField] = type;
+      else if (typeCode) this.report.todo("criatura: tipo sem correspondência (traits.tipo fica ausente)", id, `\`${typeCode}\``);
+      const nd = str(attrs.nd).trim();
+      if (nd) traits[creatures.ndField] = nd;
+    }
+    const hasTraitField = (key: string) => this.def.traitFields.some((f) => f.key === key);
+    const origem = str(detalhes.origem).trim();
+    if (origem && hasTraitField("origem")) traits.origem = origem;
+    const divindade = str(detalhes.divindade).trim();
+    if (divindade && hasTraitField("divindade")) traits.divindade = divindade;
+    const idiomas = (Array.isArray(obj(tracos.idiomas).value) ? (obj(tracos.idiomas).value as unknown[]) : []).map(str).filter(Boolean);
+    if (idiomas.length > 0 && hasTraitField("idiomas")) traits.idiomas = idiomas.join(", ");
+    const sentidosValue = (Array.isArray(obj(attrs.sentidos).value) ? (obj(attrs.sentidos).value as unknown[]) : []).map(str).filter(Boolean);
+    const sentidosCustom = str(obj(attrs.sentidos).custom).trim();
+    const sentidos = [...sentidosValue, ...(sentidosCustom ? [sentidosCustom] : [])].join(", ");
+    if (sentidos && hasTraitField("sentidos")) traits.sentidos = sentidos;
+    const movement = obj(attrs.movement);
+    const movementUnit = str(movement.unit) || "m";
+    const MOVEMENT_LABELS: Record<string, string> = { fly: "voo", swim: "natação", climb: "escalada", burrow: "escavação" };
+    const extraMovement = Object.entries(MOVEMENT_LABELS)
+      .filter(([key]) => num(movement[key]) !== 0)
+      .map(([key, label]) => `${label} ${Math.round(num(movement[key]))}${movementUnit}`);
+    if (extraMovement.length > 0 && hasTraitField("deslocamentos")) traits.deslocamentos = extraMovement.join(", ");
+
+    // Resistências/imunidades/vulnerabilidades por tipo de dano: as chaves do Foundry já batem com
+    // damageTypes[] do sistema (corte, impacto, perfuração...). "dano" é a resposta GERAL
+    // (damageResponses.all); "perda" (perda de PV) não é um tipo de dano nosso e é ignorada.
+    const byType: Record<string, DamageResponseDraft> = {};
+    let all: DamageResponseDraft = EMPTY_DAMAGE_RESPONSE;
+    for (const [key, raw] of Object.entries(obj(tracos.resistencias))) {
+      const r = obj(raw);
+      const response: DamageResponseDraft = { reduction: Math.max(0, Math.round(num(r.value))), half: false, immune: r.imunidade === true, vulnerable: r.vulnerabilidade === true };
+      if (response.reduction === 0 && !response.immune && !response.vulnerable) continue;
+      if (key === "dano") all = response;
+      else if (key === "perda") this.report.todo('resistência: "perda" (perda de PV) não é um tipo de dano do sistema, ignorada', id, JSON.stringify(response));
+      else if (this.damageTypes.has(key)) byType[key] = response;
+      else this.report.todo("resistência: tipo sem correspondência", id, `\`${key}\``);
+    }
+
+    const sizeFoundry = str(tracos.tamanho).trim();
+    const size = (MAP.size as Record<string, string>)[sizeFoundry] ?? null;
+    if (!size) this.report.todo("criatura: tamanho sem mapeamento (ficha nasce sem tamanho)", id, `\`${sizeFoundry}\``);
+
+    const level = Math.max(1, Math.round(num(obj(attrs.nivel).value)) || 1);
+
+    // Perícias: o Foundry guarda o TOTAL (`value`); a nossa ficha guarda entradas e CALCULA o
+    // total pela fórmula do sistema. Grava `trained`, calcula com other=0 e ajusta `other` pela
+    // diferença — o total bate com o livro usando a fórmula do próprio sistema, sem hardcode (e a
+    // iniciativa do bloco, {skill.iniciativa}, sai certa de graça).
+    const skillTargets = new Map<string, number>();
+    const skills: Record<string, { trained: boolean; other: number; attribute: null }> = {};
+    for (const [abbr, raw] of Object.entries(obj(s.pericias))) {
+      const p = obj(raw);
+      const key = this.skillByPrefix(abbr);
+      if (!key) {
+        if (num(p.value) !== 0 || p.treinado === true) this.report.todo("perícia: abreviação sem correspondência no sistema", id, `\`${abbr}\``);
+        continue;
+      }
+      skillTargets.set(key, num(p.value));
+      skills[key] = { trained: p.treinado === true, other: 0, attribute: null };
+    }
+    const draftData = CharacterDataSchema.parse({
+      ...createDefaultCharacterData(this.def),
+      attributes,
+      skills,
+      size,
+      derivedOverrides,
+      level,
+      manualProgression: true,
+    });
+    const computed = computeCharacter(this.def, draftData);
+    for (const [key, target] of skillTargets) {
+      const sk = skills[key];
+      if (sk) sk.other = Math.round(target - (computed.skills[key]?.total ?? 0));
+    }
+
+    // Itens embutidos: mesmo conversor de item de sempre (kindOf/convert), um a um; id sintético
+    // "<id>#item<n>" (1-based) só para relatório/descrições — o item embutido não tem id próprio.
+    const items: CompendiumItemBody[] = [];
+    doc.items.forEach((raw, index) => {
+      const itemDoc: FoundryDoc = {
+        _id: String(raw._id ?? ""),
+        name: String(raw.name ?? ""),
+        type: typeof raw.type === "string" ? raw.type : "",
+        system: (raw.system ?? {}) as Record<string, unknown>,
+        effects: Array.isArray(raw.effects) ? (raw.effects as FoundryEffect[]) : [],
+        pack: doc.pack,
+        path: doc.path,
+        items: [],
+      };
+      const itemKind = kindOf(itemDoc);
+      if (!itemKind) {
+        this.report.bump(this.report.skippedTypes, `ameacas (item embutido): ${itemDoc.type || "(sem tipo)"}`);
+        return;
+      }
+      const itemId = `${id}#item${index + 1}`;
+      const itemDraft = convert(this, itemDoc, itemKind, itemId);
+      if (!itemDraft) return;
+      if (this.kind(itemKind).hasActivation) {
+        const enhancements = extractEnhancements(itemDoc, itemId, itemKind, this.report, unknownEntities, resolvers);
+        if (enhancements.list.length > 0) itemDraft.enhancements = enhancements.list.map((e) => ({ ...e, label: "" }));
+      }
+      if (descriptions) {
+        const text = htmlToText(str(obj(itemDoc.system.description).value), unknownEntities);
+        if (text) {
+          descriptions[creatureItemTextKey(id, index + 1)] = text;
+          this.report.descriptions++;
+        }
+      }
+      items.push({
+        kind: itemDraft.kind,
+        name: itemDraft.name,
+        fields: itemDraft.fields ?? {},
+        actions: itemDraft.actions ?? [],
+        activation: itemDraft.activation ?? null,
+        enhancements: itemDraft.enhancements ?? [],
+        save: itemDraft.save ?? null,
+        statBonuses: itemDraft.statBonuses ?? {},
+        slots: itemDraft.slots ?? 0,
+        price: itemDraft.price ?? 0,
+        description: "",
+        page: itemDraft.page ?? null,
+      });
+    });
+
+    if (descriptions) {
+      const bio = htmlToText(str(obj(detalhes.biography).value), unknownEntities);
+      if (!bio) this.report.descriptionsEmpty.push(id);
+      else {
+        descriptions[id] = bio;
+        this.report.descriptions++;
+      }
+    }
+
+    return {
+      id,
+      name: doc.name.trim().slice(0, 80),
+      page: null,
+      $source: `Compendium.tormenta20.${doc.pack}.Actor.${doc._id}`,
+      sheet: { attributes, resources, skills, traits, size, derivedOverrides, damageResponses: { all, byType }, level, manualProgression: true, items },
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1033,6 +1253,9 @@ const KIND_FILES: Record<string, string> = {
   power: "powers.json",
 };
 
+/** Arquivo de saída das criaturas (docs/plano-criaturas.md). Fora de KIND_FILES: não é um item-kind. */
+const CREATURE_FILE = "creatures.json";
+
 /** Tira os campos no default para o JSON ficar enxuto (o Zod repõe ao carregar). */
 function compact(draft: Draft): Record<string, unknown> {
   const out: Record<string, unknown> = { id: draft.id, name: draft.name, kind: draft.kind, $source: draft.$source };
@@ -1049,6 +1272,37 @@ function compact(draft: Draft): Record<string, unknown> {
   if (draft.price) out.price = draft.price;
   if (draft.page !== null && draft.page !== undefined) out.page = draft.page;
   return out;
+}
+
+/** Tira os campos no default de um item EMBUTIDO numa criatura (sem id/tags/$source: não são entradas próprias). */
+function compactCreatureItem(item: CompendiumItemBody): Record<string, unknown> {
+  const out: Record<string, unknown> = { kind: item.kind, name: item.name };
+  if (Object.keys(item.fields).length > 0) out.fields = item.fields;
+  if (item.actions.length > 0) out.actions = item.actions;
+  if (item.activation) out.activation = item.activation;
+  if (item.enhancements.length > 0) {
+    out.enhancements = item.enhancements.map((e) => ({ id: e.id, cost: e.cost, ...(e.repeatable ? { repeatable: true } : {}), ...(e.effect ? { effect: e.effect } : {}) }));
+  }
+  if (item.save) out.save = item.save;
+  if (Object.keys(item.statBonuses).length > 0) out.statBonuses = item.statBonuses;
+  if (item.slots) out.slots = item.slots;
+  if (item.price) out.price = item.price;
+  if (item.page !== null) out.page = item.page;
+  return out;
+}
+
+/** Tira os campos no default de uma entrada de CRIATURA para o JSON ficar enxuto. */
+function compactCreature(draft: CreatureDraft): Record<string, unknown> {
+  const sheet: Record<string, unknown> = { attributes: draft.sheet.attributes, resources: draft.sheet.resources, skills: draft.sheet.skills };
+  if (Object.keys(draft.sheet.traits).length > 0) sheet.traits = draft.sheet.traits;
+  if (draft.sheet.size !== null) sheet.size = draft.sheet.size;
+  if (Object.keys(draft.sheet.derivedOverrides).length > 0) sheet.derivedOverrides = draft.sheet.derivedOverrides;
+  const { all, byType } = draft.sheet.damageResponses;
+  if (Object.keys(byType).length > 0 || all.reduction > 0 || all.immune || all.vulnerable) sheet.damageResponses = { all, byType };
+  sheet.level = draft.sheet.level;
+  sheet.manualProgression = draft.sheet.manualProgression;
+  if (draft.sheet.items.length > 0) sheet.items = draft.sheet.items.map(compactCreatureItem);
+  return { type: "creature", id: draft.id, name: draft.name, $source: draft.$source, ...(draft.page !== null ? { page: draft.page } : {}), sheet };
 }
 
 function main(): void {
@@ -1070,6 +1324,19 @@ function main(): void {
     "Aprimoramentos (effects `onuse`+`self` de magias, poderes e consumíveis) viram `enhancements[{ id: \"eN\", cost, repeatable, effect? }]`; `repeatable` = flag `aumenta` (\"Múltiplas Aplicações\"). O texto vai para `descriptions.local.json` na chave `<id>#eN` e a lista continua no fim da descrição (\"+N PM: ...\"). Truque (custo vazio em magia) e custos negativos ficam só na descrição. Os demais effects (efeitos ativos) não entram mais na descrição.",
   );
   report.notes.push("Poderes raciais entram em `powers.json` com a raça como tag; o vínculo raça → poderes (`grants` do Foundry) não é modelado no nosso schema.");
+  report.notes.push(
+    "Criaturas (`ameacas`, `creatures.json`): o Foundry não guarda página do livro no bloco do ATOR (só nos itens embutidos), então `page` fica `null` em todas. " +
+      "`detalhes.raca/tesouro/role/alinhamento/equipamento/resistencias(texto)/ataquescac` não têm campo correspondente no nosso schema e não são importados — " +
+      "os ataques e as resistências já vêm de forma estruturada dos itens embutidos e de `tracos.resistencias`.",
+  );
+  report.notes.push(
+    "Criaturas: perícias — o Foundry guarda o TOTAL da perícia; gravamos `trained` e ajustamos `skills.<k>.other` pela diferença entre esse total e o calculado pela " +
+      "fórmula do sistema com `other = 0`, então o total bate com o livro sem hardcode (e a iniciativa do bloco, `{skill.iniciativa}`, sai certa de graça).",
+  );
+  report.notes.push(
+    'Criaturas: resistência "perda" (perda de PV) não é um tipo de dano do sistema e é ignorada; a resposta "dano" (geral) vira `damageResponses.all`. ' +
+      "`half` (reduz o dano à metade) nunca vem do Foundry: sempre `false` na importação.",
+  );
 
   const customIds = new Set<string>();
   const customPath = join(outDir, CUSTOM_FILE);
@@ -1077,6 +1344,7 @@ function main(): void {
 
   const docs = readPacks(opts.source);
   const drafts = new Map<string, Draft[]>();
+  const creatureDrafts: CreatureDraft[] = [];
   const usedIds = new Set<string>(customIds);
   const descriptions: Record<string, string> = {};
   const unknownEntities = new Set<string>();
@@ -1085,24 +1353,15 @@ function main(): void {
     return existsSync(p) ? str((JSON.parse(readFileSync(p, "utf-8")) as { version?: unknown }).version) : "?";
   })();
 
-  for (const doc of docs) {
-    if (SKIPPED_PACKS[doc.pack]) {
-      report.bump(report.skippedPacks, `${doc.pack} (${SKIPPED_PACKS[doc.pack]})`);
-      continue;
-    }
-    const kind = kindOf(doc);
-    if (!kind) {
-      report.bump(report.skippedTypes, doc.type);
-      continue;
-    }
-    if (doc.effects.some((e) => Array.isArray(e.changes) && e.changes.length > 0)) report.bump(report.effectsIgnored, doc.type);
-
-    // Id: slug do nome; colisão → sufixo do subtipo (poderes) ou do id do Foundry.
+  // Id: slug do nome; colisão → sufixo do subtipo (poderes) ou do id do Foundry. Compartilhado
+  // entre itens e criaturas: os dois vivem no mesmo espaço de ids do compêndio (ver a checagem
+  // "Ids únicos entre arquivos" mais abaixo). null = id já existe em custom.json (pula o documento).
+  const assignId = (doc: FoundryDoc): string | null => {
     let id = slug(doc.name);
     if (!id) throw new Error(`Documento sem nome utilizável: ${doc.path}`);
     if (customIds.has(id)) {
       report.replacedByCustom.push(id);
-      continue;
+      return null;
     }
     if (usedIds.has(id)) {
       const subtype = slug(str(doc.system.subtipo).split(",")[0] ?? "");
@@ -1111,6 +1370,33 @@ function main(): void {
       id = candidate;
     }
     usedIds.add(id);
+    return id;
+  };
+
+  for (const doc of docs) {
+    if (SKIPPED_PACKS[doc.pack]) {
+      report.bump(report.skippedPacks, `${doc.pack} (${SKIPPED_PACKS[doc.pack]})`);
+      continue;
+    }
+
+    // Ator (bloco de monstro): formato bem diferente de um item, tratado à parte — não passa por
+    // kindOf/convert, que são de ITEM.
+    if (doc.type === "npc") {
+      const id = assignId(doc);
+      if (id === null) continue;
+      creatureDrafts.push(converter.creature(doc, id, unknownEntities, resolvers, opts.withDescriptions ? descriptions : null));
+      continue;
+    }
+
+    const kind = kindOf(doc);
+    if (!kind) {
+      report.bump(report.skippedTypes, doc.type);
+      continue;
+    }
+    if (doc.effects.some((e) => Array.isArray(e.changes) && e.changes.length > 0)) report.bump(report.effectsIgnored, doc.type);
+
+    const id = assignId(doc);
+    if (id === null) continue;
 
     const draft = convert(converter, doc, kind, id);
     if (!draft) continue;
@@ -1145,11 +1431,17 @@ function main(): void {
     files.set(file, entries);
     report.generated.set(file, entries.length);
   }
+  {
+    const entries = creatureDrafts.sort((a, b) => a.id.localeCompare(b.id)).map(compactCreature);
+    validateCompendiumEntries(opts.systemId, entries);
+    files.set(CREATURE_FILE, entries);
+    report.generated.set(CREATURE_FILE, entries.length);
+  }
   // Ids únicos entre arquivos (o loader já dá precedência, mas gerado não pode repetir).
   const all = [...files.values()].flat().map((e) => e.id as string);
   if (new Set(all).size !== all.length) throw new Error("Id repetido entre arquivos gerados");
 
-  for (const file of Object.values(KIND_FILES)) {
+  for (const file of [...Object.values(KIND_FILES), CREATURE_FILE]) {
     const entries = files.get(file) ?? [];
     const payload = {
       $generated: "Gerado por scripts/import-foundry-compendium.ts a partir dos packs do Foundry. Não edite à mão: use custom.json (tem precedência por id).",

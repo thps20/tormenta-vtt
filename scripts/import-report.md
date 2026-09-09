@@ -10,6 +10,7 @@ Este arquivo é regenerado a cada execução; não edite à mão. Plano e decis�
 | armor.json | 24 |
 | classes.json | 12 |
 | consumables.json | 95 |
+| creatures.json | 83 |
 | gear.json | 160 |
 | powers.json | 745 |
 | races.json | 16 |
@@ -22,9 +23,8 @@ Packs ignorados de propósito (criaturas, convocações, macros, tabelas, journa
 
 | Pack | Documentos |
 |---|---|
-| ameacas (criaturas (NPCs)) | 83 |
-| convocacoes (criaturas convocadas) | 18 |
-| habilidades-de-criaturas (habilidades e armas naturais de criaturas) | 61 |
+| convocacoes (criaturas convocadas (atributos escalam com o nível do conjurador; ver docs/backlog.md)) | 18 |
+| habilidades-de-criaturas (habilidades e armas naturais de criaturas, num pack à parte (os itens do pack ameacas já vêm embutidos no ator, sem depender deste)) | 61 |
 | parceiros (parceiros (regra de NPC)) | 18 |
 
 ## Regras aplicadas (decisões do dono do projeto)
@@ -36,10 +36,13 @@ Packs ignorados de propósito (criaturas, convocações, macros, tabelas, journa
 - Poderes `ability` → `habilidade`, `distincao` → `distincao` (opções adicionadas a `power.type` no JSON do sistema).
 - Aprimoramentos (effects `onuse`+`self` de magias, poderes e consumíveis) viram `enhancements[{ id: "eN", cost, repeatable, effect? }]`; `repeatable` = flag `aumenta` ("Múltiplas Aplicações"). O texto vai para `descriptions.local.json` na chave `<id>#eN` e a lista continua no fim da descrição ("+N PM: ..."). Truque (custo vazio em magia) e custos negativos ficam só na descrição. Os demais effects (efeitos ativos) não entram mais na descrição.
 - Poderes raciais entram em `powers.json` com a raça como tag; o vínculo raça → poderes (`grants` do Foundry) não é modelado no nosso schema.
+- Criaturas (`ameacas`, `creatures.json`): o Foundry não guarda página do livro no bloco do ATOR (só nos itens embutidos), então `page` fica `null` em todas. `detalhes.raca/tesouro/role/alinhamento/equipamento/resistencias(texto)/ataquescac` não têm campo correspondente no nosso schema e não são importados — os ataques e as resistências já vêm de forma estruturada dos itens embutidos e de `tracos.resistencias`.
+- Criaturas: perícias — o Foundry guarda o TOTAL da perícia; gravamos `trained` e ajustamos `skills.<k>.other` pela diferença entre esse total e o calculado pela fórmula do sistema com `other = 0`, então o total bate com o livro sem hardcode (e a iniciativa do bloco, `{skill.iniciativa}`, sai certa de graça).
+- Criaturas: resistência "perda" (perda de PV) não é um tipo de dano do sistema e é ignorada; a resposta "dano" (geral) vira `damageResponses.all`. `half` (reduz o dano à metade) nunca vem do Foundry: sempre `false` na importação.
 
-Aprimoramentos (effects `onuse`+`self`): 568 em 218 entradas, 170 repetíveis (`aumenta`); 15 truques (custo vazio em magia, só na descrição); 291 effects `onuse` sem `self` não modelados (aprimoramentos concedidos a outras magias/ataques, ex.: Familiar Coruja).
+Aprimoramentos (effects `onuse`+`self`): 743 em 281 entradas, 211 repetíveis (`aumenta`); 24 truques (custo vazio em magia, só na descrição); 314 effects `onuse` sem `self` não modelados (aprimoramentos concedidos a outras magias/ataques, ex.: Familiar Coruja).
 
-Efeito mecânico preenchido só quando o texto inteiro casa um padrão estrito ("aumenta o dano em +XdY", "+XdY de dano", "muda o dano para XdY", "aumenta a cura em +XdY", "aumenta a CD em +N", "muda o alcance para <unidade>", "muda a duração para [N] <unidade>", "muda a área para <texto>", "aumenta o número de alvos em +N"): 1 `areaSet`, 18 `damageDiceAdd`, 8 `durationSet`, 2 `healDiceAdd`, 5 `rangeSet`, 15 `targetsAdd`. Frases compostas ("muda o alcance para médio e a duração para cena") e os demais ficam como só custo e estão listados por categoria no fim deste relatório.
+Efeito mecânico preenchido só quando o texto inteiro casa um padrão estrito ("aumenta o dano em +XdY", "+XdY de dano", "muda o dano para XdY", "aumenta a cura em +XdY", "aumenta a CD em +N", "muda o alcance para <unidade>", "muda a duração para [N] <unidade>", "muda a área para <texto>", "aumenta o número de alvos em +N"): 1 `areaSet`, 26 `damageDiceAdd`, 10 `durationSet`, 2 `healDiceAdd`, 12 `rangeSet`, 17 `targetsAdd`. Frases compostas ("muda o alcance para médio e a duração para cena") e os demais ficam como só custo e estão listados por categoria no fim deste relatório.
 
 Efeitos ativos (`effects[]` com `changes`) são ignorados de propósito; só a contagem:
 
@@ -69,10 +72,11 @@ Ids que existem em `custom.json` (confirmados no livro) e por isso não foram ge
 Nomes repetidos; o id ganhou sufixo (subtipo ou id do Foundry):
 
 - "Lendas e Histórias" (poderes/classe/bardo/lendas-e-histórias.yml) → `lendas-e-historias-bardo`
+- "Trog" (racas/trog.yml) → `trog-sbktqcqbvmuncp15`
 
 ## TODO (sem correspondência no Foundry ou fora dos nossos enums)
 
-Total: 198 pendências em 14 categorias.
+Total: 510 pendências em 19 categorias.
 
 ### alcance: valor fora dos nossos enums (gravado "special") (7)
 
@@ -84,26 +88,112 @@ Total: 198 pendências em 14 categorias.
 - `sonho`: `any`
 - `videncia`: `any`
 
-### aprimoramento: sem a flag de múltiplas aplicações (gravado como não repetível) (6)
+### aprimoramento: sem a flag de múltiplas aplicações (gravado como não repetível) (9)
 
 - `amedrontar`: "afeta todos os alvos válidos a sua escolha dentro do alcance."
 - `ancora-dimensional`: "muda o efeito para criar um fio de energia cor de esmeralda que prende o alvo a "
+- `arauto-dos-goblinoides#item3`: "afeta todos os alvos válidos a sua escolha dentro do alcance."
 - `area-escorregadia`: "muda a CD dos testes de Acrobacia para 15."
 - `area-escorregadia`: "muda a CD dos testes de Acrobacia para 20."
 - `arma-espiritual`: "invoca duas armas, permitindo que você contra-ataque (ou ataque, se usar o aprim"
 - `arma-espiritual`: "muda o tipo do dano para essência. Requer 2o círculo."
+- `hobgoblin-mago-de-batalha#item3`: "afeta todos os alvos válidos a sua escolha dentro do alcance."
+- `necromante#item2`: "afeta todos os alvos válidos a sua escolha dentro do alcance."
 
-### armadura pesada: limite de atributo na Defesa (maxAttr) não importado; conferir no livro (9)
+### arma: proficiência: valor sem mapeamento (68)
+
+- `aranha-gigante#item2`: `natural`
+- `assassino-aberrante#item4`: `natural`
+- `assassino-aberrante#item5`: `natural`
+- `basilisco#item3`: `natural`
+- `besouro-aberrante#item4`: `natural`
+- `cao-do-inferno#item2`: `natural`
+- `cascavel#item2`: `natural`
+- `centauro-combatente#item4`: `natural`
+- `centauro-xama#item8`: `natural`
+- `centopeia-dragao#item4`: `natural`
+- `dragao-adulto#item11`: `natural`
+- `dragao-adulto#item12`: `natural`
+- `dragao-filhote#item2`: `natural`
+- `dragao-filhote#item3`: `natural`
+- `dragao-jovem#item3`: `natural`
+- `dragao-jovem#item4`: `natural`
+- `dragao-rei#item16`: `natural`
+- `dragao-rei#item17`: `natural`
+- `dragao-veneravel#item13`: `natural`
+- `dragao-veneravel#item14`: `natural`
+- `formiga-aberrante#item1`: `natural`
+- `formiga-aberrante#item2`: `natural`
+- `formiga-aberrante-maior#item1`: `natural`
+- `formiga-aberrante-maior#item2`: `natural`
+- `ganchador#item2`: `natural`
+- `ganchador#item3`: `natural`
+- `gargula#item2`: `natural`
+- `glop#item1`: `natural`
+- `gnoll-filibusteiro#item3`: `natural`
+- `gnoll-saqueador#item2`: `natural`
+- `golem-de-ferro#item1`: `natural`
+- `grifo#item2`: `natural`
+- `grifo#item3`: `natural`
+- `guerreiro-de-chifres#item2`: `natural`
+- `hidra#item2`: `natural`
+- `jiboia#item3`: `natural`
+- `lagash#item6`: `natural`
+- `lobo#item3`: `natural`
+- `lobo-crocodilo#item2`: `natural`
+- `lobo-das-cavernas#item3`: `natural`
+- `manticora#item2`: `natural`
+- `manticora#item3`: `natural`
+- `nagah-guardiao#item3`: `natural`
+- `nagah-mistica#item8`: `natural`
+- `naja#item2`: `natural`
+- `orc-mutante#item4`: `natural`
+- `otyugh#item4`: `natural`
+- `otyugh#item5`: `natural`
+- `rato-gigante#item2`: `natural`
+- `sacerdote-da-tormenta#item9`: `natural`
+- `serpe#item3`: `natural`
+- `serpe#item4`: `natural`
+- `sucuri#item3`: `natural`
+- `trog#item2`: `natural`
+- `troll#item2`: `natural`
+- `troll#item3`: `natural`
+- `troll-aquatico#item2`: `natural`
+- `troll-aquatico#item3`: `natural`
+- `troll-das-cavernas#item4`: `natural`
+- `troll-do-gelo#item2`: `natural`
+- `troll-do-gelo#item3`: `natural`
+- `troll-subterraneo#item2`: `natural`
+- `troll-subterraneo#item3`: `natural`
+- `turba-zumbi#item4`: `natural`
+- `urso-coruja#item2`: `natural`
+- `urso-coruja#item3`: `natural`
+- `vampiro#item7`: `natural`
+- `zumbi#item2`: `natural`
+
+### armadura pesada: limite de atributo na Defesa (maxAttr) não importado; conferir no livro (21)
 
 - `armadura-completa`: Foundry maxAtr = 0
 - `armadura-da-luz`: Foundry maxAtr = 0
 - `baluarte-anao`: Foundry maxAtr = 0
 - `brunea`: Foundry maxAtr = 0
+- `capelao-de-guerra#item7`: Foundry maxAtr = 0
+- `capitao-baluarte#item4`: Foundry maxAtr = 0
 - `carapaca-demoniaca`: Foundry maxAtr = 0
+- `cavaleiro-supremacista#item7`: Foundry maxAtr = 0
 - `cota-de-malha`: Foundry maxAtr = 0
+- `esqueleto-de-elite#item3`: Foundry maxAtr = 0
+- `falange#item5`: Foundry maxAtr = 0
+- `hobgoblin-soldado#item3`: Foundry maxAtr = 0
 - `loriga-do-centuriao`: Foundry maxAtr = 0
 - `loriga-segmentada`: Foundry maxAtr = 0
 - `meia-armadura`: Foundry maxAtr = 0
+- `recruta-supremacista#item3`: Foundry maxAtr = 0
+- `sargento-da-guarda#item3`: Foundry maxAtr = 0
+- `sargento-mor#item7`: Foundry maxAtr = 0
+- `soldado-supremacista#item5`: Foundry maxAtr = 0
+- `tirano-do-terceiro#item7`: Foundry maxAtr = 0
+- `vampiro#item8`: Foundry maxAtr = 0
 
 ### ataque: perícia vazia ou desconhecida no Foundry (ação de ataque omitida) (7)
 
@@ -138,19 +228,34 @@ Total: 198 pendências em 14 categorias.
 - `raio-arcano`: `(@circulo)d8`: Caractere inválido "@" em "(@circulo)d8"
 - `use-seu-poder-para-o-bem`: `(@InquisidordaMagia)d6`: Caractere inválido "@" em "(@InquisidordaMagia)d6"
 
-### dano: referência @ desconhecida (2)
+### dano: referência @ desconhecida (3)
 
 - `fome-de-mana`: `@Tormenta`
+- `sacerdote-da-tormenta#item7`: `@Tormenta`
 - `sangue-acido`: `@Tormenta`
 
-### dano: tipo sem correspondência (gravado sem tipo) (16)
+### dano: tipo sem correspondência (gravado sem tipo) (34)
 
+- `aparicao#item2`: `curatpv`
+- `assassino-aberrante#item9`: `curapm`
+- `basilisco#item2`: `perda`
+- `besouro-aberrante#item5`: `curapm`
 - `campo-de-forca`: `curatpv`
+- `cascavel#item1`: `perda`
 - `cicuta`: `perda`
+- `cultista-da-traicao#item4`: `perda`
 - `essencia-de-mana`: `curapm`
+- `formiga-aberrante#item3`: `curapm`
+- `formiga-aberrante-maior#item3`: `curapm`
+- `golem-de-ferro#item2`: `perda`
 - `golpe-magico`: `curatpm`
+- `hobgoblin-mago-de-batalha#item9`: `curapm`
 - `homunculo`: `perda`
+- `lagash#item4`: `perda`
+- `lagash#item5`: `perda`
+- `naja#item1`: `perda`
 - `natureza-venenosa`: `perda`
+- `necromante#item5`: `curapm`
 - `nevoa-toxica`: `perda`
 - `palavra-primordial`: `perda`
 - `peconha-comum`: `perda`
@@ -159,10 +264,14 @@ Total: 198 pendências em 14 categorias.
 - `po-de-lich`: `perda`
 - `pocao-de-vitalidade-fantasma`: `curatpv`
 - `presas-venenosas`: `perda`
+- `serpe#item2`: `perda`
+- `sombra-dos-goblinoides#item4`: `perda`
+- `sombra-dos-goblinoides#item5`: `perda`
+- `sombra-dos-goblinoides#item6`: `perda`
 - `sorte-dos-loucos`: `curapm`
 - `vitalidade-fantasma`: `curatpv`
 
-### duração: texto livre no Foundry (só a unidade foi mapeada) (20)
+### duração: texto livre no Foundry (só a unidade foi mapeada) (21)
 
 - `anular-a-luz`: "Ver Texto"
 - `assassino-fantasmagorico`: "cena, até ser descarregada"
@@ -174,6 +283,7 @@ Total: 198 pendências em 14 categorias.
 - `desejo`: "veja texto"
 - `detectar-ameacas`: "Cena, até ser descarregada"
 - `dispersar-as-trevas`: "veja texto"
+- `dragao-rei#item8`: "veja texto"
 - `guardiao-divino`: "Cena ou até ser descarregado"
 - `hipnotismo`: "1d4 Rodadas"
 - `missao-divina`: "1 semana ou até ser descarregada"
@@ -193,18 +303,40 @@ Total: 198 pendências em 14 categorias.
 - `runa-de-protecao`: `hour`
 - `sonho`: `minute`
 
-### fórmula: rolagem que o nosso parser não aceita (ação omitida) (3)
+### fórmula: rolagem que o nosso parser não aceita (ação omitida) (4)
 
 - `anatomia-insana`: `1d4cs<=1*@Tormenta2`: Caractere inválido "<" em "1d4cs<=1*@Tormenta2"
 - `asas-insetoides`: `7.5+(@Tormenta*1.5)`: Caractere inválido "." em "7.5+(@Tormenta*1.5)"
 - `desprezar-a-realidade`: `1d100cs<(min(20+(@Tormenta2*5),50))`: Caractere inválido "<" em "1d100cs<(min(20+(@Tormenta2*5),50))"
+- `troll-das-cavernas#item1`: `1d6 * 1.5`: Caractere inválido "." em "1d6 * 1.5"
 
-### página: sem `source` com "p. N" (76)
+### magia: escola: valor sem mapeamento (1)
+
+- `capelao-de-guerra#item5`: ``
+
+### magia: tipo: valor sem mapeamento (1)
+
+- `capelao-de-guerra#item5`: ``
+
+### página: sem `source` com "p. N" (267)
 
 - `aggelus`: (vazio)
 - `alaude-eletrico`: "Marca pag T20, 001"
+- `aparicao#item1`: (vazio)
+- `aparicao#item2`: (vazio)
+- `aranha-gigante#item1`: (vazio)
+- `aranha-gigante#item4`: (vazio)
+- `arauto-dos-goblinoides#item1`: (vazio)
+- `arauto-dos-goblinoides#item2`: (vazio)
 - `arco-do-juramento`: "Marca pag T20, 002"
 - `armadura-ossea`: (vazio)
+- `assassino-aberrante#item10`: (vazio)
+- `assassino-aberrante#item11`: (vazio)
+- `assassino-aberrante#item3`: (vazio)
+- `assassino-aberrante#item6`: (vazio)
+- `assassino-aberrante#item7`: (vazio)
+- `assassino-aberrante#item8`: (vazio)
+- `assassino-aberrante#item9`: (vazio)
 - `aumento-de-atributo-carisma`: (vazio)
 - `aumento-de-atributo-constituicao`: (vazio)
 - `aumento-de-atributo-destreza`: (vazio)
@@ -215,42 +347,177 @@ Total: 198 pendências em 14 categorias.
 - `azagaia-dos-relampagos`: (vazio)
 - `barbaro`: (vazio)
 - `bardo`: (vazio)
+- `basilisco#item1`: (vazio)
+- `basilisco#item2`: (vazio)
+- `besouro-aberrante#item5`: (vazio)
+- `besouro-aberrante#item6`: (vazio)
+- `besouro-aberrante#item7`: (vazio)
+- `besouro-aberrante#item8`: (vazio)
 - `besta-explosiva`: (vazio)
 - `bucaneiro`: (vazio)
 - `cacador`: (vazio)
 - `cajado-da-destruicao`: (vazio)
 - `cajado-da-vida`: (vazio)
 - `cajado-do-poder`: (vazio)
+- `cao-do-inferno#item1`: (vazio)
+- `capelao-de-guerra#item1`: (vazio)
+- `capitao-baluarte#item1`: (vazio)
+- `capitao-baluarte#item2`: (vazio)
+- `cascavel#item1`: (vazio)
+- `cavaleiro-supremacista#item8`: (vazio)
 - `cavaleiro`: (vazio)
+- `centauro-combatente#item2`: (vazio)
+- `centauro-xama#item1`: (vazio)
+- `centauro-xama#item5`: (vazio)
+- `centopeia-dragao#item1`: (vazio)
+- `centopeia-dragao#item2`: (vazio)
+- `centopeia-dragao#item3`: (vazio)
+- `chefe-bandido#item2`: (vazio)
 - `clerigo`: (vazio)
+- `colosso-supremo#item1`: (vazio)
+- `colosso-supremo#item2`: (vazio)
+- `colosso-supremo#item3`: (vazio)
+- `colosso-supremo#item4`: (vazio)
+- `colosso-supremo#item5`: (vazio)
+- `colosso-supremo#item6`: (vazio)
+- `colosso-supremo#item7`: (vazio)
+- `colosso-supremo#item8`: (vazio)
 - `controlar-ar`: "Errata ADB, Blog da Jambô"
+- `cultista-da-traicao#item1`: (vazio)
+- `cultista-da-traicao#item2`: (vazio)
+- `cultista-da-traicao#item4`: (vazio)
 - `dahllan`: (vazio)
+- `devorador-de-medos#item1`: (vazio)
+- `devorador-de-medos#item2`: (vazio)
+- `devorador-de-medos#item3`: (vazio)
+- `dragao-adulto#item10`: (vazio)
+- `dragao-adulto#item13`: (vazio)
+- `dragao-adulto#item14`: (vazio)
+- `dragao-adulto#item15`: (vazio)
+- `dragao-adulto#item1`: (vazio)
+- `dragao-adulto#item2`: (vazio)
+- `dragao-adulto#item9`: (vazio)
+- `dragao-filhote#item1`: (vazio)
+- `dragao-filhote#item4`: (vazio)
+- `dragao-filhote#item5`: (vazio)
+- `dragao-jovem#item1`: (vazio)
+- `dragao-jovem#item2`: (vazio)
+- `dragao-jovem#item5`: (vazio)
+- `dragao-jovem#item6`: (vazio)
+- `dragao-jovem#item7`: (vazio)
+- `dragao-rei#item14`: (vazio)
+- `dragao-rei#item15`: (vazio)
+- `dragao-rei#item18`: (vazio)
+- `dragao-rei#item19`: (vazio)
+- `dragao-rei#item1`: (vazio)
+- `dragao-rei#item20`: (vazio)
+- `dragao-rei#item2`: (vazio)
+- `dragao-rei#item5`: (vazio)
+- `dragao-veneravel#item11`: (vazio)
+- `dragao-veneravel#item12`: (vazio)
+- `dragao-veneravel#item15`: (vazio)
+- `dragao-veneravel#item16`: (vazio)
+- `dragao-veneravel#item17`: (vazio)
+- `dragao-veneravel#item18`: (vazio)
+- `dragao-veneravel#item1`: (vazio)
 - `druida`: (vazio)
 - `elfo`: (vazio)
+- `engenho-de-guerra-goblin#item1`: (vazio)
+- `engenho-de-guerra-goblin#item2`: (vazio)
+- `engenho-de-guerra-goblin#item3`: (vazio)
+- `engenho-de-guerra-goblin#item4`: (vazio)
+- `engenho-de-guerra-goblin#item5`: (vazio)
+- `engenho-de-guerra-goblin#item6`: (vazio)
+- `engenho-de-guerra-goblin#item7`: (vazio)
+- `engenho-de-guerra-goblin#item8`: (vazio)
+- `engenho-de-guerra-goblin#item9`: (vazio)
+- `enxame-kobold#item1`: (vazio)
+- `enxame-kobold#item2`: (vazio)
+- `enxame-kobold#item3`: (vazio)
 - `espada-baronial`: (vazio)
 - `espada-sortuda`: (vazio)
+- `falange#item1`: (vazio)
+- `falange#item3`: (vazio)
+- `finntroll-cacador#item4`: (vazio)
+- `finntroll-feitor#item2`: (vazio)
+- `finntroll-feitor#item3`: (vazio)
+- `finntroll-feitor#item4`: (vazio)
+- `finntroll-feitor#item5`: (vazio)
+- `finntroll-feitor#item7`: (vazio)
 - `florete-fugaz`: (vazio)
+- `formiga-aberrante#item3`: (vazio)
+- `formiga-aberrante#item4`: (vazio)
+- `formiga-aberrante#item5`: (vazio)
+- `formiga-aberrante#item6`: (vazio)
+- `formiga-aberrante-maior#item3`: (vazio)
+- `formiga-aberrante-maior#item4`: (vazio)
+- `formiga-aberrante-maior#item5`: (vazio)
+- `formiga-aberrante-maior#item6`: (vazio)
+- `ganchador#item1`: (vazio)
+- `ganchador#item4`: (vazio)
+- `ganchador#item5`: (vazio)
+- `gargula#item1`: (vazio)
+- `goblin-engenhoqueiro#item6`: (vazio)
+- `goblin-salteador#item1`: (vazio)
 - `goblin`: (vazio)
+- `golem-de-ferro#item2`: (vazio)
+- `golem-de-ferro#item3`: (vazio)
 - `golem`: (vazio)
+- `grifo#item1`: (vazio)
+- `grifo#item4`: (vazio)
+- `guarda-de-cidade#item2`: (vazio)
+- `guerreiro-de-chifres#item3`: (vazio)
+- `hidra#item1`: (vazio)
+- `hobgoblin-mago-de-batalha#item2`: (vazio)
 - `hynne`: (vazio)
 - `inventor`: (vazio)
+- `jiboia#item1`: (vazio)
 - `julgamento-divino-justica`: (vazio)
 - `kliren`: (vazio)
 - `ladino`: (vazio)
+- `lagash#item1`: (vazio)
+- `lagash#item2`: (vazio)
+- `lagash#item3`: (vazio)
+- `lagash#item4`: (vazio)
+- `lagash#item5`: (vazio)
 - `lamina-da-luz`: (vazio)
 - `lanca-animalesca`: (vazio)
 - `lefou`: (vazio)
 - `lingua-do-deserto`: (vazio)
+- `lobo#item1`: (vazio)
+- `lobo#item2`: (vazio)
+- `lobo-crocodilo#item1`: (vazio)
+- `lobo-das-cavernas#item1`: (vazio)
+- `lobo-das-cavernas#item2`: (vazio)
 - `lutador`: (vazio)
 - `maca-do-terror`: (vazio)
 - `machado-silvestre`: (vazio)
 - `magias-clerigo`: (vazio)
+- `manticora#item1`: (vazio)
 - `martelo-dos-anoes`: (vazio)
 - `medusa`: (vazio)
 - `minotauro`: (vazio)
+- `nagah-mistica#item2`: (vazio)
+- `nagah-mistica#item6`: (vazio)
+- `nagah-mistica#item9`: (vazio)
+- `naja#item1`: (vazio)
+- `necromante#item1`: (vazio)
+- `necromante#item6`: (vazio)
+- `necromante#item7`: (vazio)
 - `nobre`: (vazio)
 - `odre`: (vazio)
+- `ogro#item1`: (vazio)
+- `ogro#item2`: (vazio)
+- `orc-chefe#item1`: (vazio)
+- `orc-chefe#item2`: (vazio)
+- `orc-chefe#item4`: (vazio)
+- `orc-combatente#item1`: (vazio)
+- `orc-combatente#item3`: (vazio)
+- `orc-mutante#item1`: (vazio)
+- `orc-mutante#item2`: (vazio)
 - `osteon`: (vazio)
+- `otyugh#item1`: (vazio)
+- `otyugh#item3`: (vazio)
 - `paladino`: (vazio)
 - `pocao-de-concentracao-de-combate-cena`: (vazio)
 - `pocao-de-enfeiticar`: (vazio)
@@ -268,15 +535,79 @@ Total: 198 pendências em 14 categorias.
 - `punhal-traicoeiro`: (vazio)
 - `qareen`: (vazio)
 - `ramo-verdejante`: (vazio)
+- `rato-gigante#item1`: (vazio)
+- `recruta-supremacista#item1`: (vazio)
+- `sacerdote-da-tormenta#item2`: (vazio)
+- `sargento-da-guarda#item1`: (vazio)
+- `sargento-da-guarda#item6`: (vazio)
+- `sargento-mor#item1`: (vazio)
+- `sargento-mor#item2`: (vazio)
 - `sereia-tritao`: (vazio)
+- `serpe#item1`: (vazio)
+- `serpe#item2`: (vazio)
 - `silfide`: (vazio)
+- `soldado-supremacista#item1`: (vazio)
+- `sombra-dos-goblinoides#item3`: (vazio)
+- `sombra-dos-goblinoides#item4`: (vazio)
+- `sombra-dos-goblinoides#item7`: (vazio)
 - `sorte-dos-loucos`: (vazio)
+- `sucuri#item1`: (vazio)
 - `sulfure`: (vazio)
+- `tirano-do-terceiro#item1`: (vazio)
+- `tirano-do-terceiro#item2`: (vazio)
+- `tirano-do-terceiro#item3`: (vazio)
+- `tirano-do-terceiro#item4`: (vazio)
+- `tirano-do-terceiro#item5`: (vazio)
+- `tirano-do-terceiro#item6`: (vazio)
+- `tirano-do-terceiro#item7`: (vazio)
 - `traje-de-artista`: (vazio)
-- `trog`: (vazio)
+- `trog#item3`: (vazio)
+- `trog-sbktqcqbvmuncp15`: (vazio)
+- `troll#item1`: (vazio)
+- `troll-aquatico#item1`: (vazio)
+- `troll-aquatico#item4`: (vazio)
+- `troll-das-cavernas#item1`: (vazio)
+- `troll-das-cavernas#item2`: (vazio)
+- `troll-do-gelo#item1`: (vazio)
+- `troll-do-gelo#item4`: (vazio)
+- `troll-do-gelo#item5`: (vazio)
+- `troll-subterraneo#item1`: (vazio)
+- `troll-subterraneo#item4`: (vazio)
+- `troll-subterraneo#item5`: (vazio)
+- `turba-zumbi#item1`: (vazio)
+- `turba-zumbi#item2`: (vazio)
+- `turba-zumbi#item3`: (vazio)
+- `urso-coruja#item1`: (vazio)
+- `vampiro#item1`: (vazio)
+- `vampiro#item2`: (vazio)
+- `vampiro#item3`: (vazio)
+- `vampiro#item4`: (vazio)
+- `vampiro#item5`: (vazio)
 - `versatilidade`: (vazio)
 - `vingadora-sagrada`: (vazio)
 - `voz-poderosa`: (vazio)
+- `zumbi#item1`: (vazio)
+
+### perícia: abreviação sem correspondência no sistema (3)
+
+- `goblin-engenhoqueiro`: `ofi1`
+- `hobgoblin-mago-de-batalha`: `ofi1`
+- `sombra-dos-goblinoides`: `ofi1`
+
+### poder: tipo: valor sem mapeamento (12)
+
+- `assassino-aberrante#item1`: ``
+- `besouro-aberrante#item2`: ``
+- `besouro-aberrante#item3`: ``
+- `finntroll-cacador#item2`: ``
+- `finntroll-cacador#item3`: ``
+- `finntroll-feitor#item1`: ``
+- `gnoll-filibusteiro#item1`: ``
+- `goblin-engenhoqueiro#item1`: ``
+- `jiboia#item2`: ``
+- `nagah-guardiao#item1`: ``
+- `otyugh#item2`: ``
+- `sucuri#item2`: ``
 
 ### raça: sentidos e perícias treinadas não existem no Foundry (16)
 
@@ -295,7 +626,7 @@ Total: 198 pendências em 14 categorias.
 - `sereia-tritao`: conferir no livro
 - `silfide`: conferir no livro
 - `sulfure`: conferir no livro
-- `trog`: conferir no livro
+- `trog-sbktqcqbvmuncp15`: conferir no livro
 
 ### resistência: texto sem uma perícia única (14)
 
@@ -316,7 +647,7 @@ Total: 198 pendências em 14 categorias.
 
 ## Aprimoramentos sem efeito mecânico (por categoria)
 
-519 aprimoramentos ficaram como só custo (`effect` ausente) porque o texto não casa nenhum padrão estrito. Não entram no total de TODO; o jogador pode completar o efeito na ficha (modo edição).
+675 aprimoramentos ficaram como só custo (`effect` ausente) porque o texto não casa nenhum padrão estrito. Não entram no total de TODO; o jogador pode completar o efeito na ficha (modo edição).
 
 ### alcance (15)
 
@@ -336,7 +667,7 @@ Total: 198 pendências em 14 categorias.
 - `possessao#e3`: muda a duração para permanente, mas destrói seu corpo original no processo. Uma criatura possuída p…
 - `tranca-arcana#e1`: muda o alcance para curto e a duração para instantânea. Em vez do normal, a magia abre portas, baús…
 
-### alvo adicional (150)
+### alvo adicional (209)
 
 - `abencoar-alimentos#e2`: muda a duração para permanente, o alvo para 1 frasco com água e adiciona componente material (pó de…
 - `acalmar-animal#e2`: muda o alvo para 1 monstro ou espírito com Inteligência 1 ou 2.
@@ -358,12 +689,28 @@ pronunciar palavras (o que permite lançar essa magia de armadu…
 - `ancora-dimensional#e4`: muda o alvo para área de cubo de 9m, a duração para permanente e adiciona componente material (chav…
 - `ancora-dimensional#e5`: muda o alcance para médio, a área para esfera de 3m de raio e o alvo para criaturas escolhidas. Cri…
 - `aparencia-perfeita#e1`: muda o alcance para toque e o alvo para 1 humanoide
+- `arauto-dos-goblinoides#item3#e1`: alvos que falhem na resistência ficam apavorados por 1d4+1 rodadas, em vez de apenas 1.
+- `arauto-dos-goblinoides#item3#e2`: muda o alvo para 1 criatura.
+- `arauto-dos-goblinoides#item3#e3`: afeta todos os alvos válidos a sua escolha dentro do alcance.
+- `arauto-dos-goblinoides#item4#e2`: também remove uma condição de fadiga do alvo.
+- `arauto-dos-goblinoides#item4#e4`: muda o alcance para curto e o alvo para criaturas escolhidas.
 - `arma-espiritual#e3`: muda a duração para sustentada. Além do normal, uma vez por rodada, você pode gastar uma ação livre…
 - `aviso#e2`: se escolher mensagem, o alvo pode enviar uma resposta de até 25 palavras para você até o fim de seu…
 - `aviso#e3`: se escolher localização, muda a duração para cena. O alvo sabe onde você está mesmo que você mude d…
 - `bencao#e1`: muda o alvo para 1 cadáver e a duração para 1 semana. O cadáver não se decompõe nem pode ser transf…
 - `camuflagem-ilusoria#e1`: a imagem do alvo fica mais distorcida, aumentando a chance de falha da camuflagem leve para 50%.
 - `camuflagem-ilusoria#e2`: muda o alcance para curto e o alvo para criaturas escolhidas. Requer 4º círculo.
+- `capelao-de-guerra#item3#e1`: muda o alvo para 1 cadáver e a duração para 1 semana. O cadáver não se decompõe nem pode ser transf…
+- `capelao-de-guerra#item4#e2`: também remove uma condição de fadiga do alvo.
+- `capelao-de-guerra#item4#e4`: muda o alcance para curto e o alvo para criaturas escolhidas.
+- `cavaleiro-supremacista#item1#e3`: muda a execução para padrão, o alcance para curto, o alvo para criaturas escolhidas e a duração par…
+- `cavaleiro-supremacista#item3#e1`: muda o alcance para toque e o alvo para 1 criatura.
+- `cavaleiro-supremacista#item4#e3`: muda o alcance para pessoal e o alvo para área: esfera com 6m de raio. Você dispara raios pelas pon…
+- `cavaleiro-supremacista#item5#e1`: muda o alvo para criaturas escolhidas no alcance. Requer 4º círculo.
+- `cavaleiro-supremacista#item5#e2`: muda o alcance para pessoal e o alvo para você. Você acelera sua mente, além de seu corpo. A ação a…
+- `centauro-xama#item3#e3`: muda o alcance para pessoal, a área para alvo (você) e a resistência para nenhuma. Em vez do normal…
+- `centauro-xama#item4#e2`: também remove uma condição de fadiga do alvo.
+- `centauro-xama#item4#e4`: muda o alcance para curto e o alvo para criaturas escolhidas.
 - `circulo-da-justica#e1`: muda a execução para ação padrão, o alcance para pessoal, o alvo para você, a duração para cena e a…
 - `comando#e1`: muda o alvo para 1 criatura.
 - `compreensao#e2`: muda o alcance para curto e o alvo para criaturas escolhidas. Você pode entender todas as criaturas…
@@ -375,6 +722,11 @@ pronunciar palavras (o que permite lançar essa magia de armadu…
 - `controlar-plantas#e3`: muda o alcance para pessoal, a área para alvo (você) e a resistência para nenhuma. Em vez do normal…
 - `convocacao-instantanea#e2`: muda o alvo para um baú Médio, a duração para permanente e adiciona sacrifício de 1 PM. Em vez do n…
 - `convocacao-instantanea#e4`: muda o alvo para 1 objeto de até 10 espaços. Um objeto muito grande ou pesado para aparecer em suas…
+- `cultista-da-traicao#item7#e1`: muda o alvo para 1 criatura.
+- `cultista-da-traicao#item8#e2`: também remove uma condição de fadiga do alvo.
+- `cultista-da-traicao#item8#e4`: muda o alcance para curto e o alvo para criaturas escolhidas.
+- `cultista-da-traicao#item9#e4`: muda o alvo para 1 criatura e a resistência para Fortitude parcial. Você lança a magia nos olhos do…
+- `cultista-da-traicao#item9#e5`: muda o alcance para pessoal e o alvo para você. Em vez do normal, você é coberto por sombras, receb…
 - `curar-ferimentos#e2`: também remove uma condição de fadiga do alvo.
 - `curar-ferimentos#e4`: muda o alcance para curto e o alvo para criaturas escolhidas.
 - `despedacar#e2`: muda o alvo para objeto mundano Médio. Requer 2º círculo.
@@ -387,6 +739,26 @@ pronunciar palavras (o que permite lançar essa magia de armadu…
 - `disfarce-ilusorio#e2`: muda o alcance para curto e o alvo para 1 criatura. Uma criatura involuntária pode anular o efeito …
 - `disfarce-ilusorio#e4`: muda o alcance para curto e o alvo para criaturas escolhidas. Cada criatura pode ter uma aparência …
 - `dispersar-as-trevas#e2`: muda o alcance para curto, a área para alvo 1 criatura e a duração para cena. O alvo fica imune a e…
+- `dragao-adulto#item4#e2`: também remove uma condição de fadiga do alvo.
+- `dragao-adulto#item4#e4`: muda o alcance para curto e o alvo para criaturas escolhidas.
+- `dragao-adulto#item6#e1`: em vez do normal, você sugere uma ação para o alvo e ele obedece. A sugestão deve ser feita de modo…
+- `dragao-adulto#item6#e2`: muda o alvo para 1 espírito ou monstro. Requer 3º círculo.
+- `dragao-adulto#item6#e3`: afeta todos os alvos dentro do alcance.
+- `dragao-adulto#item8#e1`: muda o alvo para criaturas escolhidas no alcance. Requer 4º círculo.
+- `dragao-adulto#item8#e2`: muda o alcance para pessoal e o alvo para você. Você acelera sua mente, além de seu corpo. A ação a…
+- `dragao-rei#item10#e1`: em vez do normal, você sugere uma ação para o alvo e ele obedece. A sugestão deve ser feita de modo…
+- `dragao-rei#item10#e2`: muda o alvo para 1 espírito ou monstro. Requer 3º círculo.
+- `dragao-rei#item10#e3`: afeta todos os alvos dentro do alcance.
+- `dragao-rei#item12#e2`: muda o alcance para curto e o alvo para até 5 criaturas.
+- `dragao-rei#item13#e1`: muda o alvo para criaturas escolhidas no alcance. Requer 4º círculo.
+- `dragao-rei#item13#e2`: muda o alcance para pessoal e o alvo para você. Você acelera sua mente, além de seu corpo. A ação a…
+- `dragao-veneravel#item10#e1`: muda o alvo para criaturas escolhidas no alcance. Requer 4º círculo.
+- `dragao-veneravel#item10#e2`: muda o alcance para pessoal e o alvo para você. Você acelera sua mente, além de seu corpo. A ação a…
+- `dragao-veneravel#item6#e2`: também remove uma condição de fadiga do alvo.
+- `dragao-veneravel#item6#e4`: muda o alcance para curto e o alvo para criaturas escolhidas.
+- `dragao-veneravel#item8#e1`: em vez do normal, você sugere uma ação para o alvo e ele obedece. A sugestão deve ser feita de modo…
+- `dragao-veneravel#item8#e2`: muda o alvo para 1 espírito ou monstro. Requer 3º círculo.
+- `dragao-veneravel#item8#e3`: afeta todos os alvos dentro do alcance.
 - `enfeiticar#e1`: em vez do normal, você sugere uma ação para o alvo e ele obedece. A sugestão deve ser feita de modo…
 - `enfeiticar#e2`: muda o alvo para 1 espírito ou monstro. Requer 3º círculo.
 - `enfeiticar#e3`: afeta todos os alvos dentro do alcance.
@@ -395,6 +767,12 @@ pronunciar palavras (o que permite lançar essa magia de armadu…
 - `escuridao#e4`: muda o alvo para 1 criatura e a resistência para Fortitude parcial. Você lança a magia nos olhos do…
 - `escuridao#e5`: muda o alcance para pessoal e o alvo para você. Em vez do normal, você é coberto por sombras, receb…
 - `ferver-sangue#e2`: muda alvo para criaturas escolhidas. Requer 5º círculo.
+- `finntroll-feitor#item10#e1`: em vez do normal, você sugere uma ação para o alvo e ele obedece. A sugestão deve ser feita de modo…
+- `finntroll-feitor#item10#e2`: muda o alvo para 1 espírito ou monstro. Requer 3º círculo.
+- `finntroll-feitor#item10#e3`: afeta todos os alvos dentro do alcance.
+- `finntroll-feitor#item8#e1`: você lança a magia sem gesticular ou
+pronunciar palavras (o que permite lançar essa magia de armadu…
+- `finntroll-feitor#item8#e2`: muda a duração para 1 dia. Além do normal, você "finca" a adaga na mente do alvo. Enquanto a magia …
 - `fisico-divino#e1`: muda o alcance para curto e o alvo para criaturas escolhidas.
 - `fisico-divino#e2`: em vez do normal, o alvo recebe +2 nos três atributos físicos. Requer 3º círculo.
 - `fisico-divino#e3`: em vez do normal, o alvo recebe +4 no atributo escolhido. Requer 4º círculo.
@@ -403,6 +781,10 @@ pronunciar palavras (o que permite lançar essa magia de armadu…
 - `forma-eterea#e1`: muda o alcance para toque e o alvo para até 5 criaturas voluntárias que estejam de mãos dadas. Depo…
 - `hipnotismo#e1`: como o normal, mas alvos que passarem na resistência não sabem que foram vítimas de uma magia.
 - `hipnotismo#e2`: muda o alvo para animais ou humanoides escolhidos.
+- `hobgoblin-mago-de-batalha#item3#e1`: alvos que falhem na resistência ficam apavorados por 1d4+1 rodadas, em vez de apenas 1.
+- `hobgoblin-mago-de-batalha#item3#e2`: muda o alvo para 1 criatura.
+- `hobgoblin-mago-de-batalha#item3#e3`: afeta todos os alvos válidos a sua escolha dentro do alcance.
+- `hobgoblin-mago-de-batalha#item6#e3`: muda a execução para padrão, o alcance para curto, o alvo para criaturas escolhidas e a duração par…
 - `imobilizar#e1`: muda o alvo para 1 espírito.
 - `imobilizar#e3`: muda o alvo para 1 criatura. Requer 4º círculo
 - `infligir-ferimentos#e1`: além do normal, se falhar na resistência, o alvo fica fraco pela cena.
@@ -433,6 +815,11 @@ pronunciar palavras (o que permite lançar essa magia de armadu…
 - `missao-divina#e1`: muda o alcance para toque, a
 duração para permanente e adiciona
 penalidade de –1 PM. Em vez do norm…
+- `nagah-mistica#item5#e1`: muda o alvo para criaturas escolhidas no alcance. Requer 4º círculo.
+- `nagah-mistica#item5#e2`: muda o alcance para pessoal e o alvo para você. Você acelera sua mente, além de seu corpo. A ação a…
+- `necromante#item2#e1`: alvos que falhem na resistência ficam apavorados por 1d4+1 rodadas, em vez de apenas 1.
+- `necromante#item2#e2`: muda o alvo para 1 criatura.
+- `necromante#item2#e3`: afeta todos os alvos válidos a sua escolha dentro do alcance.
 - `orientacao#e1`: muda a duração para cena. Em vez do normal, escolha um atributo. Sempre que o alvo fizer um teste d…
 - `orientacao#e2`: muda a duração para cena. Escolha entre atributos físicos (Força, Destreza e Constituição) ou menta…
 - `orientacao#e3`: muda o alvo para criaturas escolhidas. Requer 3º círculo.
@@ -459,6 +846,10 @@ penalidade de –1 PM. Em vez do norm…
 - `roubar-a-alma#e1`: o objeto que abriga a alma detém os mesmos PM totais que o alvo. Se estiver empunhando o objeto, vo…
 - `roubar-a-alma#e2`: como uma reação ao lançar esta magia, você possui o corpo sem alma do alvo, como na magia Possessão…
 - `runa-de-protecao#e2`: muda o alvo para "você" e o alcance para "pessoal". Ao invés do normal, escolha uma magia de 1º cír…
+- `sacerdote-da-tormenta#item3#e2`: também remove uma condição de fadiga do alvo.
+- `sacerdote-da-tormenta#item3#e4`: muda o alcance para curto e o alvo para criaturas escolhidas.
+- `sacerdote-da-tormenta#item5#e3`: muda o alcance para toque e o alvo para 1 criatura. A magia falha se você e o alvo não forem devoto…
+- `sacerdote-da-tormenta#item6#e1`: muda a área para alvo de 1 objeto. Em vez do normal, o alvo emana uma área de silêncio com 3m de ra…
 - `salto-dimensional#e2`: muda o alvo para você e uma criatura voluntária. Você pode escolher este aprimoramento mais vezes p…
 - `santuario#e2`: também protege o alvo contra efeitos de área. Uma criatura que tente atacar uma área que inclua o a…
 - `segunda-chance#e2`: muda o alcance para curto e o alvo para até 5 criaturas.
@@ -503,12 +894,21 @@ penalidade de –1 PM. Em vez do norm…
 - `servos-invisiveis#e2`: você pode comandar os servos para realizar uma única tarefa no seu lugar. Em termos de jogo, eles p…
 - `tranca-arcana#e2`: aumenta a CD para abrir o alvo em +5.
 
-### cura fora do padrão (12)
+### cura fora do padrão (21)
 
+- `arauto-dos-goblinoides#item4#e1`: aumenta a cura em +1d8+1.
+- `capelao-de-guerra#item4#e1`: aumenta a cura em +1d8+1.
+- `centauro-xama#item4#e1`: aumenta a cura em +1d8+1.
+- `cultista-da-traicao#item8#e1`: aumenta a cura em +1d8+1.
 - `cura-pelas-maos#e1`: aumenta a cura em +1d8+1.
 - `curar-ferimentos#e1`: aumenta a cura em +1d8+1.
+- `dragao-adulto#item4#e1`: aumenta a cura em +1d8+1.
+- `dragao-rei#item12#e1`: aumenta a cura em +20 PV.
+- `dragao-rei#item12#e3`: muda o alvo para uma criatura que tenha morrido há até uma rodada. Esta magia pode curá-la.
+- `dragao-veneravel#item6#e1`: aumenta a cura em +1d8+1.
 - `ervas-curativas#e1`: aumenta a cura +2d6 PV
 - `purificacao#e1`: também cura todos os PV perdidos por veneno.
+- `sacerdote-da-tormenta#item3#e1`: aumenta a cura em +1d8+1.
 - `segunda-chance#e1`: aumenta a cura em +20 PV.
 - `segunda-chance#e3`: muda o alvo para uma criatura que tenha morrido há até uma rodada. Esta magia pode curá-la.
 - `sopro-da-salvacao#e1`: aumenta a quantidade de cura em 1d8+2.
@@ -518,7 +918,7 @@ penalidade de –1 PM. Em vez do norm…
 - `transmutar-objetos#e6`: aumentar a cura em +1d8.
 - `virtude-paladinesca-compaixao#e1`: aumenta a cura em +2d6+1.
 
-### dano fora do padrão (99)
+### dano fora do padrão (130)
 
 - `amarras-etereas#e3`: em vez do normal, cada laço é destruído automaticamente com um único ataque bem-sucedido; porém, ca…
 - `ancora-dimensional#e2`: muda o efeito para criar um fio de energia cor de esmeralda que prende o alvo a um ponto no espaço …
@@ -535,6 +935,12 @@ penalidade de –1 PM. Em vez do norm…
 - `campo-de-forca#e1`: muda a execução para reação e a duração para instantânea. Em vez do normal, você recebe redução 30 …
 - `campo-de-forca#e3`: muda o alcance para curto, o alvo para outra criatura ou objeto Enorme ou menor e a duração para su…
 - `canalizar-energia-positiva-negativa#e1`: Aumenta a cura/dano em 1d6.
+- `capelao-de-guerra#item2#e2`: a arma passa a causar +1d6 de dano de ácido, eletricidade, fogo ou frio, escolhido no momento em qu…
+- `cavaleiro-supremacista#item3#e3`: sua pele ganha aspecto e dureza de aço. Você recebe resistência a dano 10. Requer 4º círculo.
+- `cavaleiro-supremacista#item3#e4`: muda o alcance para toque, o alvo para 1 criatura, a duração para 1d4 rodadas e adiciona Resistênci…
+- `cavaleiro-supremacista#item4#e1`: aumenta o dano em 1d8+1.
+- `cavaleiro-supremacista#item4#e2`: muda a resistências para nenhum. Como parte da execução da magia, você faz um ataque corpo a corpo …
+- `centauro-xama#item2#e4`: aumenta o dano da arma em mais um passo.
 - `chuva-de-meteoros#e1`: aumenta o número de meteoros que atingem a área, o que aumenta o dano em +2d6 de impacto e +2d6 de …
 - `colera-do-deus-sol#e1`: aumenta o dano em +2d6 (+2d8 contra mortos-vivos).
 - `coluna-de-chamas#e1`: aumenta o dano de fogo em +1d6.
@@ -556,10 +962,23 @@ penalidade de –1 PM. Em vez do norm…
 - `criar-elementos#e2`: muda o efeito para alvo 1 criatura ou objeto e a resistência para Reflexos reduz à metade. Se escol…
 - `criar-elementos#e3`: se escolheu fogo, aumenta o dano inicial de cada chama em +1d6.
 - `criar-ilusao#e7`: também criar sensações táteis, como texturas; criaturas que não saibam que é uma ilusão não consegu…
+- `cultista-da-traicao#item10#e2`: muda a resistência para Reflexos reduz à metade e o enxame para criaturas maiores, como gatos, guax…
+- `cultista-da-traicao#item10#e4`: muda a resistência para Reflexos reduz à metade e o enxame para criaturas elementais. Ele causa 5d1…
+- `cultista-da-traicao#item11#e2`: muda o tipo do dano para trevas.
+- `cultista-da-traicao#item6#e2`: a arma passa a causar +1d6 de dano de ácido, eletricidade, fogo ou frio, escolhido no momento em qu…
 - `cuspir-enxame#e1`: Aumenta o dano em +1d6 a cada 2 outros poderes da tormenta que possui.
 - `deflagracao-de-mana#e1`: aumenta o dano em 10.
 - `desintegrar#e1`: aumenta o dano total em +2d12 e o dano mínimo em +1d12.
 - `despedacar#e1`: aumenta o dano em +1d8+2.
+- `dragao-adulto#item3#e1`: muda a execução para reação e a duração para instantânea. Em vez do normal, você recebe redução 30 …
+- `dragao-adulto#item3#e2`: aumenta os PV temporários em +5 ou a redução de dano em +10.
+- `dragao-adulto#item3#e3`: muda o alcance para curto, o alvo para outra criatura ou objeto Enorme ou menor e a duração para su…
+- `dragao-rei#item6#e1`: muda a execução para reação e a duração para instantânea. Em vez do normal, você recebe redução 30 …
+- `dragao-rei#item6#e2`: aumenta os PV temporários em +5 ou a redução de dano em +10.
+- `dragao-rei#item6#e3`: muda o alcance para curto, o alvo para outra criatura ou objeto Enorme ou menor e a duração para su…
+- `dragao-veneravel#item4#e1`: muda a execução para reação e a duração para instantânea. Em vez do normal, você recebe redução 30 …
+- `dragao-veneravel#item4#e2`: aumenta os PV temporários em +5 ou a redução de dano em +10.
+- `dragao-veneravel#item4#e3`: muda o alcance para curto, o alvo para outra criatura ou objeto Enorme ou menor e a duração para su…
 - `enxame-de-pestes#e2`: muda a resistência para Reflexos reduz à metade e o enxame para criaturas maiores, como gatos, guax…
 - `enxame-de-pestes#e4`: muda a resistência para Reflexos reduz à metade e o enxame para criaturas elementais. Ele causa 5d1…
 - `enxame-rubro#e3`: muda o dano para trevas.
@@ -567,12 +986,19 @@ penalidade de –1 PM. Em vez do norm…
 - `erupcao-glacial#e2`: muda a área para cilindro com 6m de raio e 6m de altura e a duração para sustentada. Em vez do norm…
 - `escudo-da-fe#e4`: muda a execução para ação padrão, o alcance para toque e a duração para cena. A magia cria uma cone…
 - `explosao-de-chamas#e2`: muda a resistência para Reflexos parcial. Se passar, a criatura reduz o dano à metade; se falhar, f…
+- `finntroll-cacador#item1#e1`: Aumenta o Dano
+- `finntroll-feitor#item12#e2`: sempre que o alvo fizer o teste de Vontade e falhar, a marca causa 3d6 pontos de dano psíquico. Req…
+- `finntroll-feitor#item13#e2`: muda a área para alvo (criaturas escolhidas). Em vez do normal, você dispara vários relâmpagos, um …
 - `flecha-acida#e3`: aumenta o dano inicial e o dano por rodada em +1d6.
 - `forca-dos-penhascos#e1`: Reduz o dano em 10 para cada PM gasto.
 - `golpe-elemental#e2`: Dano Ácido
 - `golpe-elemental#e3`: Dano Fogo
 - `golpe-elemental#e4`: Dano Frio
 - `golpe-elemental#e5`: Dano Eletricidade
+- `hobgoblin-mago-de-batalha#item5#e2`: muda a área para efeito de esfera flamejante com tamanho Médio e a duração para cena. Em vez do nor…
+- `hobgoblin-mago-de-batalha#item5#e3`: muda a duração para 1 dia ou até ser descarregada. Em vez do normal, você cria uma pequena pedra fl…
+- `hobgoblin-mago-de-batalha#item7#e1`: muda a resistência para nenhum. Como parte da execução da magia, você pode fazer um ataque corpo a …
+- `hobgoblin-mago-de-batalha#item7#e3`: muda o alcance para pessoal, o alvo para você e a duração para cena. Em vez do normal, a cada rodad…
 - `infligir-ferimentos#e2`: aumenta o dano em 1d8+1.
 - `infligir-ferimentos#e3`: muda a resistência para nenhum. Como parte da execução da magia, você pode fazer um ataque corpo a …
 - `julgamento-divino-vindicacao#e1`: Aumenta o bônus de ataque em +1 e o bônus de dano em +1d8
@@ -585,6 +1011,10 @@ penalidade de –1 PM. Em vez do norm…
 - `miasma-mefitico#e2`: muda o tipo do dano para trevas.
 - `muralha-elemental#e2`: muda a duração para sustentada e adiciona uma nova escolha, Essência. A muralha é invisível e indes…
 - `muralha-elemental#e3`: aumenta o dano por atravessar a muralha em +2d6.
+- `nagah-mistica#item4#e2`: muda a área para alvo (criaturas escolhidas). Em vez do normal, você dispara vários relâmpagos, um …
+- `necromante#item8#e1`: aumenta o dano em +1d8+1.
+- `necromante#item9#e1`: muda a resistência para nenhum. Como parte da execução da magia, você pode fazer um ataque corpo a …
+- `necromante#item9#e3`: muda o alcance para pessoal, o alvo para você e a duração para cena. Em vez do normal, a cada rodad…
 - `nevoa#e4`: a nuvem tem um tom esverdeado e se torna cáustica. No início de seus turnos, criaturas dentro dela …
 - `nevoa#e5`: aumenta o dano de ácido em +2d4.
 - `nevoa#e6`: além do normal, a nuvem fica espessa, quase sólida. Qualquer criatura dentro dela tem seu deslocame…
@@ -599,6 +1029,7 @@ penalidade de –1 PM. Em vez do norm…
 - `relampago-flamejante#e1`: aumenta o dano das rajadas em +1d6.
 - `relampago-flamejante#e2`: aumenta o dano da rajada mista em +2d12.
 - `resistencia-a-energia#e3`: muda o efeito para redução de dano contra todos os tipos listados na magia. Requer 3º círculo.
+- `sacerdote-da-tormenta#item5#e2`: aumenta a resistência a dano em +5.
 - `seta-infalivel#e1`: muda as setas para lanças de energia que surgem e caem do céu. Cada lança causa 1d8+1 pontos de dan…
 - `soco-do-mestre#e4`: muda o tipo do dano para essência.
 - `sonho#e1`: transforma o sonho do alvo em um pesadelo. A vítima deve fazer um teste de Vontade. Se falhar, não …
@@ -620,11 +1051,16 @@ penalidade de –1 PM. Em vez do norm…
 - `vitalidade-fantasma#e1`: aumenta os PV temporários recebidos em +1d10. Caso a magia cause dano, em vez disso aumenta o dano …
 - `vitalidade-fantasma#e2`: muda o alvo para área: esfera com 6m de raio centrada em você e a resistência para Fortitude reduz …
 
-### duração (37)
+### duração (53)
 
 - `alarme#e3`: muda a duração para 1 dia ou até ser descarregada e a resistência para Vontade anula. Quando um int…
 - `animar-objetos#e1`: muda a duração para permanente e adiciona componente material (prataria no valor de T$ 1.000). Você…
 - `augurio#e2`: muda a execução para 10 minutos e a duração para 1 minuto. Em vez do normal, você consulta uma divi…
+- `cavaleiro-supremacista#item1#e1`: muda a execução para padrão e a duração para cena. Requer 2º círculo.
+- `cavaleiro-supremacista#item1#e4`: muda a execução para padrão e a duração para 1 dia. Além do normal, você recebe um sexto sentido qu…
+- `cavaleiro-supremacista#item3#e5`: como acima, mas com duração permanente. Requer 5º círculo.
+- `cavaleiro-supremacista#item5#e3`: muda a duração para cena. A ação adicional que você pode fazer é apenas de movimento. Uma criatura …
+- `centauro-xama#item3#e1`: muda a duração para instantânea. Em vez do normal, as plantas na área diminuem, como se tivessem si…
 - `circulo-da-justica#e3`: muda a duração para permanente e adiciona componente material (balança de prata no valor de T$ 5.00…
 - `comunhao-com-a-natureza#e1`: muda a execução para 1 minuto e a duração para instantânea. Em vez do normal, você descobre 1d4+1 i…
 - `concentracao-de-combate#e1`: muda a execução para padrão e a duração para cena. Requer 2º círculo.
@@ -637,7 +1073,15 @@ penalidade de –1 PM. Em vez do norm…
 - `criar-ilusao#e8`: muda a duração para sustentada. Além do normal, você pode gastar uma ação livre para modificar livr…
 - `despertar-consciencia#e2`: muda a duração para permanente e adiciona penalidade de -3 PM.
 - `dificultar-deteccao#e2`: muda a duração para 1 semana.
+- `dragao-adulto#item8#e3`: muda a duração para cena. A ação adicional que você pode fazer é apenas de movimento. Uma criatura …
+- `dragao-rei#item13#e3`: muda a duração para cena. A ação adicional que você pode fazer é apenas de movimento. Uma criatura …
+- `dragao-veneravel#item10#e3`: muda a duração para cena. A ação adicional que você pode fazer é apenas de movimento. Uma criatura …
 - `escudo-da-fe#e5`: muda a duração para 1 dia. Requer 2º círculo.
+- `finntroll-feitor#item12#e1`: muda a duração para 1 dia. Se não estiver em combate, a criatura só pode fazer o teste de Vontade a…
+- `finntroll-feitor#item9#e3`: muda a duração para 1 dia. Requer 2º círculo.
+- `hobgoblin-mago-de-batalha#item4#e3`: muda a duração para 1 dia. Requer 2º círculo.
+- `hobgoblin-mago-de-batalha#item6#e1`: muda a execução para padrão e a duração para cena. Requer 2º círculo.
+- `hobgoblin-mago-de-batalha#item6#e4`: muda a execução para padrão e a duração para 1 dia. Além do normal, você recebe um sexto sentido qu…
 - `invisibilidade#e2`: muda a duração para cena. Requer 3º círculo.
 - `lanca-ignea#e2`: muda a duração para cena ou até ser descarregada. Em vez do efeito normal, a magia cria quatro dard…
 - `luz#e3`: muda a duração para permanente e adiciona componente material (pó de rubi no valor de T$ 50). Reque…
@@ -645,6 +1089,8 @@ penalidade de –1 PM. Em vez do norm…
 - `miragem#e2`: muda a duração para permanente e adiciona componente material (pó de diamante no valor de T$ 1.000)…
 - `missao-divina#e2`: aumenta a duração para 1 ano ou até ser descarregada.
 - `montaria-arcana#e2`: muda a duração para permanente e adiciona penalidade de -3 PM.
+- `nagah-mistica#item5#e3`: muda a duração para cena. A ação adicional que você pode fazer é apenas de movimento. Uma criatura …
+- `necromante#item3#e3`: muda a duração para 1 dia. Requer 2º círculo.
 - `oracao#e4`: muda a duração para cena. Requer 4º círculo
 - `pele-de-pedra#e5`: como acima, mas com duração permanente. Requer 5º círculo.
 - `profanar#e3`: muda a execução para 1 hora, a duração para permanente e adiciona componente material (incenso e ól…
@@ -652,6 +1098,7 @@ penalidade de –1 PM. Em vez do norm…
 - `refugio#e3`: em vez do normal, cria um espaço extradimensional, similar a uma caverna vazia e escura, que compor…
 - `resistencia-a-energia#e1`: muda a duração para 1 dia. Requer 2º círculo.
 - `rogar-maldicao#e2`: muda a duração para permanente e resistência para Fortitude parcial. Se passar, a criatura ainda so…
+- `sacerdote-da-tormenta#item6#e2`: muda a duração para cena. Em vez do normal, nenhum som pode deixar a área, mas criaturas dentro da …
 - `semiplano#e2`: muda a duração para permanente e adiciona componente material (maquete do semiplano feito de materi…
 - `servo-divino#e1`: muda a duração para 1 dia ou até ser descarregada. O espírito realiza uma tarefa a sua escolha que …
 - `servo-divino#e2`: muda a duração para 1 semana ou até ser descarregada. O espírito realiza uma tarefa que exija até u…
@@ -660,7 +1107,7 @@ penalidade de –1 PM. Em vez do norm…
 - `velocidade#e3`: muda a duração para cena. A ação adicional que você pode fazer é apenas de movimento. Uma criatura …
 - `voo#e2`: muda a duração para 1 dia. Requer 4º círculo.
 
-### outro (198)
+### outro (239)
 
 - `ajuste-de-mira#e1`: aumentra o bônus em +1.
 - `alarme#e2`: além do normal, você também percebe qualquer efeito de adivinhação que seja usado dentro da área ou…
@@ -670,6 +1117,7 @@ penalidade de –1 PM. Em vez do norm…
 - `anular-a-luz#e2`: muda o círculo máximo de magias dissipadas para 4º. Requer 4º Círculo.
 - `anular-a-luz#e3`: muda o círculo máximo de magias dissipadas para 5º. Requer 5º Círculo.
 - `ao-por-do-sol#e1`: Novo Efeito
+- `arauto-dos-goblinoides#item5#e1`: aumenta as penalidades em –1, limitado pelo círculo máximo de magia que você pode lançar.
 - `arco-arcano#e1`: Arco Encantado
 - `area-escorregadia#e1`: aumenta a área em +1 quadrado de 1,5m.
 - `arma-espiritual#e1`: além do normal, a arma o protege. Você recebe +1 na Defesa.
@@ -696,6 +1144,14 @@ penalidade de –1 PM. Em vez do norm…
 - `campo-de-forca#e2`: muda os PV temporários ou a RD para 50. Requer 3º círculo.
 - `campo-de-forca#e4`: como o aprimoramento acima, mas tudo dentro da esfera fica praticamente sem peso. Uma vez por rodad…
 - `campo-de-forca#e5`: muda os PV temporários ou a RD para 70. Requer 4º círculo.
+- `capelao-de-guerra#item2#e1`: aumenta o bônus em +1 (bônus máximo limitado pelo círculo máximo de magia que você pode lançar).
+- `capelao-de-guerra#item3#e2`: aumenta os bônus em +1, limitado pelo círculo máximo de magia que você pode lançar.
+- `cavaleiro-supremacista#item1#e2`: além do normal, ao atacar você, um inimigo deve rolar dois dados e usar o pior resultado. Requer 3º…
+- `cavaleiro-supremacista#item2#e1`: muda a área para esfera com 9m de raio. Em vez do normal, cria um efeito de disjunção. Todas as mag…
+- `centauro-xama#item2#e1`: fornece +1 nos testes de ataque com a arma.
+- `centauro-xama#item2#e2`: muda a execução para ação de movimento.
+- `centauro-xama#item2#e3`: aumenta o bônus nos testes de ataque em +1.
+- `centauro-xama#item3#e2`: além do normal, criaturas que falhem na resistência também ficam imóveis.
 - `circulo-da-justica#e2`: muda a penalidade nas perícias para –10 (se passar na resistência) e –20 (se falhar). Requer 4º cír…
 - `circulo-da-restauracao#e1`: aumenta a regeneração de PV em 1d8+1.
 - `colera-do-deus-sol#e2`: aumenta a área em +6m de raio.
@@ -726,6 +1182,10 @@ penalidade de –1 PM. Em vez do norm…
 - `criar-ilusao#e2`: aumenta o efeito da ilusão em +1 cubo de 1,5m.
 - `criar-ilusao#e3`: também pode criar ilusões de imagem e sons combinados.
 - `criar-ilusao#e5`: também pode criar odores e sensações térmicas, que são percebidos a uma distância igual ao dobro do…
+- `cultista-da-traicao#item10#e3`: aumenta o número de enxames em +1. Eles não podem ocupar o mesmo espaço. Requer 3º círculo.
+- `cultista-da-traicao#item6#e1`: aumenta o bônus em +1 (bônus máximo limitado pelo círculo máximo de magia que você pode lançar).
+- `cultista-da-traicao#item9#e1`: aumenta a área da escuridão em +1,5m de raio.
+- `cultista-da-traicao#item9#e2`: muda o efeito para fornecer camuflagem total por escuridão total. As sombras bloqueiam a visão na á…
 - `cupula-de-repulsao#e1`: a cúpula impede criaturas de se aproximarem a menos de 4,5m de você (ou seja, deve haver dois quadr…
 - `cupula-de-repulsao#e2`: além do normal, criaturas afetadas também precisam fazer o teste de resistência se fizerem um ataqu…
 - `cura-pelas-maos#e2`: Anular condição (abalado, apavorado, atordoado, cego, doente, exausto, fatigado ou surdo).
@@ -743,6 +1203,18 @@ penalidade de –1 PM. Em vez do norm…
 - `dispersar-as-trevas#e4`: muda o círculo máximo de magias dissipadas para 5º. Requer 5º círculo.
 - `dissipar-magia#e1`: muda a área para esfera com 9m de raio. Em vez do normal, cria um
 efeito de disjunção. Todas as mag…
+- `dragao-adulto#item3#e4`: como o aprimoramento acima, mas tudo dentro da esfera fica praticamente sem peso. Uma vez por rodad…
+- `dragao-adulto#item5#e1`: muda a área para esfera com 9m de raio. Em vez do normal, cria um efeito de disjunção. Todas as mag…
+- `dragao-adulto#item7#e1`: muda o efeito para afetar magias de até 3º círculo. Requer 4º círculo.
+- `dragao-adulto#item7#e2`: muda o efeito para afetar magias de até 4º círculo. Requer 5º círculo.
+- `dragao-rei#item11#e1`: muda o efeito para afetar magias de até 3º círculo. Requer 4º círculo.
+- `dragao-rei#item11#e2`: muda o efeito para afetar magias de até 4º círculo. Requer 5º círculo.
+- `dragao-rei#item6#e4`: como o aprimoramento acima, mas tudo dentro da esfera fica praticamente sem peso. Uma vez por rodad…
+- `dragao-rei#item9#e1`: muda a área para esfera com 9m de raio. Em vez do normal, cria um efeito de disjunção. Todas as mag…
+- `dragao-veneravel#item4#e4`: como o aprimoramento acima, mas tudo dentro da esfera fica praticamente sem peso. Uma vez por rodad…
+- `dragao-veneravel#item7#e1`: muda a área para esfera com 9m de raio. Em vez do normal, cria um efeito de disjunção. Todas as mag…
+- `dragao-veneravel#item9#e1`: muda o efeito para afetar magias de até 3º círculo. Requer 4º círculo.
+- `dragao-veneravel#item9#e2`: muda o efeito para afetar magias de até 4º círculo. Requer 5º círculo.
 - `duelo#e1`: Aumenta o bônus em +1
 - `duplicata-ilusoria#e1`: cria uma cópia adicional.
 - `engenho-de-mana#e1`: em vez de flutuar no ponto em que foi conjurado, o disco flutua atrás de você, mantendo-se sempre a…
@@ -757,7 +1229,13 @@ efeito de disjunção. Todas as mag…
 - `escuridao#e1`: aumenta a área da escuridão em +1,5m de raio.
 - `escuridao#e2`: muda o efeito para fornecer camuflagem total por escuridão total. As sombras bloqueiam a visão na á…
 - `estrategista#e1`: aliado adicional
+- `falange#item3#e1`: +1d6-1 (kobolds adjacentes)
 - `ferramenta-de-morte#e1`: Novo Efeito
+- `finntroll-feitor#item11#e1`: em vez do normal, as condições adquiridas são debilitado e esmorecido.
+- `finntroll-feitor#item11#e2`: em vez do normal, afeta qualquer tipo de criatura.
+- `finntroll-feitor#item11#e3`: além do normal, criaturas que falhem na resistência ficam aos prantos (em termos de jogo, adquirem …
+- `finntroll-feitor#item9#e1`: muda a execução para reação. Em vez do normal, você cria um escudo mágico que fornece +6 na Defesa …
+- `finntroll-feitor#item9#e2`: aumenta o bônus na Defesa em +1.
 - `fisico-divino#e5`: +2 em Força
 - `fisico-divino#e6`: +2 em Destreza
 - `fisico-divino#e7`: +2 em Constituição
@@ -772,6 +1250,9 @@ efeito de disjunção. Todas as mag…
 - `heroismo#e1`: muda o bônus para +6.
 - `hipnotismo#e4`: também afeta espíritos e monstros na área. Requer 2º círculo.
 - `hipnotismo#e5`: também afeta construtos, espíritos, monstros e mortos-vivos na área. Requer 3º círculo.
+- `hobgoblin-mago-de-batalha#item4#e1`: muda a execução para reação. Em vez do normal, você cria um escudo mágico que fornece +6 na Defesa …
+- `hobgoblin-mago-de-batalha#item4#e2`: aumenta o bônus na Defesa em +1.
+- `hobgoblin-mago-de-batalha#item6#e2`: além do normal, ao atacar você, um inimigo deve rolar dois dados e usar o pior resultado. Requer 3º…
 - `ilusao-lacerante#e2`: muda a área para um cubo de 90m. Requer 4º círculo.
 - `imagem-espelhada#e1`: aumenta o número de cópias em +1 (e o bônus na Defesa em +2).
 - `imagem-espelhada#e2`: além do normal, toda vez que uma cópia é destruída, emite um clarão de luz. A criatura que destruiu…
@@ -798,6 +1279,10 @@ efeito de disjunção. Todas as mag…
 - `muralha-de-ossos#e2`: o muro é feito de uma massa de esqueletos animados. Sempre que uma criatura iniciar seu turno adjac…
 - `muralha-elemental#e1`: aumenta o comprimento em +15m e altura em +3m, até 60m de comprimento e 9m de altura.
 - `musica-nota-azul#e1`: Novo Efeito
+- `nagah-mistica#item3#e1`: aumenta o número de cópias em +1 (e o bônus na Defesa em +2).
+- `nagah-mistica#item3#e2`: além do normal, toda vez que uma cópia é destruída, emite um clarão de luz. A criatura que destruiu…
+- `necromante#item3#e1`: muda a execução para reação. Em vez do normal, você cria um escudo mágico que fornece +6 na Defesa …
+- `necromante#item3#e2`: aumenta o bônus na Defesa em +1.
 - `nevoa#e1`: a magia também funciona sob a água, criando uma nuvem de tinta.
 - `nome-na-arena#e1`: Nome na Arena
 - `oracao#e1`: aumenta os bônus em +1 (bônus máximo limitado pelo círculo máximo de magia que você pode lançar).
@@ -834,6 +1319,8 @@ efeito de disjunção. Todas as mag…
 - `rogar-maldicao#e1`: aumenta o número de efeitos que você pode escolher em +1. Requer 3º círculo.
 - `runa-de-protecao#e3`: como o aprimoramento anterior, mas você pode escolher magias de 2º círculo. Requer 3º
 círculo.
+- `sacerdote-da-tormenta#item4#e1`: aumenta as penalidades em –1, limitado pelo círculo máximo de magia que você pode lançar.
+- `sacerdote-da-tormenta#item5#e1`: aumenta o bônus de Força em +1.
 - `salto-dimensional#e3`: muda a execução para reação. Em vez do normal, você salta para um espaço adjacente (1,5m), recebend…
 - `santuario#e1`: além do normal, escolha um tipo de criatura entre animal, construto ou morto-vivo. Você não pode se…
 - `servo-morto-vivo#e1`: muda o componente material para pó de ônix negro (T$ 500). Em vez de um zumbi ou esqueleto, cria um…
@@ -855,6 +1342,7 @@ círculo.
 - `transmutar-objetos#e1`: aumenta o limite de tamanho do objeto em uma categoria.
 - `transmutar-objetos#e2`: aumenta o preço máximo do objeto criado em um fator de x10 (+3 PM por T$ 250 de preço, +6 PM por T$…
 - `transmutar-objetos#e5`: como o aprimoramento anterior, mas passa a afetar itens mágicos.
+- `turba-zumbi#item1#e1`: +1d6-1 (kobolds adjacentes)
 - `vestimenta-da-fe#e1`: o objeto oferece o mesmo bônus em testes de resistência. Requer 3º círculo.
 - `vestimenta-da-fe#e2`: aumenta o bônus em +1.
 - `vestimenta-da-fe#e4`: Aumenta o bônus em resistência em +1 (relativo ao efeito de +4 PM, que aumenta o bônus fornecido pe…
@@ -865,37 +1353,120 @@ círculo.
 
 ## Descrições
 
-`descriptions.local.json` gravado com 1288 descrições e 568 textos de aprimoramento (`<id>#eN`), fora do git.
+`descriptions.local.json` gravado com 1669 descrições e 743 textos de aprimoramento (`<id>#eN`), fora do git.
 
-Entradas sem descrição no Foundry (o app mostra "ver livro"): 30.
+Entradas sem descrição no Foundry (o app mostra "ver livro"): 113.
 
 - `aggelus`
+- `aparicao`
+- `aranha-gigante`
+- `arauto-dos-goblinoides`
+- `assassino-aberrante`
+- `bandido`
 - `barbaro`
 - `bardo`
+- `basilisco`
+- `besouro-aberrante`
 - `bucaneiro`
 - `cacador`
+- `cao-do-inferno`
+- `capelao-de-guerra`
+- `capitao-baluarte`
+- `cascavel`
 - `cavaleiro`
+- `cavaleiro-supremacista`
+- `centauro-combatente`
+- `centauro-xama`
+- `centopeia-dragao`
+- `chefe-bandido`
 - `clerigo`
+- `colosso-supremo`
+- `cultista-da-traicao`
 - `dahllan`
+- `devorador-de-medos`
+- `dragao-adulto`
+- `dragao-filhote`
+- `dragao-jovem`
+- `dragao-rei`
+- `dragao-veneravel`
 - `druida`
 - `elfo`
+- `engenho-de-guerra-goblin`
+- `enxame-kobold`
+- `esqueleto`
+- `esqueleto-de-elite`
+- `falange`
+- `finntroll-cacador`
+- `finntroll-feitor`
+- `formiga-aberrante`
+- `formiga-aberrante-maior`
+- `ganchador`
+- `gargula`
+- `glop`
+- `gnoll-filibusteiro`
+- `gnoll-saqueador`
 - `goblin`
+- `goblin-engenhoqueiro`
+- `goblin-salteador`
 - `golem`
+- `golem-de-ferro`
+- `grifo`
 - `grimorio`
+- `guarda-de-cidade`
+- `guerreiro-de-chifres`
+- `hidra`
+- `hobgoblin-mago-de-batalha`
+- `hobgoblin-soldado`
 - `hynne`
 - `inventor`
+- `jiboia`
 - `kliren`
 - `ladino`
+- `lagash`
 - `lefou`
 - `livro-formulas`
+- `lobo`
+- `lobo-crocodilo`
+- `lobo-das-cavernas`
 - `lutador`
+- `maniaco-lefou`
+- `manticora`
 - `medusa`
 - `minotauro`
+- `nagah-guardiao`
+- `nagah-mistica`
+- `naja`
+- `necromante`
 - `nobre`
+- `ogro`
+- `orc-chefe`
+- `orc-combatente`
+- `orc-mutante`
 - `osteon`
+- `otyugh`
 - `paladino`
 - `qareen`
+- `rato-gigante`
+- `recruta-supremacista`
+- `sacerdote-da-tormenta`
+- `sargento-da-guarda`
+- `sargento-mor`
 - `sereia-tritao`
+- `serpe`
 - `silfide`
+- `soldado-supremacista`
+- `sombra-dos-goblinoides`
+- `sucuri`
 - `sulfure`
+- `tirano-do-terceiro`
 - `trog`
+- `trog-sbktqcqbvmuncp15`
+- `troll`
+- `troll-aquatico`
+- `troll-das-cavernas`
+- `troll-do-gelo`
+- `troll-subterraneo`
+- `turba-zumbi`
+- `urso-coruja`
+- `vampiro`
+- `zumbi`

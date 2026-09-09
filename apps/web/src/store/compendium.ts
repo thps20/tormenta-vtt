@@ -4,16 +4,33 @@ import { dropTargetAt, type DropPoint } from "../lib/dropTargets";
 import { emitAck } from "./connection";
 import { toast } from "./ui";
 
+/** Onde a paleta foi aberta: "sheet" (ficha, insere item) ou "map" (mesa em foco, GM solta criatura). */
+export type PaletteContext = "sheet" | "map";
+
+/** Toggle "invisível ao soltar": lembrado na sessão (sessionStorage), não por sala nem por criatura. */
+const SPAWN_INVISIBLE_KEY = "tvtt:compendiumSpawnInvisible";
+
+function readSpawnInvisible(): boolean {
+  try {
+    return sessionStorage.getItem(SPAWN_INVISIBLE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Compêndio da sala (entradas vindas de compendium:list) e estado da paleta.
  * As entradas são carregadas uma vez, na primeira abertura, e ficam em memória.
  */
 interface CompendiumState {
   entries: CompendiumEntry[];
+  /** Ids que vieram do compêndio da SALA (homebrew do GM): o chip "Sala" da paleta só aparece com algum. */
+  roomIds: string[];
   status: "idle" | "loading" | "ready" | "error";
-  /** Paleta aberta por cima da ficha. */
+  /** Paleta aberta (por cima da ficha, ou flutuando sobre o mapa). */
   isOpen: boolean;
-  /** Filtro inicial (tipo da aba de onde a paleta foi aberta). null = todos. */
+  context: PaletteContext;
+  /** Filtro inicial (aba ativa da ficha, ou o chip "Criaturas" ao abrir sobre o mapa). null = todos. */
   initialKind: string | null;
   /** Último item inserido: a ficha troca para a aba dele e o destaca por um instante. */
   lastInserted: { itemId: string; kind: string; at: number } | null;
@@ -22,9 +39,16 @@ interface CompendiumState {
    * registrado sob o cursor (lib/dropTargets), para o feedback da zona de soltura.
    */
   drag: { entryId: string; point: DropPoint; targetId: string | null } | null;
+  /**
+   * Quantidade e toggle "invisível ao soltar" de uma criatura (preview no contexto "map").
+   * Vivem aqui, não como estado local da paleta, porque o fantasma de células do VttCanvas
+   * (docs/plano-criaturas.md §2.4) também precisa da quantidade durante o arrasto.
+   */
+  spawnCount: number;
+  spawnInvisible: boolean;
 
   load: () => Promise<void>;
-  open: (kind?: string | null) => void;
+  open: (context: PaletteContext, kind?: string | null) => void;
   close: () => void;
   markInserted: (itemId: string, kind: string) => void;
   startDrag: (entryId: string, point: DropPoint) => void;
@@ -32,17 +56,24 @@ interface CompendiumState {
   /** Solta: chama onDrop do alvo sob o cursor (se houver) e devolve se caiu em algum. */
   endDrag: () => boolean;
   cancelDrag: () => void;
+  setSpawnCount: (n: number) => void;
+  /** Persiste em sessionStorage. */
+  setSpawnInvisible: (v: boolean) => void;
   /** Limpa o estado ao sair da sala (as entradas dependem do sistema da sala). */
   reset: () => void;
 }
 
 export const useCompendium = create<CompendiumState>((set, get) => ({
   entries: [],
+  roomIds: [],
   status: "idle",
   isOpen: false,
+  context: "sheet",
   initialKind: null,
   lastInserted: null,
   drag: null,
+  spawnCount: 1,
+  spawnInvisible: readSpawnInvisible(),
 
   load: async () => {
     if (get().status === "loading" || get().status === "ready") return;
@@ -53,11 +84,11 @@ export const useCompendium = create<CompendiumState>((set, get) => ({
       toast(res.error);
       return;
     }
-    set({ entries: res.data, status: "ready" });
+    set({ entries: res.data.entries, roomIds: res.data.roomIds, status: "ready" });
   },
 
-  open: (kind = null) => {
-    set({ isOpen: true, initialKind: kind });
+  open: (context, kind = null) => {
+    set({ isOpen: true, context, initialKind: kind });
     void get().load();
   },
   close: () => set({ isOpen: false }),
@@ -80,5 +111,14 @@ export const useCompendium = create<CompendiumState>((set, get) => ({
     return true;
   },
   cancelDrag: () => set({ drag: null }),
-  reset: () => set({ entries: [], status: "idle", isOpen: false, initialKind: null, lastInserted: null, drag: null }),
+  setSpawnCount: (n) => set({ spawnCount: n }),
+  setSpawnInvisible: (v) => {
+    set({ spawnInvisible: v });
+    try {
+      sessionStorage.setItem(SPAWN_INVISIBLE_KEY, String(v));
+    } catch {
+      /* sessionStorage indisponível (aba privada etc.): só não lembra entre reaberturas. */
+    }
+  },
+  reset: () => set({ entries: [], roomIds: [], status: "idle", isOpen: false, context: "sheet", initialKind: null, lastInserted: null, drag: null, spawnCount: 1 }),
 }));

@@ -151,7 +151,7 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, comp
                 <span>Adicionar {currentKind.label}</span>
               </button>
             )}
-            <button onClick={() => openCompendium(currentKind.key)} className={smallBtn} id="btn-open-compendium" title={`Inserir do compêndio (${PALETTE_SHORTCUT_LABEL})`}>
+            <button onClick={() => openCompendium("sheet", currentKind.key)} className={smallBtn} id="btn-open-compendium" title={`Inserir do compêndio (${PALETTE_SHORTCUT_LABEL})`}>
               <BookOpen className="w-3.5 h-3.5" />
               <span>Do compêndio</span>
             </button>

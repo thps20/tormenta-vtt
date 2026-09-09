@@ -2401,7 +2401,8 @@
         {
           "label": "Em um resultado 1, o autômato enguiça como uma engenhoca.",
           "kind": "formula",
-          "formula": "1d6"
+          "formula": "1d6",
+          "damageType": null
         }
       ],
       "activation": {
@@ -13692,7 +13693,8 @@
         {
           "label": "Atributo bonificado",
           "kind": "formula",
-          "formula": "1d6"
+          "formula": "1d6",
+          "damageType": null
         }
       ],
       "activation": {

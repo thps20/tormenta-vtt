@@ -1,10 +1,19 @@
-import { entryToItem, type Character, type CharacterItem, type CharacterPatch, type CompendiumEntry, type SystemDefinition } from "@tormenta-vtt/shared";
+import { entryToItem, type Character, type CharacterItem, type CharacterPatch, type CompendiumEntry, type CompendiumItemEntry, type SystemDefinition } from "@tormenta-vtt/shared";
 
 /**
  * Regras de inserção de uma entrada do compêndio numa ficha. Funções puras
  * (testáveis) usadas por insertFromCompendium na store de fichas. Nada aqui
  * conhece "classe" ou "raça": lê level.classes e itemKinds[].maxCount.
  */
+
+/**
+ * Chips virtuais da paleta (docs/plano-criaturas.md §2.1): filtram por ALGO QUE NÃO É
+ * itemKinds[].key, então usam um id fora do alfabeto de chave do sistema (KeySchema não aceita
+ * "_"  no início) — nunca colidem com uma chave real de itemKinds[].
+ */
+export const CREATURE_FILTER = "__creature__";
+/** Filtra por ORIGEM (id veio do compêndio da sala), não por tipo — junta itens e criaturas homebrew. */
+export const ROOM_FILTER = "__room__";
 
 export interface InsertCheck {
   /** Pode inserir direto (Enter, "+", soltar). */
@@ -15,7 +24,7 @@ export interface InsertCheck {
   replaces: CharacterItem | null;
 }
 
-export function checkInsert(def: SystemDefinition, character: Pick<Character, "items">, entry: CompendiumEntry): InsertCheck {
+export function checkInsert(def: SystemDefinition, character: Pick<Character, "items">, entry: CompendiumItemEntry): InsertCheck {
   const kind = def.itemKinds.find((k) => k.key === entry.kind);
   if (!kind) return { ok: false, reason: `Tipo de item desconhecido: ${entry.kind}`, replaces: null };
   if (kind.maxCount === undefined) return { ok: true, reason: null, replaces: null };
@@ -42,7 +51,7 @@ export interface InsertResult {
 export function buildInsertPatch(
   def: SystemDefinition,
   character: Pick<Character, "items">,
-  entry: CompendiumEntry,
+  entry: CompendiumItemEntry,
   newId: () => string,
   opts: { replace?: CharacterItem | null } = {},
 ): InsertResult {

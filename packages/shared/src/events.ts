@@ -31,6 +31,7 @@ import type {
   CombatSetSurprisedPayload,
   CombatStartPayload,
   CompendiumEntry,
+  CompendiumSpawnCreaturePayload,
   FogConfig,
   FogUpdatePayload,
   Participant,
@@ -66,6 +67,14 @@ export interface RoomSnapshot {
   chat: ChatMessage[];
   /** Fichas da sala (jogadores não recebem as de kind = "npc"). */
   characters: Character[];
+}
+
+/** Resposta de `compendium:list`. */
+export interface CompendiumList {
+  /** Sistema + sala mescladas. Entradas `type: "creature"` só vêm para o GM (filtro no servidor). */
+  entries: CompendiumEntry[];
+  /** Ids que vieram do compêndio da SALA (homebrew do GM): a paleta mostra o chip "Sala" só quando houver algum. */
+  roomIds: string[];
 }
 
 export interface ClientToServerEvents {
@@ -113,11 +122,18 @@ export interface ClientToServerEvents {
 
   // Compêndio
   /**
-   * Entradas do compêndio do sistema da sala (e, no futuro, as da própria sala,
-   * que têm prioridade quando o id coincide). Sem broadcast: o cliente pede ao
-   * abrir a paleta e guarda em memória.
+   * Entradas do compêndio do sistema da sala + as da própria sala (homebrew do GM, que tem
+   * prioridade quando o id coincide). Sem broadcast: o cliente pede ao abrir a paleta e guarda em
+   * memória. Criaturas (`type: "creature"`) só vêm para o GM — o servidor filtra, não só a UI.
    */
-  "compendium:list": (payload: Record<string, never>, ack: Ack<CompendiumEntry[]>) => void;
+  "compendium:list": (payload: Record<string, never>, ack: Ack<CompendiumList>) => void;
+  /**
+   * Solta `count` cópias de uma criatura do compêndio na cena (GM). Uma transação (ficha NPC nova
+   * + token vinculado por cópia); ack devolve os tokens criados (pode ser menos que `count`, se a
+   * espiral de posicionamento estourar o raio máximo). Broadcast de character:created (só GM,
+   * NPC) e token:created (visibilidade normal) para cada um, feito separadamente deste ack.
+   */
+  "compendium:spawn-creature": (payload: CompendiumSpawnCreaturePayload, ack: Ack<Token[]>) => void;
 
   // Régua (efêmera: só broadcast, nada vai ao banco)
   /** Enviado com throttle enquanto o participante arrasta a régua; `ruler: null` ao soltar. */

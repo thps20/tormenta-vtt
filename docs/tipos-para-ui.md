@@ -1,14 +1,16 @@
 # Tipos de ficha e de sistema (referência para UI)
 
-Bloco autocontido com os tipos `Character`, `CharacterItem`, `Action`, `Modifier` e `SystemDefinition` do `packages/shared`, mais o JSON atual do Tormenta20. Pensado para colar em outra ferramenta (gerador de UI, protótipo, LLM) sem depender do repositório.
+Bloco autocontido com os tipos `Character`, `CharacterItem`, `Action`, `Modifier`, `SystemDefinition` e `ComputedCharacter` (saída de `computeCharacter`) do `packages/shared`, mais o JSON atual do Tormenta20. Pensado para colar em outra ferramenta (gerador de UI, protótipo, LLM) sem depender do repositório.
 
-**Atenção:** os tipos abaixo são a forma **inferida** dos schemas Zod (saída do `z.infer`, com defaults já aplicados, então campos com `.default()` aparecem como obrigatórios). No código eles existem só como `z.infer<typeof XSchema>`; a fonte da verdade continua sendo os schemas. Se um schema mudar, este arquivo precisa ser regenerado.
+**Atenção:** os tipos abaixo são a forma **inferida** dos schemas Zod (saída do `z.infer`, com defaults já aplicados, então campos com `.default()` aparecem como obrigatórios) ou, no caso de `ComputedCharacter`/`ClassEntry`/`ItemModifier`, interfaces TS escritas à mão em `rules/`. A fonte da verdade continua sendo o código. Se um schema mudar, este arquivo precisa ser regenerado.
 
 Fontes:
 
 - `packages/shared/src/schemas/character.ts`
 - `packages/shared/src/schemas/system.ts`
 - `packages/shared/src/rules/modifierTarget.ts`
+- `packages/shared/src/rules/compute.ts`
+- `packages/shared/src/rules/progression.ts`
 - `packages/shared/src/schemas/common.ts`
 - `packages/shared/systems/tormenta20.json`
 
@@ -201,6 +203,18 @@ type CharacterData = {
   spellcastingAttribute: Key | null;  // default null
   bio: string;                   // max 20000, default ""
   items: CharacterItem[];        // default []
+  /** RD, "reduz à metade", imune, vulnerável — por damageTypes[].key ("all" vale pra qualquer tipo). Ver docs/plano-criaturas.md §0.3. */
+  damageResponses: {
+    all: DamageResponse;                        // default { reduction: 0, half: false, immune: false, vulnerable: false }
+    byType: Record<Key, DamageResponse>;        // default {}
+  };
+};
+
+type DamageResponse = {
+  reduction: number;   // int >= 0, default 0
+  half: boolean;       // default false
+  immune: boolean;     // default false
+  vulnerable: boolean; // default false
 };
 
 /**
@@ -228,6 +242,67 @@ type CharacterRollRequest =
   | { type: "initiative" }
   | { type: "extra"; key: Key }
   | { type: "action"; itemId: Id; actionId: Id };
+
+// ----------------------------------------------------------------------------
+// Ficha CALCULADA (rules/compute.ts) — computeCharacter(def, character). Função
+// PURA: servidor e cliente rodam a mesma; nada disto é persistido.
+// ----------------------------------------------------------------------------
+
+type ComputedSkill = {
+  key: Key;
+  label: string;
+  /** Atributo efetivamente usado. */
+  attribute: Key;
+  trained: boolean;
+  /** Id do item que concede o treino; null = marcado na ficha ou não treinada. */
+  grantedBy: Id | null;
+  /** false quando a perícia exige treino e o personagem não é treinado. */
+  usable: boolean;
+  total: number;
+};
+
+type ComputedResource = {
+  max: number;
+  min: number;
+  /** Conta do máximo em texto quando veio das classes; null quando digitado ou por fórmula. */
+  detail: string | null;
+};
+
+/** Item de classe da ficha (level.classes.kind), com os níveis já lidos. */
+type ClassEntry = {
+  itemId: Id;
+  name: string;
+  levels: number;
+  /** Classe inicial efetiva: a marcada no item ou, se nenhuma, a primeira da lista. */
+  initial: boolean;
+};
+
+/** Modificador de atributo concedido por um item ativo (raça etc.), já somado em `attributes`. */
+type ItemModifier = {
+  itemId: Id;
+  itemName: string;
+  /** Seletor no formato de Modifier.target (hoje só "attr.<key>"). */
+  target: string;
+  value: number;
+};
+
+type ComputedCharacter = {
+  level: number;
+  /** "classes" = nível e recursos por nível vêm dos itens de classe; "manual" = digitados. */
+  levelSource: "classes" | "manual";
+  classes: ClassEntry[];
+  halfLevel: number;
+  trainedBonus: number;
+  attributes: Record<Key, number>;
+  itemModifiers: ItemModifier[];
+  equip: Record<Key, number>;
+  skills: Record<SkillInstanceKey, ComputedSkill>;
+  /** Stats derivados já calculados (Defesa, CD...). */
+  derived: Record<Key, number>;
+  resources: Record<Key, ComputedResource>;
+  /** Erros de fórmula não derrubam a ficha: viram aviso e o valor fica 0. */
+  warnings: string[];
+};
 
 // ----------------------------------------------------------------------------
 // Definição de sistema (system.ts) — schemaVersion 2

@@ -3,7 +3,9 @@ import { Heart, Search, Swords, X } from 'lucide-react';
 import {
   computeCharacter,
   isHealingType,
+  suggestDamage,
   type Character,
+  type DamageSuggestion,
   type DiceRoll,
   type Participant,
   type SystemDefinition,
@@ -36,6 +38,12 @@ interface TargetRow {
   current: number;
   max: number;
   ownerLabel: string;
+  /**
+   * Sugestão pela resposta a dano da ficha vinculada (rules/damageResponse.ts). Token solto (sem
+   * ficha) não tem damageResponses: sugestão neutra (×1, sem aviso) — o servidor não muda de
+   * qualquer forma, isto é só o que vem PRÉ-SELECIONADO ao marcar o alvo.
+   */
+  suggestion: DamageSuggestion;
 }
 
 /** ×½ "reduz à metade" arredonda pra baixo; ×0 sempre dá 0 (resistiu). */
@@ -74,9 +82,10 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
       if (me.role !== 'gm' && token.ownerId !== me.id) continue;
       let current: number;
       let max: number;
+      let character: Character | undefined;
       if (token.characterId) {
         if (!def.tokenBar) continue;
-        const character = charById.get(token.characterId);
+        character = charById.get(token.characterId);
         if (!character) continue;
         const computed = computeCharacter(def, character);
         max = computed.resources[def.tokenBar]?.max ?? 0;
@@ -87,10 +96,12 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
         max = token.hp.max;
       }
       const ownerLabel = token.ownerId ? (participants.find((p) => p.id === token.ownerId)?.nickname ?? 'Jogador') : 'GM';
-      out.push({ token, current, max, ownerLabel });
+      // Token solto (sem ficha) não tem damageResponses: sugestão sempre neutra pra ele.
+      const suggestion = character ? suggestDamage(def, damage, character.damageResponses) : { multiplier: '1' as const, amount: roll.total, note: '' };
+      out.push({ token, current, max, ownerLabel, suggestion });
     }
     return out.sort((a, b) => a.token.name.localeCompare(b.token.name));
-  }, [def, tokens, charById, participants, me]);
+  }, [def, tokens, charById, participants, me, damage, roll.total]);
 
   const filteredRows = useMemo(
     () => (search.trim() ? rows.filter((r) => r.token.name.toLowerCase().includes(search.trim().toLowerCase())) : rows),
@@ -113,15 +124,20 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
 
   if (damage.length === 0 || rows.length === 0) return null;
 
+  // Pré-seleciona pela sugestão da resposta a dano (rules/damageResponse.ts) ao marcar o alvo; o
+  // Mestre troca o multiplicador ou digita outro valor depois, como sempre — o servidor não muda.
   const toggle = (tokenId: string) => {
+    const suggestion = rows.find((r) => r.token.id === tokenId)?.suggestion;
     setAmounts((s) => {
       if (tokenId in s) {
         const { [tokenId]: _drop, ...rest } = s;
         return rest;
       }
-      return { ...s, [tokenId]: withMultiplier(roll.total, sign, '1') };
+      return { ...s, [tokenId]: suggestion ? sign * suggestion.amount : withMultiplier(roll.total, sign, '1') };
     });
-    setMultipliers((s) => ({ ...s, [tokenId]: '1' }));
+    // suggestion.multiplier null (RD, ou parcelas mistas) vira "sem botão marcado": o valor já
+    // ajustado (acima) fica só no campo manual, igual a quando o Mestre digita um número à mão.
+    setMultipliers((s) => ({ ...s, [tokenId]: suggestion ? (suggestion.multiplier ?? undefined) : '1' }));
   };
 
   const setMultiplier = (tokenId: string, mult: '1' | '0.5' | '2' | '0') => {
@@ -188,7 +204,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
 
           <div className="max-h-56 overflow-y-auto scrollbar-thin">
             {filteredRows.length === 0 && <div className="p-3 text-center text-zinc-500 text-[11px]">Nenhum token</div>}
-            {filteredRows.map(({ token, current, max, ownerLabel }) => {
+            {filteredRows.map(({ token, current, max, ownerLabel, suggestion }) => {
               const selected = token.id in amounts;
               const amount = amounts[token.id] ?? 0;
               const mult = multipliers[token.id];
@@ -201,6 +217,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
                       {current}/{max} · {ownerLabel}
                     </span>
                   </label>
+                  {suggestion.note && <div className="pl-6 -mt-0.5 text-[10px] text-amber-400">{suggestion.note}</div>}
                   {selected && (
                     <div className="flex items-center gap-1 mt-1.5 pl-5">
                       {(['1', '0.5', '2', '0'] as const).map((m) => (

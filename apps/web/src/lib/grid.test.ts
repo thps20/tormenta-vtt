@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampToMap, gridLines, normalizeOffset, snapToCellCenter, snapToGrid, tokensInBox } from "./grid";
+import { cellAt, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, normalizeOffset, snapToCellCenter, snapToGrid, tokensInBox } from "./grid";
 import type { GridConfig } from "@tormenta-vtt/shared";
 
 const grid: GridConfig = { type: "square", cellSize: 50, offsetX: 10, offsetY: 0, color: "#000", snap: true };
@@ -33,6 +33,28 @@ describe("grid", () => {
   it("gera linhas verticais e horizontais", () => {
     const lines = gridLines({ ...grid, offsetX: 0 }, { width: 100, height: 50 });
     expect(lines).toHaveLength(3 + 2);
+  });
+
+  it("effectiveCellSize: cellSize do grid quadrado, ou 70 fixo pra grid none", () => {
+    expect(effectiveCellSize(grid)).toBe(50);
+    expect(effectiveCellSize({ ...grid, type: "none" })).toBe(70);
+  });
+
+  it("cellAt/cellToPoint fazem o caminho de ida e volta (grid quadrado)", () => {
+    expect(cellAt({ x: 10, y: 0 }, grid)).toEqual({ col: 0, row: 0 });
+    expect(cellAt({ x: 65, y: 60 }, grid)).toEqual({ col: 1, row: 1 });
+    expect(cellToPoint({ col: 1, row: 1 }, grid)).toEqual({ x: 60, y: 50 });
+    expect(cellToPoint(cellAt({ x: 72, y: 26 }, grid), grid)).toEqual({ x: 60, y: 0 });
+  });
+
+  it("cellAt com grid none usa célula virtual de 70px, sem offset", () => {
+    expect(cellAt({ x: 72, y: 26 }, { ...grid, type: "none" })).toEqual({ col: 1, row: 0 });
+  });
+
+  it("cellRect arredonda o lado do token pra células (mínimo 1)", () => {
+    expect(cellRect({ x: 60, y: 50, width: 100 }, grid)).toEqual({ col: 1, row: 1, cells: 2 });
+    // width bem menor que uma célula ainda ocupa 1 (nunca 0).
+    expect(cellRect({ x: 10, y: 0, width: 10 }, grid)).toEqual({ col: 0, row: 0, cells: 1 });
   });
 
   it("seleção em caixa pega tokens pelo centro, em qualquer direção do arraste", () => {

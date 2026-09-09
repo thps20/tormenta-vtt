@@ -1,20 +1,30 @@
-import React, { useRef, useState, useEffect, useMemo } from "react";
+import React, { forwardRef, useRef, useState, useEffect, useImperativeHandle, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
-import { conditionIconDataUrl, measureDistance, type Character, type Combat, type ConditionDef, type FogShape, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenCondition, type TokenPatch } from "@tormenta-vtt/shared";
+import { applyResourceDelta, computeCharacter, conditionIconDataUrl, creatureColor, DEFAULT_MAP_SIZE, findFreeCells, measureDistance, type Character, type CharacterPatch, type CharacterRollRequest, type Combat, type ConditionDef, type FogShape, type GridConfig, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenCondition, type TokenPatch } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
-import { clampToMap, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
+import { cellAt, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
 import { useImage } from "../lib/useImage";
 import { newId } from "../lib/ids";
+import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
+import { useCompendium } from "../store/compendium";
 import type { FogToolMode, FogToolShape, RemoteRuler, ToolMode } from "../store/tools";
 import { TokenInspector } from "./TokenInspector";
+import { NpcQuickCard } from "./NpcQuickCard";
 import { ConditionMenu } from "./ConditionMenu";
 import { FogLayer } from "./FogLayer";
 
-/** Tamanho padrão quando a cena ainda não tem mapa. */
-export const DEFAULT_MAP = { width: 1600, height: 1100 };
+/** Tamanho padrão quando a cena ainda não tem mapa (shared: o servidor usa o mesmo, ver compendium:spawn-creature). */
+export const DEFAULT_MAP = DEFAULT_MAP_SIZE;
+
+/** Métodos imperativos expostos por ref: quem monta o canvas (RoomPage) às vezes precisa de um
+ *  dado dele sem virar prop (ex.: onde soltar uma criatura do compêndio ao apertar Enter). */
+export interface VttCanvasHandle {
+  /** Ponto do mapa (pixels) no centro da viewport agora — mesmo cálculo do botão "novo token". */
+  getViewportCenter: () => { x: number; y: number };
+}
 
 interface VttCanvasProps {
   scene: Scene;
@@ -57,12 +67,29 @@ interface VttCanvasProps {
   linkableCharacters: Character[];
   onLinkCharacter: (tokenId: string, characterId: string | null) => void;
   onOpenCharacter: (characterId: string) => void;
+  /** Duplo clique num token vinculado a uma ficha (padrão Foundry): RoomPage decide se o usuário
+   *  pode vê-la e abre. Token sem ficha: não é chamado. */
+  onTokenOpenSheet: (tokenId: string) => void;
+  /**
+   * Ficha rápida do NPC (docs/plano-criaturas.md §3, docs/tipos-ficha-rapida.md): clique simples
+   * num token NPC do GM abre o NpcQuickCard no lugar do TokenInspector. Patch raso de recurso
+   * (PV), rolagem de ação e uso de item — os mesmos três caminhos que a ficha completa já usa.
+   */
+  onCharacterPatch: (characterId: string, patch: CharacterPatch) => void;
+  onCharacterRoll: (characterId: string, request: CharacterRollRequest) => void;
+  onCharacterUseItem: (characterId: string, itemId: string) => void;
   /** Barra de vida por token (tokenBar do sistema, lida da ficha vinculada). */
   tokenBars: Record<string, TokenBar>;
   /** Modo Névoa (GM): o que desenhar e com qual forma. null para jogadores. */
   fogTool: FogTool | null;
   /** Forma pronta (pincel solto, retângulo solto, polígono fechado), em pixels do mapa. */
   onFogShape: (shape: FogShape) => void;
+  /**
+   * Solta uma criatura do compêndio no ponto (pixels do mapa) — arrastar da paleta contextual até
+   * o mapa (docs/plano-criaturas.md §2.4). GM only; ausente = o mapa não aceita o drop (a paleta
+   * segue funcionando por Enter/botão, que usam o centro da viewport em vez do ponto de soltura).
+   */
+  onSpawnCreature?: (entryId: string, point: { x: number; y: number }, opts: { count: number; visible: boolean }) => void;
 }
 
 export interface FogTool {
@@ -81,7 +108,7 @@ export interface TokenBar {
 
 /** Texto de ajuda do canto superior direito, por ferramenta. */
 const MODE_HINTS: Record<ToolMode, string> = {
-  select: "Arraste tokens para mover • Espaço + arrastar = navegar • Scroll = zoom",
+  select: "Arraste tokens para mover • Duplo clique = ficha • Espaço + arrastar = navegar • Scroll = zoom",
   pan: "Arraste para navegar pelo mapa • Scroll = zoom",
   ruler: "Clique e arraste para medir • Scroll = zoom",
   fog: "Névoa: escolha Revelar/Ocultar e uma forma no painel • Scroll = zoom",
@@ -101,6 +128,9 @@ const BODY_STROKE = 3;
 /** Alças de redimensionar habilitadas no Transformer (sem cantos de rotação: `rotateEnabled={false}`). */
 const RESIZE_ANCHOR_NAMES = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
 
+/** Id do alvo de soltura do mapa (lib/dropTargets) — só criaturas do compêndio, ver docs/plano-criaturas.md §2.4. */
+const MAP_DROP_TARGET = "map";
+
 /** Raio do círculo do token em pixels do mapa (o token é desenhado a partir de width/height). */
 function tokenRadius(t: { width: number; height: number }): number {
   return Math.min(t.width, t.height) / 2;
@@ -111,7 +141,7 @@ export function canControl(me: Participant, token: Token): boolean {
   return me.role === "gm" || token.ownerId === me.id;
 }
 
-export const VttCanvas: React.FC<VttCanvasProps> = ({
+export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   scene,
   mode,
   tokens,
@@ -138,10 +168,15 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   linkableCharacters,
   onLinkCharacter,
   onOpenCharacter,
+  onTokenOpenSheet,
+  onCharacterPatch,
+  onCharacterRoll,
+  onCharacterUseItem,
   tokenBars,
   fogTool,
   onFogShape,
-}) => {
+  onSpawnCreature,
+}, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -188,6 +223,10 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   const groupDragRef = useRef<{ leader: { x: number; y: number }; others: Array<{ token: Token; x: number; y: number }> } | null>(null);
   /** Ponto inicial da régua em andamento (pixels do mapa). */
   const rulerStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  /** Último mousedown num token (id + instante), pro duplo clique por geometria (ver registerTokenClick). */
+  const lastTokenMouseDownRef = useRef<{ tokenId: string; time: number } | null>(null);
+  const DOUBLE_CLICK_MS = 300;
 
   // --- Névoa (GM): gesto em andamento. Nada vai ao servidor antes de soltar/fechar.
   /** Pincel: pontos [x1,y1,x2,y2,...] acumulados no arrasto (já decimados). null = não está pintando. */
@@ -280,6 +319,14 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   // Liga o Transformer (alças de redimensionar) ao token selecionado, se pudermos controlá-lo.
   const selectedToken = tokens.find((t) => t.id === selectedTokenId) ?? null;
   const canResize = selectedToken !== null && canControl(me, selectedToken);
+
+  // Ficha rápida do NPC (docs/plano-criaturas.md §3): clique simples num token NPC do GM mostra o
+  // NpcQuickCard no lugar do TokenInspector. O botão "Token" do card força o inspector genérico
+  // até trocar de seleção — reselecionar o mesmo token volta pra ficha rápida.
+  const [forceInspector, setForceInspector] = useState(false);
+  useEffect(() => setForceInspector(false), [selectedTokenId]);
+  const selectedCharacter = selectedToken?.characterId ? linkableCharacters.find((c) => c.id === selectedToken.characterId) : undefined;
+  const showQuickCard = me.role === "gm" && selectedCharacter?.kind === "npc" && !forceInspector;
   useEffect(() => {
     const tr = transformerRef.current;
     const stage = stageRef.current;
@@ -294,15 +341,58 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     x: (dimensions.width / 2 - stagePos.x) / stageScale,
     y: (dimensions.height / 2 - stagePos.y) / stageScale,
   });
+  useImperativeHandle(ref, () => ({ getViewportCenter: viewportCenter }));
 
   const handleCreateToken = () => {
-    const size = scene.grid.type === "square" ? scene.grid.cellSize : 70;
+    const size = effectiveCellSize(scene.grid);
     const c = viewportCenter();
     let pos = { x: c.x - size / 2, y: c.y - size / 2 };
     if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
-    pos = findFreeSpot(pos, size, tokens, map);
+    pos = findFreeSpot(pos, scene.grid, tokens, map);
     onTokenCreate(pos, size);
   };
+
+  /** Ponto de TELA (clientX/Y — arrasto vem de fora do Konva, da paleta do compêndio) em pixels do mapa. */
+  const mapPointFromClient = (point: { x: number; y: number }): { x: number; y: number } => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const stage = stageRef.current;
+    if (!rect || !stage) return { x: 0, y: 0 };
+    return { x: (point.x - rect.left - stage.x()) / stage.scaleX(), y: (point.y - rect.top - stage.y()) / stage.scaleY() };
+  };
+
+  // Alvo de soltura "mapa": só criaturas do compêndio (docs/plano-criaturas.md §2.4), só quando o
+  // RoomPage ligou onSpawnCreature (GM, com cena). A quantidade/toggle vêm da store (a paleta e o
+  // fantasma abaixo leem o mesmo estado).
+  useEffect(() => {
+    if (!onSpawnCreature) return;
+    return registerDropTarget({
+      id: MAP_DROP_TARGET,
+      accepts: (entry) => entry.type === "creature",
+      onDrop: (entry, point) => {
+        if (entry.type !== "creature") return;
+        const { spawnCount, spawnInvisible } = useCompendium.getState();
+        onSpawnCreature(entry.id, mapPointFromClient(point), { count: spawnCount, visible: !spawnInvisible });
+      },
+    });
+  }, [onSpawnCreature]);
+
+  // Fantasma de soltura: N retângulos de célula, na cor do tipo da criatura, seguindo o arrasto —
+  // MESMA findFreeCells que o servidor roda ao criar, então onde você vê é onde os tokens caem.
+  const dragEntry = useCompendium((s) => (s.drag ? s.entries.find((e) => e.id === s.drag?.entryId) : undefined));
+  const dragOverMap = useCompendium((s) => s.drag?.targetId === MAP_DROP_TARGET);
+  const dragPoint = useCompendium((s) => s.drag?.point ?? null);
+  const spawnCount = useCompendium((s) => s.spawnCount);
+  const creatureGhost = useMemo(() => {
+    if (!dragOverMap || !dragPoint || !dragEntry || dragEntry.type !== "creature" || !systemDef) return null;
+    const cellSize = effectiveCellSize(scene.grid);
+    const cellsPerSide = Math.max(1, Math.round(systemDef.sizes.find((s) => s.key === dragEntry.sheet.size)?.tokenCells ?? 1));
+    const bounds = { cols: Math.max(1, Math.ceil(map.width / cellSize)), rows: Math.max(1, Math.ceil(map.height / cellSize)) };
+    const occupied = tokens.map((t) => cellRect(t, scene.grid));
+    const start = cellAt(mapPointFromClient(dragPoint), scene.grid);
+    const cells = findFreeCells({ start, cells: cellsPerSide, count: spawnCount, occupied, bounds });
+    return { color: creatureColor(systemDef, dragEntry), size: cellsPerSide * cellSize, cells: cells.map((c) => cellToPoint(c, scene.grid)) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragOverMap, dragPoint, dragEntry, systemDef, scene.grid, tokens, map.width, map.height, spawnCount, stagePos.x, stagePos.y, stageScale]);
 
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
@@ -581,6 +671,24 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
   };
 
   /**
+   * Duplo clique num token, por GEOMETRIA (não pelo `dblclick` nativo do Konva: como ele só dispara
+   * quando os DOIS cliques acertam a mesma shape pelo canvas de hit, o mesmo embaralhamento
+   * anti-fingerprinting que quebra hover/clique de token quebraria isto também — ver
+   * docs/debug-condicoes.md). Mora no `onMouseDown` do Stage, que roda sempre (é o handler do
+   * próprio Stage, não depende do hit chegar num Group): dois mousedown no mesmo token dentro da
+   * janela contam como duplo clique. Token com ficha (que o usuário pode ver — RoomPage decide):
+   * abre a ficha. Sem ficha: nada — o primeiro clique já selecionou e mostra o TokenInspector.
+   */
+  const registerTokenClick = (token: Token) => {
+    const now = performance.now();
+    const last = lastTokenMouseDownRef.current;
+    const isDoubleClick = last !== null && last.tokenId === token.id && now - last.time <= DOUBLE_CLICK_MS;
+    // Um terceiro clique rápido não vira "outro duplo clique": exige um mousedown novo primeiro.
+    lastTokenMouseDownRef.current = isDoubleClick ? null : { tokenId: token.id, time: now };
+    if (isDoubleClick && token.characterId) onTokenOpenSheet(token.id);
+  };
+
+  /**
    * Modo Selecionar: sobre uma alça de redimensionar, repassa o mousedown pra ela; sobre um token,
    * repassa pro Group — nos dois casos, só se o canvas de hit não reconheceu (pra o Konva iniciar o
    * drag/resize normalmente a partir daí); no mapa vazio, começa a caixa de seleção.
@@ -610,6 +718,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     }
     const t = tokenAtPointer();
     if (t) {
+      registerTokenClick(t);
       if (!hitLandedOnToken(e.target, t.id)) tokenGroup(t.id)?.fire("mousedown", { evt: e.evt, pointerId: e.pointerId }, false);
       return;
     }
@@ -790,6 +899,7 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
     <div
       ref={containerRef}
       id="vtt-canvas-container"
+      {...(onSpawnCreature ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
       className={`relative flex-1 h-full w-full bg-stone-950 overflow-hidden select-none ${mode === "pan" ? "cursor-grab" : mode === "select" ? "cursor-default" : "cursor-crosshair"}`}
     >
       <Stage
@@ -882,6 +992,20 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
               dash={[6 / stageScale, 4 / stageScale]}
             />
           )}
+          {/* Fantasma de soltura de criatura: por cima de tudo, só desenho (listening={false} no Layer). */}
+          {creatureGhost?.cells.map((p, i) => (
+            <Rect
+              key={i}
+              x={p.x}
+              y={p.y}
+              width={creatureGhost.size}
+              height={creatureGhost.size}
+              fill={`${creatureGhost.color}33`}
+              stroke={creatureGhost.color}
+              strokeWidth={2 / stageScale}
+              dash={[8 / stageScale, 4 / stageScale]}
+            />
+          ))}
           {/* Tooltip de condição por último de todos: nenhum token pode cobri-lo. */}
           {conditionTooltip && <ConditionTooltipLayerContent tip={conditionTooltip} stageScale={stageScale} />}
         </Layer>
@@ -924,7 +1048,37 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
         )}
       </div>
 
-      {selectedToken && (
+      {selectedToken && showQuickCard && systemDef && selectedCharacter && (
+        <NpcQuickCard
+          token={selectedToken}
+          character={selectedCharacter}
+          computed={computeCharacter(systemDef, selectedCharacter)}
+          def={systemDef}
+          conditions={systemDef.conditions}
+          activeConditions={selectedToken.conditions}
+          onHpChange={(delta) => {
+            const tokenBar = systemDef.tokenBar;
+            if (!tokenBar) return;
+            const bounds = computeCharacter(systemDef, selectedCharacter).resources[tokenBar] ?? { max: 0, min: 0, detail: null };
+            const current = selectedCharacter.resources[tokenBar] ?? { current: 0, temp: 0, maxOverride: null };
+            const next = applyResourceDelta({ current: current.current, temp: current.temp }, delta, { min: bounds.min, max: bounds.max });
+            onCharacterPatch(selectedCharacter.id, {
+              resources: { ...selectedCharacter.resources, [tokenBar]: { ...current, current: next.current, temp: next.temp } },
+            });
+          }}
+          onRoll={(ref) => onCharacterRoll(selectedCharacter.id, { type: "action", itemId: ref.itemId, actionId: ref.actionId })}
+          onUseItem={(itemId) => onCharacterUseItem(selectedCharacter.id, itemId)}
+          onToggleCondition={(key) => {
+            const has = selectedToken.conditions.some((c) => c.key === key);
+            const next = has ? selectedToken.conditions.filter((c) => c.key !== key) : [...selectedToken.conditions, { key }];
+            onTokenPatch({ id: selectedToken.id, conditions: next });
+          }}
+          onOpenFullSheet={() => onOpenCharacter(selectedCharacter.id)}
+          onOpenTokenInspector={() => setForceInspector(true)}
+          onClose={() => onSelectToken(null)}
+        />
+      )}
+      {selectedToken && !showQuickCard && (
         <TokenInspector
           token={selectedToken}
           participants={participants}
@@ -964,29 +1118,30 @@ export const VttCanvas: React.FC<VttCanvasProps> = ({
       )}
     </div>
   );
-};
+});
+VttCanvas.displayName = "VttCanvas";
 
 /**
  * Evita empilhar tokens novos no mesmo ponto (só o de cima receberia cliques):
  * anda em espiral pelas células vizinhas até achar uma sem token.
  */
+/**
+ * Evita empilhar tokens novos no mesmo ponto: espiral em CÉLULAS a partir do ponto pedido
+ * (findFreeCells, shared), devolvendo o canto superior esquerdo em pixels do mapa. Caso particular
+ * de 1 célula de lado — o botão "novo token" só cria 1x1; a soltura de criaturas (docs/plano-criaturas.md)
+ * usa findFreeCells direto, com o lado do tamanho da criatura.
+ */
 function findFreeSpot(
   start: { x: number; y: number },
-  size: number,
+  grid: GridConfig,
   tokens: Token[],
   map: { width: number; height: number },
 ): { x: number; y: number } {
-  const occupied = (x: number, y: number) =>
-    tokens.some((t) => Math.abs(t.x - x) < size * 0.75 && Math.abs(t.y - y) < size * 0.75);
-  const offsets: Array<[number, number]> = [[0, 0]];
-  for (let r = 1; r <= 6; r++) {
-    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r) offsets.push([dx, dy]);
-  }
-  for (const [dx, dy] of offsets) {
-    const p = clampToMap(start.x + dx * size, start.y + dy * size, { width: size, height: size }, map);
-    if (!occupied(p.x, p.y)) return p;
-  }
-  return clampToMap(start.x, start.y, { width: size, height: size }, map);
+  const size = effectiveCellSize(grid);
+  const bounds = { cols: Math.max(1, Math.ceil(map.width / size)), rows: Math.max(1, Math.ceil(map.height / size)) };
+  const occupied = tokens.map((t) => cellRect(t, grid));
+  const [cell] = findFreeCells({ start: cellAt(start, grid), cells: 1, count: 1, occupied, bounds });
+  return cell ? cellToPoint(cell, grid) : clampToMap(start.x, start.y, { width: size, height: size }, map);
 }
 
 // --- Token ------------------------------------------------------------------

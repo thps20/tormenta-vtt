@@ -17,6 +17,14 @@ export const GridConfigSchema = z.object({
 });
 export type GridConfig = z.infer<typeof GridConfigSchema>;
 
+/**
+ * Tamanho (pixels) usado quando a cena ainda não tem mapa (`mapWidth`/`mapHeight` null) — tanto pra
+ * desenhar um retângulo vazio no cliente quanto pros cálculos de posicionamento do servidor
+ * (compendium:spawn-creature). Um só valor pros dois lados: usar fallbacks diferentes faria o
+ * cliente e o servidor discordarem de onde cabe um token.
+ */
+export const DEFAULT_MAP_SIZE = { width: 1600, height: 1100 };
+
 export const SceneSchema = z.object({
   id: IdSchema,
   roomId: IdSchema,

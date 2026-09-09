@@ -1,4 +1,4 @@
-import type { GridConfig } from "@tormenta-vtt/shared";
+import type { CellRect, GridConfig } from "@tormenta-vtt/shared";
 
 /**
  * Conversões célula <-> pixel. Funções puras (sem React, sem Konva) para
@@ -9,6 +9,37 @@ import type { GridConfig } from "@tormenta-vtt/shared";
 /** Offset normalizado para [0, cellSize) — evita linhas começando fora da imagem. */
 export function normalizeOffset(offset: number, cellSize: number): number {
   return ((offset % cellSize) + cellSize) % cellSize;
+}
+
+/** Lado de uma célula em pixels: cellSize do grid, ou 70 (grid "none"), como o botão de novo token já assumia. */
+export function effectiveCellSize(grid: GridConfig): number {
+  return grid.type === "square" ? grid.cellSize : 70;
+}
+
+/** Deslocamento efetivo do grid em pixels ("none" não desloca — mesma convenção de snapToGrid/gridLines). */
+function effectiveOffset(grid: GridConfig, size: number): { ox: number; oy: number } {
+  if (grid.type === "none") return { ox: 0, oy: 0 };
+  return { ox: normalizeOffset(grid.offsetX, size), oy: normalizeOffset(grid.offsetY, size) };
+}
+
+/** Célula (linha/coluna) que contém o ponto (canto superior esquerdo de um token, ou qualquer ponto). */
+export function cellAt(point: { x: number; y: number }, grid: GridConfig): { col: number; row: number } {
+  const size = effectiveCellSize(grid);
+  const { ox, oy } = effectiveOffset(grid, size);
+  return { col: Math.floor((point.x - ox) / size), row: Math.floor((point.y - oy) / size) };
+}
+
+/** Canto superior esquerdo (pixels do mapa) de uma célula. */
+export function cellToPoint(cell: { col: number; row: number }, grid: GridConfig): { x: number; y: number } {
+  const size = effectiveCellSize(grid);
+  const { ox, oy } = effectiveOffset(grid, size);
+  return { x: cell.col * size + ox, y: cell.row * size + oy };
+}
+
+/** Retângulo em células ocupado por um token (o lado é arredondado pro grid; ver rules/placement.ts). */
+export function cellRect(token: { x: number; y: number; width: number }, grid: GridConfig): CellRect {
+  const size = effectiveCellSize(grid);
+  return { ...cellAt(token, grid), cells: Math.max(1, Math.round(token.width / size)) };
 }
 
 /** Alinha o canto superior esquerdo de um token à célula mais próxima. */

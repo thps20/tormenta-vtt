@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { navigate } from "../lib/router";
 import { selectActiveScene, useRoom } from "../store/room";
 import { sceneTokens, useTokens } from "../store/tokens";
@@ -7,6 +7,7 @@ import { activeCombatant, isMyTurn, useCombat } from "../store/combat";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
 import { useSystemDef } from "../lib/system";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
+import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
 import { useTurnTitle } from "../lib/useTurnTitle";
 import { selectEffectiveMode, useTools } from "../store/tools";
 import { computeCharacter, isPointRevealed, tokenCenter } from "@tormenta-vtt/shared";
@@ -16,12 +17,16 @@ import { type CombatPanelCallbacks } from "./CombatPanel";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
 import { FogToolbar } from "./FogToolbar";
-import { VttCanvas, type TokenBar } from "./VttCanvas";
+import { VttCanvas, type TokenBar, type VttCanvasHandle } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
 import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
 import { SidePanel, type SidePanelTab } from "./SidePanel";
 import { CharacterMenu } from "./CharacterMenu";
 import { NicknamePrompt } from "./NicknamePrompt";
+import { CompendiumPalette } from "./compendium/CompendiumPalette";
+import { DragGhost } from "./compendium/DragGhost";
+import { useCompendium } from "../store/compendium";
+import { CREATURE_FILTER } from "../lib/compendium";
 
 const CENTER_ON_TURN_KEY = "tvtt:centerOnActiveTurn";
 
@@ -117,7 +122,15 @@ function Table() {
   const moveLive = useTokens((s) => s.moveLive);
   const patchToken = useTokens((s) => s.patch);
   const createToken = useTokens((s) => s.create);
+  const spawnFromCompendium = useTokens((s) => s.spawnFromCompendium);
   const deleteToken = useTokens((s) => s.delete);
+  const vttCanvasRef = useRef<VttCanvasHandle>(null);
+  /** Solta na cena ativa (Enter/botão no preview usam o centro da viewport; arrastar no mapa usa o ponto largado). */
+  const spawnCreatureAt = async (entryId: string, point: { x: number; y: number }, opts: { count: number; visible: boolean }): Promise<boolean> => {
+    if (!scene) return false;
+    const result = await spawnFromCompendium({ sceneId: scene.id, entryId, count: opts.count, visible: opts.visible, x: point.x, y: point.y });
+    return result !== null;
+  };
 
   const messages = useChat((s) => s.messages);
   const sendMessage = useChat((s) => s.send);
@@ -211,6 +224,13 @@ function Table() {
   const linkCharacter = useTokens((s) => s.linkCharacter);
   const systemDef = useSystemDef();
 
+  // Paleta do compêndio sobre o mapa (Mesa em foco, nenhuma ficha aberta — docs/plano-criaturas.md §2.2).
+  const compendiumOpen = useCompendium((s) => s.isOpen);
+  const compendiumContext = useCompendium((s) => s.context);
+  const closeCompendium = useCompendium((s) => s.close);
+  const mapPaletteOpen = compendiumOpen && compendiumContext === "map";
+  useMapPaletteShortcut((openCharacterId !== null || emptySheetOpen) || isMapConfigOpen, me?.role === "gm" ? CREATURE_FILTER : null);
+
   // Réguas dos outros só valem na cena que estou vendo.
   const remoteRulers = useMemo(() => Object.values(remoteRulersById).filter((r) => r.sceneId === scene?.id), [remoteRulersById, scene?.id]);
 
@@ -288,6 +308,7 @@ function Table() {
           {scene ? (
             <>
               <VttCanvas
+                ref={vttCanvasRef}
                 scene={scene}
                 mode={effectiveMode}
                 tokens={tokens}
@@ -306,12 +327,7 @@ function Table() {
                 onRulerClear={() => clearRuler(scene.id)}
                 onSelectMany={selectMany}
                 onToggleSelect={toggleSelect}
-                onSelectToken={(tokenId) => {
-                  selectToken(tokenId);
-                  // Clique num token vinculado a uma ficha que eu vejo abre a ficha.
-                  const characterId = tokenId ? byId[tokenId]?.characterId : null;
-                  if (characterId && charById[characterId]) openCharacter(characterId);
-                }}
+                onSelectToken={selectToken}
                 onTokenMoveLive={moveLive}
                 onTokenPatch={(patch) => void patchToken(patch)}
                 onTokenCreate={(pos, size) => {
@@ -337,6 +353,14 @@ function Table() {
                 linkableCharacters={linkableCharacters}
                 onLinkCharacter={(tokenId, characterId) => void linkCharacter(tokenId, characterId)}
                 onOpenCharacter={openCharacter}
+                onTokenOpenSheet={(tokenId) => {
+                  // Duplo clique num token vinculado a uma ficha que eu vejo abre a ficha.
+                  const characterId = byId[tokenId]?.characterId;
+                  if (characterId && charById[characterId]) openCharacter(characterId);
+                }}
+                onCharacterPatch={(characterId, patch) => void updateCharacter(characterId, patch)}
+                onCharacterRoll={(characterId, request) => void rollCharacter(characterId, request)}
+                onCharacterUseItem={(characterId, itemId) => void useCharacterItem(characterId, itemId)}
                 tokenBars={tokenBars}
                 fogTool={isGm ? { mode: fogMode, shape: fogShape, brushSize: fogBrushSize } : null}
                 onFogShape={(shape) => {
@@ -344,6 +368,7 @@ function Table() {
                   if (!scene.fog.enabled) void fogOp({ type: "setEnabled", enabled: true });
                   void fogOp({ type: "add", shape });
                 }}
+                onSpawnCreature={isGm ? (entryId, point, opts) => void spawnCreatureAt(entryId, point, opts) : undefined}
               />
               <Toolbar isGm={isGm} mode={toolMode} effectiveMode={effectiveMode} onChange={setToolMode} />
               {isGm && toolMode === "fog" && (
@@ -364,6 +389,19 @@ function Table() {
             <Centered>
               <p className="text-zinc-500 text-sm">Nenhuma cena ativa.</p>
             </Centered>
+          )}
+
+          {mapPaletteOpen && systemDef && (
+            <>
+              <CompendiumPalette
+                def={systemDef}
+                character={null}
+                mode="map"
+                onClose={closeCompendium}
+                onSpawnCreature={isGm ? (entryId, opts) => spawnCreatureAt(entryId, vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 }, opts) : undefined}
+              />
+              <DragGhost def={systemDef} />
+            </>
           )}
         </main>
 

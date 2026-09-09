@@ -3,6 +3,7 @@ import { IdSchema } from "./common.js";
 import { GridConfigSchema } from "./scene.js";
 import { FogShapeSchema } from "./fog.js";
 import { CharacterDataSchema, CharacterKindSchema, CharacterRollRequestSchema, EnhancementUseSchema } from "./character.js";
+import { CompendiumIdSchema } from "./compendium.js";
 import { RollVisibilitySchema } from "./dice.js";
 
 /**
@@ -228,3 +229,22 @@ export type CombatResumePayload = z.infer<typeof CombatResumeSchema>;
 /** `clear` ausente/false: encerra mas mantém a ordem visível. `clear: true`: apaga o combate. */
 export const CombatEndSchema = z.object({ clear: z.boolean().default(false) });
 export type CombatEndPayload = z.infer<typeof CombatEndSchema>;
+
+// --- Compêndio: soltar criatura no mapa (docs/plano-criaturas.md) ----------
+
+/**
+ * Solta `count` cópias de uma criatura do compêndio na cena (GM). `x`/`y` são o ponto de soltura
+ * em PIXELS DO MAPA (o centro da célula sob o cursor, ou o centro da área visível no Enter do
+ * preview); o servidor converte em célula e roda a mesma espiral do fantasma no cliente
+ * (findFreeCells), então onde o GM vê o fantasma é onde os tokens caem.
+ */
+export const CompendiumSpawnCreatureSchema = z.object({
+  sceneId: IdSchema,
+  entryId: CompendiumIdSchema,
+  count: z.number().int().min(1).max(20),
+  /** Toggle "invisível ao soltar" do preview (true = visible). */
+  visible: z.boolean(),
+  x: z.number().finite(),
+  y: z.number().finite(),
+});
+export type CompendiumSpawnCreaturePayload = z.infer<typeof CompendiumSpawnCreatureSchema>;

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Token, TokenCreate, TokenPatch } from "@tormenta-vtt/shared";
+import type { CompendiumSpawnCreaturePayload, Token, TokenCreate, TokenPatch } from "@tormenta-vtt/shared";
 import { throttle } from "../lib/throttle";
 import { emitAck } from "./connection";
 import { toast } from "./ui";
@@ -29,6 +29,13 @@ interface TokensState {
   /** Ao soltar / redimensionar / editar: otimista com ack e reversão. */
   patch: (patch: TokenPatch) => Promise<boolean>;
   create: (data: TokenCreate) => Promise<Token | null>;
+  /**
+   * Solta N cópias de uma criatura do compêndio na cena (GM). O servidor decide as posições
+   * (findFreeCells a partir do ponto pedido) e cria ficha + token por cópia numa transação; devolve
+   * os tokens criados (pode ser menos que o pedido, se a espiral estourar o raio máximo — sem erro).
+   * Sem otimismo: character:created/token:created chegam pelo broadcast normal (upsert idempotente).
+   */
+  spawnFromCompendium: (payload: CompendiumSpawnCreaturePayload) => Promise<Token[] | null>;
   delete: (tokenId: string) => Promise<boolean>;
   /** Vincula/desvincula uma ficha (otimista com reversão). */
   linkCharacter: (tokenId: string, characterId: string | null) => Promise<boolean>;
@@ -120,6 +127,18 @@ export const useTokens = create<TokensState>((set, get) => ({
     }
     // O broadcast token:created também chega; o upsert é idempotente.
     get().upsert(res.data);
+    return res.data;
+  },
+
+  spawnFromCompendium: async (payload) => {
+    const res = await emitAck("compendium:spawn-creature", payload);
+    if (!res.ok) {
+      toast(res.error);
+      return null;
+    }
+    // Os broadcasts character:created/token:created também chegam; o upsert é idempotente.
+    for (const token of res.data) get().upsert(token);
+    if (res.data[0]) get().select(res.data[0].id);
     return res.data;
   },
 

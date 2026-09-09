@@ -56,6 +56,7 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
   /** Aba de itens ativa: vive aqui para o atalho da paleta abrir já filtrado por ela. */
   const [activeItemTab, setActiveItemTab] = useState<string>(def.itemKinds[0]?.key ?? "");
   const compendiumOpen = useCompendium((s) => s.isOpen);
+  const compendiumContext = useCompendium((s) => s.context);
   const openCompendium = useCompendium((s) => s.open);
   const closeCompendium = useCompendium((s) => s.close);
   const paletteDocked = useMediaQuery(PALETTE_DOCK_QUERY);
@@ -75,7 +76,7 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.repeat || !isOpenPaletteShortcut(e, isTyping(e.target))) return;
       e.preventDefault();
-      if (!useCompendium.getState().isOpen) openCompendium(activeItemTab);
+      if (!useCompendium.getState().isOpen) openCompendium("sheet", activeItemTab);
     };
     window.addEventListener("keydown", onKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
@@ -95,7 +96,7 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
   const computed = useMemo(() => (character ? computeCharacter(def, character) : null), [def, character]);
   // Quem não pode editar nunca fica em modo edição (ex.: jogador vendo a ficha de outro).
   const editing = isEditMode && canEdit;
-  const paletteOpen = compendiumOpen && editing && character !== null;
+  const paletteOpen = compendiumOpen && compendiumContext === "sheet" && editing && character !== null;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
