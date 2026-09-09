@@ -14,3 +14,4 @@ export * from "./conditionIcon.js";
 export * from "./conditions.js";
 export * from "./combat.js";
 export * from "./placement.js";
+export * from "./damageResponse.js";
