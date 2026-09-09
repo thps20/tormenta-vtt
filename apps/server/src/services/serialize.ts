@@ -5,6 +5,7 @@
  */
 import type { ChatMessage as DbChatMessage, Participant as DbParticipant, Room as DbRoom, Scene as DbScene, Token as DbToken } from "@prisma/client";
 import {
+  ArrivalPointSchema,
   ChatMessageSchema,
   FogConfigSchema,
   GridConfigSchema,
@@ -43,6 +44,11 @@ export function toScene(scene: DbScene): Scene {
     // Se o JSON estiver incompleto, os defaults do schema preenchem.
     grid: GridConfigSchema.parse(scene.grid ?? {}),
     fog: FogConfigSchema.parse(scene.fog ?? {}),
+    order: scene.order,
+    // `deletedAt` NÃO entra no Scene do shared (é coluna só do banco, como Token.deletedAt): um
+    // mapa apagado simplesmente não é serializado para ninguém.
+    arrival: ArrivalPointSchema.nullable().parse(scene.arrival),
+    createdAt: scene.createdAt.toISOString(),
   };
 }
 

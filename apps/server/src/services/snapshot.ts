@@ -14,7 +14,9 @@ const CHAT_HISTORY_LIMIT = 100;
 export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<RoomSnapshot> {
   const [participants, scenes, tokens, messages, combatRow, characters] = await Promise.all([
     prisma.participant.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
-    prisma.scene.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
+    // Mapas apagados (soft delete, docs/plano-mapas.md §10) nunca vão pro cliente. Ordenados como
+    // o painel "Mapas" mostra (order asc, createdAt desempata — mesma regra de rules/scenes.ts).
+    prisma.scene.findMany({ where: { roomId: room.id, deletedAt: null }, orderBy: [{ order: "asc" }, { createdAt: "asc" }] }),
     room.activeSceneId
       ? prisma.token.findMany({ where: { sceneId: room.activeSceneId, deletedAt: null }, orderBy: { zIndex: "asc" } })
       : Promise.resolve([]),

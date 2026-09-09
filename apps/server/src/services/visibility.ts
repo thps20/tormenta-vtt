@@ -1,9 +1,20 @@
 import { isPointRevealed, tokenCenter, type FogConfig, type Token } from "@tormenta-vtt/shared";
+import { prisma } from "../db.js";
 import { rooms, type TypedServer } from "../socket/types.js";
 
 export interface Viewer {
   role: "gm" | "player";
   participantId: string;
+}
+
+/**
+ * Este mapa é o ATIVO da sala agora? Broadcast de coisa de mapa (token:*, fog:updated,
+ * combat:updated, ruler:updated) pra jogador só vale se for — o GM sempre recebe, é quem pode
+ * estar preparando um mapa que a mesa ainda não vê (docs/plano-mapas.md §5).
+ */
+export async function isActiveScene(roomId: string, sceneId: string): Promise<boolean> {
+  const room = await prisma.room.findUnique({ where: { id: roomId }, select: { activeSceneId: true } });
+  return room?.activeSceneId === sceneId;
 }
 
 /**

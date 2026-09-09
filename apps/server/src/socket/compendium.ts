@@ -61,7 +61,7 @@ function buildSpawnHistoryEntry(
         // (é só o id) — jogador nunca teve o NPC no cache, então o remove() dele é um no-op.
         io.to(rooms.all(roomId)).emit("character:deleted", { characterId: character.id });
       }
-      if (combatAffected) await emitCombat(io, roomId, { role: "gm", participantId: "" });
+      if (combatAffected) await emitCombat(io, roomId, sceneId, { role: "gm", participantId: "" });
     },
     async apply() {
       const scene = await prisma.scene.findUniqueOrThrow({ where: { id: sceneId } });
@@ -116,7 +116,7 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
         const room = await prisma.room.findUnique({ where: { id: ctx.roomId } });
         if (!room) throw new HandlerError("Sala não encontrada");
         const sceneRow = await prisma.scene.findUnique({ where: { id: data.sceneId } });
-        if (!sceneRow || sceneRow.roomId !== ctx.roomId) throw new HandlerError("Cena não encontrada");
+        if (!sceneRow || sceneRow.roomId !== ctx.roomId || sceneRow.deletedAt !== null) throw new HandlerError("Mapa não encontrado");
 
         const def = getSystemDefinition(room.systemId);
         const { entries } = await listCompendium(room.systemId, room.id, "gm");

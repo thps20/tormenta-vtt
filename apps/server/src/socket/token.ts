@@ -42,7 +42,7 @@ import {
 } from "../services/history.js";
 import { canEditToken, restrictPatchForRole } from "../services/permissions.js";
 import { toChatMessage, toScene, toToken } from "../services/serialize.js";
-import { emitTokenToPlayers } from "../services/visibility.js";
+import { emitTokenToPlayers, isActiveScene } from "../services/visibility.js";
 import { guarded, HandlerError, type Ctx } from "./ack.js";
 import { emitHistoryUpdated } from "./history.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
@@ -65,13 +65,17 @@ export function hpJson(hp: TokenHp | null): Prisma.InputJsonValue | typeof Prism
 }
 
 /**
- * Broadcast respeitando visibilidade: GM recebe sempre; jogadores só recebem o
- * token se puderem vê-lo (`visible` + névoa da cena), senão recebem token:deleted
- * (caso tenham ele em cache). Ver services/visibility.ts.
+ * Broadcast respeitando visibilidade: GM recebe sempre (pode estar preparando um mapa que a mesa
+ * ainda não vê); jogadores só recebem se o mapa do token é o ATIVO da sala (docs/plano-mapas.md §5)
+ * E se puderem vê-lo (`visible` + névoa da cena), senão recebem token:deleted (caso tenham ele em
+ * cache). Ver services/visibility.ts. A checagem de mapa ativo é assíncrona (mais uma consulta),
+ * então roda fora do fluxo síncrono desta função — não muda a assinatura nos ~10 lugares que chamam.
  */
 export function broadcastToken(io: TypedServer, roomId: string, token: Token, event: "token:created" | "token:updated", fog: FogConfig) {
   io.to(rooms.gm(roomId)).emit(event, token);
-  emitTokenToPlayers(io, roomId, token, event, fog);
+  void isActiveScene(roomId, token.sceneId).then((active) => {
+    if (active) emitTokenToPlayers(io, roomId, token, event, fog);
+  });
 }
 
 // --- token:update / token:update-many --------------------------------------------------------
@@ -204,29 +208,32 @@ function buildDeleteHistoryEntry(io: TypedServer, roomId: string, def: SystemDef
   return {
     summary: describeDelete(items.map((i) => i.name)),
     async revert() {
-      let combatAffected = false;
+      // Um lote pode cobrir tokens de mapas diferentes (Delete em multi-seleção entre cenas não é
+      // possível pela UI hoje, mas o handler não assume isso): reemite o combate de cada mapa
+      // afetado, não só um.
+      const affectedScenes = new Set<string>();
       for (const item of items) {
         const row = await prisma.token.update({ where: { id: item.tokenId }, data: { deletedAt: null } });
         const scene = await prisma.scene.findUniqueOrThrow({ where: { id: item.sceneId } });
         broadcastToken(io, roomId, toToken(row), "token:updated", toScene(scene).fog);
         if (item.combatSnapshot) {
           await restoreCombatSnapshot(item.combatSnapshot);
-          combatAffected = true;
+          affectedScenes.add(item.sceneId);
         }
       }
-      if (combatAffected) await emitCombat(io, roomId, { role: "gm", participantId: "" });
+      for (const sceneId of affectedScenes) await emitCombat(io, roomId, sceneId, { role: "gm", participantId: "" });
     },
     async apply() {
-      let combatAffected = false;
+      const affectedScenes = new Set<string>();
       for (const item of items) {
         const row = await prisma.token.findUnique({ where: { id: item.tokenId } });
         if (!row || row.deletedAt !== null) throw new Error(`token "${item.name}" não existe mais`);
         const snap = await adjustCombatForTokenRemoval(def, item.sceneId, item.tokenId);
         await prisma.token.update({ where: { id: item.tokenId }, data: { deletedAt: new Date() } });
         io.to(rooms.all(roomId)).emit("token:deleted", { tokenId: item.tokenId });
-        if (snap) combatAffected = true;
+        if (snap) affectedScenes.add(item.sceneId);
       }
-      if (combatAffected) await emitCombat(io, roomId, { role: "gm", participantId: "" });
+      for (const sceneId of affectedScenes) await emitCombat(io, roomId, sceneId, { role: "gm", participantId: "" });
     },
   };
 }
@@ -236,7 +243,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
     "token:create",
     guarded(socket, TokenCreateSchema, async (data, ctx) => {
       const scene = await prisma.scene.findUnique({ where: { id: data.sceneId } });
-      if (!scene || scene.roomId !== ctx.roomId) throw new HandlerError("Cena não encontrada");
+      if (!scene || scene.roomId !== ctx.roomId || scene.deletedAt !== null) throw new HandlerError("Mapa não encontrado");
       if (data.ownerId) {
         const owner = await prisma.participant.findUnique({ where: { id: data.ownerId } });
         if (!owner || owner.roomId !== ctx.roomId) throw new HandlerError("Dono inválido");
@@ -300,7 +307,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       // characterId, Combatant intactos) para o desfazer restaurar tudo sem precisar de snapshot.
       await prisma.token.update({ where: { id: tokenId }, data: { deletedAt: new Date() } });
       io.to(rooms.all(ctx.roomId)).emit("token:deleted", { tokenId });
-      if (combatSnapshot) await emitCombat(io, ctx.roomId, { role: ctx.role, participantId: ctx.participantId });
+      if (combatSnapshot) await emitCombat(io, ctx.roomId, row.sceneId, { role: ctx.role, participantId: ctx.participantId });
 
       if (ctx.role === "gm") {
         pushEntry(ctx.roomId, buildDeleteHistoryEntry(io, ctx.roomId, def, [{ tokenId, name: row.name, sceneId: row.sceneId, combatSnapshot }]));
@@ -319,15 +326,15 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       const def = await requireSystem(ctx.roomId);
 
       const items: DeleteItem[] = [];
-      let combatAffected = false;
+      const affectedScenes = new Set<string>();
       for (const row of rows) {
         const combatSnapshot = await adjustCombatForTokenRemoval(def, row.sceneId, row.id);
         await prisma.token.update({ where: { id: row.id }, data: { deletedAt: new Date() } });
         io.to(rooms.all(ctx.roomId)).emit("token:deleted", { tokenId: row.id });
-        if (combatSnapshot) combatAffected = true;
+        if (combatSnapshot) affectedScenes.add(row.sceneId);
         items.push({ tokenId: row.id, name: row.name, sceneId: row.sceneId, combatSnapshot });
       }
-      if (combatAffected) await emitCombat(io, ctx.roomId, { role: ctx.role, participantId: ctx.participantId });
+      for (const sceneId of affectedScenes) await emitCombat(io, ctx.roomId, sceneId, { role: ctx.role, participantId: ctx.participantId });
 
       if (ctx.role === "gm") {
         pushEntry(ctx.roomId, buildDeleteHistoryEntry(io, ctx.roomId, def, items));

@@ -1,11 +1,12 @@
 /**
- * Limpeza definitiva de tokens soft-deleted (docs/plano-desfazer.md §8). Sem lib nova nem cron do
- * SO — um setInterval simples, chamado uma vez no boot (index.ts). Não existe "encerrar sala" no
- * MVP hoje (uma sala nunca fecha explicitamente), então fica só o gatilho por tempo.
+ * Limpeza definitiva de tokens e mapas soft-deleted (docs/plano-desfazer.md §8, docs/plano-mapas.md
+ * §10.2). Sem lib nova nem cron do SO — um setInterval simples, chamado uma vez no boot
+ * (index.ts). Não existe "encerrar sala" no MVP hoje (uma sala nunca fecha explicitamente), então
+ * fica só o gatilho por tempo.
  */
 import { prisma } from "../db.js";
 
-/** Dias que um token apagado fica na "lixeira" antes de ser removido de vez do banco. */
+/** Dias que um token ou mapa apagado fica na "lixeira" antes de ser removido de vez do banco. */
 export const TOKEN_TRASH_RETENTION_DAYS = 30;
 
 /** De quanto em quanto tempo a limpeza roda. */
@@ -26,6 +27,17 @@ export async function purgeDeletedTokens(now: Date = new Date()): Promise<number
   return result.count;
 }
 
+/**
+ * Apaga de vez mapas marcados como deletedAt há mais de TOKEN_TRASH_RETENTION_DAYS dias (docs/
+ * plano-mapas.md §10.2). Tokens e combate do mapa caem junto por `onDelete: Cascade` — não precisa
+ * apagá-los antes. Mesma regra de invalidação: uma entrada de histórico de "apagar mapa" que ainda
+ * apontar pra um desses simplesmente falha no próximo undo/redo e é descartada.
+ */
+export async function purgeDeletedScenes(now: Date = new Date()): Promise<number> {
+  const result = await prisma.scene.deleteMany({ where: { deletedAt: { lt: retentionCutoff(now) } } });
+  return result.count;
+}
+
 /** Roda a limpeza uma vez no boot e depois a cada CLEANUP_INTERVAL_MS. Devolve o timer, pra
  *  encerramento limpo (index.ts já para todo o resto no SIGINT/SIGTERM). */
 export function scheduleTokenTrashCleanup(log: { info: (obj: unknown, msg?: string) => void; error: (obj: unknown, msg?: string) => void }): NodeJS.Timeout {
@@ -35,6 +47,11 @@ export function scheduleTokenTrashCleanup(log: { info: (obj: unknown, msg?: stri
         if (count > 0) log.info({ count }, "limpeza: tokens apagados de vez (retenção expirada)");
       })
       .catch((err) => log.error({ err }, "limpeza de tokens falhou"));
+    purgeDeletedScenes()
+      .then((count) => {
+        if (count > 0) log.info({ count }, "limpeza: mapas apagados de vez (retenção expirada)");
+      })
+      .catch((err) => log.error({ err }, "limpeza de mapas falhou"));
   };
   run();
   return setInterval(run, CLEANUP_INTERVAL_MS);

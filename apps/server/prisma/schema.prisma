@@ -59,6 +59,16 @@ model Scene {
   grid      Json     @default("{\"type\":\"square\",\"cellSize\":70,\"offsetX\":0,\"offsetY\":0,\"color\":\"#00000055\",\"snap\":true}")
   /// FogConfig serializado (ver FogConfigSchema): névoa manual da fase 2.
   fog       Json     @default("{\"enabled\":false,\"base\":\"hidden\",\"shapes\":[]}")
+  /// Ordem no painel "Mapas" (arrastar reordena, scene:reorder). Renumerado 0..n-1 a cada reorder;
+  /// o backfill desta migration numera as salas existentes por createdAt.
+  order     Int      @default(0)
+  /// Soft delete (mesmo padrão de Token.deletedAt, docs/plano-mapas.md §10): a linha e tudo que
+  /// pende dela (tokens, combate) continuam no banco pra desfazer restaurar; a limpeza definitiva
+  /// apaga depois de 30 dias (services/cleanup.ts). null = mapa "existe" normalmente.
+  deletedAt DateTime?
+  /// ArrivalPointSchema serializado ({ x, y } em pixels do mapa): onde tokens levados de outro mapa
+  /// aparecem ao ativar (docs/plano-mapas.md §9). null = sem marcador definido (usa o centro do mapa).
+  arrival   Json?
   createdAt DateTime @default(now())
 
   room   Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)

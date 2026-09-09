@@ -32,7 +32,7 @@ import { rooms, type TypedServer } from "../socket/types.js";
 import { toCharacter } from "./characters.js";
 import { emitChatMessage } from "./chatVisibility.js";
 import { toChatMessage, toScene, toToken } from "./serialize.js";
-import { emitTokenToPlayers, tokenVisibleTo } from "./visibility.js";
+import { emitTokenToPlayers, isActiveScene, tokenVisibleTo } from "./visibility.js";
 
 export interface Viewer {
   role: "gm" | "player";
@@ -55,24 +55,23 @@ export async function loadCombatRow(sceneId: string): Promise<CombatRow | null> 
   });
 }
 
-/** Carrega e confirma que o combate é desta sala. */
+/** Carrega e confirma que o combate é deste mapa. */
 export async function requireCombat(sceneId: string, roomId: string): Promise<CombatRow> {
   const row = await loadCombatRow(sceneId);
-  if (!row || row.roomId !== roomId) throw new HandlerError("Não há combate nesta cena");
+  if (!row || row.roomId !== roomId) throw new HandlerError("Não há combate neste mapa");
   return row;
 }
 
-/** Confirma que a cena é a cena ATIVA da sala (combate só existe na cena ativa; ver docs/plano-combate.md §2). */
-export async function requireActiveScene(roomId: string, sceneId: string): Promise<void> {
+/**
+ * Combate deixou de exigir "mapa ativo" (docs/plano-mapas.md §7): o GM inicia/edita combate em
+ * qualquer mapa que esteja vendo. Só o JOGADOR continua restrito ao mapa ativo da sala — ele não
+ * deveria nem saber que outros mapas existem, muito menos controlar um combatente neles. Defesa em
+ * profundidade: o cliente honesto de um jogador nem tem esses ids.
+ */
+export async function requirePlayerOnActiveScene(roomId: string, sceneId: string, role: "gm" | "player"): Promise<void> {
+  if (role === "gm") return;
   const room = await prisma.room.findUnique({ where: { id: roomId } });
-  if (!room || room.activeSceneId !== sceneId) throw new HandlerError("Só é possível ter combate na cena ativa da sala");
-}
-
-/** Carrega o combate da cena ATIVA da sala (todo evento de combate, exceto combat:start, opera nela). */
-export async function requireActiveCombat(roomId: string): Promise<CombatRow> {
-  const room = await prisma.room.findUnique({ where: { id: roomId } });
-  if (!room?.activeSceneId) throw new HandlerError("Nenhuma cena ativa");
-  return requireCombat(room.activeSceneId, roomId);
+  if (!room || room.activeSceneId !== sceneId) throw new HandlerError("Este mapa não está ativo");
 }
 
 /**
@@ -129,42 +128,39 @@ export function toCombat(row: CombatRow, def: SystemDefinition, viewer: Viewer, 
 }
 
 /**
- * Recarrega o combate da cena ATIVA da sala e emite `combat:updated` para o GM e,
- * individualmente, para cada jogador (a visibilidade de cada um pode ser diferente:
- * é dono de um token oculto pela névoa pros outros, por exemplo). `null` quando a
- * sala não tem cena ativa, ou a cena ativa não tem combate — zera quem tinha um antes
- * (ex.: `combat:end { clear: true }`, ou trocar de cena — o cliente já refaz room:join).
+ * Recarrega o combate DE UM MAPA e emite `combat:updated` para o GM e, individualmente, para cada
+ * jogador (a visibilidade de cada um pode ser diferente: é dono de um token oculto pela névoa pros
+ * outros, por exemplo). `combat: null` = esse mapa não tem combate — zera quem tinha um antes (ex.:
+ * `combat:end { clear: true }`).
  *
- * Devolve a visão de QUEM CHAMOU (`caller`), pro handler usar como resposta do ack:
- * nunca devolvemos a visão do GM pra um jogador, mesmo que ele tenha disparado o lote.
+ * Broadcast (docs/plano-mapas.md §5): o GM SEMPRE recebe (pode estar preparando um mapa que não é
+ * o ativo); jogadores só recebem se `sceneId` for o mapa ATIVO da sala — não sabem de combate em
+ * mapa que não veem, nem que ele existe.
+ *
+ * Devolve a visão de QUEM CHAMOU (`caller`), pro handler usar como resposta do ack: nunca devolvemos
+ * a visão do GM pra um jogador, mesmo que ele tenha disparado o lote.
  */
-export async function emitCombat(io: TypedServer, roomId: string, caller: Viewer): Promise<Combat | null> {
+export async function emitCombat(io: TypedServer, roomId: string, sceneId: string, caller: Viewer): Promise<Combat | null> {
   const room = await prisma.room.findUnique({ where: { id: roomId } });
-  if (!room?.activeSceneId) {
-    io.to(rooms.all(roomId)).emit("combat:updated", null);
-    return null;
-  }
+  if (!room) throw new HandlerError("Sala não encontrada");
 
   const def = getSystemDefinition(room.systemId);
-  const [row, sceneRow, players] = await Promise.all([
-    loadCombatRow(room.activeSceneId),
-    prisma.scene.findUniqueOrThrow({ where: { id: room.activeSceneId } }),
-    prisma.participant.findMany({ where: { roomId, role: "player" } }),
-  ]);
-
-  if (!row) {
-    io.to(rooms.all(roomId)).emit("combat:updated", null);
-    return null;
-  }
-
+  const [row, sceneRow] = await Promise.all([loadCombatRow(sceneId), prisma.scene.findUniqueOrThrow({ where: { id: sceneId } })]);
   const fog = toScene(sceneRow).fog;
-  const gmView = toCombat(row, def, { role: "gm", participantId: "" }, fog);
-  io.to(rooms.gm(roomId)).emit("combat:updated", gmView);
-  for (const p of players) {
-    io.to(rooms.participant(p.id)).emit("combat:updated", toCombat(row, def, { role: "player", participantId: p.id }, fog));
+
+  const gmView: Combat | null = row ? toCombat(row, def, { role: "gm", participantId: "" }, fog) : null;
+  io.to(rooms.gm(roomId)).emit("combat:updated", { sceneId, combat: gmView });
+
+  if (room.activeSceneId === sceneId) {
+    const players = await prisma.participant.findMany({ where: { roomId, role: "player" } });
+    for (const p of players) {
+      const view = row ? toCombat(row, def, { role: "player", participantId: p.id }, fog) : null;
+      io.to(rooms.participant(p.id)).emit("combat:updated", { sceneId, combat: view });
+    }
   }
 
-  return caller.role === "gm" ? gmView : toCombat(row, def, caller, fog);
+  if (caller.role === "gm") return gmView;
+  return row ? toCombat(row, def, caller, fog) : null;
 }
 
 /** Fórmula + rótulo da iniciativa de um combatente: pela ficha vinculada (token atual), ou sem ficha (bônus manual). */
@@ -219,6 +215,26 @@ export async function prepareTokenRemovalFromCombat(def: SystemDefinition, comba
 }
 
 /**
+ * Tira um token do combate do MAPA QUE ELE ESTÁ DEIXANDO (`scene:activate`/`scene:delete` movendo
+ * pra outro mapa, docs/plano-mapas.md §8/§10). Diferente de `prepareTokenRemovalFromCombat` (usada
+ * pelo soft delete de token, que deixa a linha do Combatant intacta porque `token.deletedAt` já a
+ * filtra fora até o desfazer restaurar): aqui o token continua existindo, só mudou de mapa, então a
+ * linha do Combatant precisa mesmo sumir — mesmo caminho de `combat:remove`. Devolve `true` se o
+ * token era combatente ali (quem chama sabe que precisa reemitir o combate desse mapa).
+ */
+export async function removeTokenFromSceneCombat(def: SystemDefinition, sceneId: string, tokenId: string): Promise<boolean> {
+  const combat = await loadCombatRow(sceneId);
+  if (!combat) return false;
+  const combatant = combat.combatants.find((c) => c.tokenId === tokenId);
+  if (!combatant) return false;
+  const nextState = stateAfterRemoval(def, combat.combatants, { activeCombatantId: combat.activeCombatantId, round: combat.round }, new Set([combatant.id]));
+  await prisma.combatant.deleteMany({ where: { id: combatant.id } });
+  await prisma.combat.update({ where: { id: combat.id }, data: { activeCombatantId: nextState.activeCombatantId, round: nextState.round } });
+  await persistNormalizedOrder(combat.combatants.filter((c) => c.id !== combatant.id));
+  return true;
+}
+
+/**
  * `token:update` reemite o combate só quando algo que a lista mostra de fato mudou: nome, cor,
  * `visible`, ou a posição cruzou a fronteira da névoa (não a cada tick de um arraste comum —
  * ver docs/plano-combate.md §4). Não faz nada se o token não é combatente de combate nenhum.
@@ -232,7 +248,7 @@ export async function maybeReemitCombatForToken(io: TypedServer, roomId: string,
 
   const combatant = await prisma.combatant.findFirst({ where: { tokenId: after.id }, select: { id: true } });
   if (!combatant) return;
-  await emitCombat(io, roomId, { role: "gm", participantId: "" });
+  await emitCombat(io, roomId, after.sceneId, { role: "gm", participantId: "" });
 }
 
 /**
@@ -253,9 +269,10 @@ async function applyConditionExpiry(
   actorParticipantId: string,
   strategy: (conditions: TokenCondition[]) => ConditionExpiry,
 ): Promise<void> {
-  const [tokens, sceneRow] = await Promise.all([
+  const [tokens, sceneRow, active] = await Promise.all([
     prisma.token.findMany({ where: { sceneId, deletedAt: null } }),
     prisma.scene.findUniqueOrThrow({ where: { id: sceneId } }),
+    isActiveScene(roomId, sceneId),
   ]);
   const fog = toScene(sceneRow).fog;
   const labelByKey = new Map(def.conditions.map((c) => [c.key, c.label]));
@@ -267,7 +284,8 @@ async function applyConditionExpiry(
 
     const updated = toToken(await prisma.token.update({ where: { id: row.id }, data: { conditions: remaining } }));
     io.to(rooms.gm(roomId)).emit("token:updated", updated);
-    emitTokenToPlayers(io, roomId, updated, "token:updated", fog);
+    // Combate deixou de exigir mapa ativo (docs/plano-mapas.md §7): jogador só recebe se for.
+    if (active) emitTokenToPlayers(io, roomId, updated, "token:updated", fog);
 
     for (const cond of expired) {
       const label = labelByKey.get(cond.key) ?? cond.key;
