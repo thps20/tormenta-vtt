@@ -11,11 +11,14 @@ import { deleteSelectedTokens, useDeleteSelectionShortcut } from "../lib/useDele
 import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
 import { useTurnTitle } from "../lib/useTurnTitle";
 import { useHistory } from "../store/history";
+import { useSceneList } from "../store/sceneList";
 import { selectEffectiveMode, useTools } from "../store/tools";
-import { computeCharacter, isPointRevealed, tokenCenter } from "@tormenta-vtt/shared";
+import { computeCharacter, isPointRevealed, pickTokensToCarry, tokenCenter } from "@tormenta-vtt/shared";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { CombatBanner } from "./CombatBanner";
 import { type CombatPanelCallbacks } from "./CombatPanel";
+import { CarryTokensDialog, type CarryTokenRow } from "./CarryTokensDialog";
+import { ViewingSceneBanner } from "./ViewingSceneBanner";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
 import { FogToolbar } from "./FogToolbar";
@@ -83,11 +86,27 @@ function Table() {
   // aviso e o painel "Mapas" (que precisam saber qual é o ativo de verdade da mesa).
   const scene = useRoom(selectViewedScene);
   const activeScene = useRoom(selectActiveScene);
+  const scenes = useRoom((s) => s.scenes);
+  const viewingSceneId = useRoom((s) => s.viewingSceneId);
   const leave = useRoom((s) => s.leave);
   const setMap = useRoom((s) => s.setMap);
   const updateGrid = useRoom((s) => s.updateGrid);
+  const enterScene = useRoom((s) => s.enterScene);
+  const createScene = useRoom((s) => s.createScene);
+  const activateScene = useRoom((s) => s.activateScene);
+  const renameScene = useRoom((s) => s.renameScene);
+  const duplicateSceneAction = useRoom((s) => s.duplicateScene);
+  const deleteScene = useRoom((s) => s.deleteScene);
+  const reorderScenesAction = useRoom((s) => s.reorderScenes);
+  const setSceneArrival = useRoom((s) => s.setSceneArrival);
   const [isMapConfigOpen, setMapConfigOpen] = useState(false);
   const [sidePanelTab, setSidePanelTab] = useState<SidePanelTab>("chat");
+  // Mapas (docs/plano-mapas.md §8/§9): diálogo "Levar para o mapa" ao ativar, e o modo "definir
+  // ponto de chegada" (o próximo clique no canvas do mapa X grava, ver VttCanvas#arrivalPickMode).
+  const [carryDialogSceneId, setCarryDialogSceneId] = useState<string | null>(null);
+  const [settingArrivalSceneId, setSettingArrivalSceneId] = useState<string | null>(null);
+  const sceneListItems = useSceneList((s) => s.itemsBySceneId);
+  const loadSceneList = useSceneList((s) => s.load);
 
   // Ferramenta ativa do canvas + atalhos de teclado (V/H/R/Esc/espaço).
   const toolMode = useTools((s) => s.mode);
@@ -108,6 +127,17 @@ function Table() {
   const fogOp = useRoom((s) => s.fogOp);
   useToolShortcuts();
   useDeleteSelectionShortcut();
+
+  // Aba "Mapas": busca a lista sob demanda (contagens/combate que o cliente não carregou).
+  useEffect(() => {
+    if (sidePanelTab === "maps") void loadSceneList();
+  }, [sidePanelTab, loadSceneList]);
+
+  // Esc cancela o modo "definir ponto de chegada" em andamento (mesmo gesto de cancelar de sempre).
+  useEffect(() => {
+    setSettingArrivalSceneId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cancelNonce]);
 
   // Seleciona o objeto estável (byId) e deriva a lista com useMemo: um seletor que
   // devolvesse um array novo a cada chamada faria o Zustand re-renderizar sem parar.
@@ -292,6 +322,64 @@ function Table() {
     await updateGrid(grid);
   };
 
+  // --- Mapas: painel, ativar com "Levar para o mapa", ponto de chegada (docs/plano-mapas.md) -----
+
+  const handleActivateRequest = (destSceneId: string) => {
+    const originTokens = activeScene ? sceneTokens(byId, activeScene.id) : [];
+    // Nada pra levar: ativa direto, sem incomodar o GM com um diálogo vazio.
+    if (!activeScene || originTokens.length === 0) {
+      void activateScene({ sceneId: destSceneId });
+      return;
+    }
+    setCarryDialogSceneId(destSceneId);
+  };
+
+  const handleCarryConfirm = (moveTokenIds: string[]) => {
+    if (carryDialogSceneId) void activateScene({ sceneId: carryDialogSceneId, moveTokenIds });
+    setCarryDialogSceneId(null);
+  };
+
+  const handleSetArrivalMode = (sceneId: string) => {
+    // O clique precisa acontecer no canvas DESTE mapa: navega pra ele primeiro se for outro.
+    if (scene?.id !== sceneId) void enterScene(sceneId);
+    setSettingArrivalSceneId(sceneId);
+  };
+
+  const handlePickArrival = (point: { x: number; y: number }) => {
+    if (settingArrivalSceneId) void setSceneArrival(settingArrivalSceneId, point);
+    setSettingArrivalSceneId(null);
+  };
+
+  const handleDeleteMapRequest = async (sceneId: string) => {
+    const sceneName = scenes.find((s) => s.id === sceneId)?.name ?? "este mapa";
+    if (!window.confirm(`Apagar o mapa "${sceneName}"?`)) return;
+    const res = await deleteScene(sceneId);
+    if (!res || res.status !== "needs-confirm") return;
+    const names = res.playerTokenIds.map((id) => byId[id]?.name ?? "token").join(", ");
+    if (window.confirm(`Este mapa tem tokens de jogador (${names}). Apagar move eles para o mapa ativo. Continuar?`)) {
+      await deleteScene(sceneId, true);
+    }
+  };
+
+  // Linhas do diálogo "Levar para o mapa": tokens do mapa ATIVO ATUAL (de onde eles saem).
+  const carryDestScene = carryDialogSceneId ? scenes.find((s) => s.id === carryDialogSceneId) : null;
+  const activeSceneTokens = activeScene ? sceneTokens(byId, activeScene.id) : [];
+  const activeCombat = sceneCombat(combatByScene, activeScene?.id);
+  const carryRows: CarryTokenRow[] = carryDestScene
+    ? (() => {
+        // "Selecionado" só faz sentido se o GM estava olhando o mapa ativo quando clicou em Ativar.
+        const relevantSelected = scene?.id === activeScene?.id ? selectedIds : [];
+        const candidates = pickTokensToCarry({ tokens: activeSceneTokens, selectedIds: relevantSelected, characters });
+        return activeSceneTokens.map((t) => ({
+          tokenId: t.id,
+          name: t.name,
+          ownerNickname: t.ownerId ? (participants.find((p) => p.id === t.ownerId)?.nickname ?? null) : null,
+          preselected: candidates.some((c) => c.tokenId === t.id),
+          inCombat: activeCombat?.combatants.some((c) => c.tokenId === t.id) ?? false,
+        }));
+      })()
+    : [];
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0c0c0c] text-zinc-100 antialiased">
       <TopBar
@@ -318,14 +406,23 @@ function Table() {
 
       <div className="flex-1 flex overflow-hidden relative">
         <main className="flex-1 h-full relative overflow-hidden">
-          <CombatBanner
-            combat={combat}
-            meId={me.id}
-            viewer={isGm ? "gm" : "player"}
-            onRollSelf={() => viewedSceneId && void combatRoll({ sceneId: viewedSceneId, scope: "self" })}
-            onDelay={(combatantId) => viewedSceneId && void combatDelay(viewedSceneId, combatantId)}
-            onResume={(combatantId) => viewedSceneId && void combatResume(viewedSceneId, combatantId)}
-          />
+          {isGm && scene && activeScene && scene.id !== activeScene.id ? (
+            <ViewingSceneBanner
+              viewingName={scene.name}
+              activeName={activeScene.name}
+              onGoToActive={() => void enterScene(activeScene.id)}
+              onActivateThis={() => handleActivateRequest(scene.id)}
+            />
+          ) : (
+            <CombatBanner
+              combat={combat}
+              meId={me.id}
+              viewer={isGm ? "gm" : "player"}
+              onRollSelf={() => viewedSceneId && void combatRoll({ sceneId: viewedSceneId, scope: "self" })}
+              onDelay={(combatantId) => viewedSceneId && void combatDelay(viewedSceneId, combatantId)}
+              onResume={(combatantId) => viewedSceneId && void combatResume(viewedSceneId, combatantId)}
+            />
+          )}
           {scene ? (
             <>
               <VttCanvas
@@ -392,6 +489,8 @@ function Table() {
                   void fogOp({ type: "add", shape });
                 }}
                 onSpawnCreature={isGm ? (entryId, point, opts) => void spawnCreatureAt(entryId, point, opts) : undefined}
+                arrivalPickMode={isGm && settingArrivalSceneId === scene.id}
+                onPickArrival={handlePickArrival}
               />
               <Toolbar
                 isGm={isGm}
@@ -421,7 +520,7 @@ function Table() {
             </>
           ) : (
             <Centered>
-              <p className="text-zinc-500 text-sm">Nenhuma cena ativa.</p>
+              <p className="text-zinc-500 text-sm">Nenhum mapa ativo.</p>
             </Centered>
           )}
 
@@ -463,6 +562,22 @@ function Table() {
           onOpenCharacter={openCharacter}
           onCreateCharacter={(payload) => void createCharacter(payload).then((c) => c && openCharacter(c.id))}
           onDeleteCharacter={(id) => void deleteCharacter(id)}
+          maps={{
+            scenes,
+            activeSceneId: room.activeSceneId,
+            viewingSceneId,
+            itemsBySceneId: sceneListItems,
+            onEnter: (sceneId) => void enterScene(sceneId),
+            onActivateRequest: handleActivateRequest,
+            onCreate: (payload) => void createScene(payload),
+            onRename: (sceneId, name) => void renameScene(sceneId, name),
+            onDuplicate: (sceneId) => void duplicateSceneAction(sceneId),
+            onDeleteRequest: (sceneId) => void handleDeleteMapRequest(sceneId),
+            onReorder: (sceneIds) => void reorderScenesAction(sceneIds),
+            onSetArrivalMode: handleSetArrivalMode,
+            onClearArrival: (sceneId) => void setSceneArrival(sceneId, null),
+            arrivalPickingSceneId: settingArrivalSceneId,
+          }}
         />
       </div>
 
@@ -484,6 +599,15 @@ function Table() {
 
       {isGm && scene && (
         <MapConfigModal isOpen={isMapConfigOpen} scene={scene} onSave={(r) => void handleSaveMapConfig(r)} onClose={() => setMapConfigOpen(false)} />
+      )}
+
+      {carryDestScene && (
+        <CarryTokensDialog
+          destSceneName={carryDestScene.name}
+          rows={carryRows}
+          onCancel={() => setCarryDialogSceneId(null)}
+          onConfirm={handleCarryConfirm}
+        />
       )}
     </div>
   );

@@ -6,6 +6,7 @@ import { useChat } from "./chat";
 import { useCombat } from "./combat";
 import { useCharacters } from "./characters";
 import { useHistory } from "./history";
+import { useSceneList } from "./sceneList";
 import { useTools } from "./tools";
 import { toast } from "./ui";
 
@@ -29,11 +30,20 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
     // Quem caiu no meio de uma medição não vai mandar o "apagar".
     useTools.getState().removeRemoteRuler(id);
   });
-  socket.on("room:activeSceneChanged", ({ sceneId }) => useRoom.getState().setActiveScene(sceneId));
+  socket.on("room:activeSceneChanged", ({ sceneId }) => {
+    useRoom.getState().setActiveScene(sceneId);
+    useSceneList.getState().refreshIfLoaded();
+  });
 
-  socket.on("scene:created", (scene) => useRoom.getState().upsertScene(scene));
+  socket.on("scene:created", (scene) => {
+    useRoom.getState().upsertScene(scene);
+    useSceneList.getState().refreshIfLoaded();
+  });
   socket.on("scene:updated", (scene) => useRoom.getState().upsertScene(scene));
-  socket.on("scene:deleted", ({ sceneId }) => useRoom.getState().removeScene(sceneId));
+  socket.on("scene:deleted", ({ sceneId }) => {
+    useRoom.getState().removeScene(sceneId);
+    useSceneList.getState().refreshIfLoaded();
+  });
   socket.on("scene:reordered", ({ order }) => useRoom.getState().applyReorder(order));
   socket.on("fog:updated", ({ sceneId, fog }) => useRoom.getState().applyFog(sceneId, fog));
 

@@ -99,6 +99,13 @@ interface VttCanvasProps {
    * segue funcionando por Enter/botão, que usam o centro da viewport em vez do ponto de soltura).
    */
   onSpawnCreature?: (entryId: string, point: { x: number; y: number }, opts: { count: number; visible: boolean }) => void;
+  /**
+   * "Definir ponto de chegada" (docs/plano-mapas.md §9): true entre o clique no menu do card do
+   * mapa e o próximo clique no canvas, que grava o ponto (`onPickArrival`) em vez do comportamento
+   * normal da ferramenta atual. GM only.
+   */
+  arrivalPickMode?: boolean;
+  onPickArrival?: (point: { x: number; y: number }) => void;
 }
 
 export interface FogTool {
@@ -187,6 +194,8 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   fogTool,
   onFogShape,
   onSpawnCreature,
+  arrivalPickMode,
+  onPickArrival,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -766,6 +775,11 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   };
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (arrivalPickMode) {
+      const p = pointerMapPos();
+      if (p && e.evt.button === 0) onPickArrival?.(p);
+      return;
+    }
     if (fogActive) {
       const p = pointerMapPos();
       if (p && e.evt.button === 0) fogClick(p);
@@ -982,6 +996,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
 
         <Layer id="tokens-layer">
           {tokensAboveFog.map(renderToken)}
+          {/* Ponto de chegada (docs/plano-mapas.md §9): pino só pro GM, não é token, não entra em nenhuma lista. */}
+          {me.role === "gm" && scene.arrival && (
+            <Group x={scene.arrival.x} y={scene.arrival.y} listening={false}>
+              <Line points={[0, -22, 0, 8]} stroke="#d4af37" strokeWidth={2} />
+              <Line points={[0, -22, 14, -15, 0, -8]} closed fill="#d4af37" />
+              <Circle radius={3} fill="#d4af37" y={8} />
+            </Group>
+          )}
           <Transformer
             ref={transformerRef}
             rotateEnabled={false}
@@ -1141,11 +1163,13 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         <Info className="w-3.5 h-3.5 text-[#d4af37]" />
         {/* "Delete apaga" só pro GM: jogador não apaga token por este atalho (ver useDeleteSelectionShortcut). */}
         <span>
-          {fogActive && fogTool
-            ? FOG_HINTS[fogTool.shape]
-            : mode === "select" && me.role === "gm"
-              ? `${MODE_HINTS.select} • Delete apaga os selecionados`
-              : MODE_HINTS[mode]}
+          {arrivalPickMode
+            ? "Clique no mapa para definir o ponto de chegada • Esc cancela"
+            : fogActive && fogTool
+              ? FOG_HINTS[fogTool.shape]
+              : mode === "select" && me.role === "gm"
+                ? `${MODE_HINTS.select} • Delete apaga os selecionados`
+                : MODE_HINTS[mode]}
         </span>
       </div>
       )}

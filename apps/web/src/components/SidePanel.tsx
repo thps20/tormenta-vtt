@@ -1,11 +1,12 @@
 import React from 'react';
-import { MessageSquare, Swords, Users } from 'lucide-react';
+import { Map as MapIcon, MessageSquare, Swords, Users } from 'lucide-react';
 import { ChatTab } from './ChatTab';
 import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
 import { CharactersTab } from './CharactersTab';
+import { MapsPanel, type MapsPanelProps } from './MapsPanel';
 import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, Participant, Token } from '@tormenta-vtt/shared';
 
-export type SidePanelTab = 'chat' | 'initiative' | 'characters';
+export type SidePanelTab = 'chat' | 'initiative' | 'characters' | 'maps';
 
 interface SidePanelProps {
   /** Aba ativa (controlada pela página, para outros botões poderem abrir uma aba). */
@@ -35,6 +36,8 @@ interface SidePanelProps {
   onDeleteCharacter: (characterId: string) => void;
   /** Botões de ação nos cards de item do chat (dano, cura) rolam pela ficha. */
   onRollCharacter: (characterId: string, request: CharacterRollRequest) => void;
+  /** Aba "Mapas" (só GM) — props repassadas direto pro MapsPanel. */
+  maps: MapsPanelProps;
 }
 
 export const SidePanel: React.FC<SidePanelProps> = ({
@@ -61,6 +64,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   onCreateCharacter,
   onDeleteCharacter,
   onRollCharacter,
+  maps,
 }) => {
   const setActiveTab = onTabChange;
 
@@ -136,6 +140,21 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             {characters.length}
           </span>
         </button>
+
+        {isGm && (
+          <button
+            id="tab-btn-maps"
+            onClick={() => setActiveTab('maps')}
+            className={`flex-1 flex items-center justify-center gap-2 text-xs font-serif font-bold tracking-widest uppercase transition-all cursor-pointer ${
+              activeTab === 'maps'
+                ? 'border-b-2 border-[#d4af37] bg-[#222222] text-[#d4af37]'
+                : 'border-b border-[#2d2417] text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a1a]'
+            }`}
+          >
+            <MapIcon className="w-3.5 h-3.5" />
+            <span>Mapas</span>
+          </button>
+        )}
       </div>
 
       {/* Tab Content Container */}
@@ -159,6 +178,8 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             onCreate={onCreateCharacter}
             onDelete={onDeleteCharacter}
           />
+        ) : activeTab === 'maps' && isGm ? (
+          <MapsPanel {...maps} />
         ) : (
           <CombatPanel
             combat={combat}

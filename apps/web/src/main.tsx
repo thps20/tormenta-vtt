@@ -21,7 +21,8 @@ if (import.meta.env.DEV) {
     import("./store/tools"),
     import("./store/compendium"),
     import("./store/history"),
-  ]).then(([c, r, t, ch, cb, ca, tl, co, h]) => {
+    import("./store/sceneList"),
+  ]).then(([c, r, t, ch, cb, ca, tl, co, h, sl]) => {
     Object.assign(window, {
       __vtt: {
         useConnection: c.useConnection,
@@ -33,6 +34,7 @@ if (import.meta.env.DEV) {
         useTools: tl.useTools,
         useCompendium: co.useCompendium,
         useHistory: h.useHistory,
+        useSceneList: sl.useSceneList,
       },
     });
   });
