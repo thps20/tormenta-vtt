@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Check, FileText, Heart, Info, Plus, Shield, SlidersHorizontal, Sparkles, Swords, X, Zap } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Anchor, Check, FileText, Heart, Info, Plus, Shield, SlidersHorizontal, Sparkles, Swords, X, Zap } from "lucide-react";
 import type { Character, CharacterItem, ComputedCharacter, ConditionDef, SystemDefinition, Token, TokenCondition } from "@tormenta-vtt/shared";
 import { DamageTypeBadge } from "./DamageTypeBadge";
 
@@ -22,6 +22,35 @@ export interface NpcQuickCardProps {
   onOpenFullSheet: () => void;
   onOpenTokenInspector: () => void;
   onClose: () => void;
+}
+
+/** Posição arrastada do card, em pixels do contêiner do canvas (offsetParent). null = posição padrão. */
+interface QuickCardPos {
+  x: number;
+  y: number;
+}
+
+/** Lembrada por aba (sessionStorage): ao reabrir o card na mesma sessão, volta pra onde ficou. */
+const QUICK_CARD_POS_KEY = "tvtt:npcQuickCardPos";
+
+function loadQuickCardPos(): QuickCardPos | null {
+  try {
+    const raw = sessionStorage.getItem(QUICK_CARD_POS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<QuickCardPos>;
+    return typeof parsed.x === "number" && typeof parsed.y === "number" ? { x: parsed.x, y: parsed.y } : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveQuickCardPos(pos: QuickCardPos | null): void {
+  try {
+    if (pos) sessionStorage.setItem(QUICK_CARD_POS_KEY, JSON.stringify(pos));
+    else sessionStorage.removeItem(QUICK_CARD_POS_KEY);
+  } catch {
+    /* ignora (aba anônima etc.) */
+  }
 }
 
 /** "Imune"/"Vulnerável" ganham prioridade sobre RD/½ (não faz sentido combinar); null = nada ativo. */
@@ -59,6 +88,70 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
   const [deltaInput, setDeltaInput] = useState("");
   const [isConditionsOpen, setIsConditionsOpen] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+
+  // ----- Arrastar pelo cabeçalho (pointer events; ver docs no topo do arquivo) -----
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<QuickCardPos | null>(loadQuickCardPos);
+  /** pointerId em arraste + de onde o ponteiro pegou o card, pra não "saltar" ao começar. */
+  const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
+
+  /** Nunca deixa o card sumir da área visível do canvas (offsetParent = contêiner do VttCanvas). */
+  const clampPos = (x: number, y: number): QuickCardPos => {
+    const parent = cardRef.current?.offsetParent as HTMLElement | null;
+    const card = cardRef.current;
+    if (!parent || !card) return { x, y };
+    const maxX = Math.max(0, parent.clientWidth - card.offsetWidth);
+    const maxY = Math.max(0, parent.clientHeight - card.offsetHeight);
+    return { x: Math.min(Math.max(0, x), maxX), y: Math.min(Math.max(0, y), maxY) };
+  };
+
+  // Reclampa ao montar (a posição salva pode vir de uma janela com outro tamanho) e sempre que o
+  // contêiner do canvas mudar de tamanho (ex.: painel lateral abre/fecha, resize da janela).
+  useEffect(() => {
+    const parent = cardRef.current?.offsetParent as HTMLElement | null;
+    if (!parent) return;
+    const reclamp = () => setPos((p) => (p ? clampPos(p.x, p.y) : p));
+    reclamp();
+    const observer = new ResizeObserver(reclamp);
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, []);
+
+  const handleHeaderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button")) return; // não inicia arraste clicando nos ícones
+    const card = cardRef.current;
+    if (!card) return;
+    const cardRect = card.getBoundingClientRect();
+    dragRef.current = { pointerId: e.pointerId, offsetX: e.clientX - cardRect.left, offsetY: e.clientY - cardRect.top };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleHeaderPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    const parent = cardRef.current?.offsetParent as HTMLElement | null;
+    if (!drag || drag.pointerId !== e.pointerId || !parent) return;
+    const parentRect = parent.getBoundingClientRect();
+    setPos(clampPos(e.clientX - parentRect.left - drag.offsetX, e.clientY - parentRect.top - drag.offsetY));
+  };
+
+  const handleHeaderPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragRef.current?.pointerId !== e.pointerId) return;
+    dragRef.current = null;
+    // Lê a posição final do próprio DOM (já aplicada pelo último pointermove) em vez de confiar no
+    // estado "pos" capturado no closure deste handler, que pode estar um render atrás.
+    const card = cardRef.current;
+    const parent = card?.offsetParent as HTMLElement | null;
+    if (!card || !parent) return;
+    const parentRect = parent.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    saveQuickCardPos({ x: cardRect.left - parentRect.left, y: cardRect.top - parentRect.top });
+  };
+
+  /** Botão "encaixar": volta pra posição padrão (bottom-4 right-4) e esquece a posição arrastada. */
+  const dockToDefault = () => {
+    setPos(null);
+    saveQuickCardPos(null);
+  };
 
   // ----- Cabeçalho: ND/tipo (só existem se o sistema tiver creatures) e tamanho -----
   const creatures = def.creatures;
@@ -112,12 +205,22 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
 
   return (
     <div
+      ref={cardRef}
       id="npc-quick-card"
-      className="absolute bottom-4 right-4 w-[360px] max-w-[calc(100vw-2rem)] bg-[#14120f] border border-[#3d311f] rounded-lg shadow-2xl text-zinc-200 flex flex-col max-h-[calc(100vh-5.5rem)] select-none z-30"
-      style={{ boxShadow: "0 12px 36px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(212, 175, 55, 0.15)" }}
+      className={`absolute ${pos ? "" : "bottom-4 right-4"} w-[360px] max-w-[calc(100vw-2rem)] bg-[#14120f] border border-[#3d311f] rounded-lg shadow-2xl text-zinc-200 flex flex-col max-h-[calc(100vh-5.5rem)] select-none z-30`}
+      style={{
+        boxShadow: "0 12px 36px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(212, 175, 55, 0.15)",
+        ...(pos ? { left: pos.x, top: pos.y } : {}),
+      }}
     >
-      {/* ----------------- CABEÇALHO ----------------- */}
-      <div className="px-3 py-2.5 bg-[#1a1713] border-b border-[#2d2417] flex items-center justify-between gap-2 shrink-0">
+      {/* ----------------- CABEÇALHO (arrastável: pega aqui e solta em qualquer ponto) ----------------- */}
+      <div
+        className="px-3 py-2.5 bg-[#1a1713] border-b border-[#2d2417] flex items-center justify-between gap-2 shrink-0 cursor-grab active:cursor-grabbing touch-none"
+        onPointerDown={handleHeaderPointerDown}
+        onPointerMove={handleHeaderPointerMove}
+        onPointerUp={handleHeaderPointerUp}
+        onPointerCancel={handleHeaderPointerUp}
+      >
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/20 shadow-sm" style={{ backgroundColor: token.color }} />
           <div className="min-w-0">
@@ -143,6 +246,16 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          {pos && (
+            <button
+              id="npc-btn-dock"
+              onClick={dockToDefault}
+              title="Encaixar (voltar à posição padrão)"
+              className="p-1.5 rounded text-zinc-500 hover:text-amber-300 hover:bg-[#25201a] border border-transparent hover:border-[#3d311f] transition-all cursor-pointer"
+            >
+              <Anchor className="w-3.5 h-3.5" />
+            </button>
+          )}
           <button
             id="npc-btn-full-sheet"
             onClick={onOpenFullSheet}
