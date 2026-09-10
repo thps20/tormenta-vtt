@@ -30,6 +30,7 @@ model Room {
   messages     ChatMessage[]
   combats      Combat[]
   characters   Character[]
+  handouts     Handout[]
 }
 
 model Participant {
@@ -71,9 +72,10 @@ model Scene {
   arrival   Json?
   createdAt DateTime @default(now())
 
-  room   Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  tokens Token[]
-  combat Combat?
+  room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tokens      Token[]
+  combat      Combat?
+  handoutPins HandoutPin[]
 
   @@index([roomId])
 }
@@ -151,6 +153,9 @@ model ChatMessage {
   /// InitiativeBatch serializado (ver InitiativeBatchSchema) quando kind == "initiative-batch":
   /// combat:roll rolando mais de um combatente publica um card só, em vez de um por combatente.
   initiativeBatch Json?
+  /// HandoutCard serializado (ver HandoutCardSchema) quando kind == "handout": cópia denormalizada
+  /// do handout no momento de handout:show (§9.10) — não muda se o handout original for editado.
+  handout       Json?
   /// Quem vê: "all" | "gm" | "self" (ver RollVisibilitySchema). Filtrado no broadcast e no snapshot.
   visibility    String   @default("all")
   /// Token ao qual a rolagem está ligada (combatente de combat:roll, ou personagem com token
@@ -159,6 +164,10 @@ model ChatMessage {
   /// iniciativa em lote citam vários tokens dentro de `initiativeBatch`, não aqui (o gate deles
   /// é por linha, não pela mensagem inteira).
   tokenId       String?
+  /// Sussurro visual (handout:show "para X", §9.10): setado, só o GM e este participantId recebem
+  /// a mensagem — nem card, nem placeholder pros demais (mesmo espírito do gate de tokenId, mas por
+  /// pessoa). null = sem sussurro, regra normal de visibility.
+  whisperTo     String?
   createdAt     DateTime @default(now())
 
   room  Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -214,4 +223,57 @@ model Combatant {
 
   @@unique([combatId, tokenId])
   @@index([combatId])
+}
+
+/// Biblioteca de handouts por sala (docs/SPEC.md §9.10): imagem ou texto que o GM mostra pros
+/// jogadores (overlay em tela cheia + card no chat) ou fixa no mapa como um pino (HandoutPin
+/// abaixo). Só o GM vê esta tabela (handout:list é gmOnly). `kind` decide quais campos valem.
+model Handout {
+  id        String    @id @default(cuid())
+  roomId    String
+  name      String
+  kind      String // "image" | "text"
+  imageUrl  String?
+  width     Int?
+  height    Int?
+  text      String?
+  tags      String[]  @default([])
+  /// Soft delete (mesmo padrão de Token.deletedAt): apagar também soft-deleta os pinos deste
+  /// handout em qualquer mapa (uma entrada de desfazer só, docs/plano-desfazer.md). null = existe.
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  room Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  pins HandoutPin[]
+
+  @@index([roomId])
+}
+
+/// Pino de um handout fixado num mapa. Geometria em pixels do mapa, como Token/Template. Campos de
+/// conteúdo são uma CÓPIA denormalizada do Handout no momento de fixar (mesmo padrão de
+/// Combatant.name/color): editar o handout original depois não atualiza pinos já fixados.
+model HandoutPin {
+  id        String    @id @default(cuid())
+  sceneId   String
+  handoutId String
+  x         Float
+  y         Float
+  /// GM controla: pino invisível só aparece pro GM (mesma regra de Token.visible).
+  visible   Boolean   @default(true)
+  name      String
+  kind      String // "image" | "text"
+  imageUrl  String?
+  width     Int?
+  height    Int?
+  text      String?
+  /// Soft delete (docs/plano-desfazer.md): handout:unpin, e a cascata de handout:delete, só marcam
+  /// esta data — o desfazer do GM restaura sem precisar de snapshot manual.
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  scene   Scene   @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  handout Handout @relation(fields: [handoutId], references: [id], onDelete: Cascade)
+
+  @@index([sceneId])
+  @@index([handoutId])
 }

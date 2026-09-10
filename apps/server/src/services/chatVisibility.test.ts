@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage, FogConfig, Token } from "@tormenta-vtt/shared";
-import { emitChatMessage, initiativeBatchForViewer, messageVisibleTo, redactForAuthor, tokenGateOk } from "./chatVisibility.js";
+import { emitChatMessage, initiativeBatchForViewer, messageVisibleTo, redactForAuthor, tokenGateOk, whisperGateOk } from "./chatVisibility.js";
 import { rooms, type TypedServer } from "../socket/types.js";
 
 const base: ChatMessage = {
@@ -11,6 +11,7 @@ const base: ChatMessage = {
   kind: "roll",
   visibility: "all",
   tokenId: null,
+  whisperTo: null,
   createdAt: new Date().toISOString(),
   roll: {
     id: "d1",
@@ -141,6 +142,25 @@ describe("tokenGateOk", () => {
   it("mapa volta a ser o ativo: mensagem represada volta a ser entregue (mesma checagem, activeSceneId novo)", () => {
     const tokenInfo = { token: { ...tokenFixture, visible: true }, fog: openFog };
     expect(tokenGateOk("t1", other, "p-author", tokenInfo, "s1")).toBe(true);
+  });
+});
+
+// base.whisperTo é null nos fixtures: maioria dos testes trata "sem sussurro" como o caso normal.
+describe("whisperGateOk", () => {
+  it("sem whisperTo: sempre ok (regra normal de visibility)", () => {
+    expect(whisperGateOk(base, other)).toBe(true);
+  });
+
+  it("GM sempre recebe, mesmo não sendo o alvo do sussurro", () => {
+    expect(whisperGateOk({ ...base, whisperTo: "p-other" }, gm)).toBe(true);
+  });
+
+  it("o alvo do sussurro recebe", () => {
+    expect(whisperGateOk({ ...base, whisperTo: "p-other" }, other)).toBe(true);
+  });
+
+  it("quem não é o alvo nem o GM fica de fora", () => {
+    expect(whisperGateOk({ ...base, whisperTo: "p-other" }, author)).toBe(false);
   });
 });
 

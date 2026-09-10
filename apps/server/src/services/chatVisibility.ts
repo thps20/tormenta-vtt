@@ -22,6 +22,12 @@
  * ativo vazavam pro chat dos jogadores (o token, em si, podia estar perfeitamente visível — só o
  * mapa é que não era o que a mesa está vendo). Quando o mapa vira ativo, a mensagem volta a ser
  * entregue no próximo snapshot (`room:join`), igual à regra 2 — sem reenvio ao vivo.
+ *
+ * Regra 3 (`whisperTo`, §9.10 — handout:show "para X"): mesmo mecanismo de exclusão total da
+ * regra 2, mas por PESSOA em vez de por token — quem não é o GM nem o participante alvo fica de
+ * fora por completo (nem card, nem placeholder), independente de `visibility` (que fica "all"
+ * nessas mensagens). Como só o GM publica handout, "autor sempre recebe" já vale de graça (GM
+ * nunca é bloqueado por regra nenhuma aqui).
  */
 import { FogConfigSchema, type ChatMessage, type FogConfig, type Token } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
@@ -100,6 +106,20 @@ export function tokenGateOk(
   return tokenVisibleTo(tokenInfo.token, { role: "player", participantId: viewer.participantId }, tokenInfo.fog);
 }
 
+/** Regra 3: sussurro visual (`whisperTo`, §9.10). GM sempre passa; jogador só se for o alvo. */
+export function whisperGateOk(msg: Pick<ChatMessage, "whisperTo">, viewer: Viewer): boolean {
+  if (!msg.whisperTo) return true;
+  return viewer.role === "gm" || viewer.participantId === msg.whisperTo;
+}
+
+/** Ids dos jogadores (nunca o GM) que não são o alvo do sussurro e por isso ficam de fora por
+ *  completo — mesmo papel de `blockedPlayerIds`, mas pra regra 3. `[]` quando não é sussurro. */
+async function blockedPlayerIdsForWhisper(roomId: string, whisperTo: string | null): Promise<string[]> {
+  if (!whisperTo) return [];
+  const players = await prisma.participant.findMany({ where: { roomId, role: "player" } });
+  return players.filter((p) => p.id !== whisperTo).map((p) => p.id);
+}
+
 /**
  * Emite `chat:message` para a sala toda: quem não pode ver o resultado recebe
  * a mesma mensagem sem `roll`/`item`/`text` (existe no chat dele, com um
@@ -108,8 +128,8 @@ export function tokenGateOk(
  * Revelar: `chat:reveal` chama esta função de novo com `visibility:"all"`,
  * e aí todo mundo já está na sala que recebe o conteúdo completo).
  *
- * Quando a mensagem tem `tokenId`, quem não vê esse token fica de fora de TUDO
- * (nem o placeholder) — daí o `.except(...)` nos dois envios abaixo.
+ * Quando a mensagem tem `tokenId` OU `whisperTo`, quem não vê esse token/não é o alvo do sussurro
+ * fica de fora de TUDO (nem o placeholder) — daí o `.except(...)` nos dois envios abaixo.
  *
  * Um card de iniciativa em lote (`kind: "initiative-batch"`) não tem um `tokenId` só: cada
  * linha cita o seu, e o gate é por linha (não pela mensagem inteira) — delega pra
@@ -118,7 +138,11 @@ export function tokenGateOk(
 export async function emitChatMessage(io: TypedServer, roomId: string, msg: ChatMessage): Promise<void> {
   if (msg.kind === "initiative-batch") return emitInitiativeBatchMessage(io, roomId, msg);
 
-  const blocked = msg.tokenId ? await blockedPlayerIds(roomId, msg.tokenId, msg.participantId) : [];
+  const [tokenBlocked, whisperBlocked] = await Promise.all([
+    msg.tokenId ? blockedPlayerIds(roomId, msg.tokenId, msg.participantId) : Promise.resolve([]),
+    blockedPlayerIdsForWhisper(roomId, msg.whisperTo),
+  ]);
+  const blocked = [...new Set([...tokenBlocked, ...whisperBlocked])];
   const exceptRooms = blocked.map(rooms.participant);
   const withExcept = (target: ReturnType<TypedServer["to"]>) => (exceptRooms.length ? target.except(exceptRooms) : target);
 

@@ -10,6 +10,7 @@ import { registerFogHandlers } from "./fog.js";
 import { registerTemplateHandlers } from "./templates.js";
 import { registerCompendiumHandlers } from "./compendium.js";
 import { registerHistoryHandlers } from "./history.js";
+import { registerHandoutHandlers } from "./handout.js";
 import type { TypedServer } from "./types.js";
 
 /** Ponto único que liga todos os handlers de socket. */
@@ -33,6 +34,7 @@ export function registerSocketHandlers(io: TypedServer, log: FastifyBaseLogger):
     registerTemplateHandlers(io, socket);
     registerCompendiumHandlers(io, socket);
     registerHistoryHandlers(io, socket);
+    registerHandoutHandlers(io, socket);
 
     socket.on("disconnect", (reason) => {
       log.info({ socketId: socket.id, reason }, "socket desconectado");

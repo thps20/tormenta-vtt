@@ -42,6 +42,7 @@ import { pushEntry, type HistoryEntry } from "../services/history.js";
 import { toScene, toToken } from "../services/serialize.js";
 import { clearTemplates, listTemplates } from "../services/templates.js";
 import { tokenVisibleTo } from "../services/visibility.js";
+import { handoutPinVisibleTo, toHandoutPin } from "../services/handouts.js";
 import { guarded, HandlerError } from "./ack.js";
 import { emitHistoryUpdated } from "./history.js";
 import { broadcastToken } from "./token.js";
@@ -328,14 +329,16 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
       }
       const scene = toScene(sceneRow);
       const viewer = { role: ctx.role, participantId: ctx.participantId };
-      const [tokenRows, combatRow, def] = await Promise.all([
+      const [tokenRows, combatRow, def, handoutPinRows] = await Promise.all([
         prisma.token.findMany({ where: { sceneId, deletedAt: null }, orderBy: { zIndex: "asc" } }),
         loadCombatRow(sceneId),
         requireSystem(ctx.roomId),
+        prisma.handoutPin.findMany({ where: { sceneId, deletedAt: null } }),
       ]);
       const tokens = tokenRows.map(toToken).filter((t) => tokenVisibleTo(t, viewer, scene.fog));
       const combat = combatRow ? toCombat(combatRow, def, viewer, scene.fog) : null;
-      return { tokens, combat, templates: listTemplates(sceneId) };
+      const handoutPins = handoutPinRows.map(toHandoutPin).filter((p) => handoutPinVisibleTo(p, viewer, sceneId));
+      return { tokens, combat, templates: listTemplates(sceneId), handoutPins };
     }),
   );
 

@@ -6,14 +6,15 @@ import { loadCombatRow, toCombat } from "./combat.js";
 import { toChatMessage, toParticipant, toRoomPublic, toScene, toToken } from "./serialize.js";
 import { characterVisibleTo, toCharacter } from "./characters.js";
 import { tokenVisibleTo } from "./visibility.js";
-import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, tokenGateOk } from "./chatVisibility.js";
+import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, tokenGateOk, whisperGateOk } from "./chatVisibility.js";
 import { listTemplates } from "./templates.js";
+import { handoutPinVisibleTo, toHandoutPin } from "./handouts.js";
 
 const CHAT_HISTORY_LIMIT = 100;
 
 /** Estado completo da sala do ponto de vista de `me`. */
 export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<RoomSnapshot> {
-  const [participants, scenes, tokens, messages, combatRow, characters] = await Promise.all([
+  const [participants, scenes, tokens, messages, combatRow, characters, handoutPinRows] = await Promise.all([
     prisma.participant.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
     // Mapas apagados (soft delete, docs/plano-mapas.md §10) nunca vão pro cliente. Ordenados como
     // o painel "Mapas" mostra (order asc, createdAt desempata — mesma regra de rules/scenes.ts).
@@ -28,6 +29,9 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     }),
     room.activeSceneId ? loadCombatRow(room.activeSceneId) : Promise.resolve(null),
     prisma.character.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
+    room.activeSceneId
+      ? prisma.handoutPin.findMany({ where: { sceneId: room.activeSceneId, deletedAt: null } })
+      : Promise.resolve([]),
   ]);
 
   // Névoa da cena ativa: decide quais tokens (e combatentes) alheios um jogador recebe.
@@ -64,12 +68,15 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     // Gabaritos são efêmeros (docs/plano-gabaritos.md): sem fog/visibilidade por token, todos que
     // veem o mapa ativo veem todos os gabaritos dele.
     templates: room.activeSceneId ? listTemplates(room.activeSceneId) : [],
+    handoutPins: handoutPinRows.map(toHandoutPin).filter((p) => handoutPinVisibleTo(p, viewer, room.activeSceneId)),
     chat: chatMessages.flatMap((m) => {
       if (m.kind === "initiative-batch") {
         const view = initiativeBatchForViewer(m, viewer, tokenInfoById, room.activeSceneId);
         return view ? [view] : [];
       }
-      return tokenGateOk(m.tokenId, viewer, m.participantId, tokenInfoById.get(m.tokenId ?? ""), room.activeSceneId) && messageVisibleTo(m, viewer)
+      return tokenGateOk(m.tokenId, viewer, m.participantId, tokenInfoById.get(m.tokenId ?? ""), room.activeSceneId) &&
+        whisperGateOk(m, viewer) &&
+        messageVisibleTo(m, viewer)
         ? [m]
         : [];
     }),

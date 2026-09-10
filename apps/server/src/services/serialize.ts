@@ -86,8 +86,10 @@ export function toChatMessage(m: DbChatMessage): ChatMessage {
     roll: m.roll ?? undefined,
     item: m.item ?? undefined,
     initiativeBatch: m.initiativeBatch ?? undefined,
+    handout: m.handout ?? undefined,
     visibility: m.visibility,
     tokenId: m.tokenId,
+    whisperTo: m.whisperTo,
     createdAt: m.createdAt.toISOString(),
   });
 }
