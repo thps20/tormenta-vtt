@@ -255,7 +255,8 @@ apps/web/src/
   components/   Lobby, RoomPage (liga stores aos componentes), TopBar (inclui o MapSelector, só
                 GM — botão-seletor de mapa com dropdown, atalho M, §9.7), Toolbar, VttCanvas,
                 TokenInspector, SidePanel (3 abas: Chat, Iniciativa, Fichas — responsivas, só
-                ícone com tooltip/badge quando o header fica estreito demais pro rótulo), ChatTab,
+                ícone com tooltip/badge quando o header fica estreito demais pro rótulo; recolhível,
+                §9.8), ChatTab,
                 InitiativeTab (modo de combate), CombatBanner (faixa "rolar iniciativa"/"seu
                 turno"), CharactersTab, MapsPanel (conteúdo do dropdown do MapSelector, §9.7),
                 CarryTokensDialog ("Levar para o mapa" ao ativar, §9.7), MapConfigModal,
@@ -542,3 +543,20 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   reencaixe posição+tamanho (`resnapToken`, `apps/server/src/services/grid.ts`, `grid.test.ts`:
   troca de `cellSize`, só offset, grid "none" ↔ square, sem mudança nenhuma) são testados à parte,
   sem banco.
+
+### 9.8 Painel lateral recolhível
+
+Recolher o `SidePanel` (Chat/Iniciativa/Fichas) pra dar a largura toda ao canvas (setembro/2026).
+
+- **Ícone + atalho**: um botão na borda entre o canvas e o painel (expandido, sobreposto à borda
+  esquerda do painel; recolhido, dentro da alça — abaixo) alterna o estado; atalho **\\** (barra
+  invertida) ou **Ctrl+B**, fora de campo de texto (`isTyping`, mesma proteção dos outros atalhos
+  — cobre o chat, onde `\` deveria só digitar), em `lib/useSidePanelShortcut.ts`.
+- **Recolhido**: o painel vira uma alça fina (`w-7`) em vez de sumir — o canvas ocupa o resto da
+  largura (é só `flex-1` no `<main>`, a alça é que encolhe). A alça mostra o botão pra reabrir e
+  dois badges, só quando valem: um ponto pulsante "é o seu turno" (mesma checagem de
+  `useTurnTitle`) e um contador de mensagens chegadas desde que recolheu (zera ao reabrir, não
+  soma por aba — reabrir em qualquer aba já conta como "visto"; não é um "não lido" por mensagem,
+  só um aviso de que algo chegou enquanto a alça estava fina).
+- **Preferência por usuário**: `localStorage` (`tvtt:sidePanelCollapsed`), mesmo padrão de
+  "centralizar no token da vez" (§3.5) — cada navegador/aba é "um usuário" neste app sem login.

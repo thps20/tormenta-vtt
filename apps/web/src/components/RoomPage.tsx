@@ -9,6 +9,7 @@ import { useSystemDef } from "../lib/system";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
 import { deleteSelectedTokens, useDeleteSelectionShortcut } from "../lib/useDeleteSelectionShortcut";
 import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
+import { useSidePanelShortcut } from "../lib/useSidePanelShortcut";
 import { useTurnTitle } from "../lib/useTurnTitle";
 import { useHistory } from "../store/history";
 import { useSceneList } from "../store/sceneList";
@@ -34,6 +35,7 @@ import { useCompendium } from "../store/compendium";
 import { CREATURE_FILTER } from "../lib/compendium";
 
 const CENTER_ON_TURN_KEY = "tvtt:centerOnActiveTurn";
+const SIDE_PANEL_COLLAPSED_KEY = "tvtt:sidePanelCollapsed";
 
 /**
  * Página da mesa: entra na sala pela URL e liga as stores aos componentes.
@@ -101,6 +103,23 @@ function Table() {
   const setSceneArrival = useRoom((s) => s.setSceneArrival);
   const [isMapConfigOpen, setMapConfigOpen] = useState(false);
   const [sidePanelTab, setSidePanelTab] = useState<SidePanelTab>("chat");
+  // Painel lateral recolhido (\ ou Ctrl+B, ícone na borda): preferência por usuário (localStorage,
+  // mesmo padrão de centerOnActiveTurn abaixo) — cada navegador/aba é "um usuário" neste app sem login.
+  const [sidePanelCollapsed, setSidePanelCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SIDE_PANEL_COLLAPSED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDE_PANEL_COLLAPSED_KEY, sidePanelCollapsed ? "1" : "0");
+    } catch {
+      /* ignora (aba anônima etc.) */
+    }
+  }, [sidePanelCollapsed]);
+  useSidePanelShortcut(() => setSidePanelCollapsed((v) => !v));
   // Mapas (docs/plano-mapas.md §8/§9): diálogo "Levar para o mapa" ao ativar, e o modo "definir
   // ponto de chegada" (o próximo clique no canvas do mapa X grava, ver VttCanvas#arrivalPickMode).
   const [carryDialogSceneId, setCarryDialogSceneId] = useState<string | null>(null);
@@ -174,6 +193,14 @@ function Table() {
 
   const messages = useChat((s) => s.messages);
   const sendMessage = useChat((s) => s.send);
+  // Badge "mensagens não lidas" da alça do painel recolhido: quantas chegaram desde que recolheu.
+  // Expandido, o contador acompanha messages.length de perto (fica sempre em 0); recolhido, ele
+  // para de seguir e a diferença vira o badge — reabrir volta a seguir (zera na hora).
+  const [seenMessageCount, setSeenMessageCount] = useState(messages.length);
+  useEffect(() => {
+    if (!sidePanelCollapsed) setSeenMessageCount(messages.length);
+  }, [messages.length, sidePanelCollapsed]);
+  const unreadMessages = sidePanelCollapsed ? Math.max(0, messages.length - seenMessageCount) : 0;
 
   // Combate do mapa VISITADO (docs/plano-mapas.md §7): não existe mais "o combate da sala" — cada
   // mapa tem o seu (ou nenhum), independente do que os outros mapas têm.
@@ -253,7 +280,8 @@ function Table() {
   }, [centerOnActiveTurn, activeTurnTokenId]);
 
   // Título da aba pisca "Seu turno" pra quem está numa aba em segundo plano.
-  useTurnTitle(me !== null && isMyTurn(combat, me));
+  const myTurn = me !== null && isMyTurn(combat, me);
+  useTurnTitle(myTurn);
 
   const charById = useCharacters((s) => s.byId);
   const characters = useMemo(() => sortedCharacters(charById), [charById]);
@@ -570,6 +598,10 @@ function Table() {
           onOpenCharacter={openCharacter}
           onCreateCharacter={(payload) => void createCharacter(payload).then((c) => c && openCharacter(c.id))}
           onDeleteCharacter={(id) => void deleteCharacter(id)}
+          collapsed={sidePanelCollapsed}
+          onToggleCollapsed={() => setSidePanelCollapsed((v) => !v)}
+          unreadMessages={unreadMessages}
+          isMyTurn={myTurn}
         />
       </div>
 
