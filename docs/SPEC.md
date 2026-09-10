@@ -170,7 +170,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `room:join` | `{ inviteCode, nickname?, gmSecret?, sessionToken? }` | todos | ack `RoomSnapshot`; `room:participantJoined`. `sessionToken` válido → reconecta o mesmo participante; senão exige `nickname` e cria um novo |
 | `scene:create` | `{ name, mapUrl?, mapWidth?, mapHeight? }` (`mapUrl` opcional: "criar por upload" numa chamada só) | GM | `scene:created` |
 | `scene:activate` | `{ sceneId, moveTokenIds?, dropPoint? }` (§9.7: diálogo "Levar para o mapa") | GM | `token:updated` de cada token movido, `combat:updated` do mapa de origem se ele tinha combate, `room:activeSceneChanged` |
-| `scene:enter` | `{ sceneId }` | GM (qualquer mapa vivo da sala), jogador (só o ativo) | ack `{ tokens, combat }`; sem broadcast — navegar/restaurar sem os efeitos colaterais de `room:join` (§9.7) |
+| `scene:enter` | `{ sceneId }` | GM (qualquer mapa vivo da sala), jogador (só o ativo) | ack `{ tokens, combat, templates }` (§9.9); sem broadcast — navegar/restaurar sem os efeitos colaterais de `room:join` (§9.7) |
 | `scene:rename` | `{ sceneId, name }` | GM | `scene:updated` |
 | `scene:duplicate` | `{ sceneId, name? }` (nome ausente = gerado, "Cópia de X") | GM | `scene:created` |
 | `scene:delete` | `{ sceneId, confirmMovePlayerTokens? }` | GM | ack `{ status: "deleted" }` ou `{ status: "needs-confirm", playerTokenIds }` (nada apagado ainda); `scene:deleted` + `token:updated` dos tokens de jogador movidos (§9.7) |
@@ -208,6 +208,8 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `combat:resume` | `{ sceneId, combatantId }` (só no mapa ativo) | GM ou dono do combatente | `combat:updated` |
 | `combat:end` | `{ sceneId, clear? }` | GM | `combat:updated` (`combat: null` se `clear: true`) |
 | `ruler:update` | `{ sceneId, ruler: { start, end } \| null }` (pixels do mapa) | todos | `ruler:updated` para os **outros** (efêmero: não persiste; `null` apaga) |
+| `template:upsert` | `{ sceneId, template: Template, live? }` (§9.9) | GM, ou dono (só no mapa ativo) | `template:upserted`; cria (id novo) ou edita (mover/girar); `ownerId` do payload nunca é confiado (fixo desde a criação) |
+| `template:remove` | `{ sceneId, templateId }` | GM, ou dono (só no mapa ativo) | `template:removed` |
 | `history:undo` / `history:redo` | `{}` | GM | desfaz/refaz o topo da pilha da sala (§9.6); ack `{ summary } \| null` (`null` = pilha vazia); broadcasts normais das entidades afetadas + `history:updated` |
 
 ### Servidor → Cliente
@@ -228,6 +230,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `combat:updated` | `{ sceneId, combat: Combat \| null }` (estado completo DE UM MAPA, já ordenado e filtrado pela visibilidade de quem recebe — §3.5; `combat: null` = sem combate nesse mapa. GM sempre recebe; jogador só se `sceneId` for o mapa ATIVO — §9.7) |
 | `history:updated` | `{ canUndo, canRedo, undoSummary?, redoSummary? }` — só pro GM (§9.6) |
 | `ruler:updated` | `{ participantId, nickname, sceneId, ruler \| null }` (régua de outro participante; sem eco ao autor; jogador só recebe se `sceneId` for o mapa ATIVO — §9.7) |
+| `template:upserted` / `template:removed` | `{ sceneId, template }` / `{ sceneId, templateId }` (§9.9; cliente faz upsert por id) |
 | `server:error` | `{ message }` |
 
 ### HTTP (fora do socket)
@@ -260,7 +263,9 @@ apps/web/src/
                 InitiativeTab (modo de combate), CombatBanner (faixa "rolar iniciativa"/"seu
                 turno"), CharactersTab, MapsPanel (conteúdo do dropdown do MapSelector, §9.7),
                 CarryTokensDialog ("Levar para o mapa" ao ativar, §9.7), MapConfigModal,
-                NicknamePrompt, Toasts, CharacterSheetDrawer (gaveta da ficha)
+                NicknamePrompt, Toasts, CharacterSheetDrawer (gaveta da ficha),
+                TemplateToolbar (painel da ferramenta Área), TemplateLayer (desenho dos
+                gabaritos no canvas, §9.9)
   components/compendium/  CompendiumPalette (paleta encaixada ou flutuante), EntryPreview, DragGhost (arrasto)
   components/character/  seções da ficha: CharacterHeader, AttributesGrid, ResourcesBlock,
                 DerivedStatsBar, SkillsSection, ItemsSection, ModifiersSection, DetailsSection,
@@ -269,32 +274,37 @@ apps/web/src/
                 room.ts (viewingSceneId/selectViewedScene, ações de mapa — §9.7), tokens.ts, chat.ts,
                 combat.ts (byScene: combate por mapa, §9.7), characters.ts, ui.ts (toasts),
                 sceneList.ts (contagens/combate de cada mapa pro painel "Mapas", §9.7),
-                tools.ts (ferramenta ativa, régua), compendium.ts (entradas, paleta, arrasto)
+                tools.ts (ferramenta ativa, régua, forma/tamanho da ferramenta Área — §9.9),
+                templates.ts (gabaritos por mapa, §9.9), compendium.ts (entradas, paleta, arrasto)
   lib/          router.ts (2 rotas, sem lib), api.ts (HTTP), grid.ts (célula↔pixel, puro),
                 session.ts (localStorage/sessionStorage), throttle.ts, useImage.ts,
                 thumbnails.ts (miniatura de mapa gerada no cliente, cacheada — §9.7),
                 system.ts (useSystemDef), ids.ts,
-                useToolShortcuts.ts (V/H/R/Esc/espaço), useTurnTitle.ts (título da aba pisca no seu turno),
-                compendium.ts (regras de inserção, puro), dropTargets.ts (alvos de soltura por data-drop-target)
+                useToolShortcuts.ts (V/H/R/T/Esc/espaço), useTurnTitle.ts (título da aba pisca no seu turno),
+                compendium.ts (regras de inserção, puro), dropTargets.ts (alvos de soltura por data-drop-target),
+                templates.ts (ponte pixel↔metro dos gabaritos, §9.9)
 apps/server/src/
   index.ts, env.ts, db.ts
   http/         rooms.ts, upload.ts
   socket/       index.ts, types.ts, ack.ts (validação Zod + ack), room.ts, scene.ts,
-                token.ts, chat.ts, combat.ts (modo de combate), character.ts, ruler.ts (efêmero), compendium.ts
+                token.ts, chat.ts, combat.ts (modo de combate), character.ts, ruler.ts (efêmero),
+                compendium.ts, templates.ts (efêmero, §9.9)
   services/     serialize.ts (Prisma → shared), snapshot.ts, presence.ts,
                 combat.ts (carregar/ordenar/filtrar/emitir combate; regras de ordem em si em shared/rules/combat.ts),
                 permissions.ts, chatCommands.ts, ids.ts,
                 characters.ts (Prisma ↔ Character, visibilidade, broadcast),
                 rolls.ts (rola, persiste e publica; usado pelo chat, pela ficha e pelo combate),
                 chatVisibility.ts (quem vê cada mensagem: `visibility` + gate por `tokenId`),
-                compendium.ts (sistema + sala via mergeCompendium; a sala ainda é um stub vazio)
+                compendium.ts (sistema + sala via mergeCompendium; a sala ainda é um stub vazio),
+                templates.ts (gabaritos em memória por mapa, nunca no banco — §9.9)
 packages/shared/src/
-  schemas/      (Zod, inclui payloads.ts, character.ts e combat.ts)  events.ts
+  schemas/      (Zod, inclui payloads.ts, character.ts, combat.ts e template.ts)  events.ts
   dice/         parser + roller, puro, sem I/O
   rules/        placeholders.ts, modifierTarget.ts (regex do target),
                 compute.ts (computeCharacter), rolls.ts (buildCharacterRoll), combat.ts (ordenação,
                 turno, surpresa — puro, testado), scenes.ts (ordem, nomeação de cópia, pré-marcação
-                de "levar para o mapa", quem pode apagar um mapa — puro, testado, §9.7), defaults.ts
+                de "levar para o mapa", quem pode apagar um mapa — puro, testado, §9.7), defaults.ts,
+                templates.ts (geometria dos gabaritos e parseAreaText, puro, testado — §9.9)
   systems.ts    registro dos JSONs (getSystemDefinition)
   compendium/   registro dos compêndios (subpath @tormenta-vtt/shared/compendium, só o servidor importa)
 packages/shared/systems/
@@ -312,6 +322,7 @@ Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a fi
 - Névoa (§9.3): só "desfazer último" (sem histórico completo nem refazer); sem luz dinâmica, paredes ou visão por token; a visibilidade de um token olha só o centro dele; `fog:updated` sempre manda a lista completa de shapes (limitada a 500).
 - Modo de combate (§3.5): duração de condição em rodadas é só schema preparado, sem automação nenhuma; a mensagem de uma rolagem ligada a um token oculto (card individual ou linha de um `initiative-batch`) só volta a ser entregue no próximo `room:join`, não ao vivo quando o token é revelado; a barra "iniciar/adicionar combatentes" reaproveita a seleção de tokens do mapa (ferramenta Selecionar) em vez de ter um seletor próprio na aba.
 - Criaturas do compêndio (§9.5): o pack `convocacoes` do Foundry (convocações que escalam pelo nível do conjurador) ficou fora do importador — `docs/backlog.md`. `NpcQuickCard` é a versão mínima do contrato (`docs/tipos-ficha-rapida.md`); a UI de verdade vem do AI Studio depois. `token:apply-damage` continua sem aplicar `damageResponses` sozinho — só sugere e avisa (§0.4/§3.3 do plano) — `docs/backlog.md`.
+- Gabaritos de área de efeito (§9.9): ângulo do cone e largura da linha são únicos por sistema (ou por preset), não digitáveis por gabarito na hora de colocar; nenhuma automação de regra (dano, CD, resistência continuam manuais); não interagem com a névoa nem entram no undo/redo — se perdem num restart do servidor (efêmeros por design).
 
 ## 9. Fase 2 (pós-MVP)
 
@@ -560,3 +571,52 @@ Recolher o `SidePanel` (Chat/Iniciativa/Fichas) pra dar a largura toda ao canvas
   só um aviso de que algo chegou enquanto a alça estava fina).
 - **Preferência por usuário**: `localStorage` (`tvtt:sidePanelCollapsed`), mesmo padrão de
   "centralizar no token da vez" (§3.5) — cada navegador/aba é "um usuário" neste app sem login.
+
+### 9.9 Gabaritos de área de efeito (templates)
+
+Círculo, cone, linha e quadrado no mapa, no estilo Foundry, pra visualizar alcance de magias/
+poderes e ver quem está dentro (setembro/2026). Plano e decisões em `docs/plano-gabaritos.md`.
+**Fora do escopo**: qualquer automação de regra (dano, CD, resistência continuam manuais — só
+desenha e destaca) e interação com a névoa (gabarito aparece independente dela, como a régua).
+
+- **Modelo**: `SystemDefinition.templates` opcional (`{ coneAngle, lineWidth, presets[] }`) —
+  sem ele a ferramenta "Área" nem aparece na barra (regra número 1: nenhum ângulo padrão fica
+  hardcoded no código). `coneAngle`/`lineWidth` são o padrão de todo cone/linha do sistema, na
+  unidade do `grid` (graus e metros em T20: 90° e 1,5 m); um preset (`presets[].angle`/`.width`)
+  pode sobrescrever. `Template` (`packages/shared/src/schemas/template.ts`) é discriminado por
+  `shape` (`circle {r}`, `cone {length, angle}`, `line {length, width}`, `square {side}`), com
+  `id, ownerId, x, y, rotation, label` em comum — geometria em **pixels do mapa**, como token/fog;
+  `angle`/`width` de cone/linha são copiados do padrão do sistema (ou do preset) no momento da
+  criação, então o gabarito continua correto mesmo se o JSON mudar depois.
+- **Persistência**: efêmeros por sessão — guardados em memória no servidor
+  (`apps/server/src/services/templates.ts`, `Map<sceneId, Map<templateId, Template>>`, mesmo
+  padrão de `presence.ts`), nunca no banco. Sobrevivem a F5/reconexão (vêm no `RoomSnapshot` do
+  mapa ativo e no ack de `scene:enter`), mas não a um restart do servidor nem à troca de mapa
+  (cada mapa só mostra os seus); `scene:delete` limpa os do mapa apagado. Cap de 200 gabaritos por
+  mapa (`TEMPLATE_MAX_PER_SCENE`), mesmo espírito do limite de shapes da névoa.
+- **Eventos** (`template:upsert`/`template:remove`, cliente → servidor; `template:upserted`/
+  `template:removed`, broadcast): mesma regra de broadcast de mapa de sempre — GM sempre recebe,
+  jogador só se `sceneId` é o mapa ATIVO da sala. `template:upsert` cria (id novo) ou edita
+  (mover/girar); dono é sempre travado no servidor (`ownerId` do payload nunca é confiado — fixo
+  desde a criação, igual ao princípio de token). Permissão: dono ou GM edita/apaga; jogador só no
+  mapa ativo (mesma regra de `ruler:update`/`combat:delay`).
+- **Não entra no undo/redo (§9.6)**: ferramenta efêmera, fácil de apagar à mão — mesmo motivo da
+  régua não ter Ctrl+Z próprio.
+- **Ferramenta "Área"** (barra do canvas, atalho **T**, não é GM-only — jogador também coloca os
+  seus): sub-modo por forma (círculo/cone/linha/quadrado) e um campo de tamanho só (raio/
+  comprimento/lado, na unidade do sistema); presets de `SystemDefinition.templates.presets`
+  preenchem forma+tamanho num dropdown, sem posicionar sozinho. Colocar: clique define a origem
+  (círculo/quadrado confirmam nesse mesmo clique); cone e linha giram seguindo o mouse até o 2º
+  clique confirmar a rotação. Depois de colocado (ferramenta Selecionar): arrastar o corpo move,
+  uma alça na ponta (cone/linha) ou perto da borda (quadrado; círculo não tem, girar não muda
+  nada) gira; Delete/Backspace apaga o selecionado. Toda a interação (selecionar, arrastar, alça
+  de rotação) é por geometria, nunca pelo hit canvas do Konva — mesmo motivo de sempre neste
+  projeto (`docs/debug-condicoes.md`: canvas de hit embaralhado por proteção anti-fingerprinting).
+- **Destaque de alvos**: token conta como "dentro" se o centro da célula dele está na forma; token
+  grande (mais de uma célula) conta se qualquer célula estiver dentro (`tokensInTemplate`,
+  `packages/shared/src/rules/templates.ts`, puro e testado). Rótulo "N alvos" no gabarito e anel
+  nos tokens atingidos — só destaque visual, nenhuma automação.
+- **Botão "Colocar área"** no card de item do chat (`activation.area`, §3.6): aparece quando o
+  sistema declara `templates` e o card tem área; casa o texto com um padrão simples ("esfera de
+  6 m", "cone de 9 m" — sem acento/caixa, `parseAreaText`) e já abre a ferramenta com a forma e o
+  tamanho certos; sem match, abre a ferramenta sem preset.
