@@ -35,6 +35,15 @@ import type {
   CompendiumSpawnCreaturePayload,
   FogConfig,
   FogUpdatePayload,
+  Handout,
+  HandoutClosePayload,
+  HandoutCreatePayload,
+  HandoutDeletePayload,
+  HandoutPin,
+  HandoutPinCreatePayload,
+  HandoutShowPayload,
+  HandoutUnpinPayload,
+  HandoutUpdatePayload,
   Participant,
   RoomJoinPayload,
   RoomPublic,
@@ -82,6 +91,8 @@ export interface RoomSnapshot {
   combat: Combat | null;
   /** Gabaritos de área de efeito da cena ativa (docs/plano-gabaritos.md). Efêmeros, não vêm do banco. */
   templates: Template[];
+  /** Pinos de handout fixados na cena ativa (§9.10), já filtrados pela visibilidade de quem recebe. */
+  handoutPins: HandoutPin[];
   chat: ChatMessage[];
   /** Fichas da sala (jogadores não recebem as de kind = "npc"). */
   characters: Character[];
@@ -123,7 +134,10 @@ export interface ClientToServerEvents {
    * Navega para um mapa sem os efeitos colaterais de `room:join` (presença, snapshot inteiro):
    * GM entra em qualquer mapa não apagado da sala; jogador só no mapa ativo. Sem broadcast.
    */
-  "scene:enter": (payload: SceneEnterPayload, ack: Ack<{ tokens: Token[]; combat: Combat | null; templates: Template[] }>) => void;
+  "scene:enter": (
+    payload: SceneEnterPayload,
+    ack: Ack<{ tokens: Token[]; combat: Combat | null; templates: Template[]; handoutPins: HandoutPin[] }>,
+  ) => void;
   "scene:rename": (payload: SceneRenamePayload, ack: Ack<Scene>) => void;
   /** Copia mapUrl/mapWidth/mapHeight/grid/fog/arrival; NÃO copia tokens nem combate. */
   "scene:duplicate": (payload: SceneDuplicatePayload, ack: Ack<Scene>) => void;
@@ -203,6 +217,28 @@ export interface ClientToServerEvents {
    *  do payload); GM edita/apaga qualquer um, jogador só os seus, e só no mapa ATIVO da sala. */
   "template:upsert": (payload: TemplateUpsertPayload, ack: Ack<Template>) => void;
   "template:remove": (payload: TemplateRemovePayload, ack: Ack) => void;
+
+  // Handouts (§9.10): biblioteca por sala, só GM (criar/editar/apagar/listar/mostrar/fechar/fixar).
+  // Biblioteca (create/update/delete/list) é enviada só pro GM (rooms.gm) — jogador nunca vê a lista.
+  /** `imageUrl`/`width`/`height` vêm do upload HTTP (POST /api/upload) feito antes, como scene:setMap. */
+  "handout:create": (payload: HandoutCreatePayload, ack: Ack<Handout>) => void;
+  /** Só nome/tags — trocar imagem/texto é apagar e criar de novo. */
+  "handout:update": (payload: HandoutUpdatePayload, ack: Ack<Handout>) => void;
+  /** Soft delete: apaga também (soft delete) os pinos deste handout em qualquer mapa, uma entrada de
+   *  desfazer só (docs/plano-desfazer.md). */
+  "handout:delete": (payload: HandoutDeletePayload, ack: Ack) => void;
+  "handout:list": (payload: Record<string, never>, ack: Ack<{ items: Handout[] }>) => void;
+  /**
+   * Publica `chat:message{kind:"handout"}` e abre o overlay AO VIVO pra quem recebe (broadcast, não
+   * este ack). `target: "all"` = sala toda; `{participantId}` = sussurro visual (só aquele jogador +
+   * GM, via `ChatMessage.whisperTo`).
+   */
+  "handout:show": (payload: HandoutShowPayload, ack: Ack) => void;
+  /** Fecha o overlay pra quem via a mensagem (ela continua no chat, clicável de novo). */
+  "handout:close": (payload: HandoutClosePayload, ack: Ack) => void;
+  /** Fixa uma cópia denormalizada do handout como um pino no mapa (entra no desfazer do GM). */
+  "handout:pin": (payload: HandoutPinCreatePayload, ack: Ack<HandoutPin>) => void;
+  "handout:unpin": (payload: HandoutUnpinPayload, ack: Ack) => void;
 
   // Chat + dados
   /**
@@ -292,6 +328,16 @@ export interface ServerToClientEvents {
   /** Gabarito criado ou editado (mover/girar) — o cliente faz upsert por id, igual a token:updated. */
   "template:upserted": (p: { sceneId: string; template: Template }) => void;
   "template:removed": (p: { sceneId: string; templateId: string }) => void;
+
+  // Handouts (§9.10). Biblioteca (created/updated/deleted) só vai pro GM. Pino segue a regra de
+  // broadcast de mapa de sempre: GM sempre recebe; jogador só se `visible` e `sceneId` é o mapa ATIVO.
+  "handout:created": (handout: Handout) => void;
+  "handout:updated": (handout: Handout) => void;
+  "handout:deleted": (p: { id: string }) => void;
+  "handout:pinned": (p: { sceneId: string; pin: HandoutPin }) => void;
+  "handout:unpinned": (p: { sceneId: string; pinId: string }) => void;
+  /** Efêmero: instrui quem via a mensagem a fechar o overlay (a mensagem em si não muda no chat). */
+  "handout:closed": (p: { messageId: string }) => void;
 
   /** Erros não relacionados a um ack específico. */
   "server:error": (p: { message: string }) => void;

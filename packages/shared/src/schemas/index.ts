@@ -10,3 +10,4 @@ export * from "./system.js";
 export * from "./payloads.js";
 export * from "./character.js";
 export * from "./compendium.js";
+export * from "./handout.js";

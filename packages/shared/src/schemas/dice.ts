@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { IdSchema } from "./common.js";
 import { ItemCardSchema } from "./character.js";
+import { HandoutCardSchema } from "./handout.js";
 import { KeySchema } from "./system.js";
 
 /**
@@ -111,14 +112,17 @@ export const ChatMessageSchema = z.object({
   participantId: IdSchema,
   nickname: z.string(),
   /**
-   * Texto puro, rolagem, aviso do sistema, card de item usado (character:use-item) ou lote de
-   * iniciativa (combat:roll rolando vários combatentes de uma vez, ver `initiativeBatch`).
+   * Texto puro, rolagem, aviso do sistema, card de item usado (character:use-item), lote de
+   * iniciativa (combat:roll rolando vários combatentes de uma vez, ver `initiativeBatch`) ou
+   * handout mostrado pelo GM (handout:show, ver `handout`).
    */
-  kind: z.enum(["text", "roll", "system", "item", "initiative-batch"]),
+  kind: z.enum(["text", "roll", "system", "item", "initiative-batch", "handout"]),
   text: z.string().max(2000).optional(),
   roll: DiceRollSchema.optional(),
   item: ItemCardSchema.optional(),
   initiativeBatch: InitiativeBatchSchema.optional(),
+  /** Cópia denormalizada do handout mostrado (handout:show), quando kind == "handout". */
+  handout: HandoutCardSchema.optional(),
   /**
    * Token ao qual esta rolagem está ligada (combatente de combat:roll, ou personagem com
    * token vinculado na cena ativa). Quem não pode ver esse token (oculto ou sob a névoa) não
@@ -128,6 +132,13 @@ export const ChatMessageSchema = z.object({
   tokenId: IdSchema.nullable().default(null),
   /** Quem recebe a mensagem (servidor filtra no broadcast e no snapshot). "Revelar" (GM) muda para "all". */
   visibility: RollVisibilitySchema.default("all"),
+  /**
+   * Sussurro visual (handout:show "para X"): setado, a mensagem só existe pro GM e para este
+   * participante — nem card, nem placeholder pros demais, igual ao gate de `tokenId` acima, mas
+   * por PESSOA em vez de por token. Independente de `visibility` (que fica "all" nesse caso).
+   * Só handout usa por enquanto; campo genérico caso outra coisa precise de sussurro no futuro.
+   */
+  whisperTo: IdSchema.nullable().default(null),
   createdAt: z.string().datetime(),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
