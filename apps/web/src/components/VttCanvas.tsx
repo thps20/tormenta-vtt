@@ -2,10 +2,37 @@ import React, { forwardRef, useRef, useState, useEffect, useImperativeHandle, us
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
-import { applyResourceDelta, computeCharacter, conditionIconDataUrl, creatureColor, DEFAULT_MAP_SIZE, findFreeCells, measureDistance, type Character, type CharacterPatch, type CharacterRollRequest, type Combat, type ConditionDef, type FogShape, type GridConfig, type Participant, type Ruler, type Scene, type SystemDefinition, type Token, type TokenCondition, type TokenPatch } from "@tormenta-vtt/shared";
+import {
+  applyResourceDelta,
+  computeCharacter,
+  conditionIconDataUrl,
+  creatureColor,
+  DEFAULT_MAP_SIZE,
+  findFreeCells,
+  measureDistance,
+  pointInTemplate,
+  tokensInTemplate,
+  type Character,
+  type CharacterPatch,
+  type CharacterRollRequest,
+  type Combat,
+  type ConditionDef,
+  type FogShape,
+  type GridConfig,
+  type Participant,
+  type Ruler,
+  type Scene,
+  type SystemDefinition,
+  type Template,
+  type TemplateShape,
+  type Token,
+  type TokenCondition,
+  type TokenPatch,
+} from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
 import { cellAt, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
+import { newTemplate } from "../lib/templates";
 import { useImage } from "../lib/useImage";
 import { newId } from "../lib/ids";
 import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
@@ -15,6 +42,7 @@ import { TokenInspector } from "./TokenInspector";
 import { NpcQuickCard } from "./NpcQuickCard";
 import { ConditionMenu } from "./ConditionMenu";
 import { FogLayer } from "./FogLayer";
+import { TemplateLayer } from "./TemplateLayer";
 
 /** Tamanho padrão quando a cena ainda não tem mapa (shared: o servidor usa o mesmo, ver compendium:spawn-creature). */
 export const DEFAULT_MAP = DEFAULT_MAP_SIZE;
@@ -106,6 +134,27 @@ interface VttCanvasProps {
    */
   arrivalPickMode?: boolean;
   onPickArrival?: (point: { x: number; y: number }) => void;
+
+  /** Gabaritos de área de efeito da cena visitada (docs/plano-gabaritos.md). */
+  templates: Template[];
+  /** Modo Área ligado (null = sistema não declara `templates`, a ferramenta nem existe). */
+  templateTool: TemplateTool | null;
+  selectedTemplateId: string | null;
+  onSelectTemplate: (templateId: string | null) => void;
+  /** Clique de origem (círculo/quadrado) ou 2º clique confirmando a rotação (cone/linha). */
+  onTemplateCreate: (template: Template) => void;
+  /** Durante mover/girar um gabarito selecionado: aplica local e emite com throttle (eco `live`). */
+  onTemplateLive: (template: Template) => void;
+  /** Ao soltar: patch final do gesto, com ack. */
+  onTemplateCommit: (template: Template) => void;
+}
+
+/** Forma + tamanho (metros) escolhidos na TemplateToolbar, e a sobrescrita de ângulo/largura de um preset. */
+export interface TemplateTool {
+  shape: TemplateShape;
+  sizeUnits: number;
+  angleOverride?: number;
+  widthOverride?: number;
 }
 
 export interface FogTool {
@@ -128,6 +177,7 @@ const MODE_HINTS: Record<ToolMode, string> = {
   pan: "Arraste para navegar pelo mapa • Scroll = zoom",
   ruler: "Clique e arraste para medir • Scroll = zoom",
   fog: "Névoa: escolha Revelar/Ocultar e uma forma no painel • Scroll = zoom",
+  template: "Clique para posicionar • Cone/linha: mova o mouse para girar, clique de novo para confirmar • Scroll = zoom",
   draw: "Desenho: em breve",
 };
 
@@ -155,6 +205,11 @@ function tokenRadius(t: { width: number; height: number }): number {
 /** GM move tudo; jogador só o que possui (mesma regra do servidor). */
 export function canControl(me: Participant, token: Token): boolean {
   return me.role === "gm" || token.ownerId === me.id;
+}
+
+/** GM move/gira/apaga qualquer gabarito; jogador só os seus (mesma regra do servidor). */
+export function canControlTemplate(me: Participant, template: Template): boolean {
+  return me.role === "gm" || template.ownerId === me.id;
 }
 
 export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
@@ -196,6 +251,13 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   onSpawnCreature,
   arrivalPickMode,
   onPickArrival,
+  templates,
+  templateTool,
+  selectedTemplateId,
+  onSelectTemplate,
+  onTemplateCreate,
+  onTemplateLive,
+  onTemplateCommit,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -268,6 +330,15 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   /** Ponteiro em pixels do mapa (círculo do pincel e linha elástica do polígono). */
   const [fogPointer, setFogPointer] = useState<{ x: number; y: number } | null>(null);
 
+  // --- Gabaritos de área de efeito (docs/plano-gabaritos.md): gesto em andamento.
+  /** Cone/linha: origem já clicada, girando até o 2º clique confirmar (círculo/quadrado não usam
+   *  isto — confirmam no próprio primeiro clique, sem fase de rotação). */
+  const [placingTemplate, setPlacingTemplate] = useState<{ shape: TemplateShape; origin: { x: number; y: number }; rotation: number } | null>(null);
+  /** Arrastando o CORPO do gabarito selecionado (modo Selecionar): delta do ponteiro desde o início. */
+  const templateDragRef = useRef<{ id: string; startPointer: { x: number; y: number }; startTemplate: Template } | null>(null);
+  /** Arrastando a ALÇA de rotação do gabarito selecionado. */
+  const templateRotateRef = useRef<{ id: string } | null>(null);
+
   const cancelGestures = () => {
     boxStartRef.current = null;
     setSelectionBox(null);
@@ -279,6 +350,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     rectStartRef.current = null;
     setPolygonPoints([]);
     setFogDraft(null);
+    setPlacingTemplate(null);
+    templateDragRef.current = null;
+    templateRotateRef.current = null;
   };
 
   // Esc cancela a caixa/régua em andamento.
@@ -662,6 +736,42 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     if (shape) onFogShape(shape);
   };
 
+  // --- Gabaritos de área de efeito (docs/plano-gabaritos.md) --------------------------------
+  const templateActive = mode === "template" && templateTool !== null;
+
+  /** Gabarito sob o ponteiro, por GEOMETRIA (mesmo motivo de tokenAtPointer: gabarito não tem hit
+   *  do Konva, `listening={false}` na TemplateLayer). O de cima (último da lista) primeiro. */
+  const templateAtPointer = (): Template | null => {
+    const p = pointerMapPos();
+    if (!p) return null;
+    for (let i = templates.length - 1; i >= 0; i--) {
+      const t = templates[i];
+      if (t && pointInTemplate(p, t)) return t;
+    }
+    return null;
+  };
+
+  /** Ponto da alça de rotação de um gabarito: na ponta do cone/linha, ou um pouco além da borda do
+   *  quadrado. Círculo não gira (giro não muda nada visualmente) — sem alça. */
+  const templateRotateHandlePoint = (t: Template): { x: number; y: number } | null => {
+    if (t.shape === "circle") return null;
+    const dist = (t.shape === "square" ? t.side / 2 : t.length) + 20 / stageScale;
+    return { x: t.x + Math.cos(t.rotation) * dist, y: t.y + Math.sin(t.rotation) * dist };
+  };
+
+  /** A alça do gabarito SELECIONADO está sob o ponteiro? (só ele tem alça desenhada). */
+  const templateRotateHandleAtPointer = (): Template | null => {
+    const selected = templates.find((t) => t.id === selectedTemplateId);
+    if (!selected) return null;
+    const handle = templateRotateHandlePoint(selected);
+    const p = pointerMapPos();
+    if (!handle || !p) return null;
+    const hitRadius = 10 / stageScale;
+    const dx = p.x - handle.x;
+    const dy = p.y - handle.y;
+    return dx * dx + dy * dy <= hitRadius * hitRadius ? selected : null;
+  };
+
   /** Cursor conforme o modo; no modo Selecionar, "grab" sobre um token que posso mover. Também estica a caixa de seleção e a régua. */
   const handleStageMouseMove = () => {
     if (Konva.isDragging()) return; // no meio de um arraste não mexemos em nada
@@ -679,7 +789,28 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (start && p) onRulerUpdate({ start, end: rulerPoint(p) });
       return;
     }
+    if (templateActive) {
+      setCursor("crosshair");
+      const placing = placingTemplate;
+      const p = pointerMapPos();
+      // Cone/linha giram seguindo o mouse até o 2º clique confirmar (círculo/quadrado não têm essa fase).
+      if (placing && p) setPlacingTemplate({ ...placing, rotation: Math.atan2(p.y - placing.origin.y, p.x - placing.origin.x) });
+      return;
+    }
     if (mode !== "select") return setCursor("crosshair");
+    if (templateRotateRef.current) {
+      const { id } = templateRotateRef.current;
+      const current = templates.find((t) => t.id === id);
+      const p = pointerMapPos();
+      if (current && p) onTemplateLive({ ...current, rotation: Math.atan2(p.y - current.y, p.x - current.x) });
+      return;
+    }
+    if (templateDragRef.current) {
+      const { startPointer, startTemplate } = templateDragRef.current;
+      const p = pointerMapPos();
+      if (p) onTemplateLive({ ...startTemplate, x: startTemplate.x + (p.x - startPointer.x), y: startTemplate.y + (p.y - startPointer.y) });
+      return;
+    }
     const start = boxStartRef.current;
     if (start) {
       const p = pointerMapPos();
@@ -736,7 +867,44 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       onRulerUpdate({ start, end: start });
       return;
     }
+    if (templateActive && templateTool && systemDef) {
+      const p = pointerMapPos();
+      if (!p) return;
+      const origin = snapEnabled ? snapToCellCenter(p.x, p.y, scene.grid) : p;
+      const cellSizePx = effectiveCellSize(scene.grid);
+      if (placingTemplate) {
+        // 2º clique: confirma cone/linha com a rotação de AGORA (o mousemove já vinha atualizando
+        // placingTemplate, mas o ponteiro pode ter andado um frame a mais desde o último evento).
+        const rotation = Math.atan2(p.y - placingTemplate.origin.y, p.x - placingTemplate.origin.x);
+        const built = newTemplate({
+          shape: placingTemplate.shape,
+          origin: placingTemplate.origin,
+          sizeUnits: templateTool.sizeUnits,
+          angleOverride: templateTool.angleOverride,
+          widthOverride: templateTool.widthOverride,
+          ownerId: me.id,
+          def: systemDef,
+          cellSizePx,
+        });
+        onTemplateCreate({ ...built, rotation });
+        setPlacingTemplate(null);
+        return;
+      }
+      if (templateTool.shape === "cone" || templateTool.shape === "line") {
+        // Cone/linha: origem só, a rotação segue o mouse até o 2º clique (ramo acima).
+        setPlacingTemplate({ shape: templateTool.shape, origin, rotation: 0 });
+        return;
+      }
+      // Círculo/quadrado: confirma no próprio clique, sem fase de rotação.
+      onTemplateCreate(newTemplate({ shape: templateTool.shape, origin, sizeUnits: templateTool.sizeUnits, ownerId: me.id, def: systemDef, cellSizePx }));
+      return;
+    }
     if (mode !== "select") return;
+    const rotateTarget = templateRotateHandleAtPointer();
+    if (rotateTarget) {
+      templateRotateRef.current = { id: rotateTarget.id };
+      return;
+    }
     // Alça de redimensionar tem prioridade sobre o token: geometricamente ela fica na borda dele,
     // então "sobre o token" também é "sobre a alça" perto dos cantos.
     const anchor = resizeAnchorAtPointer();
@@ -750,11 +918,33 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (!hitLandedOnToken(e.target, t.id)) tokenGroup(t.id)?.fire("mousedown", { evt: e.evt, pointerId: e.pointerId }, false);
       return;
     }
+    const tmpl = templateAtPointer();
+    if (tmpl && canControlTemplate(me, tmpl)) {
+      onSelectTemplate(tmpl.id);
+      onSelectToken(null);
+      const p = pointerMapPos();
+      if (p) templateDragRef.current = { id: tmpl.id, startPointer: p, startTemplate: tmpl };
+      return;
+    }
     boxStartRef.current = pointerMapPos();
   };
 
   /** Soltou o mouse: fecha a régua (some) ou a caixa de seleção (seleciona o que está dentro). */
   const handleStageMouseUp = () => {
+    if (templateRotateRef.current) {
+      const { id } = templateRotateRef.current;
+      templateRotateRef.current = null;
+      const current = templates.find((t) => t.id === id);
+      if (current) onTemplateCommit(current);
+      return;
+    }
+    if (templateDragRef.current) {
+      const { id } = templateDragRef.current;
+      templateDragRef.current = null;
+      const current = templates.find((t) => t.id === id);
+      if (current) onTemplateCommit(current);
+      return;
+    }
     if (fogActive) return fogMouseUp();
     if (rulerStartRef.current) {
       rulerStartRef.current = null;
@@ -796,7 +986,12 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (!hitLandedOnToken(e.target, t.id)) selectByClick(t.id, e.evt.shiftKey);
       return;
     }
-    if (e.target === stageRef.current || e.target.name() === "map-background") onSelectToken(null);
+    if (e.target === stageRef.current || e.target.name() === "map-background") {
+      onSelectToken(null);
+      // Só limpa a seleção de gabarito se o clique NÃO foi em cima de um (mousedown já selecionou
+      // e talvez começado a arrastar; o `click` que o Konva dispara em seguida não deve desfazer).
+      if (!templateAtPointer()) onSelectTemplate(null);
+    }
   };
 
   /**
@@ -815,8 +1010,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     if (!hitLandedOnToken(e.target, t.id)) openConditionMenuAt(t);
   };
 
-  /** Clique num token: seleciona só ele; com Shift, entra/sai da seleção atual. */
+  /** Clique num token: seleciona só ele; com Shift, entra/sai da seleção atual. Token e gabarito
+   *  nunca ficam selecionados juntos (evita ambiguidade no Delete e nas alças). */
   const selectByClick = (tokenId: string, additive: boolean) => {
+    onSelectTemplate(null);
     if (additive) onToggleSelect(tokenId);
     else onSelectToken(tokenId);
   };
@@ -889,6 +1086,43 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   // combate mesmo "ended" sem clear (fica congelado no valor de quando encerrou).
   const menuCombatRound = combat && combat.status !== "ended" ? combat.round : null;
   const badgeCombatRound = combat?.round ?? null;
+
+  // --- Gabaritos de área de efeito: preview durante a colocação, contagem/destaque de alvos e a
+  // alça de rotação do selecionado (docs/plano-gabaritos.md).
+  const templateDraft = useMemo<Template | null>(() => {
+    if (!placingTemplate || !templateTool || !systemDef) return null;
+    return newTemplate({
+      shape: placingTemplate.shape,
+      origin: placingTemplate.origin,
+      sizeUnits: templateTool.sizeUnits,
+      angleOverride: templateTool.angleOverride,
+      widthOverride: templateTool.widthOverride,
+      ownerId: me.id,
+      def: systemDef,
+      cellSizePx: effectiveCellSize(scene.grid),
+      rotationOverride: placingTemplate.rotation,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placingTemplate, templateTool, systemDef, scene.grid, me.id]);
+
+  const templateTargets = useMemo(() => {
+    const cellSizePx = effectiveCellSize(scene.grid);
+    const counts: Record<string, number> = {};
+    const highlightedIds = new Set<string>();
+    for (const t of templates) {
+      const ids = tokensInTemplate(tokens, t, cellSizePx);
+      counts[t.id] = ids.size;
+      for (const id of ids) highlightedIds.add(id);
+    }
+    return { counts, highlighted: tokens.filter((t) => highlightedIds.has(t.id)) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templates, tokens, scene.grid]);
+
+  const templateRotateHandle = useMemo(() => {
+    const selected = templates.find((t) => t.id === selectedTemplateId);
+    return selected ? templateRotateHandlePoint(selected) : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templates, selectedTemplateId, stageScale]);
 
   // Tooltip da condição em hover: mora AQUI (e é desenhado na última camada) porque dentro do Group
   // do token qualquer token desenhado depois pintava por cima dele. Ver ConditionTooltipLayerContent.
@@ -1027,6 +1261,15 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           {fogActive && fogTool && (
             <FogGestureOverlay tool={fogTool} pointer={fogPointer} polygonPoints={polygonPoints} draft={fogDraft} stageScale={stageScale} />
           )}
+          <TemplateLayer
+            templates={templates}
+            draft={templateDraft}
+            selectedId={selectedTemplateId}
+            targetCounts={templateTargets.counts}
+            rotateHandle={templateRotateHandle}
+            highlightedTokens={templateTargets.highlighted}
+            stageScale={stageScale}
+          />
           {selectionBox && (
             <Rect
               x={Math.min(selectionBox.x1, selectionBox.x2)}

@@ -1,6 +1,7 @@
 import React from "react";
-import { Dices, Sparkles } from "lucide-react";
-import type { ChatMessage, ItemCard, SystemDefinition } from "@tormenta-vtt/shared";
+import { Dices, Shapes, Sparkles } from "lucide-react";
+import { parseAreaText, type ChatMessage, type ItemCard, type SystemDefinition } from "@tormenta-vtt/shared";
+import { useTools } from "../../store/tools";
 import { DamageFormula } from "../DamageTypeBadge";
 
 interface ItemCardMessageProps {
@@ -35,6 +36,16 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
   if (card.area) meta.push({ label: "Área", value: card.area, enhanced: enhanced.has("area") });
   const enhancements = card.enhancements ?? [];
   const notes = enhancements.filter((e) => e.note);
+
+  // "Colocar área" (docs/plano-gabaritos.md): só existe se a sala tem a ferramenta (def.templates)
+  // e o card declara uma área. Casa o texto com um padrão simples ("esfera de 6 m", "cone de 9 m")
+  // pra já abrir a ferramenta com a forma/tamanho certos; sem match, abre sem preset (como pedido).
+  const showAreaButton = canAct && !!card.area && !!def?.templates;
+  const placeArea = () => {
+    const parsed = parseAreaText(card.area);
+    if (parsed) useTools.getState().pickTemplatePreset({ shape: parsed.shape, size: parsed.size });
+    useTools.getState().setMode("template");
+  };
 
   return (
     <div id={`chat-msg-${msg.id}`} className="p-3 rounded border bg-[#101418]/80 border-sky-900/50 shadow-inner">
@@ -84,6 +95,18 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
             </div>
           ))}
         </div>
+      )}
+
+      {showAreaButton && (
+        <button
+          type="button"
+          onClick={placeArea}
+          className="mt-1.5 flex items-center gap-1 text-[10px] font-serif font-bold uppercase tracking-wider text-[#d4af37] hover:text-[#e8c766] cursor-pointer"
+          title="Abre a ferramenta Área (T) já com a forma e o tamanho, quando o texto casar"
+        >
+          <Shapes className="w-3 h-3" />
+          Colocar área
+        </button>
       )}
 
       {/* Aprimoramentos usados (cards antigos no banco não têm o campo). */}

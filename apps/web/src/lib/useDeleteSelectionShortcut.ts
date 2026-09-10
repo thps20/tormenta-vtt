@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { selectIsGm, useRoom } from "../store/room";
 import { useTokens } from "../store/tokens";
+import { useTemplates } from "../store/templates";
 import { useCharacters } from "../store/characters";
 import { isTyping } from "./isTyping";
 
@@ -38,9 +39,22 @@ export function deleteSelectedTokens(): void {
 }
 
 /**
- * Atalho global: Delete/Backspace apaga os tokens selecionados no canvas, quando o foco não está
- * num campo de texto (isTyping). Multi-seleção apaga todos de uma vez. Um único listener na janela
- * (montado pela página da mesa, ao lado de useToolShortcuts).
+ * Apaga o gabarito de área de efeito selecionado, se houver (docs/plano-gabaritos.md). Diferente
+ * de `deleteSelectedTokens`: GM ou dono (o servidor confere de novo; selecionar um gabarito alheio
+ * nem é possível pelo clique — VttCanvas só seleciona o que o usuário controla). Token e gabarito
+ * nunca ficam selecionados juntos, então os dois `delete*` desta função nunca disparam ao mesmo tempo.
+ */
+function deleteSelectedTemplate(): void {
+  const { selectedId, byScene, remove } = useTemplates.getState();
+  if (!selectedId) return;
+  const sceneId = Object.keys(byScene).find((id) => byScene[id]?.[selectedId]);
+  if (sceneId) void remove(sceneId, selectedId);
+}
+
+/**
+ * Atalho global: Delete/Backspace apaga os tokens (só GM) ou o gabarito de área selecionado (GM ou
+ * dono), quando o foco não está num campo de texto (isTyping). Multi-seleção de token apaga todos
+ * de uma vez. Um único listener na janela (montado pela página da mesa, ao lado de useToolShortcuts).
  */
 export function useDeleteSelectionShortcut(): void {
   useEffect(() => {
@@ -50,6 +64,7 @@ export function useDeleteSelectionShortcut(): void {
       if (e.key !== "Delete" && e.key !== "Backspace") return;
       e.preventDefault();
       deleteSelectedTokens();
+      deleteSelectedTemplate();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);

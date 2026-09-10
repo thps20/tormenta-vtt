@@ -17,6 +17,7 @@ import { emitAck, getSocket, type AckOf } from "./connection";
 import { useTokens } from "./tokens";
 import { useChat } from "./chat";
 import { useCombat } from "./combat";
+import { useTemplates } from "./templates";
 import { useCharacters } from "./characters";
 import { useCompendium } from "./compendium";
 import { useSceneList } from "./sceneList";
@@ -139,6 +140,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useTokens.getState().setAll([]);
     useChat.getState().setAll([]);
     useCombat.getState().setSnapshot(null, null);
+    useTemplates.getState().setSnapshot(null, []);
     useCharacters.getState().setAll([]);
     useCompendium.getState().reset();
     useSceneList.getState().reset();
@@ -153,6 +155,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useTokens.getState().setAll(snap.tokens);
     useChat.getState().setAll(snap.chat);
     useCombat.getState().setSnapshot(snap.room.activeSceneId, snap.combat);
+    useTemplates.getState().setSnapshot(snap.room.activeSceneId, snap.templates);
     useCharacters.getState().setAll(snap.characters);
 
     // Jogador sempre vê o ativo (derivado, sem sessionStorage). GM: restaura o mapa que estava
@@ -216,6 +219,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     }
     useTokens.getState().replaceScene(sceneId, res.data.tokens);
     useCombat.getState().setSceneState(sceneId, res.data.combat);
+    useTemplates.getState().replaceScene(sceneId, res.data.templates);
     set({ viewingSceneId: sceneId });
     const roomId = get().room?.id;
     if (roomId) setViewingScene(roomId, sceneId);

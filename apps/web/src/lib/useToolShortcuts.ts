@@ -5,14 +5,15 @@ import { useTools, type ToolMode } from "../store/tools";
 import { isTyping } from "./isTyping";
 
 /** Tecla → modo. Letras em minúsculo; comparamos com e.key.toLowerCase(). */
-const KEY_TO_MODE: Record<string, ToolMode> = { v: "select", h: "pan", r: "ruler", f: "fog" };
+const KEY_TO_MODE: Record<string, ToolMode> = { v: "select", h: "pan", r: "ruler", f: "fog", t: "template" };
 
 /** Modos que só o GM pode ativar. */
 const GM_ONLY_MODES = new Set<ToolMode>(["fog"]);
 
 /**
- * Atalhos globais da barra de ferramentas: V/H/R/F trocam o modo (F só para o GM),
- * Esc cancela o gesto em andamento e volta para Selecionar, espaço segurado ativa
+ * Atalhos globais da barra de ferramentas: V/H/R/F/T trocam o modo (F só para o GM; T = Área,
+ * docs/plano-gabaritos.md, também para jogador), Esc cancela o gesto em andamento e volta para
+ * Selecionar, espaço segurado ativa
  * "mover mapa". Ctrl+Z (Cmd+Z): no modo Névoa desfaz a última forma pintada (sem refazer, SPEC
  * §9.3); fora dela é o desfazer geral (docs/plano-desfazer.md) — Ctrl+Shift+Z e Ctrl+Y refazem.
  * Os dois (Névoa e geral) são só do GM, como já era o de Névoa. Um único listener na janela

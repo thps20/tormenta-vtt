@@ -1,14 +1,14 @@
 import { create } from "zustand";
-import type { Ruler } from "@tormenta-vtt/shared";
+import type { Ruler, TemplatePreset, TemplateShape } from "@tormenta-vtt/shared";
 import { throttle } from "../lib/throttle";
 import { emitAck } from "./connection";
 
 /**
  * Ferramenta ativa no canvas (barra vertical à esquerda). Um modo por vez;
  * "draw" já existe no tipo para a barra reservar o lugar, mas ainda não faz nada.
- * "fog" é só do GM (ver useToolShortcuts e Toolbar).
+ * "fog" é só do GM (ver useToolShortcuts e Toolbar). "template" (Área) não é GM-only.
  */
-export type ToolMode = "select" | "pan" | "ruler" | "fog" | "draw";
+export type ToolMode = "select" | "pan" | "ruler" | "fog" | "template" | "draw";
 
 /** Sub-modo da névoa: o que a forma desenhada faz. */
 export type FogToolMode = "reveal" | "hide";
@@ -40,10 +40,25 @@ interface ToolsState {
   fogMode: FogToolMode;
   fogShape: FogToolShape;
   fogBrushSize: number;
+  /**
+   * Modo Área (docs/plano-gabaritos.md): forma escolhida, tamanho na unidade do sistema (metros em
+   * T20) e, só para cone/linha, a sobrescrita de ângulo/largura de um preset (undefined = usa o
+   * padrão do sistema, `SystemDefinition.templates.coneAngle`/`.lineWidth`).
+   */
+  templateShape: TemplateShape;
+  templateSize: number;
+  templateAngle: number | undefined;
+  templateWidth: number | undefined;
   setMode: (mode: ToolMode) => void;
   setFogMode: (fogMode: FogToolMode) => void;
   setFogShape: (fogShape: FogToolShape) => void;
   setFogBrushSize: (size: number) => void;
+  setTemplateShape: (shape: TemplateShape) => void;
+  setTemplateSize: (size: number) => void;
+  /** Preset do JSON do sistema, ou do botão "Colocar área" do card de item: preenche forma+tamanho
+   *  (e ângulo/largura, se o preset sobrescrever) sem posicionar sozinho — o clique no mapa continua
+   *  definindo a origem. */
+  pickTemplatePreset: (preset: Pick<TemplatePreset, "shape" | "size" | "angle" | "width">) => void;
   setSpaceHeld: (held: boolean) => void;
   cancel: () => void;
   /** Aplica local e emite com throttle (efêmero: sem ack, sem reverter). */
@@ -68,10 +83,18 @@ export const useTools = create<ToolsState>((set, get) => ({
   fogMode: "reveal",
   fogShape: "brush",
   fogBrushSize: 140,
+  templateShape: "circle",
+  templateSize: 6,
+  templateAngle: undefined,
+  templateWidth: undefined,
   setMode: (mode) => set({ mode }),
   setFogMode: (fogMode) => set({ fogMode }),
   setFogShape: (fogShape) => set({ fogShape }),
   setFogBrushSize: (size) => set({ fogBrushSize: Math.max(FOG_BRUSH_MIN, Math.min(FOG_BRUSH_MAX, Math.round(size))) }),
+  setTemplateShape: (templateShape) => set({ templateShape }),
+  setTemplateSize: (size) => set({ templateSize: Math.max(0.1, size) }),
+  pickTemplatePreset: (preset) =>
+    set({ templateShape: preset.shape, templateSize: preset.size, templateAngle: preset.angle, templateWidth: preset.width }),
   setSpaceHeld: (spaceHeld) => set({ spaceHeld }),
   cancel: () => set((s) => ({ cancelNonce: s.cancelNonce + 1 })),
 

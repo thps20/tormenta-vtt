@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { navigate } from "../lib/router";
 import { selectActiveScene, selectViewedScene, useRoom } from "../store/room";
 import { sceneTokens, useTokens } from "../store/tokens";
+import { sceneTemplates, useTemplates } from "../store/templates";
 import { useChat } from "../store/chat";
 import { activeCombatant, isMyTurn, sceneCombat, useCombat } from "../store/combat";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
@@ -23,6 +24,7 @@ import { MapSelector } from "./MapSelector";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
 import { FogToolbar } from "./FogToolbar";
+import { TemplateToolbar } from "./TemplateToolbar";
 import { VttCanvas, type TokenBar, type VttCanvasHandle } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
 import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
@@ -144,6 +146,22 @@ function Table() {
   const setFogShape = useTools((s) => s.setFogShape);
   const setFogBrushSize = useTools((s) => s.setFogBrushSize);
   const fogOp = useRoom((s) => s.fogOp);
+  // Gabaritos de área de efeito (docs/plano-gabaritos.md): forma/tamanho ficam na store de
+  // ferramentas (igual à névoa); os gabaritos em si são da cena, guardados em useTemplates.
+  const templateShape = useTools((s) => s.templateShape);
+  const templateSize = useTools((s) => s.templateSize);
+  const templateAngle = useTools((s) => s.templateAngle);
+  const templateWidth = useTools((s) => s.templateWidth);
+  const setTemplateShape = useTools((s) => s.setTemplateShape);
+  const setTemplateSize = useTools((s) => s.setTemplateSize);
+  const pickTemplatePreset = useTools((s) => s.pickTemplatePreset);
+  const templatesByScene = useTemplates((s) => s.byScene);
+  const templates = useMemo(() => sceneTemplates(templatesByScene, scene?.id), [templatesByScene, scene?.id]);
+  const selectedTemplateId = useTemplates((s) => s.selectedId);
+  const selectTemplate = useTemplates((s) => s.select);
+  const createTemplate = useTemplates((s) => s.create);
+  const templateLive = useTemplates((s) => s.updateLive);
+  const commitTemplate = useTemplates((s) => s.commit);
   useToolShortcuts();
   useDeleteSelectionShortcut();
 
@@ -527,9 +545,19 @@ function Table() {
                 onSpawnCreature={isGm ? (entryId, point, opts) => void spawnCreatureAt(entryId, point, opts) : undefined}
                 arrivalPickMode={isGm && settingArrivalSceneId === scene.id}
                 onPickArrival={handlePickArrival}
+                templates={templates}
+                templateTool={
+                  systemDef?.templates ? { shape: templateShape, sizeUnits: templateSize, angleOverride: templateAngle, widthOverride: templateWidth } : null
+                }
+                selectedTemplateId={selectedTemplateId}
+                onSelectTemplate={selectTemplate}
+                onTemplateCreate={(t) => scene && void createTemplate(scene.id, t)}
+                onTemplateLive={(t) => scene && templateLive(scene.id, t)}
+                onTemplateCommit={(t) => scene && void commitTemplate(scene.id, t)}
               />
               <Toolbar
                 isGm={isGm}
+                showTemplateTool={systemDef?.templates != null}
                 mode={toolMode}
                 effectiveMode={effectiveMode}
                 onChange={setToolMode}
@@ -551,6 +579,17 @@ function Table() {
                   onFogShape={setFogShape}
                   onBrushSize={setFogBrushSize}
                   onOp={(op) => void fogOp(op)}
+                />
+              )}
+              {toolMode === "template" && systemDef?.templates && (
+                <TemplateToolbar
+                  shape={templateShape}
+                  size={templateSize}
+                  unit={systemDef.grid?.unit ?? ""}
+                  presets={systemDef.templates.presets}
+                  onShape={setTemplateShape}
+                  onSize={setTemplateSize}
+                  onPreset={pickTemplatePreset}
                 />
               )}
             </>

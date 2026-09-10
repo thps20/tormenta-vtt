@@ -1,10 +1,12 @@
 import React from "react";
-import { CloudFog, Hand, MousePointer2, Pencil, Redo2, Ruler, Undo2 } from "lucide-react";
+import { CloudFog, Hand, MousePointer2, Pencil, Redo2, Ruler, Shapes, Undo2 } from "lucide-react";
 import type { ToolMode } from "../store/tools";
 
 interface ToolbarProps {
   /** GM vê a ferramenta Névoa e os botões de desfazer/refazer; jogador só a lista básica. */
   isGm: boolean;
+  /** Ferramenta "Área" (docs/plano-gabaritos.md) só aparece se o sistema declarar `templates`. */
+  showTemplateTool: boolean;
   /** Modo escolhido pelo usuário (não o temporário do espaço). */
   mode: ToolMode;
   /** Modo em vigor (espaço segurado mostra "Mover mapa" aceso). */
@@ -35,13 +37,16 @@ const TOOLS: ToolDef[] = [
   { mode: "ruler", label: "Régua", shortcut: "R", Icon: Ruler },
 ];
 
+/** Só quando o sistema declara `templates` (docs/plano-gabaritos.md) — não é GM-only. */
+const TEMPLATE_TOOL: ToolDef = { mode: "template", label: "Área", shortcut: "T", Icon: Shapes };
+
 /** Só o GM: pintar a névoa (ver FogToolbar para os sub-modos). */
 const GM_TOOLS: ToolDef[] = [{ mode: "fog", label: "Névoa", shortcut: "F", Icon: CloudFog }];
 
 const FUTURE_TOOLS: ToolDef[] = [{ mode: "draw", label: "Desenho", shortcut: null, Icon: Pencil, soon: true }];
 
 /** Barra vertical de ferramentas do canvas (canto superior esquerdo da mesa). */
-export const Toolbar: React.FC<ToolbarProps> = ({ isGm, mode, effectiveMode, onChange, canUndo, canRedo, undoSummary, redoSummary, onUndo, onRedo }) => (
+export const Toolbar: React.FC<ToolbarProps> = ({ isGm, showTemplateTool, mode, effectiveMode, onChange, canUndo, canRedo, undoSummary, redoSummary, onUndo, onRedo }) => (
   <div
     id="vtt-toolbar"
     role="toolbar"
@@ -51,6 +56,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ isGm, mode, effectiveMode, onC
     {TOOLS.map((t) => (
       <ToolButton key={t.mode} tool={t} active={effectiveMode === t.mode} chosen={mode === t.mode} onClick={() => onChange(t.mode)} />
     ))}
+    {showTemplateTool && (
+      <ToolButton tool={TEMPLATE_TOOL} active={effectiveMode === TEMPLATE_TOOL.mode} chosen={mode === TEMPLATE_TOOL.mode} onClick={() => onChange(TEMPLATE_TOOL.mode)} />
+    )}
     <div className="h-[1px] w-full bg-[#2d2417] my-0.5" />
     {isGm &&
       GM_TOOLS.map((t) => (

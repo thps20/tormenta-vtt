@@ -4,6 +4,7 @@ import { useRoom } from "./room";
 import { useTokens } from "./tokens";
 import { useChat } from "./chat";
 import { useCombat } from "./combat";
+import { useTemplates } from "./templates";
 import { useCharacters } from "./characters";
 import { useHistory } from "./history";
 import { useSceneList } from "./sceneList";
@@ -56,6 +57,9 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("combat:updated", ({ sceneId, combat }) => useCombat.getState().setSceneState(sceneId, combat));
 
   socket.on("ruler:updated", (p) => useTools.getState().setRemoteRuler(p));
+
+  socket.on("template:upserted", ({ sceneId, template }) => useTemplates.getState().upsertLocal(sceneId, template));
+  socket.on("template:removed", ({ sceneId, templateId }) => useTemplates.getState().removeLocal(sceneId, templateId));
 
   socket.on("character:created", (c) => useCharacters.getState().upsert(c));
   socket.on("character:updated", (c) => useCharacters.getState().upsert(c));
