@@ -52,6 +52,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 ### 3.3 Tokens
 - Criar: GM clica "Novo token" → aparece no centro da viewport com `width = height = cellSize`. Opcional: imagem via `/api/upload`.
 - Arrastar: durante o drag o cliente emite `token:update {id, x, y}` com throttle (~30/s). Ao soltar, se `grid.snap`, alinha à célula mais próxima e emite a posição final.
+- **Setas/WASD** movem o(s) token(s) selecionados (Shift = 5 células), com o mesmo snap do arraste; com combate ativo, a trava de turno vale pro teclado igual ao arraste (§9.11).
 - Redimensionar: handles nos cantos (Konva Transformer). Emite `token:update {id, width, height}`.
 - Permissão: servidor rejeita `token:update`/`token:delete` de jogador que não é `ownerId` do token (ack `{ ok: false }`).
 - Todo `token:*` aceito é persistido e reenviado a todos na sala (inclusive quem enviou, para manter uma única fonte de verdade).
@@ -97,7 +98,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 ### 3.5 Modo de combate
 > Substitui o rastreador manual de iniciativa da versão anterior do MVP. Plano e decisões em `docs/plano-combate.md`; divergências encontradas na implementação em `docs/revisao-combate.md`.
 
-- **Combate por mapa** (`Combat`, um por mapa — `Scene.combat?`, `@@unique` em `sceneId`; deixou de exigir "mapa ativo" — §9.7, docs/plano-mapas.md §7 — dois mapas podem ter combate ao mesmo tempo e ativar outro não encerra o anterior): `{ id, sceneId, round, status: "rolling" | "active" | "ended", activeCombatantId, combatants[] }`. Todo evento `combat:*` leva `sceneId`; jogador só age no mapa ATIVO da sala, GM em qualquer um que esteja vendo. `Combatant`: `{ id, tokenId, characterId? (cópia do token no momento em que entrou, só informativa), name/color (denormalizados do token na hora de enviar), ownerId (do token), initiative: number | null, rolled, bonus, delayed, surprised, order, addedRound }`.
+- **Combate por mapa** (`Combat`, um por mapa — `Scene.combat?`, `@@unique` em `sceneId`; deixou de exigir "mapa ativo" — §9.7, docs/plano-mapas.md §7 — dois mapas podem ter combate ao mesmo tempo e ativar outro não encerra o anterior): `{ id, sceneId, round, status: "rolling" | "active" | "ended", activeCombatantId, combatants[] }`. Todo evento `combat:*` leva `sceneId`; jogador só age no mapa ATIVO da sala, GM em qualquer um que esteja vendo. `Combatant`: `{ id, tokenId, characterId? (cópia do token no momento em que entrou, só informativa), name/color (denormalizados do token na hora de enviar), ownerId (do token), initiative: number | null, rolled, bonus, delayed, surprised, order, addedRound, movementBudget, movementUsed, movementDiagonals, movementPath[] }` — os quatro últimos são o orçamento de deslocamento do turno (§9.11).
 - **Regras do sistema** (`SystemDefinition.combat`, nunca hardcoded): `initiative` (fórmula de quem tem ficha vinculada), `initiativeNoSheet` (token sem ficha, `{bonus}` = valor manual do GM), `tiebreakBonus` (fórmula sem dado gravada em `Combatant.bonus` ao entrar), `tiebreak` (critérios de desempate após o valor, na ordem: T20 usa `["bonus", "order"]`), `surprise.rounds` (combatente surpreso é pulado nas N primeiras rodadas; `0` = sistema sem surpresa).
 - **Fluxo**: GM seleciona tokens no mapa (ferramenta Selecionar) e clica "Iniciar combate" (`combat:start`) — cria o combate com `status: "rolling"`; tokens podem ser adicionados (`combat:add`, reforços, entram sem iniciativa) ou removidos (`combat:remove`) depois. `combat:next` com `status: "rolling"` inicia os turnos (`round = 1`); no último combatente que pode agir, incrementa a rodada e volta ao primeiro; `combat:prev` faz o inverso (rodada mínima 1) e **não restaura condição nenhuma** (decisão deliberada: "prev" corrige um clique errado do GM, não rejoga o combate). Combatente sem iniciativa nunca recebe turno, fica no fim da lista; a ordem (`sortCombatants`, `packages/shared/src/rules/combat.ts`) é recalculada a CADA `combat:updated`, `"rolling"` ou `"active"` — então a lista do `CombatPanel` já reordena sozinha a cada iniciativa que chega (maior primeiro, desempate por bônus), sem esperar o primeiro "Próximo"; como é o mesmo cálculo nos dois status, a ordem não pula quando os turnos começam — já é a mesma que estava sendo exibida. O cliente nunca reordena por conta própria: usa a lista na ordem em que o servidor mandou (`combat.combatants`), nunca o campo `order` de cada combatente (esse só entra como desempate final no servidor, ou quando o GM arrasta pra reordenar manualmente). surpreso é pulado enquanto `round <= surprise.rounds`; adiado (`combat:delay`, só no próprio turno) sai da rotação até "entrar agora" (`combat:resume`) — que copia iniciativa/bônus de quem está agindo e assume o turno na hora, deixando quem foi interrompido para agir em seguida. `combat:end { clear? }` encerra (`status: "ended"`, mantém a ordem visível) ou, com `clear: true`, apaga o combate.
 - **Expiração de condições** (docs/plano-duracao-condicoes.md): quando `combat:next` faz a rodada avançar (`round` maior que antes, inclusive a virada de `"rolling"` pra `round = 1`), os tokens da cena com condição `expiresRound <= round` a perdem — um `token:updated` por token afetado (mesmo com várias condições vencendo juntas) e uma mensagem de chat `kind: "system"` por condição ("Goblin: Atordoado terminou"), com `tokenId` setado (só quem vê o token recebe, mesmo gate de sempre). `combat:end { clear: true }` faz o mesmo pelas condições com duração, não importa o valor de `expiresRound` — o combate acabou, então **não viram permanentes**, são removidas e listadas no chat do mesmo jeito; condição permanente (sem `expiresRound`) nunca é tocada por nenhum dos dois.
@@ -105,6 +106,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - **Card no chat**: um `combatantId` só publica `ChatMessage{kind:"roll"}` normal (rótulo "Nome: Iniciativa", com `characterId` quando há ficha vinculada) — ganha de graça o card, "Revelar" e a rolagem às cegas (§3.4). Mais de um combatente de uma vez (`"npcs"`/`"missing"`, ou `"self"` com mais de um combatente do autor faltando) publica **um card só**, `ChatMessage{kind:"initiative-batch", initiativeBatch: { round, entries: [{ combatantId, tokenId, name, formula, result }] } }`, entradas ordenadas do maior resultado pro menor. Visibilidade em duas camadas: `visibility` (all/gm/self, igual a todo `ChatMessage`) decide se `formula`/`result` aparecem em cada linha para quem recebe o card (sem elas, a UI mostra só o nome e "rolou" — mesma regra de rolagem às cegas: o GM sempre vê, o autor só se `visibility` permite); e, por linha, o gate de token oculto/névoa (§3.4/§3.5) tira do jogador as linhas dos tokens que ele não pode ver — a linha simplesmente não existe na cópia dele, sem virar placeholder, e as demais linhas continuam normalmente; se nenhuma linha sobrar, ele não recebe o card. GM sempre recebe o card inteiro. "Revelar" (GM) muda `visibility` para `all` para todos — como o revelar normal — mas não afeta o gate de token: linha de token oculto continua ausente da cópia de quem não o vê.
 - **Visibilidade**: jogador recebe só os combatentes cujo token pode ver (mesmo filtro de token/névoa de sempre) — oculto/na névoa não aparece nem some da posição: ao ser revelado, reaparece onde já estava, porque a ordem é sempre calculada sobre a lista completa no servidor e só depois filtrada. Jogador vê a ORDEM de todo mundo (nome, se já rolou), mas o **valor numérico** (iniciativa e bônus) só do **próprio** combatente (token que possui) — e mesmo assim não quando a última rolagem dele foi às cegas (`visibility: "gm"`, mesma regra de "rolagem às cegas" do chat: quem rolou não vê o próprio resultado); valor digitado à mão pelo GM (`combat:set-initiative`) não conta como às cegas, fica visível. Dos demais combatentes (inclusive de outros jogadores), nunca vê o valor. GM vê tudo sempre. Rolagens ligadas a um token que o jogador não pode ver (`visible = false` ou sob a névoa) **ou** cujo mapa não é o ATIVO da sala (mesmo com o token visível — GM pode rolar num mapa que a mesa não vê, §9.7) são omitidas por completo para ele — nem card, nem placeholder de "rolagem secreta" — independentemente do modo de rolagem de quem rolou; o **autor da rolagem sempre a recebe**, mesmo que o próprio token dele esteja oculto ou no mapa errado — o gate vale só para os demais jogadores; só o GM sempre recebe também (`ChatMessage.tokenId`, ver §3.4 e §5). Vale para `combat:roll` (inclusive linha a linha de um `initiative-batch`), `character:roll` (token vinculado à ficha, `findLinkedTokenId`) e `character:use-item`. Se o token depois for revelado, sair da névoa, ou o mapa dele virar o ativo, essas mensagens passam a ser entregues no próximo `room:join`/snapshot (não há reenvio ao vivo das mensagens já publicadas; anotado em `docs/backlog.md`).
 - **GM**: reordenar arrastando (`combat:reorder`, grava `order`), editar valor à mão (`combat:set-initiative`, `null` volta pra "não rolou"), marcar/desmarcar surpresa (`combat:set-surprised`), adicionar/remover, pular turno, encerrar. Jogador: rolar a própria, adiar/retomar a própria. Opção por usuário (checkbox na aba, `localStorage`) de centralizar o mapa no token da vez.
+- **Orçamento de deslocamento** (§9.11): toda vez que o combatente da vez muda (`combat:next`/`prev`/`delay`/`resume`, ou a remoção do ativo), o servidor resolve e grava um orçamento novo pra ele, zerando o gasto do turno anterior.
 - **Mapa**: anel destacado no token da vez (visível para quem vê o token).
 - UI nesta fase: mínima e funcional na aba Iniciativa (renomeada para o modo de combate); o visual definitivo virá do AI Studio depois.
 
@@ -127,7 +129,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - UI: a ficha abre numa gaveta lateral (`CharacterSheetDrawer`) com modo visualização (clique rola) e modo edição. Jogador tem o botão "Meu personagem" na barra superior (estado vazio + "Criar personagem" se não tiver ficha); o GM tem "Fichas", com todas as fichas da sala.
 - **Classes e raças** (fase 4) são itens: `level.classes` no JSON aponta o tipo de item de classe e seus campos de níveis e "classe inicial"; `resources[].perLevel` diz como PV/PM acumulam por nível (`firstLevelField` no 1º nível da classe inicial, `classField` nos demais, `+ attribute`, piso `minPerLevel`; multiclasse soma). Quando a ficha tem ao menos uma classe e `manualProgression = false`, `computeCharacter` devolve `levelSource = "classes"`: nível = soma dos níveis (até `level.max`) e PV/PM ignoram `maxOverride` (a conta vai em `resources[].detail` para o tooltip). Sem classe, ou com "Modo manual" ligado, tudo continua digitado; fichas antigas não mudam.
   - Campos de item estruturados (`ItemFieldDef.type`): `attributeBonuses` (raça: CON +2), `attributeChoice` (Humano: +1 em 3 à escolha, guardada em `chosen`), `skillGrants` (perícias fixas + grupos "escolha N de [lista]", com `chosen`) e `size`. Valem para qualquer item ativo (não físico, ou físico equipado) e **não são gravados na ficha**: viram `computed.itemModifiers` (origem = id do item) e `skills[].grantedBy`; remover o item remove o efeito. `itemKinds[].maxCount` limita a quantidade (1 raça), conferido em `character:update` por `validateCharacterItems`.
-  - UI: abas Classe e Raça em "Equipamentos e habilidades"; cabeçalho mostra "Guerreiro 3 / Arcanista 2" e o nível total com a soma no tooltip; nível e máximos de PV/PM ficam somente leitura (cadeado) com a conta no tooltip; botão "Modo manual" liga `manualProgression` copiando os valores calculados para os campos digitados. Escolhas (atributos flexíveis, perícias da classe) são chips que o dono marca fora do modo edição, com aviso "faltam N escolhas". Perícia concedida aparece com o checkbox travado e "Treinada por <item>". Modificadores vindos de itens aparecem travados na seção Modificadores. `movement` e `senses` da raça são só informativos.
+  - UI: abas Classe e Raça em "Equipamentos e habilidades"; cabeçalho mostra "Guerreiro 3 / Arcanista 2" e o nível total com a soma no tooltip; nível e máximos de PV/PM ficam somente leitura (cadeado) com a conta no tooltip; botão "Modo manual" liga `manualProgression` copiando os valores calculados para os campos digitados. Escolhas (atributos flexíveis, perícias da classe) são chips que o dono marca fora do modo edição, com aviso "faltam N escolhas". Perícia concedida aparece com o checkbox travado e "Treinada por <item>". Modificadores vindos de itens aparecem travados na seção Modificadores. `senses` da raça é só informativo; `movement` alimenta o placeholder `{race.movement}` usado por `derived.movement` (§9.11) — sem raça na ficha, `derived.movement` cai no `default` do campo (9 em T20).
 
 ## 4. Modelo de dados
 
@@ -153,8 +155,8 @@ Room 1───* ChatMessage *───? Token
 | **Handout** | `id, roomId, name, kind, imageUrl?, width?, height?, text?, tags[], deletedAt?` | Biblioteca por sala (§9.10), só o GM vê (`handout:list` é `gmOnly`). `kind` = `image \| text`; imagem reaproveita `POST /api/upload` (mesmo limite de 20 MB do mapa), texto vai até 20 000 caracteres, sem parser de markdown (texto puro). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Token.deletedAt`): soft delete de `handout:delete`, que também soft-deleta os pinos deste handout em qualquer mapa (§9.10) |
 | **HandoutPin** | `id, sceneId, handoutId, x, y, visible, name, kind, imageUrl?, width?, height?, text?, deletedAt?` | Handout fixado no mapa como um ícone (§9.10). Geometria em pixels do mapa, como `Token`/`Template`. Campos de conteúdo são uma CÓPIA denormalizada do `Handout` no momento de `handout:pin` (mesmo padrão de `Combatant.name/color`): editar o handout original depois não atualiza pinos já fixados — reposicionar/atualizar é apagar e fixar de novo. `visible` = GM controla se o pino aparece pros jogadores (mesma regra de `Token.visible`, sem névoa). `deletedAt`: soft delete de `handout:unpin` (e da cascata de `handout:delete`), entra no desfazer do GM (§9.6) |
 | **Combat** | `id, roomId, sceneId (único: um combate por cena), round, status, activeCombatantId?` | `status` = `rolling \| active \| ended` (§3.5). Persistido (ao contrário da iniciativa manual anterior, que vivia em memória) |
-| **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound` | `initiative = null` = ainda não rolou. `combat:remove` apaga o combatente (e ajusta `activeCombatantId`/`round` se o removido era o ativo, `stateAfterRemoval`, §3.5). `token:delete`/`token:delete-many` **não** apagam mais a linha do combatente (o token agora é soft delete, §9.6): só param de listá-lo (o combate ignora combatente cujo token tem `deletedAt`) e fazem o mesmo ajuste de turno/`order`; a linha volta se o GM desfizer |
-| **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), skillTotal, rolls{}, combat{} (§3.5), damageAttribute, tokenBar, trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código |
+| **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound, movementBudget?, movementUsed, movementDiagonals, movementAnchorX?, movementAnchorY?, movementPath?(JSON)` | `initiative = null` = ainda não rolou. `combat:remove` apaga o combatente (e ajusta `activeCombatantId`/`round` se o removido era o ativo, `stateAfterRemoval`, §3.5). `token:delete`/`token:delete-many` **não** apagam mais a linha do combatente (o token agora é soft delete, §9.6): só param de listá-lo (o combate ignora combatente cujo token tem `deletedAt`) e fazem o mesmo ajuste de turno/`order`; a linha volta se o GM desfizer. Os seis últimos campos são o orçamento de deslocamento do turno (§9.11): `movementAnchorX/Y` (de onde o próximo movimento é medido) e `movementPath` (o caminho desenhado) são colunas só do banco, nunca serializadas no `Combatant` do shared — o cliente só recebe `movementBudget/Used/Diagonals` e `movementPath` via `Combat` (§5) |
+| **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), skillTotal, rolls{}, combat{} (§3.5), damageAttribute, tokenBar, grid?, race? (§9.11), movement? (§9.11), trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código. `race?` aponta o `itemKinds[]` que alimenta o placeholder `{race.<campo>}` nas fórmulas (§9.11); `movement?` declara o orçamento de deslocamento por turno (ausente = sistema sem a regra) |
 
 Decisão: coordenadas em pixels (não células) para o token poder ficar "fora do grid" e para suportar `grid.type = none`. A conversão célula↔pixel é uma função pura usando `cellSize` e `offset`.
 
@@ -209,6 +211,8 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `combat:delay` | `{ sceneId, combatantId }` (só no próprio turno, só no mapa ativo) | GM ou dono do combatente | `combat:updated` |
 | `combat:resume` | `{ sceneId, combatantId }` (só no mapa ativo) | GM ou dono do combatente | `combat:updated` |
 | `combat:end` | `{ sceneId, clear? }` | GM | `combat:updated` (`combat: null` se `clear: true`) |
+| `combat:set-movement` | `{ sceneId, combatantId, budget?: number \| null, used? }` (§9.11; `budget: null` volta a seguir a ficha; `used` também reinicia âncora/caminho) | GM | `combat:updated` |
+| `combat:set-movement-limit` | `{ enabled }` (§9.11; trava por SALA, em memória) | GM | ack `{ enabled }`; `combat:movementLimitChanged` a todos |
 | `ruler:update` | `{ sceneId, ruler: { start, end } \| null }` (pixels do mapa) | todos | `ruler:updated` para os **outros** (efêmero: não persiste; `null` apaga) |
 | `template:upsert` | `{ sceneId, template: Template, live?, dragFrom? }` (§9.9) | GM, ou dono (só no mapa ativo) | `template:upserted`; cria (id novo) ou edita (mover/girar); `ownerId` do payload nunca é confiado (fixo desde a criação); `dragFrom` (x/y/rotation do mousedown) só informa o "antes" do desfazer do GM (§9.6) |
 | `template:remove` | `{ sceneId, templateId }` | GM, ou dono (só no mapa ativo) | `template:removed` |
@@ -238,6 +242,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `character:created` / `character:updated` | `Character` (jogadores só recebem `kind = "pc"`) |
 | `character:deleted` | `{ characterId }` |
 | `combat:updated` | `{ sceneId, combat: Combat \| null }` (estado completo DE UM MAPA, já ordenado e filtrado pela visibilidade de quem recebe — §3.5; `combat: null` = sem combate nesse mapa. GM sempre recebe; jogador só se `sceneId` for o mapa ATIVO — §9.7) |
+| `combat:movementLimitChanged` | `{ enabled }` (§9.11; trava de deslocamento da sala mudou — também entra no `RoomSnapshot` de quem entra depois) |
 | `history:updated` | `{ canUndo, canRedo, undoSummary?, redoSummary? }` — só pro GM (§9.6) |
 | `ruler:updated` | `{ participantId, nickname, sceneId, ruler \| null }` (régua de outro participante; sem eco ao autor; jogador só recebe se `sceneId` for o mapa ATIVO — §9.7) |
 | `template:upserted` / `template:removed` | `{ sceneId, template }` / `{ sceneId, templateId }` (§9.9; cliente faz upsert por id) |
@@ -341,7 +346,7 @@ packages/shared/systems/
 ## 8. Estado da implementação
 
 Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a ficha básica (§3.6). Limitações conhecidas:
-- Ficha: o compêndio (§9.4) vem dos packs do Foundry e tem lacunas listadas em `scripts/import-report.md` (proficiências e limite de atributo das armaduras pesadas, sentidos/perícias das raças, páginas ausentes, fórmulas com variáveis do Foundry); o compêndio da sala (homebrew) só existe como interface. Deslocamento e sentidos da raça não alimentam `derived[]`; poderes de classe por nível ficam de fora. Consumíveis usam a mesma ativação de poderes/magias, mas a quantidade não é descontada ao usar.
+- Ficha: o compêndio (§9.4) vem dos packs do Foundry e tem lacunas listadas em `scripts/import-report.md` (proficiências e limite de atributo das armaduras pesadas, sentidos/perícias das raças, páginas ausentes, fórmulas com variáveis do Foundry); o compêndio da sala (homebrew) só existe como interface. Sentidos da raça não alimentam `derived[]` (§9.11: deslocamento já alimenta, via `{race.movement}`); poderes de classe por nível ficam de fora. Consumíveis usam a mesma ativação de poderes/magias, mas a quantidade não é descontada ao usar.
 - `character:update` é um patch raso: editar um item reenvia a lista `items` inteira (fichas são pequenas; ok por ora).
 - A presença (`connected`) se perde ao reiniciar o servidor. O combate (§3.5), diferente da iniciativa manual anterior, agora é **persistido** (tabelas `Combat`/`Combatant`) e sobrevive a um restart.
 - Uploads ficam em disco (`apps/server/uploads/`), sem limpeza de arquivos órfãos.
@@ -350,6 +355,7 @@ Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a fi
 - Criaturas do compêndio (§9.5): o pack `convocacoes` do Foundry (convocações que escalam pelo nível do conjurador) ficou fora do importador — `docs/backlog.md`. `NpcQuickCard` é a versão mínima do contrato (`docs/tipos-ficha-rapida.md`); a UI de verdade vem do AI Studio depois. `token:apply-damage` continua sem aplicar `damageResponses` sozinho — só sugere e avisa (§0.4/§3.3 do plano) — `docs/backlog.md`.
 - Gabaritos de área de efeito (§9.9): ângulo do cone e largura da linha são únicos por sistema (ou por preset), não digitáveis por gabarito na hora de colocar; nenhuma automação de regra (dano, CD, resistência continuam manuais); não interagem com a névoa; entram no undo/redo geral do GM, jogador tem um Ctrl+Z local só das próprias ações — se perdem num restart do servidor (efêmeros por design).
 - Handouts (§9.10): um pino no mapa é uma cópia do handout no momento de fixar — editar nome/imagem/texto do handout original depois NÃO atualiza pinos já fixados, e não dá pra arrastar um pino pra reposicionar (apagar e fixar de novo faz as duas coisas). Handout de texto é sempre texto puro (`white-space: pre-wrap`), sem parser de markdown — "leve" no nome, não na renderização. Uploads de imagem de handout caem na mesma pasta sem limpeza de órfãos do mapa (§8, acima).
+- Movimento e orçamento de deslocamento (§9.11): condições que alterariam o deslocamento (Lento, Imóvel...) não são automatizadas ainda (só a função pura já aceita modificadores); terreno difícil e caminho com desvio não existem (medição sempre em linha reta, como a régua); Ctrl+Z de um movimento não estorna `movementUsed` (D7 do plano — o GM tem o botão de zerar); um `token:update-many` (arraste em grupo) não é atômico no banco — se um patch do meio do lote for recusado por orçamento, os anteriores já foram persistidos (mesma característica pré-existente do handler, não uma regressão desta feature); ver `docs/revisao-movimento.md` para as bordas testadas.
 
 ## 9. Fase 2 (pós-MVP)
 
@@ -786,3 +792,107 @@ do GM; jogador só vê o que é mostrado pra ele (chat) ou fixado visível no ma
   desfixar é `gmOnly` no servidor (não só escondido na UI). Biblioteca (`handout:created/updated/
   deleted`) é enviada só pra `rooms.gm` — o jogador nunca recebe, nem filtrado; pino segue a regra
   de broadcast de mapa de sempre (§9.7).
+
+### 9.11 Movimento por teclado e orçamento de deslocamento
+
+Setas/WASD movem o token selecionado; com combate ativo, cada combatente tem um orçamento de
+deslocamento por turno (metros em T20) — caminho desenhado no mapa, gasto acumulado, bloqueio ao
+ultrapassar, override do GM. Plano e decisões em `docs/plano-movimento.md`, revisão (implementação
+x plano, bordas testadas) em `docs/revisao-movimento.md`. Fora do escopo: condições que alteram
+deslocamento (Lento, Imóvel...) — a conta já sai de uma função pura que recebe modificadores
+(`MovementModifier`), mas nada os gera ainda; terreno difícil; caminho com desvio (a medição é
+sempre em linha reta entre os pontos do caminho, como a régua, §3.2).
+
+- **Deslocamento da raça** (`{race.movement}`): `SystemDefinition.race?: { kind }` aponta o
+  `itemKinds[]` cujos campos `number` viram o placeholder `{race.<campo>}` nas fórmulas — igual
+  `{equip.<stat>}` já agrega os itens equipados, mas lendo um único item ativo (T20: o item de
+  Raça, no máximo 1). `derived.movement` do `tormenta20.json` passa a ser `"{race.movement}"`
+  (antes, uma constante "9"): com raça escolhida, lê `race.fields.movement` (Anão 6, a maioria 9);
+  sem raça na ficha, cai no `default` do campo (9). `derivedOverrides.movement` continua
+  sobrescrevendo o valor calculado (NPCs com deslocamento fixo digitado à mão).
+- **Regra de deslocamento** (`SystemDefinition.movement?: { derived, default, diagonals? }`,
+  ausente = sistema sem a regra — nem barra, nem caminho, nem bloqueio, só o movimento livre por
+  teclado): `derived` é a chave em `derived[]` com o deslocamento do personagem (T20: `"movement"`);
+  `default` é o orçamento de um token SEM ficha vinculada (T20: 9); `diagonals` sobrescreve a regra
+  de diagonais só do movimento (ausente = `grid.diagonals`, a mesma que a régua usa — uma mesa só
+  precisaria disto se quisesse combate e régua contando diferente). Exige `SystemDefinition.grid`
+  (sem `cellSize`/`unit` não dá pra converter célula ↔ metro).
+- **Medição com diagonais acumuladas** (`measureCellsFrom`, `packages/shared/src/rules/measure.ts`):
+  generaliza `measureCells` para saber quantas diagonais já foram contadas no turno (regra 1-2-1 do
+  d20) — sem isso, seis passos diagonais avulsos de 1 célula custariam 6 células em vez de 9.
+  `measureCells(dx, dy, rule)` continua existindo (= `measureCellsFrom(..., 0).cells`): régua e
+  gabaritos não mudam.
+- **Orçamento** (`packages/shared/src/rules/movement.ts`, puro — servidor valida, web faz o preview
+  ao vivo com as MESMAS funções): `movementBase` resolve a base (override do GM → `derived` da
+  ficha vinculada → `movement.default`, `null` sem `movement` no sistema); `computeMovementBudget`
+  aplica modificadores (`set → add → multiply → block`, nunca negativo — hoje a lista sempre chega
+  vazia, é o gancho de Lento/Imóvel); `stepCost`/`applyStep` custam e acumulam um passo (dx, dy em
+  CÉLULAS) no `MovementState { used, diagonals }` do turno; `fitsInBudget`/`movementRemaining`
+  respondem "cabe?" e "quanto sobra", com epsilon de 1e-6 (a regra `euclidean` gera irracionais).
+- **Âncora do turno** (D2 do plano): o servidor guarda, por combatente, de onde o próximo movimento
+  é medido (`Combatant.movementAnchorX/Y` — início do turno, ou fim do último movimento
+  confirmado). Todo `token:update` do combatente da vez — inclusive os ecos `live` do arraste
+  (~30/s) — é validado contra `âncora → destino`, mas só o patch FINAL (sem `live`) consome
+  orçamento e avança a âncora: os ecos já escrevem no banco durante o arraste (o "antes" lido ali
+  seria a posição de 33 ms atrás), e nenhum cliente — nem um adulterado que só manda ecos `live` —
+  consegue afastar o token da âncora além do orçamento, porque o servidor decide de novo em cada um.
+- **`checkMovement`** (`apps/server/src/services/movement.ts`), chamado de `token:update`/
+  `update-many` antes de gravar: sem combate ativo na cena, ou o token não é combatente daquele
+  combate (D3 — cenário, montaria, um NPC que o GM está posicionando continuam livres, mesmo com
+  combate rolando), libera. Não é o combatente da vez: jogador recebe erro ("Não é o seu turno");
+  GM libera sem consumir (não é o turno de ninguém em particular, não há o que debitar). É o da vez:
+  sem `movement`/`grid` no sistema, grid da cena `"none"`, ou a trava desligada na sala (abaixo) —
+  libera sem consumir, pra QUALQUER um, GM incluso (uma sessão inteira com a trava desligada não
+  deixa `movementUsed` residual pra travar alguém depois que ela for religada). Senão, calcula o
+  custo do passo e recusa (`HandlerError`, "Deslocamento insuficiente: restam N m") quando não cabe.
+- **Início de turno** (`startTurnMovement`): toda vez que o combatente da vez muda —
+  `combat:next`/`prev`/`delay`/`resume`, e a remoção do ativo (`stateAfterRemoval`) — o servidor
+  resolve o orçamento fresco (ficha vinculada ao TOKEN atual → `movement.default`), zera
+  `movementUsed`/`movementDiagonals` e ancora na posição ATUAL do token; `movementPath` reinicia com
+  esse ponto único. "Entrar agora" (`combat:resume`) zera na hora — é o próprio turno de quem
+  retomou, não espera o próximo `combat:next`.
+- **Caminho e visibilidade** (D5): todos que enxergam o token do combatente da vez veem a linha do
+  caminho e o gasto — inclusive de um NPC do GM (mesmo comportamento do Foundry). `Combatant.
+  movementPath` só vem preenchido pra quem é o combatente DA VEZ (`[]` nos demais, pra não inchar o
+  payload); limite de 200 pontos — depois disso, o ponto novo substitui o último em vez de
+  empilhar (o desenho perde detalhe, os números continuam exatos).
+- **Trava por sala** ("Ignorar limite de movimento", cabeçalho do painel de combate, só GM):
+  `combat:set-movement-limit { enabled }` liga/desliga em memória (não vai ao banco, mesmo padrão
+  de `services/movementLimit.ts` — não sobrevive a um restart do servidor), broadcast
+  `combat:movementLimitChanged` pra todos e entra no `RoomSnapshot.movementLimitEnabled` de quem
+  entra depois. Jogador vê o estado (legenda no painel), só o GM muda.
+- **Ajuste manual** (`combat:set-movement { sceneId, combatantId, budget?, used? }`, GM): `budget`
+  grava direto em `Combatant.movementBudget` (correr, magia, empurrão); `budget: null` volta a
+  seguir a ficha (recalcula igual `startTurnMovement`). `used` (o botão "zerar gasto" do painel)
+  também reinicia diagonais/âncora/caminho na posição atual do token — sem isso sobraria uma
+  diagonal "pendurada" ou um caminho que não bate mais com o gasto zerado.
+- **Teclado** (`useTokenMoveShortcuts`, `apps/web/src/lib`): setas/WASD movem o(s) token(s)
+  selecionados (Shift = 5 células, snap ao grid — 70 px sem snap com grid `"none"`), só com token
+  selecionado e fora de campo de texto. `canMoveNow` (`store/combat.ts`) espelha `checkMovement` do
+  servidor pra decidir quem pode mover AGORA — usada pelo hook do teclado, pelo `draggable` do
+  token no canvas (não é o turno → nem começa a arrastar) e pelo preview de gasto; o servidor
+  sempre decide de novo. Segurar a tecla é UM movimento, não N: cada passo aplica local e emite
+  `tokens.moveLive` (já throttled a 33 ms); um patch final confirma ao soltar a tecla, ou 250 ms
+  depois da última — uma entrada de Ctrl+Z por rajada, não uma por passo (o auto-repeat do SO dispara
+  várias vezes por segundo enquanto a tecla fica apertada).
+- **Recusa ao soltar/confirmar** (`movementBudgetFallback`, `store/combat.ts`, usada por
+  `VttCanvas#handleTokenDragEnd` E pelo teclado): se o destino estoura o orçamento, o cliente manda
+  a ÂNCORA em vez do destino — o servidor aceita (custo zero, `HandlerError` nunca dispara pra essa
+  posição) e o broadcast recoloca o token pra todo mundo, corrigindo até os ecos `live` que já
+  tinham sido gravados. Toast "Deslocamento insuficiente (restam N m)", no máximo um por gesto
+  mesmo em arraste de grupo.
+- **No mapa** (`MovementLayer`, `apps/web/src/components`, camada Konva só-desenho): polilinha do
+  caminho do combatente da vez (tracejada, dourada, espessura constante em pixels de tela — mesmo
+  truque `k = 1 / stageScale` da régua e dos pinos), mais o segmento AO VIVO do último ponto
+  confirmado até a posição atual do token durante um arraste/passo de teclado. Rótulo ao lado do
+  token, "4,5 / 9 m": dourado enquanto o passo em andamento cabe, vermelho quando estoura — o
+  número ao vivo soma `movementUsed` ao `stepCost` do segmento em andamento, com as mesmas funções
+  puras do servidor. Trava desligada na sala: mostra só o gasto ("4,5 m"), sem o "/ 9" e sem
+  vermelho — não há bloqueio, o número é só informativo.
+- **No painel de combate** (`CombatPanel`): barra fina (dourada, vermelha em 0) na linha do
+  combatente da vez, só quando `movementBudget != null`; GM ganha um campo numérico pro orçamento
+  (vazio = segue a ficha) e um botão de zerar o gasto, os dois via `combat:set-movement`.
+- **Desfazer não estorna deslocamento**: Ctrl+Z de um movimento (`writeTrackablePatch`, não passa
+  pelo `checkMovement` normal) reposiciona o token mas não devolve `movementUsed` — estornar exigiria
+  snapshot do estado de movimento em cada entrada de histórico. O botão de zerar gasto (acima)
+  cobre o caso raro de precisar corrigir.
