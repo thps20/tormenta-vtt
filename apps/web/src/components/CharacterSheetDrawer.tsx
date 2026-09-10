@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, UserPlus } from "lucide-react";
-import { computeCharacter, type Character, type CharacterPatch, type CharacterRollRequest, type EnhancementUse, type Participant, type SystemDefinition } from "@tormenta-vtt/shared";
+import { computeCharacter, type Character, type CharacterPatch, type CharacterRollRequest, type CompendiumEntry, type EnhancementUse, type Participant, type SystemDefinition } from "@tormenta-vtt/shared";
 import { CharacterHeader } from "./character/CharacterHeader";
 import { AttributesGrid } from "./character/AttributesGrid";
 import { ResourcesBlock } from "./character/ResourcesBlock";
@@ -87,7 +87,7 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
   const characterId = character?.id ?? null;
   useEffect(() => {
     if (!characterId || !(isEditMode && canEdit)) return;
-    return registerDropTarget({
+    return registerDropTarget<CompendiumEntry>({
       id: SHEET_DROP_TARGET,
       accepts: () => true,
       onDrop: (entry) => void onInsertFromCompendium(entry.id).then((itemId) => itemId && closeCompendium()),

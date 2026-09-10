@@ -15,9 +15,11 @@ interface TopBarProps {
   characterMenu?: React.ReactNode;
   /** Seletor de mapa (`MapSelector`), montado pela página — só GM. Sem ele, mostra só o nome do mapa ativo. */
   mapSelector?: React.ReactNode;
+  /** Seletor de handouts (`HandoutSelector`, docs/SPEC.md §9.10), ao lado do de mapa — só GM. */
+  handoutSelector?: React.ReactNode;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, onLeaveToLobby, onOpenMapConfig, characterMenu, mapSelector }) => {
+export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, onLeaveToLobby, onOpenMapConfig, characterMenu, mapSelector, handoutSelector }) => {
   const [copied, setCopied] = useState(false);
   const isGM = me.role === "gm";
 
@@ -59,6 +61,7 @@ export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, o
                   Mapa: {scene?.name ?? "Sem mapa"}
                 </span>
               )}
+              {handoutSelector}
               <span className="text-zinc-600">•</span>
               <button
                 onClick={handleCopyInvite}

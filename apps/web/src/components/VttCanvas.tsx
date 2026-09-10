@@ -16,9 +16,12 @@ import {
   type CharacterPatch,
   type CharacterRollRequest,
   type Combat,
+  type CompendiumEntry,
   type ConditionDef,
   type FogShape,
   type GridConfig,
+  type Handout,
+  type HandoutPin,
   type Participant,
   type Ruler,
   type Scene,
@@ -54,6 +57,7 @@ import { NpcQuickCard } from "./NpcQuickCard";
 import { ConditionMenu } from "./ConditionMenu";
 import { FogLayer } from "./FogLayer";
 import { TemplateLayer } from "./TemplateLayer";
+import { HandoutPinLayer, HANDOUT_PIN_RADIUS } from "./HandoutPinLayer";
 
 /** Tamanho padrão quando a cena ainda não tem mapa (shared: o servidor usa o mesmo, ver compendium:spawn-creature). */
 export const DEFAULT_MAP = DEFAULT_MAP_SIZE;
@@ -159,6 +163,20 @@ interface VttCanvasProps {
   /** Ao soltar: patch final do gesto, com ack. `dragFrom` (x/y/rotation do mousedown) só quando um
    *  gesto de mover/girar terminou — pro histórico do GM saber o "antes" de verdade (docs/plano-gabaritos.md §4). */
   onTemplateCommit: (template: Template, dragFrom?: { x: number; y: number; rotation: number }) => void;
+
+  /** Pinos de handout fixados na cena visitada (docs/SPEC.md §9.10), já filtrados por quem pode ver. */
+  handoutPins: HandoutPin[];
+  /** Clique num pino, modo Selecionar (qualquer um): abre o overlay local. */
+  onOpenHandoutPin: (pin: HandoutPin) => void;
+  /** Botão direito num pino, modo Selecionar: apaga (entra no desfazer do GM). GM only; ausente = jogador. */
+  onDeleteHandoutPin?: (pin: HandoutPin) => void;
+  /**
+   * Arrastar um card da biblioteca de handouts até o mapa fixa um pino no ponto (pixels do mapa) —
+   * mesmo mecanismo de soltar criatura do compêndio (§9.5), registrado no mesmo alvo "mapa" (o
+   * elemento aceita os dois arrastos ao mesmo tempo, ver lib/dropTargets.ts). GM only; ausente = o
+   * mapa não aceita o drop.
+   */
+  onHandoutDrop?: (handout: Handout, point: { x: number; y: number }) => void;
 }
 
 /** Forma + tamanho (metros) escolhidos na TemplateToolbar, e a sobrescrita de ângulo/largura de um preset. */
@@ -285,6 +303,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   selectedTemplateId,
   onSelectTemplate,
   onTemplateCreate,
+  handoutPins,
+  onOpenHandoutPin,
+  onDeleteHandoutPin,
+  onHandoutDrop,
   onTemplateLive,
   onTemplateCommit,
 }, ref) => {
@@ -507,7 +529,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   // fantasma abaixo leem o mesmo estado).
   useEffect(() => {
     if (!onSpawnCreature) return;
-    return registerDropTarget({
+    return registerDropTarget<CompendiumEntry>({
       id: MAP_DROP_TARGET,
       accepts: (entry) => entry.type === "creature",
       onDrop: (entry, point) => {
@@ -517,6 +539,18 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       },
     });
   }, [onSpawnCreature]);
+
+  // Segundo alvo de soltura no MESMO id "map" (docs/SPEC.md §9.10): arrastar um card da biblioteca
+  // de handouts fixa um pino no ponto. `accepts` distingue pelo formato do payload (Handout não tem
+  // `type`), então os dois registros no id "map" convivem sem se atrapalhar (lib/dropTargets.ts).
+  useEffect(() => {
+    if (!onHandoutDrop) return;
+    return registerDropTarget<Handout>({
+      id: MAP_DROP_TARGET,
+      accepts: (entry) => typeof entry === "object" && entry !== null && "kind" in entry && (entry.kind === "image" || entry.kind === "text"),
+      onDrop: (handout, point) => onHandoutDrop(handout, mapPointFromClient(point)),
+    });
+  }, [onHandoutDrop]);
 
   // Fantasma de soltura: N retângulos de célula, na cor do tipo da criatura, seguindo o arrasto —
   // MESMA findFreeCells que o servidor roda ao criar, então onde você vê é onde os tokens caem.
@@ -787,6 +821,26 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     for (let i = templates.length - 1; i >= 0; i--) {
       const t = templates[i];
       if (t && pointInTemplate(p, t)) return t;
+    }
+    return null;
+  };
+
+  /**
+   * Pino de handout sob o ponteiro, por GEOMETRIA (mesmo motivo de tokenAtPointer/templateAtPointer:
+   * `HandoutPinLayer` é só desenho, `listening={false}`, docs/SPEC.md §9.10). Raio constante em
+   * pixels de TELA (o pino não muda de tamanho com o zoom), por isso divide por stageScale em vez
+   * de multiplicar como os outros hit-tests em pixels do mapa. O de cima (último da lista) primeiro.
+   */
+  const handoutPinAtPointer = (): HandoutPin | null => {
+    const p = pointerMapPos();
+    if (!p) return null;
+    const r = HANDOUT_PIN_RADIUS / stageScale;
+    for (let i = handoutPins.length - 1; i >= 0; i--) {
+      const pin = handoutPins[i];
+      if (!pin) continue;
+      const dx = p.x - pin.x;
+      const dy = p.y - pin.y;
+      if (dx * dx + dy * dy <= r * r) return pin;
     }
     return null;
   };
@@ -1107,6 +1161,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (!hitLandedOnToken(e.target, t.id)) selectByClick(t.id, e.evt.shiftKey);
       return;
     }
+    // Pino de handout (§9.10): qualquer um (GM ou jogador) clica pra abrir — sem seleção, sem
+    // Transformer, só abre o overlay local. `HandoutPinLayer` é listening={false}, então o hit do
+    // Konva nunca "aterrissa" nele; sempre passa por aqui, por geometria.
+    const pin = handoutPinAtPointer();
+    if (pin) {
+      onOpenHandoutPin(pin);
+      return;
+    }
     if (e.target === stageRef.current || e.target.name() === "map-background") {
       onSelectToken(null);
       // Só limpa a seleção de gabarito se o clique NÃO foi em cima de um (mousedown já selecionou
@@ -1125,10 +1187,17 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     e.evt.preventDefault();
     if (mode !== "select") return;
     const t = tokenAtPointer();
-    if (!t) return;
-    // Se o hit tivesse acertado, o onContextMenu do Group já teria aberto o menu (que confere
-    // canControl por dentro, igual ao clique).
-    if (!hitLandedOnToken(e.target, t.id)) openConditionMenuAt(t);
+    if (t) {
+      // Se o hit tivesse acertado, o onContextMenu do Group já teria aberto o menu (que confere
+      // canControl por dentro, igual ao clique).
+      if (!hitLandedOnToken(e.target, t.id)) openConditionMenuAt(t);
+      return;
+    }
+    // Botão direito num pino apaga direto (GM only — entra no desfazer, sem confirmação: Ctrl+Z
+    // corrige um clique errado tão fácil quanto um confirm() teria custado, §9.10).
+    if (!onDeleteHandoutPin) return;
+    const pin = handoutPinAtPointer();
+    if (pin) onDeleteHandoutPin(pin);
   };
 
   /** Clique num token: seleciona só ele; com Shift, entra/sai da seleção atual. Token e gabarito
@@ -1309,7 +1378,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     <div
       ref={containerRef}
       id="vtt-canvas-container"
-      {...(onSpawnCreature ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
+      {...(onSpawnCreature || onHandoutDrop ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
       className={`relative flex-1 h-full w-full bg-stone-950 overflow-hidden select-none ${mode === "pan" ? "cursor-grab" : mode === "select" ? "cursor-default" : "cursor-crosshair"}`}
     >
       <Stage
@@ -1411,6 +1480,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
             cellSize={effectiveCellSize(scene.grid)}
             stageScale={stageScale}
           />
+          <HandoutPinLayer pins={handoutPins} stageScale={stageScale} />
           {selectionBox && (
             <Rect
               x={Math.min(selectionBox.x1, selectionBox.x2)}

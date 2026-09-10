@@ -9,6 +9,7 @@ import { useCharacters } from "./characters";
 import { useHistory } from "./history";
 import { useSceneList } from "./sceneList";
 import { useTools } from "./tools";
+import { useHandouts } from "./handouts";
 import { toast } from "./ui";
 
 /**
@@ -52,7 +53,13 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("token:updated", (token) => useTokens.getState().upsert(token));
   socket.on("token:deleted", ({ tokenId }) => useTokens.getState().remove(tokenId));
 
-  socket.on("chat:message", (msg) => useChat.getState().append(msg));
+  socket.on("chat:message", (msg) => {
+    useChat.getState().append(msg);
+    // Handout mostrado AO VIVO abre sozinho pra quem recebe (a mensagem já veio filtrada pelo
+    // servidor: se chegou aqui, este cliente pode vê-la). Histórico do room:join usa setAll, não
+    // este handler — quem entra depois só vê a miniatura no chat e clica pra abrir (SPEC §9.10).
+    useHandouts.getState().openFromLiveMessage(msg);
+  });
 
   socket.on("combat:updated", ({ sceneId, combat }) => useCombat.getState().setSceneState(sceneId, combat));
 
@@ -66,6 +73,14 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("character:deleted", ({ characterId }) => useCharacters.getState().remove(characterId));
 
   socket.on("history:updated", (p) => useHistory.getState().setState(p));
+
+  // Handouts (§9.10): biblioteca só chega pro GM (rooms.gm); pino segue a regra de mapa de sempre.
+  socket.on("handout:created", (h) => useHandouts.getState().upsertLibrary(h));
+  socket.on("handout:updated", (h) => useHandouts.getState().upsertLibrary(h));
+  socket.on("handout:deleted", ({ id }) => useHandouts.getState().removeFromLibrary(id));
+  socket.on("handout:pinned", ({ sceneId, pin }) => useHandouts.getState().upsertPin(sceneId, pin));
+  socket.on("handout:unpinned", ({ sceneId, pinId }) => useHandouts.getState().removePin(sceneId, pinId));
+  socket.on("handout:closed", ({ messageId }) => useHandouts.getState().closeIfOpen(messageId));
 
   socket.on("server:error", ({ message }) => toast(message));
 }

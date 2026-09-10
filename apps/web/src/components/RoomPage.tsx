@@ -4,6 +4,7 @@ import { selectActiveScene, selectViewedScene, useRoom } from "../store/room";
 import { sceneTokens, useTokens } from "../store/tokens";
 import { sceneTemplates, useTemplates } from "../store/templates";
 import { useTemplateHistory } from "../store/templateHistory";
+import { scenePins, useHandouts } from "../store/handouts";
 import { describeTemplateAreaChange } from "../lib/templates";
 import { effectiveCellSize } from "../lib/grid";
 import { useChat } from "../store/chat";
@@ -18,12 +19,15 @@ import { useTurnTitle } from "../lib/useTurnTitle";
 import { useHistory } from "../store/history";
 import { useSceneList } from "../store/sceneList";
 import { selectEffectiveMode, useTools } from "../store/tools";
-import { computeCharacter, isPointRevealed, pickTokensToCarry, tokenCenter, type Template, type TemplateChangeAction } from "@tormenta-vtt/shared";
+import { computeCharacter, isPointRevealed, pickTokensToCarry, tokenCenter, type Handout, type HandoutCard, type HandoutPin, type Template, type TemplateChangeAction } from "@tormenta-vtt/shared";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { CombatBanner } from "./CombatBanner";
 import { type CombatPanelCallbacks } from "./CombatPanel";
 import { CarryTokensDialog, type CarryTokenRow } from "./CarryTokensDialog";
 import { MapSelector } from "./MapSelector";
+import { HandoutSelector } from "./HandoutSelector";
+import { HandoutOverlay } from "./HandoutOverlay";
+import { HandoutDragGhost } from "./HandoutDragGhost";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
 import { FogToolbar } from "./FogToolbar";
@@ -167,6 +171,23 @@ function Table() {
   const commitTemplate = useTemplates((s) => s.commit);
   useToolShortcuts();
   useDeleteSelectionShortcut();
+
+  // Handouts (docs/SPEC.md §9.10): biblioteca por sala (só GM, carregada sob demanda ao abrir o
+  // HandoutSelector) + pinos do mapa visitado + overlay em tela cheia atualmente aberto.
+  const handoutLibrary = useHandouts((s) => s.library);
+  const loadHandoutLibrary = useHandouts((s) => s.loadLibrary);
+  const createHandout = useHandouts((s) => s.create);
+  const renameHandout = useHandouts((s) => s.update);
+  const deleteHandout = useHandouts((s) => s.remove);
+  const showHandout = useHandouts((s) => s.show);
+  const closeHandoutForAll = useHandouts((s) => s.closeForAll);
+  const pinHandout = useHandouts((s) => s.pin);
+  const unpinHandout = useHandouts((s) => s.unpin);
+  const openHandoutLocal = useHandouts((s) => s.openLocal);
+  const closeHandoutLocal = useHandouts((s) => s.closeLocal);
+  const openHandout = useHandouts((s) => s.open);
+  const pinsByScene = useHandouts((s) => s.pinsByScene);
+  const handoutPins = useMemo(() => scenePins(pinsByScene, scene?.id), [pinsByScene, scene?.id]);
 
   // Esc cancela o modo "definir ponto de chegada" em andamento (mesmo gesto de cancelar de sempre).
   useEffect(() => {
@@ -462,6 +483,29 @@ function Table() {
     arrivalPickingSceneId: settingArrivalSceneId,
   };
 
+  // --- Handouts (docs/SPEC.md §9.10) --------------------------------------------------------
+  const handoutsProps = {
+    handouts: handoutLibrary,
+    participants,
+    onCreate: (payload: Parameters<typeof createHandout>[0]) => void createHandout(payload),
+    onRename: (id: string, name: string) => void renameHandout(id, { name }),
+    onDelete: (id: string) => void deleteHandout(id),
+    onShow: (id: string, target: Parameters<typeof showHandout>[1]) => void showHandout(id, target),
+  };
+
+  /** Card denormalizado a partir de um pino (mesmos campos de HandoutCard, o pino só tem 3 a mais: id/sceneId/visible). */
+  const pinToCard = (pin: HandoutPin): HandoutCard =>
+    pin.kind === "image"
+      ? { handoutId: pin.handoutId, name: pin.name, kind: "image", imageUrl: pin.imageUrl, width: pin.width, height: pin.height }
+      : { handoutId: pin.handoutId, name: pin.name, kind: "text", text: pin.text };
+
+  const handleOpenHandoutPin = (pin: HandoutPin) => openHandoutLocal(null, pinToCard(pin));
+  const handleDeleteHandoutPin = (pin: HandoutPin) => scene && void unpinHandout(scene.id, pin.id);
+  const handleHandoutDrop = (handout: Handout, point: { x: number; y: number }) => {
+    if (!scene) return;
+    void pinHandout(scene.id, handout.id, point.x, point.y, true);
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0c0c0c] text-zinc-100 antialiased">
       <TopBar
@@ -488,6 +532,9 @@ function Table() {
           isGm ? (
             <MapSelector viewingScene={scene} activeScene={activeScene} maps={mapsProps} onOpen={() => void loadSceneList()} />
           ) : undefined
+        }
+        handoutSelector={
+          isGm ? <HandoutSelector handouts={handoutsProps} onOpen={() => void loadHandoutLibrary()} /> : undefined
         }
       />
 
@@ -578,6 +625,10 @@ function Table() {
                 onTemplateCreate={handleTemplateCreate}
                 onTemplateLive={(t) => scene && templateLive(scene.id, t)}
                 onTemplateCommit={handleTemplateCommit}
+                handoutPins={handoutPins}
+                onOpenHandoutPin={handleOpenHandoutPin}
+                onDeleteHandoutPin={isGm ? handleDeleteHandoutPin : undefined}
+                onHandoutDrop={isGm ? handleHandoutDrop : undefined}
               />
               <Toolbar
                 isGm={isGm}
@@ -696,6 +747,15 @@ function Table() {
           onConfirm={handleCarryConfirm}
         />
       )}
+
+      {openHandout && (
+        <HandoutOverlay
+          card={openHandout.card}
+          onClose={closeHandoutLocal}
+          onCloseForAll={isGm && openHandout.messageId ? () => void closeHandoutForAll(openHandout.messageId!) : undefined}
+        />
+      )}
+      {isGm && <HandoutDragGhost />}
     </div>
   );
 }

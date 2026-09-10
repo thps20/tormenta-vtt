@@ -6,10 +6,12 @@ import { useChat } from '../store/chat';
 import { useSystemDef } from '../lib/system';
 import { rollModeInfo } from '../lib/rollMode';
 import { ApplyDamageButton } from './chat/ApplyDamageButton';
+import { HandoutCardMessage } from './chat/HandoutCardMessage';
 import { InitiativeBatchMessage } from './chat/InitiativeBatchMessage';
 import { ItemCardMessage } from './chat/ItemCardMessage';
 import { RollModeButton } from './chat/RollModeButton';
 import { DamageFormula, DamageTypeBadge } from './DamageTypeBadge';
+import { useHandouts } from '../store/handouts';
 
 interface ChatTabProps {
   messages: ChatMessage[];
@@ -41,6 +43,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   const setRollMode = useChat((s) => s.setRollMode);
   const revealMessage = useChat((s) => s.reveal);
   const applyDamage = useChat((s) => s.applyDamage);
+  const openHandout = useHandouts((s) => s.openLocal);
   const [inputText, setInputText] = useState('');
   const isRollCommand = /^\/(r|roll|gmr|gr|pr)\b/i.test(inputText);
   const nonPublic = rollMode !== 'all';
@@ -134,6 +137,11 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                 }
               />
             );
+          }
+
+          // 2.1 CARD DE HANDOUT MOSTRADO PELO GM (§9.10)
+          if (msg.kind === 'handout') {
+            return <HandoutCardMessage key={msg.id} msg={msg} time={formatTime(msg.createdAt)} onOpen={openHandout} />;
           }
 
           // 2.5 CARD DE INICIATIVA EM LOTE (combat:roll com mais de um combatente)

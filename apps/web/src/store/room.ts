@@ -20,6 +20,7 @@ import { useCombat } from "./combat";
 import { useTemplates } from "./templates";
 import { useCharacters } from "./characters";
 import { useCompendium } from "./compendium";
+import { useHandouts } from "./handouts";
 import { useSceneList } from "./sceneList";
 import { toast } from "./ui";
 
@@ -143,6 +144,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useTemplates.getState().setSnapshot(null, []);
     useCharacters.getState().setAll([]);
     useCompendium.getState().reset();
+    useHandouts.getState().reset();
     useSceneList.getState().reset();
     // Desconectar e reconectar é o jeito simples de sair das salas do Socket.io.
     const socket = getSocket();
@@ -156,6 +158,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useChat.getState().setAll(snap.chat);
     useCombat.getState().setSnapshot(snap.room.activeSceneId, snap.combat);
     useTemplates.getState().setSnapshot(snap.room.activeSceneId, snap.templates);
+    useHandouts.getState().setSnapshot(snap.room.activeSceneId, snap.handoutPins);
     useCharacters.getState().setAll(snap.characters);
 
     // Jogador sempre vê o ativo (derivado, sem sessionStorage). GM: restaura o mapa que estava
@@ -220,6 +223,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useTokens.getState().replaceScene(sceneId, res.data.tokens);
     useCombat.getState().setSceneState(sceneId, res.data.combat);
     useTemplates.getState().replaceScene(sceneId, res.data.templates);
+    useHandouts.getState().replaceScene(sceneId, res.data.handoutPins);
     set({ viewingSceneId: sceneId });
     const roomId = get().room?.id;
     if (roomId) setViewingScene(roomId, sceneId);
