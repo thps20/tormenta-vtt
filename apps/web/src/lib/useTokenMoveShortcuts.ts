@@ -110,7 +110,17 @@ export function useTokenMoveShortcuts(): void {
       if (!delta) return;
 
       const { selectedIds, byId: tokensById } = useTokens.getState();
-      if (selectedIds.length === 0) return; // WASD só age com token selecionado
+      if (selectedIds.length === 0) {
+        // WASD só age com token selecionado — diferente do arraste, que move um token que você
+        // controla mesmo sem selecionar primeiro (VttCanvas#handleTokenDragStart). Sem o aviso,
+        // apertar seta com nada selecionado não fazia NADA (nem toast, nem erro): parecia "o
+        // teclado não funciona" quando na verdade faltava clicar no token primeiro.
+        if (!warnedRef.current) {
+          toast("Selecione um token para mover com o teclado");
+          warnedRef.current = true;
+        }
+        return;
+      }
 
       const room = useRoom.getState();
       const me = room.me;

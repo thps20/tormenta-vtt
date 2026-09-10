@@ -868,7 +868,11 @@ sempre em linha reta entre os pontos do caminho, como a régua, §3.2).
   diagonal "pendurada" ou um caminho que não bate mais com o gasto zerado.
 - **Teclado** (`useTokenMoveShortcuts`, `apps/web/src/lib`): setas/WASD movem o(s) token(s)
   selecionados (Shift = 5 células, snap ao grid — 70 px sem snap com grid `"none"`), só com token
-  selecionado e fora de campo de texto. `canMoveNow` (`store/combat.ts`) espelha `checkMovement` do
+  selecionado e fora de campo de texto — diferente do arraste, que move um token que a pessoa
+  controla mesmo sem selecionar primeiro (`VttCanvas#handleTokenDragStart`); apertar seta/WASD sem
+  nada selecionado mostra o toast "Selecione um token para mover com o teclado" (um por tecla
+  segurada, via o mesmo `warnedRef` do aviso "Não é o seu turno") em vez de não fazer nada em
+  silêncio. `canMoveNow` (`store/combat.ts`) espelha `checkMovement` do
   servidor pra decidir quem pode mover AGORA — usada pelo hook do teclado, pelo `draggable` do
   token no canvas (não é o turno → nem começa a arrastar) e pelo preview de gasto; o servidor
   sempre decide de novo. Segurar a tecla é UM movimento, não N: cada passo aplica local e emite
