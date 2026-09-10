@@ -1223,11 +1223,21 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   };
 
   // --- Arraste em grupo: o token arrastado (líder) puxa os outros selecionados que eu controlo.
-  const handleTokenDragStart = (token: Token, node: Konva.Node) => {
+  const handleTokenDragStart = (token: Token, node: Konva.Node, additive: boolean) => {
     setConditionTooltip(null); // arrastando não há hover; senão o balão fica pendurado
     const leaderOrigin = { x: token.x, y: token.y };
-    if (!selectedIds.includes(token.id) || selectedIds.length < 2) {
-      // Token só (sem grupo): ainda guarda leaderOrigin, é o único dado que handleTokenDragEnd precisa.
+    if (!selectedIds.includes(token.id)) {
+      // Padrão Foundry: arrastar um token não selecionado já o seleciona (Shift entra na seleção
+      // atual, senão troca por só ele) — assim o teclado (setas/WASD, que só move o que está
+      // selecionado) já funciona logo depois de um arraste, sem precisar de um clique à parte antes
+      // (docs/fix-movimento-turno.md). O arraste em si continua só deste token: os outros da seleção
+      // (se entrou com Shift numa seleção que já tinha alguém) só se movem juntos no PRÓXIMO arraste.
+      selectByClick(token.id, additive);
+      groupDragRef.current = { leader: { x: node.x(), y: node.y() }, leaderOrigin, others: [] };
+      return;
+    }
+    if (selectedIds.length < 2) {
+      // Token só, já selecionado: ainda guarda leaderOrigin, é o único dado que handleTokenDragEnd precisa.
       groupDragRef.current = { leader: { x: node.x(), y: node.y() }, leaderOrigin, others: [] };
       return;
     }
@@ -1394,7 +1404,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       isActiveTurn={token.id === activeTurnTokenId}
       onSelect={(additive) => selectByClick(token.id, additive)}
       onCursor={setCursor}
-      onDragStart={(node) => handleTokenDragStart(token, node)}
+      onDragStart={(node, additive) => handleTokenDragStart(token, node, additive)}
       onDragMove={(node) => handleTokenDragMove(token, node)}
       onDragEnd={(node) => handleTokenDragEnd(token, node)}
       onTransformEnd={(node) => {
@@ -1720,7 +1730,8 @@ interface TokenNodeProps {
   onSelect: (additive: boolean) => void;
   /** Cursor durante o arraste (fora dele o Stage decide por geometria). */
   onCursor: (cursor: string) => void;
-  onDragStart: (node: Konva.Node) => void;
+  /** additive = Shift pressionado no início do arraste (mesmo sentido de onSelect). */
+  onDragStart: (node: Konva.Node, additive: boolean) => void;
   onDragMove: (node: Konva.Node) => void;
   onDragEnd: (node: Konva.Node) => void;
   onTransformEnd: (node: Konva.Node) => void;
@@ -1768,7 +1779,7 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, comba
       onDragStart={(e) => {
         e.cancelBubble = true;
         onCursor("grabbing");
-        onDragStart(e.target);
+        onDragStart(e.target, e.evt.shiftKey);
       }}
       onDragMove={(e) => onDragMove(e.target)}
       onDragEnd={(e) => {

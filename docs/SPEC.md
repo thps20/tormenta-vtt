@@ -27,7 +27,12 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 
 ### 3.1 Sala e convite
 - `POST /api/rooms { name, nickname }` → cria sala, cria participante GM, devolve `{ room, gmSecret, sessionToken }`.
-- URL do GM: `/room/<inviteCode>?gm=<gmSecret>` — URL do jogador: `/room/<inviteCode>`.
+- URL do GM: `/room/<inviteCode>?gm=<gmSecret>` — URL do jogador: `/room/<inviteCode>`. Qualquer uma
+  aceita também `&session=<sessionToken>` (`lib/router.ts#consumeSessionParam`): grava o token no
+  `localStorage` (mesma chave de sempre, por papel — "gm" se `?gm=` também estiver na URL, senão
+  "player") e some da URL sozinho ao carregar (`history.replaceState`, sem recarregar), pra
+  reconectar como um participante específico por um link só, sem precisar que ele já tenha entrado
+  antes nesse navegador. Uso principal: `make seed-test` (`docs/testar-com-amigos.md`).
 - Ao abrir a URL, o cliente pede nickname (se não houver `sessionToken` salvo) e emite `room:join`.
 - Servidor responde com `RoomSnapshot` (estado completo, inclui `sessionToken`) e faz broadcast de `room:participantJoined`.
 - Ao desconectar, o servidor faz broadcast de `room:participantLeft { id }`; o participante **continua** na lista com `connected = false` (jogadores online = `connected = true`).
@@ -40,7 +45,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Painel de grid: tipo (`square`/`none`), `cellSize` (px), `offsetX/Y`, cor, snap. Emite `scene:updateGrid`.
 - O canvas (react-konva) desenha: imagem do mapa → linhas do grid → tokens → réguas/caixa de seleção. Pan no modo "Mover mapa" (ou espaço segurado); zoom com scroll e botões +/−/ajustar.
 - **Barra de ferramentas** (coluna à esquerda do canvas, um modo por vez, estado em `store/tools.ts`, atalhos em `lib/useToolShortcuts.ts`):
-  - **Selecionar (V)**: clicar num token só seleciona (mantém o TokenInspector aberto, não abre ficha); duplo clique abre a ficha vinculada, se houver e o usuário puder vê-la (token sem ficha: duplo clique não faz nada além de selecionar); botão direito sempre abre o menu de condições (§3.3), mesmo em token com ficha — padrão Foundry. Arrastar no mapa vazio desenha uma caixa que seleciona os tokens com o centro dentro dela; shift+clique entra/sai da seleção; arrastar um token selecionado move todos os selecionados que o usuário controla. O Stage não faz pan. Duplo clique é detectado por geometria (dois `mousedown` no mesmo token dentro de ~300 ms), não pelo `dblclick` nativo do Konva — mesmo motivo do hit de token/badge de condição (`docs/debug-condicoes.md`): o canvas de hit do Konva é embaralhado por proteção anti-fingerprinting.
+  - **Selecionar (V)**: clicar num token só seleciona (mantém o TokenInspector aberto, não abre ficha); duplo clique abre a ficha vinculada, se houver e o usuário puder vê-la (token sem ficha: duplo clique não faz nada além de selecionar); botão direito sempre abre o menu de condições (§3.3), mesmo em token com ficha — padrão Foundry. Arrastar no mapa vazio desenha uma caixa que seleciona os tokens com o centro dentro dela; shift+clique entra/sai da seleção; arrastar um token selecionado move todos os selecionados que o usuário controla. Arrastar um token que NÃO está selecionado já o seleciona no ato — padrão Foundry, `docs/fix-movimento-turno.md` — trocando a seleção por só ele (shift+arrastar entra na seleção atual em vez de trocar, mesma regra do shift+clique); o arraste em si sempre move só o token agarrado, os outros da seleção entram no próximo arraste. O Stage não faz pan. Duplo clique é detectado por geometria (dois `mousedown` no mesmo token dentro de ~300 ms), não pelo `dblclick` nativo do Konva — mesmo motivo do hit de token/badge de condição (`docs/debug-condicoes.md`): o canvas de hit do Konva é embaralhado por proteção anti-fingerprinting.
   - **Mover mapa (H)**: arrastar em qualquer lugar faz pan; tokens não respondem. Barra de espaço segurada ativa este modo temporariamente.
   - **Régua (R)**: clicar e arrastar mede do ponto inicial ao ponteiro (pontos grudam no centro da célula quando há grid e snap). A distância usa `grid` do `SystemDefinition` (`cellSize` na unidade do jogo, `unit`, regra de diagonais `euclidean | manhattan | alternating | chebyshev`; `rules/measure.ts` faz a conta) e o `cellSize` em px da cena. A régua é enviada por `ruler:update` (efêmero) e os outros a veem com o nickname do autor; some ao soltar.
   - **Névoa (F, só GM)**: fog of war manual, descrita em §9.3. Desenho: botão reservado (desabilitado), fora do MVP.
@@ -868,11 +873,11 @@ sempre em linha reta entre os pontos do caminho, como a régua, §3.2).
   diagonal "pendurada" ou um caminho que não bate mais com o gasto zerado.
 - **Teclado** (`useTokenMoveShortcuts`, `apps/web/src/lib`): setas/WASD movem o(s) token(s)
   selecionados (Shift = 5 células, snap ao grid — 70 px sem snap com grid `"none"`), só com token
-  selecionado e fora de campo de texto — diferente do arraste, que move um token que a pessoa
-  controla mesmo sem selecionar primeiro (`VttCanvas#handleTokenDragStart`); apertar seta/WASD sem
-  nada selecionado mostra o toast "Selecione um token para mover com o teclado" (um por tecla
-  segurada, via o mesmo `warnedRef` do aviso "Não é o seu turno") em vez de não fazer nada em
-  silêncio. `canMoveNow` (`store/combat.ts`) espelha `checkMovement` do
+  selecionado e fora de campo de texto — arrastar um token seleciona sozinho (§3.2), então na
+  prática só falta seleção se ninguém clicou nem arrastou nada ainda; apertar seta/WASD nesse caso
+  mostra o toast "Selecione um token para mover com o teclado" (um por tecla segurada, via o mesmo
+  `warnedRef` do aviso "Não é o seu turno") em vez de não fazer nada em silêncio
+  (`docs/fix-movimento-turno.md`). `canMoveNow` (`store/combat.ts`) espelha `checkMovement` do
   servidor pra decidir quem pode mover AGORA — usada pelo hook do teclado, pelo `draggable` do
   token no canvas (não é o turno → nem começa a arrastar) e pelo preview de gasto; o servidor
   sempre decide de novo. Segurar a tecla é UM movimento, não N: cada passo aplica local e emite

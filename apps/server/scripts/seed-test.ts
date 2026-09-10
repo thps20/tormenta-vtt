@@ -369,26 +369,18 @@ Handouts: "Retrato do vilão" (imagem, fixado na Taverna) · "Bilhete rasgado" (
 Combate: não iniciado.
 
 --- Mestre --------------------------------------------------------------
-Abra direto (o link com "?gm=" já loga como "${mestre.nickname}", sem pedir nickname):
-  ${webUrl}/room/${INVITE_CODE}?gm=${GM_SECRET}
+Abra direto — "?gm=" já loga como "${mestre.nickname}"; "?session=" reconecta pelo sessionToken
+fixo (some da URL sozinho ao carregar, ver docs/testar-com-amigos.md):
+  ${webUrl}/room/${INVITE_CODE}?gm=${GM_SECRET}&session=${GM_SESSION_TOKEN}
 
 --- Ana (jogadora, dona da ficha da Kael) ---------------------------------
-O app não aceita sessionToken pela URL (só existe suporte a "?gm=" para o Mestre — ver
-apps/web/src/lib/session.ts). Para abrir já reconectada como "${ana.nickname}" (em vez de criar
-uma jogadora nova, que NÃO seria dona dos tokens da Kael), cole isto no console do navegador
-(F12) antes de carregar a página:
+Abra direto — reconecta como "${ana.nickname}" pelo sessionToken fixo, sem pedir nickname nem
+criar uma jogadora nova (que não seria dona dos tokens da Kael):
+  ${webUrl}/room/${INVITE_CODE}?session=${ANA_SESSION_TOKEN}
 
-  localStorage.setItem("tvtt:session:${INVITE_CODE}:player", "${ANA_SESSION_TOKEN}");
-
-Depois abra (ou recarregue):
-  ${webUrl}/room/${INVITE_CODE}
-
-Sem isso, o link puro pede um nickname e cria uma participante nova — funciona para testar,
-só não é a mesma "Ana" que já possui a Kael.
-
---- Fallback (sem tocar no navegador) -------------------------------------
+--- Fallback (sem tocar na URL) --------------------------------------------
 Código de convite: ${INVITE_CODE}
-Nickname da jogadora: Ana (entrar pelo link sem "?gm=" e digitar "Ana" no prompt)
+Nickname da jogadora: Ana (entrar pelo link sem "?gm=" nem "?session=" e digitar "Ana" no prompt)
 `);
 }
 

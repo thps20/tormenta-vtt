@@ -146,13 +146,17 @@ inicial. Nenhuma outra sala é tocada.
 
 ### Abrindo como Mestre ou como Ana
 
-O script termina imprimindo os links prontos. O do **Mestre** funciona direto — a URL com
-`?gm=<segredo>` já reconecta como "Mestre" sem pedir nickname (é o único jeito de pular a tela de
-nickname que o app já tem hoje: não existe suporte a passar `sessionToken` pela URL/cookie, só
-`gmSecret`).
+O script termina imprimindo os links prontos — os dois já entram direto, sem pedir nickname:
 
-Para abrir como **Ana** (dona da Kael) sem criar uma jogadora nova, é preciso colar o
-`sessionToken` dela no `localStorage` do navegador (console do DevTools, F12) antes de carregar a
-página — o script imprime o comando pronto (`localStorage.setItem("tvtt:session:TESTE1:player",
-"...")`). Sem isso, abrir o link puro (`/room/TESTE1`) funciona, mas cria uma jogadora "Ana"
-diferente, que não é dona dos tokens da Kael.
+- **Mestre**: a URL com `?gm=<segredo>` já reconecta como "Mestre".
+- **Ana** (dona da Kael): a URL com `?session=<token>` reconecta pelo `sessionToken` fixo dela.
+
+`?session=<token>` (`apps/web/src/lib/router.ts#consumeSessionParam`) grava o token no
+`localStorage` (mesma chave de sempre, `tvtt:session:<código>:<gm|player>` — o papel é "gm" se a
+URL também tiver `?gm=`, senão "player") e some da URL sozinho assim que a página carrega
+(`history.replaceState`, sem recarregar) — não fica pendurado se alguém copiar o link depois.
+Funciona pra qualquer sala, não só a de teste; o próprio `join` (`store/room.ts`) não mudou nada,
+só passou a encontrar o token já salvo.
+
+Sem `?session=`, abrir o link puro (`/room/TESTE1`) também funciona, mas pede nickname e cria uma
+jogadora nova — que não é dona dos tokens da Kael.

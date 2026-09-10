@@ -111,10 +111,10 @@ export function useTokenMoveShortcuts(): void {
 
       const { selectedIds, byId: tokensById } = useTokens.getState();
       if (selectedIds.length === 0) {
-        // WASD só age com token selecionado — diferente do arraste, que move um token que você
-        // controla mesmo sem selecionar primeiro (VttCanvas#handleTokenDragStart). Sem o aviso,
-        // apertar seta com nada selecionado não fazia NADA (nem toast, nem erro): parecia "o
-        // teclado não funciona" quando na verdade faltava clicar no token primeiro.
+        // WASD só age com token selecionado. Arrastar já seleciona sozinho (VttCanvas
+        // #handleTokenDragStart, padrão Foundry), então isto só dispara sem NENHUMA interação antes
+        // (ninguém clicou nem arrastou nada ainda). Sem o aviso, a tecla não fazia nada em silêncio
+        // — parecia "o teclado não funciona" (docs/fix-movimento-turno.md).
         if (!warnedRef.current) {
           toast("Selecione um token para mover com o teclado");
           warnedRef.current = true;
