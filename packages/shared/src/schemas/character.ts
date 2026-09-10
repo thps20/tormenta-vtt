@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { IdSchema } from "./common.js";
 import { KeySchema } from "./system.js";
+import { TemplateShapeSchema } from "./template.js";
 import { ModifierTargetSchema } from "../rules/modifierTarget.js";
 
 /**
@@ -88,6 +89,25 @@ export const ActionSchema = z.discriminatedUnion("kind", [
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 
+/**
+ * Área de um item ativo (docs/plano-gabaritos.md §6): forma reconhecida (a ferramenta "Área" do
+ * mapa consegue colocar sozinha) ou texto livre ("especial": vários alvos, ver descrição). `size`
+ * na unidade do `grid` do sistema (m em T20), igual ao tamanho da ferramenta/presets.
+ * `preprocess` migra o formato antigo (string solta) sem precisar de migration de banco: cards e
+ * fichas persistidos (`Character.data`/`ChatMessage.item`, ambos `Json`) continuam lendo certo —
+ * ver `ItemCardSchema.area` abaixo, que reusa este mesmo schema pelo mesmo motivo.
+ */
+export const TemplateAreaSchema = z.preprocess(
+  (v) => (typeof v === "string" ? (v.trim() ? { kind: "text", text: v.trim().slice(0, 200) } : null) : v),
+  z
+    .discriminatedUnion("kind", [
+      z.object({ kind: z.literal("shape"), shape: TemplateShapeSchema, size: z.number().positive() }),
+      z.object({ kind: z.literal("text"), text: z.string().max(200) }),
+    ])
+    .nullable(),
+);
+export type TemplateArea = z.infer<typeof TemplateAreaSchema>;
+
 /** Bloco de ativação (poderes, magias, consumíveis). Chaves vêm de system.activation. */
 export const ActivationSchema = z.object({
   /** Custo em pontos do recurso de ativação (PM em T20). */
@@ -96,7 +116,7 @@ export const ActivationSchema = z.object({
   duration: z.object({ units: z.string().max(40).default(""), value: z.number().min(0).default(0) }).default({}),
   range: z.object({ units: z.string().max(40).default(""), value: z.number().min(0).default(0) }).default({}),
   target: z.string().max(200).default(""),
-  area: z.string().max(200).default(""),
+  area: TemplateAreaSchema.default(null),
   effect: z.string().max(2000).default(""),
 });
 export type Activation = z.infer<typeof ActivationSchema>;
@@ -369,7 +389,9 @@ export const ItemCardSchema = z.object({
   range: z.string().max(60),
   duration: z.string().max(60),
   target: z.string().max(200),
-  area: z.string().max(200),
+  /** Estruturado (TemplateAreaSchema): cards antigos no banco tinham texto livre aqui — o mesmo
+   *  `preprocess` de `ActivationSchema.area` migra na leitura, sem precisar de migration de banco. */
+  area: TemplateAreaSchema,
   effect: z.string().max(2000),
   /** CD calculada (null quando o sistema não define saveDc). */
   save: z.object({ skillLabel: z.string().max(40), dc: z.number().int().nullable(), text: z.string().max(500) }).nullable(),

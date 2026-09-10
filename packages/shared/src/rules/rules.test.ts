@@ -350,7 +350,7 @@ describe("activation (poderes e magias)", () => {
       execution: "Padrão",
       range: "Médio (30 m)",
       duration: "Instantânea",
-      area: "esfera de 6 m",
+      area: { kind: "text", text: "esfera de 6 m" },
       effect: "6d6 de fogo",
       save: { skillLabel: "Reflexos", dc: 14, text: "metade" },
       actions: [{ id: "dmg", label: "Dano", kind: "damage" }],
@@ -630,13 +630,13 @@ describe("aprimoramentos (CD, cura, ataque e card)", () => {
 
   it("rangeSet, durationSet, areaSet, targetsAdd e text só mudam o card", () => {
     const card = use(["rng", 1], ["dur", 1], ["area", 1], ["tgt", 2], ["note", 1], ["atk", 1]).card;
-    expect(card).toMatchObject({ range: "Médio (30 m)", duration: "1 Dia", area: "esfera de 6 m de raio", target: "1 criatura, +2 alvos" });
+    expect(card).toMatchObject({ range: "Médio (30 m)", duration: "1 Dia", area: { kind: "text", text: "esfera de 6 m de raio" }, target: "1 criatura, +2 alvos" });
     expect(card.enhanced).toEqual(["range", "duration", "area", "target", "attack"]);
     expect(card.enhancements.find((e) => e.id === "note")).toMatchObject({ note: "Remove uma condição de fadiga do alvo." });
     expect(card.enhancements.find((e) => e.id === "rng")).not.toHaveProperty("note");
     expect(card.actions.find((a) => a.id === "dmg")).toMatchObject({ formula: "6d6", breakdown: null });
     // Sem escolha: como está no item.
-    expect(use().card).toMatchObject({ range: "Curto (9 m)", duration: "Cena", area: "", target: "1 criatura" });
+    expect(use().card).toMatchObject({ range: "Curto (9 m)", duration: "Cena", area: null, target: "1 criatura" });
     // Alvo vazio: só o extra. Um alvo: singular.
     expect(applyActivationEnhancements({ ...spell.activation!, target: "" }, sel(["tgt", 1])).target).toBe("+1 alvo");
     // Dois rangeSet: escolha inválida antes de cobrar.

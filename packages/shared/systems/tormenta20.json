@@ -358,7 +358,8 @@
       { "label": "Cone 9 m", "shape": "cone", "size": 9 },
       { "label": "Lufada: linha 9 m", "shape": "line", "size": 9 },
       { "label": "Muralha: quadrado 3 m", "shape": "square", "size": 3 }
-    ]
+    ],
+    "shapeLabels": { "circle": "Esfera", "cone": "Cone", "line": "Linha", "square": "Quadrado" }
   },
 
   "trainedBonus": [

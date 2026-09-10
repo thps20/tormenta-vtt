@@ -135,7 +135,7 @@ export function applyAttackEnhancements(baseFormula: string, selected: SelectedE
 export interface EnhancedActivation {
   range: Activation["range"];
   duration: Activation["duration"];
-  area: string;
+  area: Activation["area"];
   target: string;
   /** Soma à CD de resistência (dcAdd × vezes). */
   dcBonus: number;
@@ -184,7 +184,9 @@ export function applyActivationEnhancements(activation: Activation, selected: Se
   return {
     range: range ? { units: range.units, value: range.value ?? 0 } : activation.range,
     duration: duration ? { units: duration.units, value: duration.value ?? 0 } : activation.duration,
-    area: area ? area.text : activation.area,
+    // areaSet sempre sobrescreve com texto livre, mesmo quando o item tinha uma forma estruturada
+    // (o aprimoramento descreve a área nova por extenso — ex.: "muda a área para um cone de 18 m").
+    area: area ? { kind: "text" as const, text: area.text } : activation.area,
     target,
     dcBonus,
     attackBonus,

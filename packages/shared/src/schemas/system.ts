@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { collectPlaceholders } from "../rules/placeholders.js";
 import { ModifierTargetSchema } from "../rules/modifierTarget.js";
+import { TemplateShapeSchema } from "./template.js";
 
 /**
  * Definição de um sistema de RPG (schemaVersion 2).
@@ -369,7 +370,7 @@ export type CreatureDef = z.infer<typeof CreatureDefSchema>;
  */
 export const TemplatePresetSchema = z.object({
   label: z.string().min(1).max(60),
-  shape: z.enum(["circle", "cone", "line", "square"]),
+  shape: TemplateShapeSchema,
   size: z.number().positive(),
   angle: z.number().positive().max(180).optional(),
   width: z.number().positive().optional(),
@@ -387,6 +388,15 @@ export const TemplatesDefSchema = z.object({
   /** Largura padrão da linha/raio, na unidade do `grid`. Presets podem sobrescrever com `width`. */
   lineWidth: z.number().positive(),
   presets: z.array(TemplatePresetSchema).default([]),
+  /** Nome de cada forma na linguagem do sistema (T20 chama o círculo de "Esfera") — usado na barra
+   *  de ferramentas, no editor de item e no card do chat, pra não ter vocabulário hardcoded no
+   *  código (regra número 1) nem dois nomes divergentes pra mesma forma. */
+  shapeLabels: z.object({
+    circle: z.string().min(1).max(30),
+    cone: z.string().min(1).max(30),
+    line: z.string().min(1).max(30),
+    square: z.string().min(1).max(30),
+  }),
 });
 export type TemplatesDef = z.infer<typeof TemplatesDefSchema>;
 

@@ -22,6 +22,10 @@ const TemplateBaseSchema = z.object({
   label: z.string().max(60).default(""),
 });
 
+/** As 4 formas, sem o resto do schema — fonte única pro `shape` de `Activation.area` (§6 do plano)
+ *  e pra qualquer outro lugar que só precise validar/tipar a forma sozinha. */
+export const TemplateShapeSchema = z.enum(["circle", "cone", "line", "square"]);
+
 export const TemplateSchema = z.discriminatedUnion("shape", [
   TemplateBaseSchema.extend({ shape: z.literal("circle"), r: z.number().positive() }),
   TemplateBaseSchema.extend({ shape: z.literal("cone"), length: z.number().positive(), angle: z.number().positive().max(180) }),
@@ -33,10 +37,20 @@ export type TemplateShape = Template["shape"];
 
 /**
  * `template:upsert`: cria (id novo) ou edita (mover/girar) um gabarito existente. `live` marca eco
- * de arraste/rotação em andamento (mesmo papel de `TokenPatch.live`) — não muda nada no servidor
- * hoje (não há histórico de gabarito), mas mantém o contrato simétrico ao de token.
+ * de arraste/rotação em andamento (mesmo papel de `TokenPatch.live`) — o servidor ignora o campo
+ * ao empilhar desfazer (só o commit final, sem `live`, vira entrada — docs/plano-gabaritos.md §4).
+ * `dragFrom`: x/y/rotation capturados no MOUSEDOWN do gesto (mover ou girar), só no patch final —
+ * os ecos `live` já escreveram o gabarito em memória durante o arraste, então o "antes" lido ali
+ * reflete só ~33ms atrás, não o início do gesto inteiro (mesmo motivo de `TokenPatch.dragFrom`,
+ * docs/plano-desfazer.md §3). Usado só pra montar o "antes" da entrada de desfazer; a escrita em si
+ * sempre usa `template` (a posição/rotação final).
  */
-export const TemplateUpsertSchema = z.object({ sceneId: IdSchema, template: TemplateSchema, live: z.boolean().optional() });
+export const TemplateUpsertSchema = z.object({
+  sceneId: IdSchema,
+  template: TemplateSchema,
+  live: z.boolean().optional(),
+  dragFrom: z.object({ x: z.number(), y: z.number(), rotation: z.number() }).optional(),
+});
 export type TemplateUpsertPayload = z.infer<typeof TemplateUpsertSchema>;
 
 export const TemplateRemoveSchema = z.object({ sceneId: IdSchema, templateId: IdSchema });

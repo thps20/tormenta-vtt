@@ -140,7 +140,7 @@ export function buildItemCard(
   };
   const kind = def.itemKinds.find((k) => k.key === item.kind);
   const costResource = def.activation.resource ? def.resources.find((r) => r.key === def.activation.resource) : undefined;
-  const activation = item.activation ?? { cost: 0, execution: "", duration: { units: "", value: 0 }, range: { units: "", value: 0 }, target: "", area: "", effect: "" };
+  const activation = item.activation ?? { cost: 0, execution: "", duration: { units: "", value: 0 }, range: { units: "", value: 0 }, target: "", area: null, effect: "" };
   // Efeitos que só mudam o que o card exibe (alcance, duração, área, alvo) e a CD.
   const enhancedActivation = applyActivationEnhancements(activation, selected);
   const described = describeActivation(def, { ...activation, range: enhancedActivation.range, duration: enhancedActivation.duration });

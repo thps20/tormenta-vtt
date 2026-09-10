@@ -1,5 +1,6 @@
 import type { Template } from "../schemas/template.js";
-import type { TemplatesDef } from "../schemas/system.js";
+import type { SystemDefinition, TemplatesDef } from "../schemas/system.js";
+import type { Activation } from "../schemas/character.js";
 
 /**
  * Gabaritos de área de efeito (docs/plano-gabaritos.md). Geometria pura, em pixels do mapa —
@@ -126,7 +127,9 @@ const SHAPE_WORDS: Record<string, Template["shape"]> = {
  */
 export function parseAreaText(text: string): ParsedArea | null {
   const norm = normalize(text);
-  const match = norm.match(/\b([a-z]+)\s+de\s+(\d+(?:[.,]\d+)?)\s*m\b/);
+  // "<forma> de N m" ("esfera de 6 m") ou "<forma> com N m" ("esfera com 6m de raio" — o "de raio"
+  // sobra depois do match e é ignorado, mesma lógica de sempre: casa o começo, nunca infere o resto).
+  const match = norm.match(/\b([a-z]+)\s+(?:de|com)\s+(\d+(?:[.,]\d+)?)\s*m\b/);
   if (!match) return null;
   const [, word, sizeText] = match;
   const shape = SHAPE_WORDS[word ?? ""];
@@ -144,4 +147,31 @@ export function presetConeAngle(def: TemplatesDef, angle: number | undefined): n
 /** Largura da linha (unidade do grid) — do preset, se declarado, senão o padrão do sistema. */
 export function presetLineWidth(def: TemplatesDef, width: number | undefined): number {
   return width ?? def.lineWidth;
+}
+
+/**
+ * Rótulo legível de `Activation.area` ("Esfera 6 m" ou o texto livre) — card do chat, preview do
+ * compêndio, ficha rápida (docs/plano-gabaritos.md §6). `null` sem área. Sem `def.templates` (o
+ * sistema não declara a ferramenta, ou o dado foi importado antes de existir) cai no nome cru da
+ * forma em vez de travar — só um item já existente ficando um pouco menos bonito, não um erro.
+ */
+export function formatArea(def: Pick<SystemDefinition, "templates" | "grid">, area: Activation["area"]): string | null {
+  if (!area) return null;
+  if (area.kind === "text") return area.text;
+  const label = def.templates?.shapeLabels[area.shape] ?? area.shape;
+  const unit = def.grid?.unit;
+  return unit ? `${label} ${area.size} ${unit}` : `${label} ${area.size}`;
+}
+
+export type TemplateChangeAction = "colocar" | "mover" | "girar" | "apagar";
+
+/**
+ * "colocar área (cone 9 m)" — resumo de uma entrada de desfazer/refazer de gabarito, pro toast
+ * (docs/plano-gabaritos.md §4). `areaLabel` já pronto (forma + tamanho): quem chama monta com o
+ * rótulo do sistema e o tamanho convertido pra unidade dele — servidor (`services/history.ts`, a
+ * partir de pixels + o grid do mapa) e cliente (`store/templateHistory.ts`, que já tem o tamanho em
+ * metros da UI) convertem cada um do seu jeito, o texto final é o mesmo.
+ */
+export function describeTemplateChange(action: TemplateChangeAction, areaLabel: string): string {
+  return `${action} área (${areaLabel})`;
 }
