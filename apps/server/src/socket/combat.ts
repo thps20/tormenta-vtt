@@ -8,6 +8,8 @@ import {
   CombatRollSchema,
   CombatSceneSchema,
   CombatSetInitiativeSchema,
+  CombatSetMovementLimitSchema,
+  CombatSetMovementSchema,
   CombatSetSurprisedSchema,
   CombatStartSchema,
   advanceTurn,
@@ -34,10 +36,12 @@ import {
   type Viewer,
 } from "../services/combat.js";
 import { requireSystem } from "../services/characters.js";
+import { resolveBudget, startTurnMovement, startTurnMovementIfChanged } from "../services/movement.js";
+import { isMovementLimitEnabled, setMovementLimitEnabled } from "../services/movementLimit.js";
 import { createInitiativeBatchRoll, createRollMessage } from "../services/rolls.js";
 import { guarded, HandlerError } from "./ack.js";
 import { requireScene } from "./scene.js";
-import { type TypedServer, type TypedSocket } from "./types.js";
+import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
 function viewerOf(ctx: { role: "gm" | "player"; participantId: string }): Viewer {
   return { role: ctx.role, participantId: ctx.participantId };
@@ -134,6 +138,7 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
         await prisma.combatant.deleteMany({ where: { id: { in: combatantIds }, combatId: combat.id } });
         await prisma.combat.update({ where: { id: combat.id }, data: { activeCombatantId: nextState.activeCombatantId, round: nextState.round } });
         await persistNormalizedOrder(combat.combatants.filter((c) => !removed.has(c.id)));
+        await startTurnMovementIfChanged(def, combat.activeCombatantId, nextState.activeCombatantId);
         return sendCombat(io, ctx.roomId, sceneId, viewerOf(ctx));
       },
       { gmOnly: true },
@@ -269,6 +274,8 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
         if (nextRound > combat.round) {
           await expireConditionsOnRoundChange(io, ctx.roomId, combat.sceneId, def, ctx.participantId, nextRound);
         }
+        // Novo combatente da vez: orçamento de deslocamento zera e ancora na posição atual dele.
+        await startTurnMovementIfChanged(def, combat.activeCombatantId, state.activeCombatantId);
         return sendCombat(io, ctx.roomId, sceneId, viewerOf(ctx));
       },
       { gmOnly: true },
@@ -290,6 +297,7 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
         const sorted = sortCombatants(def, combat.combatants);
         const state = advanceTurn(def, sorted, { activeCombatantId: combat.activeCombatantId, round: combat.round }, -1);
         await prisma.combat.update({ where: { id: combat.id }, data: { activeCombatantId: state.activeCombatantId, round: state.round } });
+        await startTurnMovementIfChanged(def, combat.activeCombatantId, state.activeCombatantId);
         return sendCombat(io, ctx.roomId, sceneId, viewerOf(ctx));
       },
       { gmOnly: true },
@@ -334,6 +342,7 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
       const sorted = sortCombatants(def, updated);
       const state = advanceTurn(def, sorted, { activeCombatantId: combatantId, round: combat.round }, 1);
       await prisma.combat.update({ where: { id: combat.id }, data: { activeCombatantId: state.activeCombatantId, round: state.round } });
+      await startTurnMovementIfChanged(def, combatantId, state.activeCombatantId);
       return sendCombat(io, ctx.roomId, sceneId, viewerOf(ctx));
     }),
   );
@@ -348,6 +357,7 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
       if (!combat.activeCombatantId) throw new HandlerError("Não há ninguém agindo agora");
       const character = await linkedCharacter(row.token);
       if (!canControlCombatant(viewerOf(ctx), row.token, character)) throw new HandlerError("Você não controla este combatente");
+      const def = await requireSystem(ctx.roomId);
 
       const reordered = resumePlacement(combat.combatants, combat.activeCombatantId, combatantId);
       await Promise.all(
@@ -362,6 +372,9 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
         ),
       );
       await prisma.combat.update({ where: { id: combat.id }, data: { activeCombatantId: combatantId } });
+      // "Entra agora" começa a agir imediatamente: orçamento de deslocamento dele zera aqui, não
+      // espera o próximo combat:next (é o próprio turno dele, interrompendo quem tava na vez).
+      await startTurnMovement(def, combatantId);
       return sendCombat(io, ctx.roomId, sceneId, viewerOf(ctx));
     }),
   );
@@ -382,6 +395,50 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
           await prisma.combat.update({ where: { id: combat.id }, data: { status: "ended", activeCombatantId: null } });
         }
         await sendCombat(io, ctx.roomId, sceneId, viewerOf(ctx));
+      },
+      { gmOnly: true },
+    ),
+  );
+
+  // Orçamento de deslocamento por turno (docs/plano-movimento.md §4.3).
+  socket.on(
+    "combat:set-movement",
+    guarded(
+      socket,
+      CombatSetMovementSchema,
+      async ({ sceneId, combatantId, budget, used }, ctx) => {
+        const combat = await requireCombat(sceneId, ctx.roomId);
+        const row = await requireCombatant(combat, combatantId);
+        const def = await requireSystem(ctx.roomId);
+
+        const data: { movementBudget?: number; movementUsed?: number; movementDiagonals?: number; movementAnchorX?: number; movementAnchorY?: number; movementPath?: { x: number; y: number }[] } = {};
+        // budget === null: "voltar a seguir a ficha" — recalcula do zero (override → ficha → default).
+        if (budget !== undefined) data.movementBudget = budget === null ? await resolveBudget(def, row.token) : budget;
+        // Zerar o gasto (botão do painel) também reinicia a âncora/caminho: não sobra diagonal
+        // "pendurada" nem um caminho desenhado que já não bate com o gasto zerado.
+        if (used !== undefined) {
+          data.movementUsed = used;
+          data.movementDiagonals = 0;
+          data.movementAnchorX = row.token.x;
+          data.movementAnchorY = row.token.y;
+          data.movementPath = [{ x: row.token.x, y: row.token.y }];
+        }
+        if (Object.keys(data).length > 0) await prisma.combatant.update({ where: { id: combatantId }, data });
+        return sendCombat(io, ctx.roomId, sceneId, viewerOf(ctx));
+      },
+      { gmOnly: true },
+    ),
+  );
+
+  socket.on(
+    "combat:set-movement-limit",
+    guarded(
+      socket,
+      CombatSetMovementLimitSchema,
+      async ({ enabled }, ctx) => {
+        setMovementLimitEnabled(ctx.roomId, enabled);
+        io.to(rooms.all(ctx.roomId)).emit("combat:movementLimitChanged", { enabled });
+        return { enabled };
       },
       { gmOnly: true },
     ),

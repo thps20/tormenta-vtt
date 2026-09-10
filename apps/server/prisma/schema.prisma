@@ -218,6 +218,22 @@ model Combatant {
   /// Rodada em que entrou (reforço). 0 = entrou junto com combat:start.
   addedRound         Int     @default(0)
 
+  /// Orçamento de deslocamento do turno, na unidade do grid (docs/plano-movimento.md). Resolvido e
+  /// gravado quando o combatente vira o da vez (services/movement.ts#startTurnMovement); null =
+  /// ainda não teve turno, ou o sistema não declara `movement`.
+  movementBudget    Float?
+  /// Gasto acumulado no turno (mesma unidade) e diagonais já contadas (regra 1-2-1), zerados a
+  /// cada troca de turno.
+  movementUsed      Float   @default(0)
+  movementDiagonals Int     @default(0)
+  /// Posição (pixels do mapa) de onde o PRÓXIMO movimento é medido: início do turno, ou fim do
+  /// último movimento confirmado (D2 do plano — nunca a posição "ao vivo" de um arraste em curso).
+  movementAnchorX   Float?
+  movementAnchorY   Float?
+  /// Caminho percorrido no turno: [{x,y}] em pixels do mapa, no máximo MOVEMENT_PATH_MAX pontos
+  /// (services/movement.ts). null/ausente = turno ainda não começou.
+  movementPath      Json?
+
   combat Combat @relation(fields: [combatId], references: [id], onDelete: Cascade)
   token  Token  @relation(fields: [tokenId], references: [id], onDelete: Cascade)
 

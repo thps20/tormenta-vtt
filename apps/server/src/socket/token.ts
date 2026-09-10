@@ -31,6 +31,7 @@ import {
 import { checkApplyDamageTarget } from "../services/applyDamage.js";
 import { emitCombat, loadCombatRow, maybeReemitCombatForToken, prepareTokenRemovalFromCombat } from "../services/combat.js";
 import { emitChatMessage, messageVisibleTo } from "../services/chatVisibility.js";
+import { checkMovement } from "../services/movement.js";
 import {
   describeDelete,
   describeTokenChange,
@@ -112,11 +113,15 @@ async function applyTokenUpdate(io: TypedServer, ctx: Ctx, patch: TokenPatch): P
     const owner = await prisma.participant.findUnique({ where: { id: fields.ownerId } });
     if (!owner || owner.roomId !== ctx.roomId) throw new HandlerError("Dono inválido");
   }
+  const def = await requireSystem(ctx.roomId);
   if (fields.conditions) {
-    const def = await requireSystem(ctx.roomId);
     const known = new Set(def.conditions.map((c) => c.key));
     if (fields.conditions.some((c) => !known.has(c.key))) throw new HandlerError("Condição inexistente no sistema da sala");
   }
+  // Orçamento de deslocamento (docs/plano-movimento.md): valida ANTES de gravar — roda inclusive
+  // nos ecos "ao vivo" do arraste (D2, dá feedback rápido de "não cabe"); só commit() abaixo,
+  // chamado só no patch final (sem live), persiste o gasto e avança a âncora.
+  const movement = await checkMovement(io, def, ctx, row, patch);
   const updatedRow = await prisma.token.update({ where: { id }, data: { ...fields, ...(hp !== undefined ? { hp: hpJson(hp) } : {}) } });
   const token = toToken(updatedRow);
   const fog = toScene(row.scene).fog;
@@ -126,6 +131,7 @@ async function applyTokenUpdate(io: TypedServer, ctx: Ctx, patch: TokenPatch): P
   // Nome/cor/visível mudaram, ou a posição cruzou a névoa: se este token é um combatente,
   // a lista de combate (e quem pode vê-la) pode ter mudado junto.
   await maybeReemitCombatForToken(io, ctx.roomId, before, token, fog);
+  if (!patch.live) await movement?.commit();
   const historyBefore = dragFrom ? { ...before, x: dragFrom.x, y: dragFrom.y } : before;
   return { before, after: token, historyBefore };
 }

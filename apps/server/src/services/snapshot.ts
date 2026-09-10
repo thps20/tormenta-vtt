@@ -9,6 +9,7 @@ import { tokenVisibleTo } from "./visibility.js";
 import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, tokenGateOk, whisperGateOk } from "./chatVisibility.js";
 import { listTemplates } from "./templates.js";
 import { handoutPinVisibleTo, toHandoutPin } from "./handouts.js";
+import { isMovementLimitEnabled } from "./movementLimit.js";
 
 const CHAT_HISTORY_LIMIT = 100;
 
@@ -81,5 +82,6 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
         : [];
     }),
     characters: characters.map(toCharacter).filter((c) => characterVisibleTo(c, me.role)),
+    movementLimitEnabled: isMovementLimitEnabled(room.id),
   };
 }

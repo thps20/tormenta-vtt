@@ -31,6 +31,7 @@ import { HandlerError } from "../socket/ack.js";
 import { rooms, type TypedServer } from "../socket/types.js";
 import { toCharacter } from "./characters.js";
 import { emitChatMessage } from "./chatVisibility.js";
+import { startTurnMovementIfChanged } from "./movement.js";
 import { toChatMessage, toScene, toToken } from "./serialize.js";
 import { canAccessScene, emitTokenToPlayers, isActiveScene, tokenVisibleTo } from "./visibility.js";
 
@@ -108,6 +109,8 @@ export function toCombat(row: CombatRow, def: SystemDefinition, viewer: Viewer, 
   const combatants: Combatant[] = visible.map((cr) => {
     const mine = !isGm && cr.token.ownerId === viewer.participantId;
     const showValue = isGm || (mine && cr.lastRollVisibility !== "gm");
+    const isActive = row.activeCombatantId === cr.id;
+    const path = Array.isArray(cr.movementPath) ? (cr.movementPath as { x: number; y: number }[]) : [];
     return {
       id: cr.id,
       tokenId: cr.tokenId,
@@ -122,6 +125,11 @@ export function toCombat(row: CombatRow, def: SystemDefinition, viewer: Viewer, 
       surprised: cr.surprised,
       order: cr.order,
       addedRound: cr.addedRound,
+      movementBudget: cr.movementBudget,
+      movementUsed: cr.movementUsed,
+      movementDiagonals: cr.movementDiagonals,
+      // Só do combatente da VEZ (D5): não inchar o payload dos demais com um caminho que ninguém desenha.
+      movementPath: isActive ? path : [],
     };
   });
   return { id: row.id, sceneId: row.sceneId, round: row.round, status: row.status as CombatStatus, activeCombatantId: row.activeCombatantId, combatants };
@@ -212,6 +220,8 @@ export async function prepareTokenRemovalFromCombat(def: SystemDefinition, comba
   );
   await prisma.combat.update({ where: { id: combat.id }, data: { activeCombatantId: nextState.activeCombatantId, round: nextState.round } });
   await persistNormalizedOrder(combat.combatants.filter((c) => c.id !== combatant.id));
+  // O ativo removido pode ter passado o turno pra outro: o orçamento dele começa do zero agora.
+  await startTurnMovementIfChanged(def, combat.activeCombatantId, nextState.activeCombatantId);
 }
 
 /**
@@ -231,6 +241,7 @@ export async function removeTokenFromSceneCombat(def: SystemDefinition, sceneId:
   await prisma.combatant.deleteMany({ where: { id: combatant.id } });
   await prisma.combat.update({ where: { id: combat.id }, data: { activeCombatantId: nextState.activeCombatantId, round: nextState.round } });
   await persistNormalizedOrder(combat.combatants.filter((c) => c.id !== combatant.id));
+  await startTurnMovementIfChanged(def, combat.activeCombatantId, nextState.activeCombatantId);
   return true;
 }
 
