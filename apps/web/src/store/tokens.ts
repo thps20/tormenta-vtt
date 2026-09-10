@@ -81,6 +81,22 @@ function applyPatchLocally(previous: Token, patch: TokenPatch): Token {
   return { ...previous, ...fields };
 }
 
+/**
+ * Alvo do revert quando o servidor recusa o patch final de um gesto (arraste ou rajada de
+ * teclado). `previous` é o valor ATUAL do store no momento da chamada — durante um gesto, já foi
+ * atualizado várias vezes por `moveLive` (ecos "ao vivo", sem ack: `flushMoves` não espera
+ * resposta, então um eco recusado no meio do gesto — ex.: o turno mudou de mão, ver
+ * docs/revisao-movimento.md — nunca é percebido pelo cliente). Se isso aconteceu, `previous` já
+ * está fora de sincronia com o que o servidor tem de verdade, e reverter pra ele deixaria o token
+ * "preso" numa posição que só existe localmente. `patch.dragFrom` (x/y de onde o gesto começou,
+ * mandado pelo drag de VttCanvas e pela rajada de teclado) é o ponto que o servidor CONFIRMOU por
+ * último antes do gesto — reverter pra ele é sempre seguro, mesmo com ecos ao vivo perdidos pelo
+ * caminho. Patches sem `dragFrom` (edição avulsa, não um gesto) continuam revertendo pra `previous`.
+ */
+function revertTarget(previous: Token, patch: TokenPatch): Token {
+  return patch.dragFrom ? { ...previous, x: patch.dragFrom.x, y: patch.dragFrom.y } : previous;
+}
+
 /** Seleção derivada: selectedId só vale com exatamente um token. */
 const selection = (ids: string[]) => ({ selectedIds: ids, selectedId: ids.length === 1 ? (ids[0] ?? null) : null });
 
@@ -148,8 +164,8 @@ export const useTokens = create<TokensState>((set, get) => ({
     // 2. ack
     const res = await emitAck("token:update", patch);
     if (!res.ok) {
-      // 3. reverte
-      set((s) => ({ byId: { ...s.byId, [patch.id]: previous } }));
+      // 3. reverte (pro início do gesto quando souber onde foi — ver revertTarget)
+      set((s) => ({ byId: { ...s.byId, [patch.id]: revertTarget(previous, patch) } }));
       toast(res.error);
       return false;
     }
@@ -176,10 +192,13 @@ export const useTokens = create<TokensState>((set, get) => ({
     // 2. ack
     const res = await emitAck("token:update-many", { patches });
     if (!res.ok) {
-      // 3. reverte todos
+      // 3. reverte todos (pro início do gesto quando souber onde foi — ver revertTarget)
       set((s) => {
         const byId = { ...s.byId };
-        for (const [id, t] of previous) if (t) byId[id] = t;
+        for (const patch of patches) {
+          const t = previous.get(patch.id);
+          if (t) byId[patch.id] = revertTarget(t, patch);
+        }
         return { byId };
       });
       toast(res.error);

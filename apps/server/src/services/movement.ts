@@ -79,6 +79,24 @@ export async function startTurnMovementIfChanged(def: SystemDefinition, before: 
   if (after && after !== before) await startTurnMovement(def, after);
 }
 
+/**
+ * `scene:updateGrid` pode REENCAIXAR o token do combatente da vez (cellSize/offset mudou, a
+ * geometria da cena mudou — `services/grid.ts#resnapToken`) sem passar por `token:update`, então
+ * `checkMovement` nunca vê esse pulo. Sem isto, a âncora ficaria apontando para um pixel que não
+ * existe mais no grid novo, e o cellSize novo mediria o próximo passo errado (bloqueio incorreto,
+ * ou o oposto — deixar passar um deslocamento grande demais). Só corrige DE ONDE o próximo passo é
+ * medido: `movementUsed`/`budget`/`path` não mudam (mesmo espírito de D4 — a correção vale só daqui
+ * pra frente, não reescreve o que já foi gasto). Não-combatente, ou combatente que não é o da vez:
+ * no-op (nada a corrigir; a âncora dele só importa quando ele estiver agindo).
+ */
+export async function reanchorActiveCombatant(sceneId: string, tokenId: string, x: number, y: number): Promise<void> {
+  const combat = await prisma.combat.findUnique({ where: { sceneId }, select: { id: true, activeCombatantId: true } });
+  if (!combat?.activeCombatantId) return;
+  const active = await prisma.combatant.findUnique({ where: { id: combat.activeCombatantId }, select: { tokenId: true } });
+  if (active?.tokenId !== tokenId) return;
+  await prisma.combatant.update({ where: { id: combat.activeCombatantId }, data: { movementAnchorX: x, movementAnchorY: y } });
+}
+
 export interface MovementCommit {
   /** Grava o gasto/âncora/caminho novos e reemite `combat:updated` do mapa. Chamar SÓ no patch
    *  final do gesto (sem `patch.live`) — ver docs/plano-movimento.md D2. */

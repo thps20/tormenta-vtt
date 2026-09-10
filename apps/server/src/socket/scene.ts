@@ -38,6 +38,7 @@ import { prisma } from "../db.js";
 import { requireSystem } from "../services/characters.js";
 import { emitCombat, loadCombatRow, removeTokenFromSceneCombat, toCombat } from "../services/combat.js";
 import { cellAt, cellRect, cellToPoint, effectiveCellSize, resnapToken } from "../services/grid.js";
+import { reanchorActiveCombatant } from "../services/movement.js";
 import { pushEntry, type HistoryEntry } from "../services/history.js";
 import { toScene, toToken } from "../services/serialize.js";
 import { clearTemplates, listTemplates } from "../services/templates.js";
@@ -565,6 +566,9 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
       for (const move of moves) {
         const updated = toToken(await prisma.token.update({ where: { id: move.tokenId }, data: move.after }));
         broadcastToken(io, ctx.roomId, updated, "token:updated", scene.fog);
+        // O token pulou de pixel sem passar por token:update (checkMovement nunca viu isto): se é o
+        // combatente da vez, a âncora do orçamento de deslocamento precisa acompanhar (docs/revisao-movimento.md).
+        await reanchorActiveCombatant(sceneId, move.tokenId, move.after.x, move.after.y);
       }
 
       // Reencaixar tokens não é trivial de desfazer à mão (diferente de só mudar cor/snap) —

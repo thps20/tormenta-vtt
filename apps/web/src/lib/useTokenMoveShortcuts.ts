@@ -86,7 +86,12 @@ export function useTokenMoveShortcuts(): void {
             toastedInsufficient = true;
           }
         }
-        return [{ id: t.id, x: dest.x, y: dest.y }];
+        // `t.x`/`t.y` = onde o token estava no INÍCIO da rajada (burstTokensRef guarda o snapshot
+        // de lá, nunca atualizado durante o gesto): se o patch final for recusado (ex.: o turno
+        // mudou de mão enquanto a tecla estava segurada), o revert do store volta pra cá — não pra
+        // onde o `moveLive` tinha deixado localmente, que pode já estar fora de sincronia com o
+        // servidor (os ecos ao vivo não têm ack, ver store/tokens.ts#revertTarget).
+        return [{ id: t.id, x: dest.x, y: dest.y, dragFrom: { x: t.x, y: t.y } }];
       });
       if (patches.length === 0) return;
       if (patches.length > 1) void patchMany(patches);
