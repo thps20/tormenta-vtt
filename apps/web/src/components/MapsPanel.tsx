@@ -1,4 +1,5 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Check,
   Copy,
@@ -54,6 +55,13 @@ function nextMapName(existing: string[]): string {
 }
 
 const COMBAT_DOT: Record<string, string> = { rolling: "bg-amber-400", active: "bg-emerald-400", ended: "bg-zinc-500" };
+
+/** Largura do menu ⋯ (w-48) — usada pra calcular a posição do portal. */
+const MENU_WIDTH = 192;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), Math.max(min, max));
+}
 
 /** Aba "Mapas" do painel lateral (docs/plano-mapas.md §13), só GM. */
 export const MapsPanel: React.FC<MapsPanelProps> = ({
@@ -153,6 +161,7 @@ export const MapsPanel: React.FC<MapsPanelProps> = ({
               onEnter={() => onEnter(scene.id)}
               onActivate={() => onActivateRequest(scene.id)}
               onToggleMenu={() => setOpenMenuId(openMenuId === scene.id ? null : scene.id)}
+              onCloseMenu={() => setOpenMenuId(null)}
               onDuplicate={() => {
                 onDuplicate(scene.id);
                 setOpenMenuId(null);
@@ -232,6 +241,7 @@ interface MapCardProps {
   onEnter: () => void;
   onActivate: () => void;
   onToggleMenu: () => void;
+  onCloseMenu: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onSetArrivalMode: () => void;
@@ -260,6 +270,7 @@ const MapCard: React.FC<MapCardProps> = ({
   onEnter,
   onActivate,
   onToggleMenu,
+  onCloseMenu,
   onDuplicate,
   onDelete,
   onSetArrivalMode,
@@ -270,6 +281,52 @@ const MapCard: React.FC<MapCardProps> = ({
   onDragEnd,
 }) => {
   const thumb = useThumbnail(scene);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // Posição do menu ⋯, calculada a partir do botão (portal em document.body — nunca preso ao
+  // overflow-y-auto da lista de mapas). `null` no 1º render: o menu ainda é medido fora da tela.
+  const [menuPos, setMenuPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
+
+  // Mede o menu já montado (fora da tela) e decide left/top ou left/bottom (vira pra cima
+  // quando não cabe abaixo do botão) — roda antes do paint, então não pisca na posição errada.
+  useLayoutEffect(() => {
+    if (!menuOpen) {
+      setMenuPos(null);
+      return;
+    }
+    const btn = menuBtnRef.current;
+    const menu = menuRef.current;
+    if (!btn || !menu) return;
+    const btnRect = btn.getBoundingClientRect();
+    const menuHeight = menu.offsetHeight;
+    const left = clamp(btnRect.right - MENU_WIDTH, 4, window.innerWidth - MENU_WIDTH - 4);
+    const spaceBelow = window.innerHeight - btnRect.bottom;
+    const openUp = spaceBelow < menuHeight + 8 && btnRect.top > menuHeight + 8;
+    setMenuPos(openUp ? { left, bottom: window.innerHeight - btnRect.top + 4 } : { left, top: btnRect.bottom + 4 });
+  }, [menuOpen]);
+
+  // Fecha em clique fora, Esc ou rolagem (a posição é fixa; rolar a lista destacaria o menu do
+  // botão) — mesmo padrão de RollModeButton.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuBtnRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      onCloseMenu();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseMenu();
+    };
+    const onScroll = () => onCloseMenu();
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [menuOpen, onCloseMenu]);
 
   return (
     <div
@@ -385,28 +442,41 @@ const MapCard: React.FC<MapCardProps> = ({
 
         <div className="relative mt-auto">
           <button
+            ref={menuBtnRef}
             id={`btn-map-menu-${scene.id}`}
             onClick={onToggleMenu}
             className="p-1 rounded text-zinc-500 hover:text-amber-300 hover:bg-[#2c2419] transition-colors cursor-pointer"
           >
             <MoreVertical className="w-3.5 h-3.5" />
           </button>
-          {menuOpen && (
-            <div
-              id={`menu-map-${scene.id}`}
-              className="absolute right-0 top-full mt-1 w-48 bg-[#1e1a15] border border-[#d4af37]/70 rounded shadow-2xl z-50 p-1 flex flex-col gap-0.5"
-            >
-              <MenuItem icon={Edit2} label="Renomear" onClick={onStartRename} />
-              <MenuItem icon={Copy} label="Duplicar" onClick={onDuplicate} />
-              {scene.arrival ? (
-                <MenuItem icon={X} label="Remover ponto de chegada" onClick={onClearArrival} />
-              ) : (
-                <MenuItem icon={FlagTriangleRight} label="Definir ponto de chegada" onClick={onSetArrivalMode} />
-              )}
-              <div className="h-px bg-[#2d2417] my-0.5" />
-              <MenuItem icon={Trash2} label="Apagar" danger onClick={onDelete} />
-            </div>
-          )}
+          {menuOpen &&
+            createPortal(
+              <div
+                id={`menu-map-${scene.id}`}
+                ref={menuRef}
+                role="menu"
+                style={{
+                  position: "fixed",
+                  left: menuPos?.left ?? -9999,
+                  top: menuPos?.top,
+                  bottom: menuPos?.bottom,
+                  width: MENU_WIDTH,
+                  visibility: menuPos ? "visible" : "hidden",
+                }}
+                className="z-50 bg-[#1e1a15] border border-[#d4af37]/70 rounded shadow-2xl p-1 flex flex-col gap-0.5"
+              >
+                <MenuItem icon={Edit2} label="Renomear" onClick={onStartRename} />
+                <MenuItem icon={Copy} label="Duplicar" onClick={onDuplicate} />
+                {scene.arrival ? (
+                  <MenuItem icon={X} label="Remover ponto de chegada" onClick={onClearArrival} />
+                ) : (
+                  <MenuItem icon={FlagTriangleRight} label="Definir ponto de chegada" onClick={onSetArrivalMode} />
+                )}
+                <div className="h-px bg-[#2d2417] my-0.5" />
+                <MenuItem icon={Trash2} label="Apagar" danger onClick={onDelete} />
+              </div>,
+              document.body,
+            )}
         </div>
       </div>
     </div>

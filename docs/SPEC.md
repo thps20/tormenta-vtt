@@ -528,6 +528,11 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   rodapé "+ Novo mapa"/"Novo por upload". Selecionar um mapa ou iniciar "Definir ponto de chegada"
   fecha o dropdown (o segundo precisa que o clique seguinte chegue ao canvas); as demais ações
   deixam o dropdown aberto. Jogador só vê o texto "Mapa: <nome do ativo>", sem botão nem dropdown.
+  O menu ⋯ de cada card (Renomear/Duplicar/ponto de chegada/Apagar) abre num portal em
+  `document.body` (posição `fixed`, calculada a partir do botão), nunca preso ao
+  `overflow-y-auto` da lista — com muitos mapas o card fica escondido por trás da rolagem sem
+  isso. Abre ancorado à direita do botão, embaixo por padrão e virado pra cima quando não há
+  espaço abaixo; fecha em clique fora, Esc ou rolagem da lista.
 - **Testes puros** (`packages/shared/src/rules/scenes.ts`, `scenes.test.ts`): ordenação
   (`orderScenes`, `nextSceneOrder`), `reorderScenes` (renumera, rejeita conjunto incompleto/
   repetido/estranho), `duplicateScene`/`duplicateSceneName`, `pickTokensToCarry` (pré-marcação),
