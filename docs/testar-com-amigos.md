@@ -107,3 +107,52 @@ Testado em 2026-09-06, tudo pela URL pública:
 **Erro ao baixar o `cloudflared`**
 : Apague `.tools/cloudflared` e rode `make tunnel` de novo. O download vem do GitHub
   releases da Cloudflare (`cloudflared-linux-amd64` ou `arm64`, conforme a máquina).
+
+## Cenário de teste
+
+`make seed-test` monta (ou remonta do zero) uma sala fixa chamada **"Mesa de Teste"**, direto no
+banco via Prisma (`apps/server/scripts/seed-test.ts`, rodado com `tsx`) — sem passar pelos eventos
+socket. Serve para não precisar recriar sala/mapa/fichas/tokens na mão toda vez que for testar uma
+mudança com alguém.
+
+```
+make up          # banco no ar
+make dev          # web + server, noutro terminal
+make seed-test    # monta a "Mesa de Teste"
+```
+
+**Idempotente**: a primeira coisa que o script faz é apagar a sala "Mesa de Teste" anterior (pelo
+nome) e recriar tudo do zero — pode rodar de novo a qualquer momento para voltar ao estado
+inicial. Nenhuma outra sala é tocada.
+
+### O que a sala tem
+
+- **Convite fixo**: código `TESTE1`, GM "Mestre" e jogadora "Ana", com `sessionToken` fixo cada um
+  (para reconectar sempre como o mesmo participante, em vez de criar um novo a cada teste).
+- **Três mapas**: "Taverna" (ativo, célula 70px, com uma imagem placeholder gerada na hora),
+  "Estrada" (célula 100px, ponto de chegada definido — para testar "Levar para o mapa") e "Cripta"
+  (névoa ligada, metade do mapa revelada).
+- **Duas fichas**: "Kael" (PC de Ana — Humano Guerreiro nível 3, com espada longa, arco curto e
+  couro batido equipados, um poder ativo e duas magias do compêndio, uma com área esfera e outra
+  com área cone) e "Thorin" (NPC do GM — Anão, para validar que o deslocamento por turno sai 6m em
+  vez do padrão 9m da raça humana, §9.11 do SPEC).
+- **Sete tokens na Taverna**: Kael, Thorin, três goblins do compêndio (um deles invisível, outro
+  sangrando), um Ogro grande (token 2×2 células) caído, e uma "Carroça" sem ficha (cenário, fora do
+  combate).
+- **Handouts**: uma imagem e um texto na biblioteca, com a imagem também fixada como um pino no
+  mapa da Taverna.
+- **Combate não iniciado** (para testar o fluxo de "Iniciar combate" do zero); PV/PM de Kael e
+  Thorin cheios (as criaturas do compêndio já vêm assim).
+
+### Abrindo como Mestre ou como Ana
+
+O script termina imprimindo os links prontos. O do **Mestre** funciona direto — a URL com
+`?gm=<segredo>` já reconecta como "Mestre" sem pedir nickname (é o único jeito de pular a tela de
+nickname que o app já tem hoje: não existe suporte a passar `sessionToken` pela URL/cookie, só
+`gmSecret`).
+
+Para abrir como **Ana** (dona da Kael) sem criar uma jogadora nova, é preciso colar o
+`sessionToken` dela no `localStorage` do navegador (console do DevTools, F12) antes de carregar a
+página — o script imprime o comando pronto (`localStorage.setItem("tvtt:session:TESTE1:player",
+"...")`). Sem isso, abrir o link puro (`/room/TESTE1`) funciona, mas cria uma jogadora "Ana"
+diferente, que não é dona dos tokens da Kael.

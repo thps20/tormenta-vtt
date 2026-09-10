@@ -7,7 +7,7 @@ SHELL := /bin/bash
 -include .env
 export
 
-.PHONY: help install up down logs dev build test typecheck db-migrate db-reset db-studio tunnel clean
+.PHONY: help install up down logs dev build test typecheck db-migrate db-reset db-studio seed-test tunnel clean
 
 help: ## Lista os comandos
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -47,6 +47,9 @@ db-reset: install ## Apaga e recria o banco a partir das migrations
 
 db-studio: install ## Abre o Prisma Studio (GUI do banco)
 	pnpm --filter @tormenta-vtt/server exec prisma studio
+
+seed-test: install ## Recria do zero a sala fixa "Mesa de Teste" (mapas/fichas/tokens prontos, ver docs/testar-com-amigos.md)
+	pnpm --filter @tormenta-vtt/server run seed:test
 
 # Túnel público (Cloudflare quick tunnel): sem conta, sem token, URL aleatória
 # *.trycloudflare.com que muda a cada execução. Expõe só o Vite (5173); o Vite

@@ -7,9 +7,10 @@
     "dev": "tsx watch --env-file=../../.env src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file=../../.env dist/index.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p scripts/tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "seed:test": "tsx --env-file=../../.env scripts/seed-test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.0",
