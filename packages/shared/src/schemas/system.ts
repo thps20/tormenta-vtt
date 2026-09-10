@@ -329,6 +329,34 @@ export const DiagonalRuleSchema = z.enum(["euclidean", "manhattan", "alternating
 export type DiagonalRule = z.infer<typeof DiagonalRuleSchema>;
 
 /**
+ * De onde vêm os placeholders "{race.<campo>}": um item ativo (tipicamente maxCount 1, ex.: "Raça")
+ * cujos campos NUMBER entram em fórmulas — hoje só `derived.movement` lê `{race.movement}` (docs/plano-movimento.md).
+ * Ausente = nenhuma fórmula pode usar "{race.*}". O código nunca sabe que a chave se chama "race":
+ * é só o NOME do placeholder (como "attr"/"equip"/"skill" já são); QUAL item kind alimenta ele vem
+ * daqui, do JSON.
+ */
+export const RaceDefSchema = z.object({
+  /** Chave em itemKinds[] cujos campos number viram "{race.<campo>}". */
+  kind: KeySchema,
+});
+export type RaceDef = z.infer<typeof RaceDefSchema>;
+
+/**
+ * Orçamento de deslocamento por turno com combate ativo (docs/plano-movimento.md). Ausente = o
+ * sistema não tem essa regra: sem barra, sem caminho desenhado, sem bloqueio — só o movimento
+ * livre por teclado/arraste.
+ */
+export const MovementDefSchema = z.object({
+  /** Chave em derived[] com o deslocamento do personagem (T20: "movement"). */
+  derived: KeySchema,
+  /** Orçamento de um token SEM ficha vinculada, na unidade do `grid` (T20: 9). */
+  default: z.number().nonnegative(),
+  /** Regra de diagonais só do movimento. Ausente = `grid.diagonals` (a mesma que a régua usa). */
+  diagonals: DiagonalRuleSchema.optional(),
+});
+export type MovementDef = z.infer<typeof MovementDefSchema>;
+
+/**
  * Escala do grid no mundo do jogo. Quanto vale uma célula e como contar diagonais:
  *   euclidean   distância em linha reta (√(dx² + dy²))
  *   manhattan   só movimento ortogonal (dx + dy)
@@ -472,6 +500,10 @@ export const SystemDefinitionSchema = z.object({
   tokenBar: KeySchema.optional(),
   /** Escala do grid (valor de uma célula e regra de diagonais) para a régua. */
   grid: SystemGridDefSchema.optional(),
+  /** De onde vem "{race.<campo>}" nas fórmulas (ver RaceDefSchema). Ausente = placeholder não existe. */
+  race: RaceDefSchema.optional(),
+  /** Orçamento de deslocamento por turno em combate (ver MovementDefSchema). Ausente = sem a regra. */
+  movement: MovementDefSchema.optional(),
   /** Regras de treinamento por faixa de nível (T20: +2/+4/+6). */
   trainedBonus: z
     .array(
@@ -600,6 +632,9 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
       if (attr !== null && !attrKeys.has(attr)) fail(def, `damageAttribute.map["${option}"] referencia atributo inexistente "${attr}"`);
     }
   }
+  // Campos NUMBER do item kind que alimenta "{race.<campo>}" (ver RaceDefSchema); vazio sem `race`.
+  const raceKindDef = def.race ? def.itemKinds.find((k) => k.key === def.race?.kind) : undefined;
+  const raceFieldKeys = new Set(raceKindDef?.fields.filter((f) => f.type === "number").map((f) => f.key) ?? []);
 
   // Placeholders: cada fórmula só pode usar caminhos que existem.
   const derivedSoFar = new Set<string>();
@@ -613,7 +648,8 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
         (head === "skill" && key !== undefined && skillKeys.has(key.split(":")[0] ?? "") && tail === undefined) ||
         (head === "derived" && key !== undefined && derivedSoFar.has(key) && tail === undefined) ||
         (head === "equip" && key !== undefined && equipKeys.has(key) && tail === undefined) ||
-        (head === "resource" && key !== undefined && resourceKeys.has(key) && tail === "max");
+        (head === "resource" && key !== undefined && resourceKeys.has(key) && tail === "max") ||
+        (head === "race" && key !== undefined && raceFieldKeys.has(key) && tail === undefined);
       if (!ok) fail(def, `${where}: placeholder {${path}} não é reconhecido`);
     }
   };
@@ -635,6 +671,12 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
   }
   for (const r of def.extraRolls) check(r.formula, `extraRoll "${r.key}"`, CONTEXTUAL.extraRoll ?? []);
   if (def.activation.saveDc) check(def.activation.saveDc, "activation.saveDc", CONTEXTUAL.saveDc ?? []);
+
+  if (def.race && !def.itemKinds.some((k) => k.key === def.race?.kind)) fail(def, `race.kind referencia tipo de item inexistente "${def.race.kind}"`);
+  if (def.movement) {
+    if (!def.derived.some((d) => d.key === def.movement?.derived)) fail(def, `movement.derived referencia stat derivado inexistente "${def.movement.derived}"`);
+    if (!def.grid) fail(def, `movement exige "grid" (cellSize/unit para converter célula ↔ metro)`);
+  }
 
   return def;
 }

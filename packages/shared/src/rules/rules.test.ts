@@ -173,6 +173,16 @@ describe("computeCharacter", () => {
     expect(c.derived.x).toBe(0);
     expect(c.warnings[0]).toMatch(/derivado x/);
   });
+
+  // derived.movement lê {race.movement} do item de raça ativo (docs/plano-movimento.md).
+  it("Deslocamento (movement) lê {race.movement} da raça, com 9 de padrão sem raça", () => {
+    const anao = CharacterItemSchema.parse({ id: "r1", kind: "race", name: "Anão", fields: { movement: 6 } });
+    const humano = CharacterItemSchema.parse({ id: "r2", kind: "race", name: "Humano", fields: { movement: 9 } });
+    expect(computeCharacter(def, fixture({ items: [anao] })).derived.movement).toBe(6);
+    expect(computeCharacter(def, fixture({ items: [humano] })).derived.movement).toBe(9);
+    expect(computeCharacter(def, fixture()).derived.movement).toBe(9); // sem raça na ficha
+    expect(computeCharacter(def, fixture({ derivedOverrides: { movement: 15 } })).derived.movement).toBe(15); // override do GM (NPC)
+  });
 });
 
 describe("buildCharacterRoll", () => {

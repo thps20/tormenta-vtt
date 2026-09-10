@@ -64,7 +64,7 @@
     { "key": "defense",      "label": "Defesa",                 "abbr": "DEF", "formula": "10 + min({attr.des}, {equip.maxAttr}) + {equip.defense}" },
     { "key": "dc",           "label": "CD de habilidades",      "abbr": "CD",  "formula": "10 + {halfLevel} + {spellcastingAttr}" },
     { "key": "carryLimit",   "label": "Limite de carga",        "abbr": "Carga", "formula": "10 + max({attr.for} * 2, {attr.for})" },
-    { "key": "movement",     "label": "Deslocamento (m)",       "abbr": "Desl.", "formula": "9" }
+    { "key": "movement",     "label": "Deslocamento (m)",       "abbr": "Desl.", "formula": "{race.movement}" }
   ],
 
   "level": {
@@ -348,6 +348,10 @@
     "unit": "m",
     "diagonals": "alternating"
   },
+
+  "race": { "kind": "race" },
+
+  "movement": { "derived": "movement", "default": 9 },
 
   "templates": {
     "$comment": "Gabaritos de área de efeito no mapa (docs/plano-gabaritos.md). coneAngle/lineWidth são o padrão de todo cone/linha do sistema; um preset pode sobrescrever com angle/width. size/angle/width na unidade do grid acima (m).",

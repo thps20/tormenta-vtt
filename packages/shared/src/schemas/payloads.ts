@@ -307,6 +307,25 @@ export type CombatResumePayload = z.infer<typeof CombatResumeSchema>;
 export const CombatEndSchema = z.object({ sceneId: IdSchema, clear: z.boolean().default(false) });
 export type CombatEndPayload = z.infer<typeof CombatEndSchema>;
 
+// --- Orçamento de deslocamento por turno (docs/plano-movimento.md) ---------
+
+/**
+ * Ajuste manual do GM no orçamento/gasto de deslocamento de um combatente. `budget: null` volta a
+ * seguir a ficha (override removido); `budget` ausente não mexe no orçamento atual. `used: 0` é o
+ * botão "zerar gasto" do painel — reinicia também a âncora e o caminho desenhado (servidor).
+ */
+export const CombatSetMovementSchema = z.object({
+  sceneId: IdSchema,
+  combatantId: IdSchema,
+  budget: z.number().nonnegative().nullable().optional(),
+  used: z.number().min(0).optional(),
+});
+export type CombatSetMovementPayload = z.infer<typeof CombatSetMovementSchema>;
+
+/** Liga/desliga a trava de orçamento de deslocamento NA SALA (memória, não vai ao banco — GM only). */
+export const CombatSetMovementLimitSchema = z.object({ enabled: z.boolean() });
+export type CombatSetMovementLimitPayload = z.infer<typeof CombatSetMovementLimitSchema>;
+
 // --- Compêndio: soltar criatura no mapa (docs/plano-criaturas.md) ----------
 
 /**

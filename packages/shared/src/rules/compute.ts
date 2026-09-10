@@ -48,6 +48,8 @@ export interface ComputedCharacter {
   /** Modificadores gerados por itens ativos (raça etc.), já somados em `attributes`. */
   itemModifiers: ItemModifier[];
   equip: Record<string, number>;
+  /** Campos number do item de raça ativo, já com o default de quem não tem raça (ver computeRace). */
+  race: Record<string, number>;
   skills: Record<string, ComputedSkill>;
   derived: Record<string, number>;
   resources: Record<string, ComputedResource>;
@@ -119,6 +121,27 @@ function safeEval(formula: string, resolve: (path: string) => number | undefined
   }
 }
 
+/**
+ * Campos NUMBER do item de raça ATIVO (def.race.kind), pra "{race.<campo>}" nas fórmulas
+ * (docs/plano-movimento.md: derived.movement lê {race.movement}). Campo ausente no item, ou ficha
+ * sem esse item (sem raça escolhida): cai no `default` do campo no itemKinds (0 se não houver) —
+ * mesmo espírito de computeEquip acima, sem raça = usa o default declarado no sistema.
+ */
+function computeRace(def: SystemDefinition, data: CharacterData): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!def.race) return out;
+  const kind = def.itemKinds.find((k) => k.key === def.race?.kind);
+  if (!kind) return out;
+  const item = data.items.find((i) => i.kind === kind.key);
+  for (const field of kind.fields) {
+    if (field.type !== "number") continue;
+    const fallback = typeof field.default === "number" ? field.default : 0;
+    const raw = item?.fields[field.key];
+    out[field.key] = typeof raw === "number" && Number.isFinite(raw) ? raw : fallback;
+  }
+  return out;
+}
+
 /** Soma/min/max dos stats dos itens equipados, com default quando nenhum item define o stat. */
 function computeEquip(def: SystemDefinition, data: CharacterData): Record<string, number> {
   const out: Record<string, number> = {};
@@ -168,6 +191,7 @@ export function computeCharacter(def: SystemDefinition, character: Character | C
   }
 
   const equip = computeEquip(def, data);
+  const race = computeRace(def, data);
   const size: SizeDef | undefined = def.sizes.find((s) => s.key === data.size);
   const spellcastingAttr = data.spellcastingAttribute ? (attributes[data.spellcastingAttribute] ?? 0) : 0;
 
@@ -185,6 +209,7 @@ export function computeCharacter(def: SystemDefinition, character: Character | C
     if (key === undefined) return undefined;
     if (head === "attr" && tail === undefined) return attributes[key];
     if (head === "equip" && tail === undefined) return equip[key];
+    if (head === "race" && tail === undefined) return race[key];
     if (head === "skill" && tail === undefined) return skills[key]?.total;
     if (head === "derived" && tail === undefined) return derived[key];
     if (head === "resource" && tail === "max") return resources[key]?.max;
@@ -270,6 +295,7 @@ export function computeCharacter(def: SystemDefinition, character: Character | C
     attributes,
     itemModifiers: fromItems,
     equip,
+    race,
     skills,
     derived,
     resources,
@@ -287,6 +313,7 @@ export function makeResolver(computed: ComputedCharacter): (path: string) => num
     if (key === undefined) return undefined;
     if (head === "attr" && tail === undefined) return computed.attributes[key];
     if (head === "equip" && tail === undefined) return computed.equip[key];
+    if (head === "race" && tail === undefined) return computed.race[key];
     if (head === "skill" && tail === undefined) return computed.skills[key]?.total;
     if (head === "derived" && tail === undefined) return computed.derived[key];
     if (head === "resource" && tail === "max") return computed.resources[key]?.max;

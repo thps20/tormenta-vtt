@@ -39,6 +39,22 @@ export const CombatantSchema = z.object({
   order: z.number().int(),
   /** Rodada em que entrou (reforço). 0 = entrou junto com combat:start. */
   addedRound: z.number().int(),
+  /**
+   * Orçamento de deslocamento do turno, na unidade do `grid` (docs/plano-movimento.md). Resolvido
+   * pelo servidor quando o combatente vira o da vez (override do GM → `derived` da ficha →
+   * `movement.default` do sistema) e gravado — não recalcula a cada eco de arraste. `null` =
+   * sistema sem `movement`, ou combate ainda sem turno ativo (nada pra mostrar).
+   */
+  movementBudget: z.number().nullable(),
+  /** Gasto acumulado no turno, mesma unidade. Zerado a cada troca de turno. */
+  movementUsed: z.number(),
+  /** Diagonais já contadas no turno (regra 1-2-1, ver rules/measure.ts). */
+  movementDiagonals: z.number().int(),
+  /**
+   * Caminho percorrido no turno, em pixels do mapa (primeiro ponto = onde o turno começou).
+   * Preenchido só para o combatente da VEZ — `[]` nos demais, pra não inchar o payload à toa.
+   */
+  movementPath: z.array(z.object({ x: z.number(), y: z.number() })),
 });
 export type Combatant = z.infer<typeof CombatantSchema>;
 

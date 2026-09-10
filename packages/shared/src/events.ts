@@ -29,6 +29,8 @@ import type {
   CombatRollPayload,
   CombatScenePayload,
   CombatSetInitiativePayload,
+  CombatSetMovementLimitPayload,
+  CombatSetMovementPayload,
   CombatSetSurprisedPayload,
   CombatStartPayload,
   CompendiumEntry,
@@ -96,6 +98,9 @@ export interface RoomSnapshot {
   chat: ChatMessage[];
   /** Fichas da sala (jogadores não recebem as de kind = "npc"). */
   characters: Character[];
+  /** Trava de orçamento de deslocamento (docs/plano-movimento.md), por SALA — em memória, não vai
+   *  ao banco. `true` = ninguém excede o orçamento sem confirmação do GM (padrão). */
+  movementLimitEnabled: boolean;
 }
 
 /**
@@ -277,6 +282,10 @@ export interface ClientToServerEvents {
   "combat:resume": (payload: CombatResumePayload, ack: Ack<Combat | null>) => void;
   /** clear=false: encerra mas mantém a ordem visível; clear=true: apaga o combate. */
   "combat:end": (payload: CombatEndPayload, ack: Ack) => void;
+  /** GM: ajusta à mão o orçamento/gasto de deslocamento de um combatente (docs/plano-movimento.md §4.3). */
+  "combat:set-movement": (payload: CombatSetMovementPayload, ack: Ack<Combat | null>) => void;
+  /** GM: liga/desliga a trava de deslocamento NA SALA (memória, broadcast `combat:movementLimitChanged`). */
+  "combat:set-movement-limit": (payload: CombatSetMovementLimitPayload, ack: Ack<{ enabled: boolean }>) => void;
 
   // Desfazer/refazer (docs/plano-desfazer.md): pilha por sala, só do GM, em memória no servidor.
   /** Desfaz o topo da pilha da sala. `null` no ack = pilha vazia (nada pra desfazer). */
@@ -321,6 +330,9 @@ export interface ServerToClientEvents {
    * um `combat:updated` (de mapas diferentes) pode chegar sem relação um com o outro.
    */
   "combat:updated": (p: { sceneId: string; combat: Combat | null }) => void;
+
+  /** `combat:set-movement-limit`: novo estado da trava de deslocamento da SALA, para todos. */
+  "combat:movementLimitChanged": (p: { enabled: boolean }) => void;
 
   /** Régua de outro participante (o autor não recebe eco: já desenha a própria). ruler null = apagar. */
   "ruler:updated": (p: { participantId: string; nickname: string; sceneId: string; ruler: Ruler | null }) => void;
