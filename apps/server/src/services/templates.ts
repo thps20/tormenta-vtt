@@ -25,6 +25,12 @@ export function templateOwner(sceneId: string, templateId: string): string | und
   return bySceneAndId.get(sceneId)?.get(templateId)?.ownerId;
 }
 
+/** Objeto inteiro, ou `undefined` se não existir mais neste mapa — usado para montar o "antes" de
+ *  uma entrada de desfazer (docs/plano-gabaritos.md §4) antes de sobrescrever/remover. */
+export function getTemplate(sceneId: string, templateId: string): Template | undefined {
+  return bySceneAndId.get(sceneId)?.get(templateId);
+}
+
 export function removeTemplate(sceneId: string, templateId: string): void {
   bySceneAndId.get(sceneId)?.delete(templateId);
 }
