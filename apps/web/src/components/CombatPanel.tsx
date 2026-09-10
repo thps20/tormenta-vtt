@@ -170,8 +170,13 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
   );
 
   // Separate combatants into main list and "SEM INICIATIVA" (placed at end).
-  // A ordem é sempre a que o servidor mandou (campo `order`) — nunca reordenamos na UI.
-  const sortedCombatants = [...combat.combatants].sort((a, b) => a.order - b.order);
+  // A ordem é sempre a que o servidor mandou: `sortCombatants` (packages/shared/src/rules/combat.ts)
+  // roda a CADA emissão de combat:updated, "rolling" ou "active" — maior iniciativa primeiro,
+  // desempate por bônus, quem não rolou no fim — então a lista já reordena sozinha a cada
+  // iniciativa que chega, sem esperar o primeiro "Próximo". Reordenar de novo aqui pelo campo
+  // `order` (posição de entrada/arraste, só usado como desempate final no servidor) jogava fora
+  // essa ordem e prendia a lista na ordem de entrada até o GM arrastar manualmente.
+  const sortedCombatants = combat.combatants;
   const withInitiative = sortedCombatants.filter(
     (c) => c.initiative !== null || c.rolled
   );
