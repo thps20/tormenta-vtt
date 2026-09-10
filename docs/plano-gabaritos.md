@@ -175,40 +175,248 @@ troca pro modo `"template"` (sem preset), como pedido.
 lista `TOOLS` (não GM-only) — só aparece se `def.templates` existir (checagem no componente pai,
 que já tem o `SystemDefinition` da sala).
 
+## 4. Desfazer/refazer (GM e jogador)
+
+**Decisão na implementação**: além do pedido, `TemplateUpsertSchema` ganhou `dragFrom` (x/y/rotation
+capturados no MOUSEDOWN de mover/girar) — sem ele, o "antes" que o servidor lê no commit final já
+refletia os ecos `live` do arraste (só ~33ms atrás do fim do gesto, não o início dele), o mesmo bug
+que `TokenPatch.dragFrom` já resolve pra token (docs/plano-desfazer.md §3). `VttCanvas.tsx` captura
+`startTemplate` no mousedown de mover/girar e manda `dragFrom` no `onTemplateCommit` final.
+
+- **Servidor (GM)**: `apps/server/src/socket/templates.ts` — `template:upsert`/`template:remove`
+  fora de `live`, quando `ctx.role === "gm"`, montam uma `HistoryEntry` (`services/history.ts`,
+  `pushEntry`/`emitHistoryUpdated`, mesmo padrão de `socket/token.ts`). `getTemplate` (novo em
+  `services/templates.ts`) dá o objeto inteiro antes de sobrescrever/remover. `templateChangeAction`
+  decide "colocar"/"mover"/"girar" (ou `null` = nada mudou, não empilha) comparando `dragFrom` (ou o
+  próprio `before`, na criação) com o `saved`. `templateAreaLabel` converte o tamanho de pixels pra
+  metros com o `grid` do sistema + um `prisma.scene.findUnique` (só no commit final, não em cada
+  `live`) — "cone 9 m" no resumo. `revert`/`apply` reescrevem o gabarito em memória direto
+  (`writeTemplate`/`writeTemplateRemoval`), sem linha de banco pra invalidar — best-effort, como a
+  régua.
+- **Cliente (jogador)**: `apps/web/src/store/templateHistory.ts` (novo) — pilha local, só undo (sem
+  redo, como a Névoa). Empilhado em `RoomPage.tsx` (`handleTemplateCreate`/`handleTemplateCommit`, só
+  quando `!isGm`) e `useDeleteSelectionShortcut.ts` (`deleteSelectedTemplate`). `useToolShortcuts.ts`:
+  Ctrl+Z do jogador (que antes não fazia nada) chama `useTemplateHistory.getState().undo()`.
+  `describeTemplateAreaChange`/`templateAreaLabel` (novo, `apps/web/src/lib/templates.ts`) montam o
+  mesmo texto do lado do cliente — já tem `sizeUnits` da UI, não precisa converter de pixels do banco.
+
+## 5. Criar por clique e arrasto
+
+Substituiu o fluxo de 2 cliques (cone/linha giravam até o 2º clique) por inteiro — não sobrou nada
+do fluxo antigo. `VttCanvas.tsx`: `templateCreateRef` (origem + ponteiro cru do mousedown) +
+`templateDraftLive` (tamanho/rotação recalculados a cada `mousemove`) substituem o antigo
+`placingTemplate`. Confirma no `mouseup`: acima do limiar de ~4px de tela (mesmo da caixa de
+seleção) usa o tamanho/rotação do arrasto; abaixo, usa `templateTool.sizeUnits` da barra e rotação 0
+(clique-sem-arrasto — presets continuam funcionando).
+
+- **Snap**: por forma (refinado no §7 — a primeira versão usava `snapToVertexOrCenter` pra toda
+  origem e meia célula pro tamanho de qualquer forma; ficou certo só pro cone). Os quatro só valem
+  com "Grudar no grid" ligado (o toggle já existente, `snapEnabled`) E `scene.grid.type !== "none"`
+  — Alt/Shift são um *override* temporário desse toggle, não um mecanismo paralelo.
+- **Rótulo ao vivo**: `templateDraftLabel` (`VttCanvas.tsx`) monta "6 m • 2 alvos" a partir do
+  rascunho; `TemplateLayer.tsx` ganhou o prop `draftLabel` e desenha perto do rascunho, mesmo padrão
+  do rótulo "N alvos" dos gabaritos de verdade.
+- **Células cobertas**: `templateCoveredCells` (novo, `lib/templates.ts`) devolve os cantos (em
+  pixels) das células cujo CENTRO cai no gabarito (mesma regra de `tokensInTemplate`), com um
+  guarda-corpo de 4000 células. `TemplateLayer.tsx` desenha um `Rect` translúcido por célula
+  (`CellFill`), mais fraco que o contorno geométrico — pros gabaritos de verdade E o rascunho, só
+  quando `scene.grid.type !== "none"`.
+
+## 6. Área estruturada nos itens
+
+- `packages/shared/src/schemas/character.ts`: `TemplateAreaSchema` (novo) — discriminada por `kind`
+  ("shape" com `shape`/`size`, ou "text" com `text`), `nullable`, com `preprocess` migrando o formato
+  antigo (string solta, persistida em `Character.data` e `ChatMessage.item`, ambos `Json`) sem
+  migration de banco. Reaproveitada em `ActivationSchema.area` **e** `ItemCardSchema.area` — os dois
+  precisavam do mesmo tratamento (`ItemCardSchema` não estava no pedido original, mas
+  `ChatMessageSchema.parse()` roda em TODA leitura do histórico, `serialize.ts:toChatMessage`; sem o
+  `preprocess` ali, um card antigo no banco quebraria `room:join` inteiro).
+- `schemas/template.ts`: `TemplateShapeSchema` (novo, extraído do `discriminatedUnion`) — fonte única
+  do enum de forma, usada em `Activation.area.shape` e `TemplatePresetSchema.shape`.
+- `schemas/system.ts`: `TemplatesDefSchema.shapeLabels` (novo, obrigatório dentro do bloco opcional
+  `templates`) — nome de cada forma na linguagem do sistema. `tormenta20.json`: círculo = "Esfera"
+  (linguagem do livro), resto igual ao nome da forma. `TemplateToolbar.tsx` trocou o array hardcoded
+  de labels por este campo, pra não ter dois vocabulários divergentes pra mesma forma (regra
+  número 1).
+- `rules/templates.ts`: `parseAreaText` ganhou "`<forma>` com N m" além de "de" (cobre "esfera com 6m
+  de raio"); `formatArea` (novo) monta o texto legível ("Esfera 6 m" / o texto) pro card, preview do
+  compêndio (`EntryPreview.tsx`) e ficha rápida (`NpcQuickCard.tsx`, que antes não mostrava área
+  nenhuma). `rules/enhancements.ts`: `areaSet` continua só texto (sobrescreve qualquer forma
+  estruturada, sem mudança de comportamento).
+- Editor (`ItemsSection.tsx`): `AreaField` (novo) — select de modo (Nenhuma/Forma/Especial; "Forma"
+  só aparece com `def.templates`) + select de forma (rótulos de `shapeLabels`) + número + unidade do
+  grid.
+- Importador: `Converter.activation()` casa `s.area` com `parseAreaText`; `Report.areaShapes`/
+  `areaTexts` contam o resultado, reportados no `import-report.md`. **Rodado em 10/09/2026**: 54
+  entradas viraram forma reconhecida, 33 ficaram como texto livre.
+- `ItemCardMessage.tsx`: removido o `parseAreaText(card.area)` do card — `card.area` já vem
+  estruturado do servidor; o botão "Colocar área" só aparece com `kind === "shape"`.
+
+## 7. Snap por forma
+
+A primeira versão do §5 usava `snapToVertexOrCenter` (vértice OU centro, o mais perto) pra origem
+de QUALQUER forma e meia célula pro tamanho de qualquer forma — funciona bem pro círculo/cone (a
+regra do centro decide as células sozinha), mas deixava quadrado e linha cobrindo meia célula de
+sobra em qualquer lado ímpar de células. Ajuste pedido: cada forma tem seu próprio snap de origem/
+tamanho/direção, todos sob o mesmo toggle "Grudar no grid" + Alt solta (agora conferido o tempo
+todo do arrasto, não só no mousedown — pequena correção de consistência encontrada nesta rodada).
+
+- **Círculo**: origem só `snapToCellCenter` (era `snapToVertexOrCenter`). Tamanho continua meia
+  célula (`roundToHalfCell`, sem mudança).
+- **Cone**: sem mudança nenhuma (`snapToVertexOrCenter`, meia célula, 15°).
+- ~~**Quadrado**: origem só `snapToGrid` (vértice). Tamanho em célula inteira (`roundToWholeCell`) —
+  o vértice onde a origem grudou vira um CANTO do quadrado final via `squareCenterFromCorner`.~~
+  **Superseded pelo §8**: origem em vértice ainda deixava um lado ÍMPAR de células com o centro
+  exatamente na borda de células vizinhas em certos arrastos (a correção do dono do projeto) —
+  virou âncora de CÉLULA, não de vértice.
+- ~~**Linha**: origem (a ponta) só `snapToGrid`. Comprimento em célula inteira. Direção em passos
+  de 45° (`roundAngleToStep`). Largura sem mudança.~~ **Superseded pelo §8**: origem em vértice
+  deixava a linha CENTRADA numa linha do grid (metade numa fileira de células, metade na vizinha),
+  não dentro de uma fileira inteira — também virou âncora de célula.
+
+## 8. Correção: quadrado/linha como conjuntos de células
+
+Ajuste sobre o §7: quadrado e linha (com grid ativo) deixam de ser geometria contínua "com snap" e
+viram **conjuntos de células inteiras por definição** — nunca geometria livre. A âncora não é mais
+um PONTO (vértice), é a CÉLULA sob o cursor no mousedown; o resto (quantas células, pra que lado)
+vem do arrasto em termos de célula, não de pixel/distância.
+
+- **`apps/web/src/lib/grid.ts`**: `cellCenter(cell, grid)` (novo) — centro em pixels de uma célula
+  por índice `{col,row}` (inverso de `cellAt` + meio lado); usado pra achar de onde a linha "sai".
+- **`apps/web/src/lib/templates.ts`** — trocou `roundToWholeCell`/`squareCenterFromCorner` (§7,
+  removidos) por funções que trabalham em índice de célula, não em tamanho contínuo:
+  - `squareFromAnchorCell(anchorCell, pointerCell, grid)`: `cells` (n) = distância Chebyshev entre
+    as duas células + 1; o quadrante (`pointerCell.col/row >= anchorCell.col/row`) decide se o
+    bloco cresce pra frente ou pra trás a partir da âncora em cada eixo — ela nunca fica de fora.
+    Devolve x/y (centro, o que o `Template` guarda) e `side` já em pixels, calculados a partir dos
+    CANTOS das células via `cellToPoint` (não há conversão de tamanho contínuo envolvida).
+    `newSquareFromAnchorCell` monta o `Template` inteiro.
+  - `cellStep(cellSizePx, direction)`: distância entre o centro de uma célula e o centro da
+    PRÓXIMA na mesma direção — `cellSize` reto, `cellSize × √2` na diagonal (a distância real entre
+    dois centros vizinhos na diagonal é maior; **bug pego pelo teste da escada**: usar `cellSize`
+    fixo pra comprimento fazia uma linha diagonal de N células cobrir só ~N/√2 células de verdade).
+  - `lineTipFromAnchorCell(anchorCell, direction, grid)`: sai do CENTRO da célula-âncora até a
+    borda (direção reta) ou o canto (diagonal) mais próximos da direção, usando
+    `cellStep(...)/2` como distância — fórmula padrão de "centro até a borda de um quadrado numa
+    direção θ", `(size/2) / max(|cos θ|, |sin θ|)`. Sai do CENTRO (não de um vértice) pra linha
+    ocupar 100% da célula, nunca ficar centrada numa linha do grid.
+  - `newLineFromAnchorCell(anchorCell, direction, cells, grid, ownerId)`: `length = cells *
+    cellStep(...)` (não `cells * cellSize`, por causa do bug acima); `width` sempre `cellSize`
+    (célula inteira, ignora `templates.lineWidth` nesse modo — a regra aqui é célula inteira,
+    independente do que o sistema configurar).
+  - `cellsFromSizeUnits(sizeUnits, def)`: converte o campo de tamanho da barra (metros) numa
+    contagem de células — usado só no clique-sem-arrasto (presets), mínimo 1.
+- **`VttCanvas.tsx`**: `templateCreateRef` virou uma união discriminada por `kind`: `"cell"`
+  (quadrado/linha com grid ativo — âncora é `{col,row}`, não um ponto) ou `"free"` (círculo/cone
+  sempre; quadrado/linha sem grid ativo — origem é um ponto, como antes). `templateDraftLive`
+  deixou de ser um "saco de parâmetros" (`origin/sizeUnits/rotation/squareCorner/sign`, §7) e virou
+  DIRETAMENTE o `Template` calculado — simplifica bastante: `mousedown`/`mousemove` montam o
+  gabarito final na hora (com `newSquareFromAnchorCell`/`newLineFromAnchorCell` pro `kind: "cell"`,
+  `newTemplate` pro `"free"`) e o `mouseup` só decide se usa o rascunho (arrastou) ou monta de novo
+  com o clique-sem-arrasto (`buildClickCellTemplate`, novo helper do arquivo — quadrado ancora na
+  célula clicada e cresce pra baixo/direita, linha aponta pra direita, mesma regra do arrasto). Não
+  existe mais useMemo derivando o Template do estado — um a menos pra manter sincronizado.
+  Consequência da mudança de modelo: Shift não solta mais a direção da linha ancorada em célula
+  (só os 45° fazem sentido nesse modo — livre quebraria a garantia de célula inteira); pra
+  direção livre, Alt tira a linha do modo "cell" inteiro, caindo no `"free"` de sempre.
+- ~~**`TemplateLayer.tsx`**: quadrado/linha com células cobertas conhecidas (grid ativo) desenham só
+  o BLOCO de células (`CellBlock` — um `Rect` POR CÉLULA, cada um com o próprio stroke).~~
+  **Superseded pelo §9**: isso desenhava uma borda em CADA célula, criando linhas internas visíveis
+  entre células vizinhas — o dono do projeto pediu de volta um preenchimento único com só o
+  contorno externo, "como era antes".
+- **Testes** (`apps/web/src/lib/templates.test.ts`): os 4 cenários pedidos — linha horizontal de 6
+  células cobre exatamente (3..8, 4); linha diagonal de 3 cobre a escada (3,4)→(4,5)→(5,6); quadrado
+  2×2 ancorado em (3,4) cobre (3..4, 4..5); arrasto pra cima/esquerda inverte a âncora sem sair da
+  célula clicada. Mais linha vertical e o teste de 1 célula (não 4 pela metade).
+
+## 9. Correção: sem bordas internas entre células
+
+Ajuste sobre o §8: o `CellBlock` (um `Rect` com stroke POR CÉLULA) desenhava uma linha visível na
+fronteira entre células vizinhas — o pedido era voltar a um preenchimento único com só o contorno
+EXTERNO do conjunto de células, "como era antes" (a forma lisa de antes do §8).
+
+A saída acabou não precisando de nenhum algoritmo de "contorno da união de polígonos": dado que só
+existem duas famílias de forma aqui, cada uma tem uma solução exata e barata.
+
+- **Quadrado (sempre) e linha no EIXO do grid (múltiplo de 90°)**: as células cobertas SEMPRE
+  formam um retângulo sólido (um bloco n×n, ou uma fileira 1×n) — a própria forma lisa geométrica
+  (`TemplateShapeNode`, o `Rect` de sempre) já é PIXEL A PIXEL essa mesma área, por construção
+  (`newSquareFromAnchorCell`/`newLineFromAnchorCell`, §8). Não tem "união" pra calcular: é só
+  desenhar a forma lisa de novo, sem nenhum `Rect` por célula. Também sem o overlay sutil de célula
+  por cima (`CellFill`) — seria a MESMA área desenhada duas vezes, não informação nova.
+- **Linha na DIAGONAL (múltiplo de 45°, mas não de 90°)**: aqui uma célula só toca a vizinha por um
+  CANTO — elas nunca compartilham uma aresta inteira (diferente do bloco sólido acima). Sem aresta
+  compartilhada, não existe "borda interna" nenhuma pra remover: desenhar cada célula com o próprio
+  contorno (`CellBlock`, mantido, sem mudança) JÁ é exatamente o contorno externo da escada — os
+  "degraus" da escada são as próprias bordas de cada célula. O pedido pareceu implicar um algoritmo
+  de contorno pra esse caso, mas a geometria (células só se tocando no canto) já resolve sozinha.
+- **`packages/shared`/`apps/web/src/lib/templates.ts`**: `templateIsSolidBlock(t)` (quadrado sempre;
+  linha só se `rotation` é múltiplo de 90°) e `templateIsDiagonalLine(t)` (linha, múltiplo de 45° mas
+  não de 90°) — os dois testes puros que decidem qual desenho usar, extraídos pra serem testáveis
+  (`isAngleMultipleOf`, privada, mesma folga de ponto flutuante de `roundAngleToStep`). Nenhuma
+  mudança nas funções que calculam as células cobertas (`templateCoveredCells` etc.) — só a
+  renderização, como pedido.
+- **`TemplateLayer.tsx`**: `TemplateBody` decide entre 3 casos — `templateIsDiagonalLine` → `CellBlock`
+  (célula por célula, como já era); `templateIsSolidBlock` → só `TemplateShapeNode` (forma lisa, sem
+  `CellFill` por cima); nenhum dos dois (círculo/cone sempre; uma linha LIVRE, ângulo fora dos
+  múltiplos de 45° — só acontece com Alt numa linha que por acaso saiu bem perto de 45°, ou numa
+  cena sem grid) → forma lisa + `CellFill` por cima, como já era pra círculo/cone.
+- **Testes** (`apps/web/src/lib/templates.test.ts`): `templateIsSolidBlock`/`templateIsDiagonalLine`
+  pras 4 formas nos ângulos relevantes (eixo, diagonal, livre) — sem teste de snapshot visual (o
+  projeto não tem infra pra isso); a garantia de que as células cobertas continuam certas já vem
+  dos testes do §8, que não mudaram.
+
 ## SPEC (`docs/SPEC.md`)
 
-Nova seção **§9.9 Gabaritos de área de efeito (templates)**, no mesmo estilo de §9.3 (Névoa):
-modelo (`SystemDefinition.templates`, `Template` discriminado por forma), eventos
-(`template:upsert`/`upserted`, `template:remove`/`removed`), regra de broadcast por mapa ativo,
-permissão (dono/GM, jogador só no mapa ativo), ferramenta na barra (atalho T, sub-modos, campo de
-tamanho, presets), botão "Colocar área" no card de item, e as limitações conhecidas (sem automação
-de regra, `angle`/`width` fixos por sistema, cap de 200 gabaritos por mapa, não entra no undo).
-Soma também uma linha na tabela de eventos (§5) e, quando a feature estiver pronta, uma linha em
-"Estado da implementação" (§8).
+**§9.9 Gabaritos de área de efeito (templates)** cobre as cinco partes: modelo
+(`SystemDefinition.templates` com `shapeLabels`, `Template` discriminado por forma), persistência,
+eventos (com `dragFrom`), **desfazer/refazer** (GM na pilha geral, jogador com Ctrl+Z local),
+**ferramenta "Área" por clique-e-arrasto** (§7/§8: círculo no centro de célula, cone vértice-ou-
+centro a 15°, quadrado/linha ancorados em CÉLULA com grid ativo — sempre conjuntos de células
+inteiras — e geometria livre nos dois quando o grid está desligado; §9: quadrado/linha no eixo
+desenham a forma lisa de sempre — já é a união das células —, só a linha na diagonal desenha célula
+a célula, sem borda interna nenhuma pros outros dois casos), destaque de alvos, **área estruturada**
+(`Activation.area`, editor, importador) e o botão "Colocar área". Também: uma linha na tabela de
+eventos (§5, `dragFrom` no payload), o escopo de §9.6 (Desfazer/refazer) ganhou a menção aos
+gabaritos do GM, e a linha de "Estado da implementação" (§8 do SPEC) foi atualizada (undo/redo
+deixou de ser uma limitação).
 
 ## Arquivos principais
 
-- `packages/shared/src/schemas/system.ts`, `packages/shared/systems/tormenta20.json`
-- `packages/shared/src/schemas/payloads.ts` (ou um `schemas/template.ts` novo, seguindo o padrão de
-  `schemas/fog.ts`)
-- `packages/shared/src/rules/templates.ts` + `templates.test.ts`
-- `packages/shared/src/events.ts`
-- `apps/server/src/services/templates.ts`, `apps/server/src/socket/templates.ts`
-- `apps/server/src/services/snapshot.ts`, `apps/server/src/socket/scene.ts` (incluir `templates`)
-- `apps/web/src/store/templates.ts`, `apps/web/src/store/tools.ts`
-- `apps/web/src/components/TemplateToolbar.tsx`, `apps/web/src/components/TemplateLayer.tsx`
-- `apps/web/src/components/Toolbar.tsx`, `VttCanvas.tsx`, `useToolShortcuts.ts`
-- `apps/web/src/components/chat/ItemCardMessage.tsx`
-- `apps/web/src/lib/templates.ts` (ponte pixel/grid com as regras puras de `shared`)
-- `docs/SPEC.md`
+- `packages/shared/src/schemas/{template,system,character}.ts`, `systems/tormenta20.json`
+- `packages/shared/src/rules/{templates,enhancements,activation}.ts` + testes
+- `apps/server/src/services/templates.ts` (`getTemplate`), `apps/server/src/socket/templates.ts`
+  (desfazer do GM)
+- `apps/web/src/lib/{grid,templates}.ts` (+ `templates.test.ts`), `store/templateHistory.ts` (novo),
+  `store/templates.ts`, `useToolShortcuts.ts`, `useDeleteSelectionShortcut.ts`
+- `apps/web/src/components/{VttCanvas,TemplateLayer,TemplateToolbar,RoomPage}.tsx`
+- `apps/web/src/components/character/ItemsSection.tsx`
+- `apps/web/src/components/chat/ItemCardMessage.tsx`, `compendium/EntryPreview.tsx`,
+  `NpcQuickCard.tsx`
+- `scripts/import-foundry-compendium.ts`
+- `docs/SPEC.md`, `docs/backlog.md`
 
 ## Verificação
 
-- `make typecheck && make test` (novo `templates.test.ts` cobre `tokensInTemplate`,
-  `pointInTemplate`, `parseAreaText`; `systems.test.ts` continua validando o `tormenta20.json` com
-  o bloco novo).
-- Manual com `make dev`: GM cria círculo/cone/linha/quadrado pela barra (T), confere ângulo do cone
-  e largura da linha batendo com o metro do sistema, gira/move/apaga; jogador só mexe no mapa ativo
-  e só no próprio; recarregar a página (F5) mantém os gabaritos do mapa (via snapshot); trocar de
-  mapa não mostra os do outro; botão "Colocar área" de uma magia com "esfera de 6 m" abre a
-  ferramenta já com círculo 6 m.
+- `make typecheck && make test` (`templates.test.ts` em `shared` cobre `tokensInTemplate`,
+  `pointInTemplate`, `parseAreaText`, `formatArea`, `describeTemplateChange`, `TemplateAreaSchema`;
+  `templates.test.ts` em `apps/web` cobre `pixelsToUnit`, `roundToHalfCell`, `roundAngleToStep`,
+  `cellsFromSizeUnits`, os 4 cenários pedidos com `newSquareFromAnchorCell`/`newLineFromAnchorCell`
+  + `templateCoveredCells` (linha reta, diagonal, quadrado 2×2, âncora invertida), e
+  `templateIsSolidBlock`/`templateIsDiagonalLine` (§9); `grid.test.ts` cobre
+  `snapToVertexOrCenter`/`cellCenter`; `systems.test.ts` continua validando o `tormenta20.json` com
+  `shapeLabels`).
+- Importador rodado (`pnpm import:compendium`): 54 áreas viraram forma reconhecida, 33 ficaram texto
+  livre (`scripts/import-report.md`).
+- Manual com `make dev`: GM arrasta pra criar as 4 formas; confere quadrado/linha no eixo SEM borda
+  interna nenhuma (preenchimento único, só o contorno externo — igual a antes do §8), linha na
+  diagonal com o contorno seguindo os degraus da escada; quadrado/linha SEMPRE em célula inteira
+  (nunca sobra meia célula, nunca linha centrada num grid line), célula clicada sempre coberta mesmo
+  arrastando pra trás; linha só nos eixos/diagonais (sem Shift pra soltar); círculo/cone continuam
+  com a forma lisa + overlay sutil de célula por cima, sem borda interna nenhuma (já não tinham);
+  Alt tira quadrado/linha do modo célula (geometria livre); clique-sem-arrasto em quadrado/linha
+  ainda usa o preset, agora arredondado pra células inteiras a partir da célula clicada; Ctrl+Z
+  desfaz colocar/mover/girar/apagar com toast (GM pela pilha geral, jogador só as próprias); item
+  com "esfera de 6 m" no editor mostra "Forma" pré-selecionada, card no chat mostra "Esfera 6 m" e o
+  botão "Colocar área"; item com área "especial" não mostra o botão; recarregar (F5) preserva os
+  gabaritos do mapa ativo.

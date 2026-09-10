@@ -208,7 +208,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `combat:resume` | `{ sceneId, combatantId }` (só no mapa ativo) | GM ou dono do combatente | `combat:updated` |
 | `combat:end` | `{ sceneId, clear? }` | GM | `combat:updated` (`combat: null` se `clear: true`) |
 | `ruler:update` | `{ sceneId, ruler: { start, end } \| null }` (pixels do mapa) | todos | `ruler:updated` para os **outros** (efêmero: não persiste; `null` apaga) |
-| `template:upsert` | `{ sceneId, template: Template, live? }` (§9.9) | GM, ou dono (só no mapa ativo) | `template:upserted`; cria (id novo) ou edita (mover/girar); `ownerId` do payload nunca é confiado (fixo desde a criação) |
+| `template:upsert` | `{ sceneId, template: Template, live?, dragFrom? }` (§9.9) | GM, ou dono (só no mapa ativo) | `template:upserted`; cria (id novo) ou edita (mover/girar); `ownerId` do payload nunca é confiado (fixo desde a criação); `dragFrom` (x/y/rotation do mousedown) só informa o "antes" do desfazer do GM (§9.6) |
 | `template:remove` | `{ sceneId, templateId }` | GM, ou dono (só no mapa ativo) | `template:removed` |
 | `history:undo` / `history:redo` | `{}` | GM | desfaz/refaz o topo da pilha da sala (§9.6); ack `{ summary } \| null` (`null` = pilha vazia); broadcasts normais das entidades afetadas + `history:updated` |
 
@@ -322,7 +322,7 @@ Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a fi
 - Névoa (§9.3): só "desfazer último" (sem histórico completo nem refazer); sem luz dinâmica, paredes ou visão por token; a visibilidade de um token olha só o centro dele; `fog:updated` sempre manda a lista completa de shapes (limitada a 500).
 - Modo de combate (§3.5): duração de condição em rodadas é só schema preparado, sem automação nenhuma; a mensagem de uma rolagem ligada a um token oculto (card individual ou linha de um `initiative-batch`) só volta a ser entregue no próximo `room:join`, não ao vivo quando o token é revelado; a barra "iniciar/adicionar combatentes" reaproveita a seleção de tokens do mapa (ferramenta Selecionar) em vez de ter um seletor próprio na aba.
 - Criaturas do compêndio (§9.5): o pack `convocacoes` do Foundry (convocações que escalam pelo nível do conjurador) ficou fora do importador — `docs/backlog.md`. `NpcQuickCard` é a versão mínima do contrato (`docs/tipos-ficha-rapida.md`); a UI de verdade vem do AI Studio depois. `token:apply-damage` continua sem aplicar `damageResponses` sozinho — só sugere e avisa (§0.4/§3.3 do plano) — `docs/backlog.md`.
-- Gabaritos de área de efeito (§9.9): ângulo do cone e largura da linha são únicos por sistema (ou por preset), não digitáveis por gabarito na hora de colocar; nenhuma automação de regra (dano, CD, resistência continuam manuais); não interagem com a névoa nem entram no undo/redo — se perdem num restart do servidor (efêmeros por design).
+- Gabaritos de área de efeito (§9.9): ângulo do cone e largura da linha são únicos por sistema (ou por preset), não digitáveis por gabarito na hora de colocar; nenhuma automação de regra (dano, CD, resistência continuam manuais); não interagem com a névoa; entram no undo/redo geral do GM, jogador tem um Ctrl+Z local só das próprias ações — se perdem num restart do servidor (efêmeros por design).
 
 ## 9. Fase 2 (pós-MVP)
 
@@ -429,9 +429,11 @@ revisão pós-implementação em `docs/revisao-desfazer.md`.
 - **Escopo**: apagar token — um ou vários (`token:delete`/`token:delete-many`), mover e redimensionar
   — um token ou vários selecionados juntos (`token:update`/`token:update-many`), alternar condição e
   alterar visibilidade (também `token:update`, mesmos campos rastreados), soltar criaturas do
-  compêndio (`compendium:spawn-creature`), apagar mapa (`scene:delete`, §9.7) e editar o grid de um
+  compêndio (`compendium:spawn-creature`), apagar mapa (`scene:delete`, §9.7), editar o grid de um
   mapa quando isso reencaixa/redimensiona algum token (`scene:updateGrid`, §9.7 — só quando há
-  token pra reencaixar; um patch que só muda cor/`snap` não entra na pilha). Fora: chat/rolagens,
+  token pra reencaixar; um patch que só muda cor/`snap` não entra na pilha), e colocar/mover/girar/
+  apagar um gabarito de área de efeito do GM (`template:upsert`/`template:remove`, §9.9 — do
+  jogador não entra aqui, tem a própria pilha local). Fora: chat/rolagens,
   ações de `combat:*` disparadas pelo usuário, ficha de personagem, criar token em branco, os
   demais campos de `token:update` (nome, cor, imagem, dono — painel do token),
   criar/renomear/duplicar/reordenar/ativar mapa sem apagar nada (§9.7) e a Névoa, que mantém seu
@@ -579,15 +581,18 @@ poderes e ver quem está dentro (setembro/2026). Plano e decisões em `docs/plan
 **Fora do escopo**: qualquer automação de regra (dano, CD, resistência continuam manuais — só
 desenha e destaca) e interação com a névoa (gabarito aparece independente dela, como a régua).
 
-- **Modelo**: `SystemDefinition.templates` opcional (`{ coneAngle, lineWidth, presets[] }`) —
-  sem ele a ferramenta "Área" nem aparece na barra (regra número 1: nenhum ângulo padrão fica
-  hardcoded no código). `coneAngle`/`lineWidth` são o padrão de todo cone/linha do sistema, na
-  unidade do `grid` (graus e metros em T20: 90° e 1,5 m); um preset (`presets[].angle`/`.width`)
-  pode sobrescrever. `Template` (`packages/shared/src/schemas/template.ts`) é discriminado por
-  `shape` (`circle {r}`, `cone {length, angle}`, `line {length, width}`, `square {side}`), com
-  `id, ownerId, x, y, rotation, label` em comum — geometria em **pixels do mapa**, como token/fog;
-  `angle`/`width` de cone/linha são copiados do padrão do sistema (ou do preset) no momento da
-  criação, então o gabarito continua correto mesmo se o JSON mudar depois.
+- **Modelo**: `SystemDefinition.templates` opcional (`{ coneAngle, lineWidth, presets[],
+  shapeLabels }`) — sem ele a ferramenta "Área" nem aparece na barra (regra número 1: nenhum
+  ângulo/nome de forma fica hardcoded no código). `coneAngle`/`lineWidth` são o padrão de todo
+  cone/linha do sistema, na unidade do `grid` (graus e metros em T20: 90° e 1,5 m); um preset
+  (`presets[].angle`/`.width`) pode sobrescrever. `shapeLabels` (`{circle, cone, line, square}`)
+  dá o nome de cada forma na linguagem do sistema (T20 chama o círculo de "Esfera") — usado na
+  barra de ferramentas, no editor de item e no card do chat, sempre o mesmo rótulo. `Template`
+  (`packages/shared/src/schemas/template.ts`) é discriminado por `shape` (`circle {r}`,
+  `cone {length, angle}`, `line {length, width}`, `square {side}`), com `id, ownerId, x, y,
+  rotation, label` em comum — geometria em **pixels do mapa**, como token/fog; `angle`/`width` de
+  cone/linha são copiados do padrão do sistema (ou do preset) no momento da criação, então o
+  gabarito continua correto mesmo se o JSON mudar depois.
 - **Persistência**: efêmeros por sessão — guardados em memória no servidor
   (`apps/server/src/services/templates.ts`, `Map<sceneId, Map<templateId, Template>>`, mesmo
   padrão de `presence.ts`), nunca no banco. Sobrevivem a F5/reconexão (vêm no `RoomSnapshot` do
@@ -599,24 +604,77 @@ desenha e destaca) e interação com a névoa (gabarito aparece independente del
   jogador só se `sceneId` é o mapa ATIVO da sala. `template:upsert` cria (id novo) ou edita
   (mover/girar); dono é sempre travado no servidor (`ownerId` do payload nunca é confiado — fixo
   desde a criação, igual ao princípio de token). Permissão: dono ou GM edita/apaga; jogador só no
-  mapa ativo (mesma regra de `ruler:update`/`combat:delay`).
-- **Não entra no undo/redo (§9.6)**: ferramenta efêmera, fácil de apagar à mão — mesmo motivo da
-  régua não ter Ctrl+Z próprio.
+  mapa ativo (mesma regra de `ruler:update`/`combat:delay`). `dragFrom` (x/y/rotation do
+  mousedown do gesto de mover/girar) viaja junto no patch final, sem `live` — mesmo papel de
+  `TokenPatch.dragFrom` (§9.6): os ecos `live` já escreveram o gabarito em memória durante o
+  arraste, então é o único jeito do servidor saber o "antes" de verdade pro desfazer.
+- **Desfazer/refazer (§9.6)**: GM empilha na pilha geral da sala, junto com token/spawn/mapa —
+  `socket/templates.ts` monta a `HistoryEntry` ("colocar"/"mover"/"girar"/"apagar área (cone 9 m)")
+  e chama `pushEntry`/`emitHistoryUpdated` como qualquer outra ação do GM; `revert`/`apply`
+  reemitem o gabarito em memória direto (sem linha de banco pra invalidar — best-effort, como a
+  régua). Jogador não tem a pilha geral (`history:undo` é `gmOnly`): tem a própria, só no cliente
+  (`apps/web/src/store/templateHistory.ts`), que empilha as PRÓPRIAS ações de gabarito e desfaz com
+  Ctrl+Z (sem Ctrl+Shift+Z/Ctrl+Y — sem refazer, mesmo motivo da Névoa) reemitindo
+  `template:upsert`/`remove` com o estado anterior; toast "Desfeito: `<resumo>`" nos dois casos.
 - **Ferramenta "Área"** (barra do canvas, atalho **T**, não é GM-only — jogador também coloca os
-  seus): sub-modo por forma (círculo/cone/linha/quadrado) e um campo de tamanho só (raio/
-  comprimento/lado, na unidade do sistema); presets de `SystemDefinition.templates.presets`
-  preenchem forma+tamanho num dropdown, sem posicionar sozinho. Colocar: clique define a origem
-  (círculo/quadrado confirmam nesse mesmo clique); cone e linha giram seguindo o mouse até o 2º
-  clique confirmar a rotação. Depois de colocado (ferramenta Selecionar): arrastar o corpo move,
-  uma alça na ponta (cone/linha) ou perto da borda (quadrado; círculo não tem, girar não muda
-  nada) gira; Delete/Backspace apaga o selecionado. Toda a interação (selecionar, arrastar, alça
-  de rotação) é por geometria, nunca pelo hit canvas do Konva — mesmo motivo de sempre neste
-  projeto (`docs/debug-condicoes.md`: canvas de hit embaralhado por proteção anti-fingerprinting).
+  seus): sub-modo por forma e um campo de tamanho só (raio/comprimento/lado, na unidade do
+  sistema); presets de `SystemDefinition.templates.presets` preenchem forma+tamanho num dropdown,
+  sem posicionar sozinho. **Criar por clique e arrasto**, mousedown define a origem — o que ela
+  significa depende da forma e se o grid está ativo:
+  - **Círculo/cone** (sempre) e **quadrado/linha com "Grudar no grid" desligado ou grid "none"**:
+    origem contínua, arrastar calcula o tamanho ao vivo pela distância (círculo: raio; cone/linha:
+    comprimento, com direção = ângulo do arrasto; quadrado: lado, sem girar). Com grid ativo, Alt
+    solta o snap (o tempo todo do arrasto, não só na origem): círculo gruda no CENTRO de célula
+    mais perto (raio em meia célula, 0,75 m em T20 — a regra do centro decide as células, não
+    precisa de vértice); cone gruda no vértice OU centro mais perto (comprimento em meia célula,
+    direção em passos de 15°, Shift solta).
+  - **Quadrado/linha com "Grudar no grid" ligado** (Alt cai no caso acima): as duas formas são
+    SEMPRE um conjunto de células inteiras, nunca geometria livre — a célula sob o cursor no
+    mousedown é a célula-âncora, nunca fica de fora do resultado. Quadrado: arrastar define
+    quantas células por lado (n×n, pela distância Chebyshev até a célula do ponteiro) e pra qual
+    lado cresce (o quadrante do arrasto) — as bordas caem sempre sobre linhas do grid. Linha:
+    direção só em múltiplos de 45° (eixos e diagonais, sem Shift pra soltar — foge da regra de
+    célula inteira); comprimento em número de células a partir da âncora; ocupa 100% de cada
+    célula (fica DENTRO delas, nunca centrada numa linha do grid) — reto é uma fileira de células,
+    diagonal é a escada de células que o eixo atravessa pelo centro; largura sempre 1 célula
+    (`templates.lineWidth`, que em T20 já é 1 célula). Um clique sem arrasto usa o campo de
+    tamanho da barra convertido em células (mínimo 1): quadrado ancora na célula clicada e cresce
+    pra baixo/direita; linha começa na célula clicada apontando pra direita — mesma regra do
+    arrasto, é assim que os presets continuam funcionando.
+
+  Rótulo ao vivo (tamanho + "N alvos") durante o arrasto; soltar confirma; Esc cancela. Desenho por
+  forma: círculo/cone (e uma linha livre, sem grid) usam sempre a forma lisa normal com um
+  preenchimento sutil por célula por cima (regra do centro, mostra a discretização ao lado do
+  contorno geométrico). Quadrado (sempre reto) e linha no EIXO do grid são sempre um retângulo
+  alinhado célula a célula ponta a ponta — a própria forma lisa já é exatamente essa área, um
+  preenchimento único com só o contorno EXTERNO (sem bordas entre células, sem overlay por cima:
+  seria a mesma área duplicada). Linha na DIAGONAL: as células só se tocam por um canto (nunca
+  compartilham uma aresta inteira), então cada uma desenhada com o próprio contorno já É o contorno
+  externo da escada, sem "costura" pra fazer entre elas. Com grid "none", tudo livre, sem snap nem
+  bloco de células. Depois de colocado (ferramenta Selecionar):
+  arrastar o corpo move, uma alça na ponta (cone/linha) ou perto da borda (quadrado; círculo não
+  tem, girar não muda nada) gira — continua geometria livre, sem o snap por célula da criação;
+  Delete/Backspace apaga o selecionado. Toda a interação (selecionar, arrastar, alça de rotação) é
+  por geometria, nunca pelo hit canvas do Konva — mesmo motivo de sempre neste projeto
+  (`docs/debug-condicoes.md`: canvas de hit embaralhado por proteção anti-fingerprinting).
 - **Destaque de alvos**: token conta como "dentro" se o centro da célula dele está na forma; token
   grande (mais de uma célula) conta se qualquer célula estiver dentro (`tokensInTemplate`,
   `packages/shared/src/rules/templates.ts`, puro e testado). Rótulo "N alvos" no gabarito e anel
   nos tokens atingidos — só destaque visual, nenhuma automação.
-- **Botão "Colocar área"** no card de item do chat (`activation.area`, §3.6): aparece quando o
-  sistema declara `templates` e o card tem área; casa o texto com um padrão simples ("esfera de
-  6 m", "cone de 9 m" — sem acento/caixa, `parseAreaText`) e já abre a ferramenta com a forma e o
-  tamanho certos; sem match, abre a ferramenta sem preset.
+- **Área estruturada nos itens** (`Activation.area`, §3.6): `{ kind: "shape", shape, size } |
+  { kind: "text", text } | null` em vez de texto livre — "Nenhuma"/"Forma" (só quando o sistema
+  declara `templates`; select da forma com os rótulos de `shapeLabels` + número + unidade do
+  grid)/"Especial" (texto livre, "3 alvos", "todos os aliados"...) no editor da ficha.
+  `TemplateAreaSchema` migra o formato antigo (string solta, persistida em `Character.data` e em
+  `ChatMessage.item` — cards antigos do chat) com `preprocess`: string vazia vira `null`, string
+  com texto vira `{kind:"text"}`; sem migration de banco (os dois campos são `Json`). O
+  aprimoramento `areaSet` continua sobrescrevendo com texto livre (`{kind:"areaSet", text}`),
+  mesmo quando o item tem uma forma estruturada. O importador (`scripts/import-foundry-compendium.ts`)
+  casa o texto do Foundry com `parseAreaText` (mesmo padrão de "esfera de 6 m", "esfera com 6m de
+  raio", "cone de 9 m", "linha de 30 m", "quadrado/cubo de N m", "raio de N m", sem acento/caixa/
+  espaço fixos); sem match, cai em texto livre — contado no relatório da importação.
+- **Botão "Colocar área"** no card de item do chat, no preview do compêndio e na ficha rápida
+  (`formatArea`, `packages/shared/src/rules/templates.ts` — "Esfera 6 m" ou o texto livre): o
+  botão só aparece quando `area.kind === "shape"` e o sistema declara `templates` (fonte única —
+  sem reparsear texto no card); clicar já abre a ferramenta com a forma e o tamanho do item, o
+  clique no mapa escolhe onde colocar (não ancora no token de quem usou o item).

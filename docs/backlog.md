@@ -94,3 +94,25 @@ comprometido — só um lugar para não perder a ideia até o dono do projeto pr
   handles do canto permitem qualquer pixel, não só múltiplos de `cellSize`; ou perde essa liberdade,
   ou `cells` vira fracionário) que toca client (Konva, handles de resize) e servidor a fundo — fora
   do escopo de um fix pontual.
+- **Botão "Atualizar do compêndio" no item da ficha**, refazendo a cópia a partir da entrada de
+  origem (`$source`). Hoje `character:insert-from-compendium` copia a entrada uma vez (denormalizada,
+  `entryToItem`) e o item da ficha vive independente dali em diante — se o GM corrige o JSON do
+  compêndio depois (erro de digitação, ajuste de regra), todo item já copiado fica desatualizado e
+  só dá pra corrigir manualmente. Precisaria guardar de qual entrada o item veio (campo tipo
+  `$source: entryId`, hoje não existe no `CharacterItemSchema`) e decidir o que fazer com o que o
+  jogador já personalizou no item (nome, aprimoramentos extras, campos editados) — sobrescrever tudo
+  perderia essas edições, mesclar exigiria decidir campo a campo o que é "do compêndio" vs. "do
+  jogador". Anotado em 10/09/2026, ao implementar a área estruturada dos itens (`docs/plano-gabaritos.md` §6).
+- **Cone vindo de "Colocar área" nasce no token do conjurador, em modo apontar** (origem fixa no
+  token, só a direção é escolhida — mira com o mouse, clique confirma); dono pode reapontar depois
+  (o arrastar-o-corpo pra mover e a alça de rotação pra girar já existem, docs/plano-gabaritos.md §5).
+  Hoje o botão "Colocar área" do card de item (§6) abre a ferramenta com a forma/tamanho certos, mas
+  a origem é sempre por clique livre no mapa — nunca ancora em token nenhum (decisão do SPEC §9.9:
+  evita travar o GM num efeito lançado longe de onde o conjurador está, tipo uma Bola de Fogo à
+  distância). Faz sentido só pro CONE porque cone é "de onde eu estou, apontando pra lá" (sopro,
+  ataque em leque) — diferente de círculo/quadrado/linha, que miram um ponto longe do conjurador.
+  Implementar exigiria: achar qual token corresponde a quem usou o item (`ItemCardMessage` não tem
+  isso hoje — personagem não é 1:1 com token, pode ter zero ou vários no mapa; com mais de um,
+  precisaria perguntar qual), e um sub-modo novo da ferramenta Área ("apontar": origem travada no
+  token, só o `mousemove`/clique decide a rotação) separado do clique-e-arrasto livre de hoje.
+  Anotado em 10/09/2026 (`docs/plano-gabaritos.md` §6).
