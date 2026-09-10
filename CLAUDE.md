@@ -68,6 +68,7 @@ docs/SPEC.md          MVP, modelo de dados, eventos — fonte da verdade do esco
 - **Imports ESM** (`"type": "module"`). No server, imports relativos com extensão `.js` (exigência do NodeNext).
 - Código e comentários em **português**; identificadores em inglês (`cellSize`, `ownerId`).
 - Commits: mensagem curta no imperativo, em português ("Adiciona parser de dados").
+- **Commitar direto na `main`, sem criar branches**, a menos que o dono do projeto peça explicitamente.
 
 ## Ao implementar algo
 
