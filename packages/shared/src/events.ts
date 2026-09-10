@@ -53,6 +53,9 @@ import type {
   SceneSetArrivalPayload,
   SceneSetMapPayload,
   SceneUpdateGridPayload,
+  Template,
+  TemplateRemovePayload,
+  TemplateUpsertPayload,
   Token,
   TokenApplyDamagePayload,
   TokenCreate,
@@ -77,6 +80,8 @@ export interface RoomSnapshot {
   tokens: Token[];
   /** Combate da cena ativa (null = nenhum). Já filtrado pela visibilidade de quem recebe. */
   combat: Combat | null;
+  /** Gabaritos de área de efeito da cena ativa (docs/plano-gabaritos.md). Efêmeros, não vêm do banco. */
+  templates: Template[];
   chat: ChatMessage[];
   /** Fichas da sala (jogadores não recebem as de kind = "npc"). */
   characters: Character[];
@@ -118,7 +123,7 @@ export interface ClientToServerEvents {
    * Navega para um mapa sem os efeitos colaterais de `room:join` (presença, snapshot inteiro):
    * GM entra em qualquer mapa não apagado da sala; jogador só no mapa ativo. Sem broadcast.
    */
-  "scene:enter": (payload: SceneEnterPayload, ack: Ack<{ tokens: Token[]; combat: Combat | null }>) => void;
+  "scene:enter": (payload: SceneEnterPayload, ack: Ack<{ tokens: Token[]; combat: Combat | null; templates: Template[] }>) => void;
   "scene:rename": (payload: SceneRenamePayload, ack: Ack<Scene>) => void;
   /** Copia mapUrl/mapWidth/mapHeight/grid/fog/arrival; NÃO copia tokens nem combate. */
   "scene:duplicate": (payload: SceneDuplicatePayload, ack: Ack<Scene>) => void;
@@ -190,6 +195,14 @@ export interface ClientToServerEvents {
   // Régua (efêmera: só broadcast, nada vai ao banco)
   /** Enviado com throttle enquanto o participante arrasta a régua; `ruler: null` ao soltar. */
   "ruler:update": (payload: RulerUpdatePayload, ack: Ack) => void;
+
+  // Gabaritos de área de efeito (docs/plano-gabaritos.md): efêmeros por sessão, guardados em
+  // memória no servidor (não vão ao banco) e sincronizados por socket, mesma regra de broadcast de
+  // mapa que ruler/fog (GM sempre recebe; jogador só se `sceneId` é o mapa ATIVO da sala).
+  /** Cria (id novo) ou edita (mover/girar) um gabarito. Dono = sempre quem chamou (nunca confiado
+   *  do payload); GM edita/apaga qualquer um, jogador só os seus, e só no mapa ATIVO da sala. */
+  "template:upsert": (payload: TemplateUpsertPayload, ack: Ack<Template>) => void;
+  "template:remove": (payload: TemplateRemovePayload, ack: Ack) => void;
 
   // Chat + dados
   /**
@@ -275,6 +288,10 @@ export interface ServerToClientEvents {
 
   /** Régua de outro participante (o autor não recebe eco: já desenha a própria). ruler null = apagar. */
   "ruler:updated": (p: { participantId: string; nickname: string; sceneId: string; ruler: Ruler | null }) => void;
+
+  /** Gabarito criado ou editado (mover/girar) — o cliente faz upsert por id, igual a token:updated. */
+  "template:upserted": (p: { sceneId: string; template: Template }) => void;
+  "template:removed": (p: { sceneId: string; templateId: string }) => void;
 
   /** Erros não relacionados a um ack específico. */
   "server:error": (p: { message: string }) => void;

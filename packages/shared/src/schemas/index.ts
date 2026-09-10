@@ -2,6 +2,7 @@ export * from "./common.js";
 export * from "./room.js";
 export * from "./scene.js";
 export * from "./fog.js";
+export * from "./template.js";
 export * from "./token.js";
 export * from "./dice.js";
 export * from "./combat.js";

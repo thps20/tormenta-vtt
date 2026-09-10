@@ -349,6 +349,18 @@
     "diagonals": "alternating"
   },
 
+  "templates": {
+    "$comment": "Gabaritos de área de efeito no mapa (docs/plano-gabaritos.md). coneAngle/lineWidth são o padrão de todo cone/linha do sistema; um preset pode sobrescrever com angle/width. size/angle/width na unidade do grid acima (m).",
+    "coneAngle": 90,
+    "lineWidth": 1.5,
+    "presets": [
+      { "label": "Bola de fogo: círculo 6 m", "shape": "circle", "size": 6 },
+      { "label": "Cone 9 m", "shape": "cone", "size": 9 },
+      { "label": "Lufada: linha 9 m", "shape": "line", "size": 9 },
+      { "label": "Muralha: quadrado 3 m", "shape": "square", "size": 3 }
+    ]
+  },
+
   "trainedBonus": [
     { "minLevel": 1,  "bonus": 2 },
     { "minLevel": 7,  "bonus": 4 },

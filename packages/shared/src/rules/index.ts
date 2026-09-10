@@ -16,3 +16,4 @@ export * from "./combat.js";
 export * from "./placement.js";
 export * from "./damageResponse.js";
 export * from "./scenes.js";
+export * from "./templates.js";

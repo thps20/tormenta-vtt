@@ -360,6 +360,36 @@ export const CreatureDefSchema = z.object({
 });
 export type CreatureDef = z.infer<typeof CreatureDefSchema>;
 
+/**
+ * Gabarito pronto (círculo/cone/linha/quadrado) oferecido na ferramenta "Área" e no botão
+ * "Colocar área" do card de magia (docs/plano-gabaritos.md). `size` é o raio (círculo), comprimento
+ * (cone/linha) ou lado (quadrado), na unidade do `grid` do sistema. `angle`/`width` só valem em
+ * cone/linha respectivamente; ausentes usam o padrão do sistema (`TemplatesDefSchema.coneAngle`/
+ * `.lineWidth`) — sistemas com um único ângulo de cone não precisam repeti-lo em cada preset.
+ */
+export const TemplatePresetSchema = z.object({
+  label: z.string().min(1).max(60),
+  shape: z.enum(["circle", "cone", "line", "square"]),
+  size: z.number().positive(),
+  angle: z.number().positive().max(180).optional(),
+  width: z.number().positive().optional(),
+});
+export type TemplatePreset = z.infer<typeof TemplatePresetSchema>;
+
+/**
+ * Gabaritos de área de efeito no mapa (docs/plano-gabaritos.md). Bloco opcional: sem ele a
+ * ferramenta "Área" nem aparece na barra — nenhum ângulo/largura padrão fica hardcoded no código
+ * caso um sistema futuro não declare isto (regra número 1 do projeto).
+ */
+export const TemplatesDefSchema = z.object({
+  /** Ângulo padrão do cone, em graus. Presets podem sobrescrever com `angle`. */
+  coneAngle: z.number().positive().max(180),
+  /** Largura padrão da linha/raio, na unidade do `grid`. Presets podem sobrescrever com `width`. */
+  lineWidth: z.number().positive(),
+  presets: z.array(TemplatePresetSchema).default([]),
+});
+export type TemplatesDef = z.infer<typeof TemplatesDefSchema>;
+
 export const SystemDefinitionSchema = z.object({
   /** Versão deste formato de arquivo (para migrar JSONs antigos no futuro). */
   schemaVersion: z.literal(2),
@@ -386,6 +416,8 @@ export const SystemDefinitionSchema = z.object({
   conditions: z.array(ConditionDefSchema).default([]),
   /** Como ler um bloco de criatura no compêndio (ver CreatureDefSchema). Ausente = sistema sem criaturas. */
   creatures: CreatureDefSchema.optional(),
+  /** Gabaritos de área de efeito (ver TemplatesDefSchema). Ausente = sistema sem a ferramenta "Área". */
+  templates: TemplatesDefSchema.optional(),
 
   /** Perícias que podem ser usadas em ações de ataque (ex.: luta, pontaria). */
   attackSkills: z.array(KeySchema).default([]),
