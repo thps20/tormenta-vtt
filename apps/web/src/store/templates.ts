@@ -1,8 +1,12 @@
 import { create } from "zustand";
-import type { Template } from "@tormenta-vtt/shared";
+import type { Template, TemplateUpsertPayload } from "@tormenta-vtt/shared";
 import { throttle } from "../lib/throttle";
 import { emitAck } from "./connection";
 import { toast } from "./ui";
+
+/** x/y/rotation do gabarito no MOUSEDOWN do gesto (mover/girar) — mesmo papel de `TokenPatch.dragFrom`,
+ *  ver `commit` abaixo e docs/plano-gabaritos.md §4. */
+type TemplateDragFrom = NonNullable<TemplateUpsertPayload["dragFrom"]>;
 
 /**
  * Gabaritos de área de efeito (docs/plano-gabaritos.md): efêmeros, um mapa de cada vez —
@@ -27,8 +31,10 @@ interface TemplatesState {
   create: (sceneId: string, template: Template) => Promise<boolean>;
   /** Move/gira durante o arraste: aplica local e emite com throttle (sem ack, sem reverter — eco `live`). */
   updateLive: (sceneId: string, template: Template) => void;
-  /** Ao soltar: patch final do gesto, com ack. */
-  commit: (sceneId: string, template: Template) => Promise<boolean>;
+  /** Ao soltar: patch final do gesto, com ack. `dragFrom` (x/y/rotation do mousedown, quando o
+   *  chamador tiver) vai junto só pro servidor montar o "antes" certo do histórico do GM — os ecos
+   *  `live` já escreveram a posição em memória durante o arraste. */
+  commit: (sceneId: string, template: Template, dragFrom?: TemplateDragFrom) => Promise<boolean>;
   remove: (sceneId: string, templateId: string) => Promise<boolean>;
 }
 
@@ -74,10 +80,10 @@ export const useTemplates = create<TemplatesState>((set, get) => ({
     emitUpsertThrottled(sceneId, template);
   },
 
-  commit: async (sceneId, template) => {
+  commit: async (sceneId, template, dragFrom) => {
     emitUpsertThrottled.cancel();
     get().upsertLocal(sceneId, template);
-    const res = await emitAck("template:upsert", { sceneId, template });
+    const res = await emitAck("template:upsert", { sceneId, template, dragFrom });
     if (!res.ok) {
       toast(res.error);
       return false;

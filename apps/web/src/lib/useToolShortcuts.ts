@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useHistory } from "../store/history";
+import { useTemplateHistory } from "../store/templateHistory";
 import { selectIsGm, useRoom } from "../store/room";
 import { useTools, type ToolMode } from "../store/tools";
 import { isTyping } from "./isTyping";
@@ -15,9 +16,10 @@ const GM_ONLY_MODES = new Set<ToolMode>(["fog"]);
  * docs/plano-gabaritos.md, também para jogador), Esc cancela o gesto em andamento e volta para
  * Selecionar, espaço segurado ativa
  * "mover mapa". Ctrl+Z (Cmd+Z): no modo Névoa desfaz a última forma pintada (sem refazer, SPEC
- * §9.3); fora dela é o desfazer geral (docs/plano-desfazer.md) — Ctrl+Shift+Z e Ctrl+Y refazem.
- * Os dois (Névoa e geral) são só do GM, como já era o de Névoa. Um único listener na janela
- * (montado pela página da mesa).
+ * §9.3); fora dela é o desfazer geral do GM (docs/plano-desfazer.md) — Ctrl+Shift+Z e Ctrl+Y
+ * refazem. Jogador não tem essa pilha geral, mas tem a própria dos gabaritos de área que ele
+ * colocou (`store/templateHistory.ts`, docs/plano-gabaritos.md §4) — só Ctrl+Z, sem refazer, mesmo
+ * motivo da Névoa não ter. Um único listener na janela (montado pela página da mesa).
  */
 export function useToolShortcuts(): void {
   useEffect(() => {
@@ -28,7 +30,13 @@ export function useToolShortcuts(): void {
       const isGm = selectIsGm(useRoom.getState());
       const key = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && !e.altKey && (key === "z" || key === "y")) {
-        if (!isGm) return; // desfazer (de qualquer tipo) é só do GM
+        if (!isGm) {
+          if (key === "z" && !e.shiftKey) {
+            e.preventDefault();
+            void useTemplateHistory.getState().undo();
+          }
+          return;
+        }
         if (useTools.getState().mode === "fog") {
           // Só Ctrl+Z desfaz a névoa — ela não tem "refazer" (SPEC §9.3); Ctrl+Shift+Z/Ctrl+Y não
           // fazem nada aqui dentro (não caem pro desfazer geral: mudaria o que a ferramenta ativa

@@ -30,9 +30,20 @@ import {
   type TokenPatch,
 } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
-import { cellAt, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, snapToCellCenter, snapToGrid, tokensInBox, type Box } from "../lib/grid";
+import { cellAt, cellCenter, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox, type Box } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
-import { newTemplate } from "../lib/templates";
+import {
+  cellCountFromPixels,
+  cellsFromSizeUnits,
+  newLineFromAnchorCell,
+  newSquareFromAnchorCell,
+  newTemplate,
+  pixelsToUnit,
+  roundAngleToStep,
+  roundToHalfCell,
+  templateCoveredCells,
+  templateSizePx,
+} from "../lib/templates";
 import { useImage } from "../lib/useImage";
 import { newId } from "../lib/ids";
 import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
@@ -145,8 +156,9 @@ interface VttCanvasProps {
   onTemplateCreate: (template: Template) => void;
   /** Durante mover/girar um gabarito selecionado: aplica local e emite com throttle (eco `live`). */
   onTemplateLive: (template: Template) => void;
-  /** Ao soltar: patch final do gesto, com ack. */
-  onTemplateCommit: (template: Template) => void;
+  /** Ao soltar: patch final do gesto, com ack. `dragFrom` (x/y/rotation do mousedown) só quando um
+   *  gesto de mover/girar terminou — pro histórico do GM saber o "antes" de verdade (docs/plano-gabaritos.md §4). */
+  onTemplateCommit: (template: Template, dragFrom?: { x: number; y: number; rotation: number }) => void;
 }
 
 /** Forma + tamanho (metros) escolhidos na TemplateToolbar, e a sobrescrita de ângulo/largura de um preset. */
@@ -177,7 +189,7 @@ const MODE_HINTS: Record<ToolMode, string> = {
   pan: "Arraste para navegar pelo mapa • Scroll = zoom",
   ruler: "Clique e arraste para medir • Scroll = zoom",
   fog: "Névoa: escolha Revelar/Ocultar e uma forma no painel • Scroll = zoom",
-  template: "Clique para posicionar • Cone/linha: mova o mouse para girar, clique de novo para confirmar • Scroll = zoom",
+  template: "Clique e arraste para definir tamanho/direção (Alt/Shift soltam o snap) • Clique parado usa o tamanho da barra • Scroll = zoom",
   draw: "Desenho: em breve",
 };
 
@@ -210,6 +222,23 @@ export function canControl(me: Participant, token: Token): boolean {
 /** GM move/gira/apaga qualquer gabarito; jogador só os seus (mesma regra do servidor). */
 export function canControlTemplate(me: Participant, template: Template): boolean {
   return me.role === "gm" || template.ownerId === me.id;
+}
+
+/** Clique sem arrasto em quadrado/linha com grid ativo (docs/plano-gabaritos.md §8): segue a mesma
+ *  regra do arrasto — o campo de tamanho da barra vira uma contagem de células, quadrado cresce pra
+ *  baixo/direita a partir da célula clicada, linha aponta pra direita a partir dela. */
+function buildClickCellTemplate(
+  templateTool: Pick<TemplateTool, "shape" | "sizeUnits">,
+  anchorCell: { col: number; row: number },
+  grid: GridConfig,
+  def: SystemDefinition,
+  ownerId: string,
+): Template {
+  const cells = cellsFromSizeUnits(templateTool.sizeUnits, def);
+  if (templateTool.shape === "square") {
+    return newSquareFromAnchorCell(anchorCell, { col: anchorCell.col + cells - 1, row: anchorCell.row + cells - 1 }, grid, ownerId);
+  }
+  return newLineFromAnchorCell(anchorCell, 0, cells, grid, ownerId);
 }
 
 export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
@@ -330,14 +359,24 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   /** Ponteiro em pixels do mapa (círculo do pincel e linha elástica do polígono). */
   const [fogPointer, setFogPointer] = useState<{ x: number; y: number } | null>(null);
 
-  // --- Gabaritos de área de efeito (docs/plano-gabaritos.md): gesto em andamento.
-  /** Cone/linha: origem já clicada, girando até o 2º clique confirmar (círculo/quadrado não usam
-   *  isto — confirmam no próprio primeiro clique, sem fase de rotação). */
-  const [placingTemplate, setPlacingTemplate] = useState<{ shape: TemplateShape; origin: { x: number; y: number }; rotation: number } | null>(null);
+  // --- Gabaritos de área de efeito (docs/plano-gabaritos.md §5/§8): gesto de criar em andamento.
+  /** Duas famílias de gesto (§8): "cell" — quadrado/linha com grid ativo, SEMPRE um conjunto de
+   *  células inteiras, nunca geometria livre; a âncora é a CÉLULA sob o cursor no mousedown (não um
+   *  ponto). "free" — círculo/cone sempre, e quadrado/linha quando o grid está inativo ou Alt solta
+   *  o snap; a origem já é um ponto (com ou sem snap contínuo, conforme a forma). `startPointer` é
+   *  sempre o ponteiro CRU do mousedown, só pra medir a distância arrastada e decidir clique×arrasto. */
+  const templateCreateRef = useRef<
+    | { kind: "cell"; shape: "square" | "line"; anchorCell: { col: number; row: number }; startPointer: { x: number; y: number } }
+    | { kind: "free"; shape: TemplateShape; origin: { x: number; y: number }; startPointer: { x: number; y: number } }
+    | null
+  >(null);
+  /** O gabarito calculado ao vivo durante o arrasto — já o `Template` pronto (renderizado como
+   *  rascunho + rótulo, e usado direto ao soltar se o gesto virou mesmo um arrasto). */
+  const [templateDraftLive, setTemplateDraftLive] = useState<Template | null>(null);
   /** Arrastando o CORPO do gabarito selecionado (modo Selecionar): delta do ponteiro desde o início. */
   const templateDragRef = useRef<{ id: string; startPointer: { x: number; y: number }; startTemplate: Template } | null>(null);
   /** Arrastando a ALÇA de rotação do gabarito selecionado. */
-  const templateRotateRef = useRef<{ id: string } | null>(null);
+  const templateRotateRef = useRef<{ id: string; startTemplate: Template } | null>(null);
 
   const cancelGestures = () => {
     boxStartRef.current = null;
@@ -350,7 +389,8 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     rectStartRef.current = null;
     setPolygonPoints([]);
     setFogDraft(null);
-    setPlacingTemplate(null);
+    templateCreateRef.current = null;
+    setTemplateDraftLive(null);
     templateDragRef.current = null;
     templateRotateRef.current = null;
   };
@@ -773,7 +813,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   };
 
   /** Cursor conforme o modo; no modo Selecionar, "grab" sobre um token que posso mover. Também estica a caixa de seleção e a régua. */
-  const handleStageMouseMove = () => {
+  const handleStageMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (Konva.isDragging()) return; // no meio de um arraste não mexemos em nada
     if (mode === "pan") return setCursor("grab");
     if (fogActive) {
@@ -791,10 +831,55 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     }
     if (templateActive) {
       setCursor("crosshair");
-      const placing = placingTemplate;
+      const gesture = templateCreateRef.current;
       const p = pointerMapPos();
-      // Cone/linha giram seguindo o mouse até o 2º clique confirmar (círculo/quadrado não têm essa fase).
-      if (placing && p) setPlacingTemplate({ ...placing, rotation: Math.atan2(p.y - placing.origin.y, p.x - placing.origin.x) });
+      if (gesture && p && systemDef) {
+        const grid = scene.grid;
+        const cellSizePx = effectiveCellSize(grid);
+        if (gesture.kind === "cell") {
+          // Quadrado/linha com grid ativo: SEMPRE um conjunto de células inteiras, nunca geometria
+          // livre (docs/plano-gabaritos.md §8) — Alt não solta aqui (é decidido no mousedown: Alt
+          // segurado nem entra nesse "kind", cai direto no ramo "free" abaixo).
+          if (gesture.shape === "square") {
+            setTemplateDraftLive(newSquareFromAnchorCell(gesture.anchorCell, cellAt(p, grid), grid, me.id));
+          } else {
+            const anchorCenter = cellCenter(gesture.anchorCell, grid);
+            const rawAngle = Math.atan2(p.y - anchorCenter.y, p.x - anchorCenter.x);
+            const direction = roundAngleToStep(rawAngle, 45); // só eixos/diagonais, pra percorrer células inteiras
+            const distancePx = Math.hypot(p.x - anchorCenter.x, p.y - anchorCenter.y);
+            const cells = cellCountFromPixels(distancePx, cellSizePx, direction);
+            setTemplateDraftLive(newLineFromAnchorCell(gesture.anchorCell, direction, cells, grid, me.id));
+          }
+          return;
+        }
+        // "free": círculo/cone sempre; quadrado/linha quando o grid está inativo ou Alt solta o snap.
+        // Alt solta o snap o tempo todo do arrasto, não só na origem (docs/plano-gabaritos.md §7).
+        const gridActive = snapEnabled && grid.type !== "none" && !e.evt.altKey;
+        let sizeUnits = pixelsToUnit(Math.hypot(p.x - gesture.origin.x, p.y - gesture.origin.y), systemDef, cellSizePx);
+        let rotation = 0;
+        if (gesture.shape === "cone") {
+          rotation = Math.atan2(p.y - gesture.origin.y, p.x - gesture.origin.x);
+          if (gridActive) {
+            sizeUnits = roundToHalfCell(sizeUnits, systemDef); // regra do centro decide as células, meia célula basta
+            if (!e.evt.shiftKey) rotation = roundAngleToStep(rotation, 15);
+          }
+        } else if (gesture.shape === "line") {
+          rotation = Math.atan2(p.y - gesture.origin.y, p.x - gesture.origin.x); // livre: sem grid, sem passo
+        }
+        setTemplateDraftLive(
+          newTemplate({
+            shape: gesture.shape,
+            origin: gesture.origin,
+            sizeUnits,
+            rotationOverride: rotation,
+            angleOverride: templateTool?.angleOverride,
+            widthOverride: templateTool?.widthOverride,
+            ownerId: me.id,
+            def: systemDef,
+            cellSizePx,
+          }),
+        );
+      }
       return;
     }
     if (mode !== "select") return setCursor("crosshair");
@@ -870,39 +955,44 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     if (templateActive && templateTool && systemDef) {
       const p = pointerMapPos();
       if (!p) return;
-      const origin = snapEnabled ? snapToCellCenter(p.x, p.y, scene.grid) : p;
-      const cellSizePx = effectiveCellSize(scene.grid);
-      if (placingTemplate) {
-        // 2º clique: confirma cone/linha com a rotação de AGORA (o mousemove já vinha atualizando
-        // placingTemplate, mas o ponteiro pode ter andado um frame a mais desde o último evento).
-        const rotation = Math.atan2(p.y - placingTemplate.origin.y, p.x - placingTemplate.origin.x);
-        const built = newTemplate({
-          shape: placingTemplate.shape,
-          origin: placingTemplate.origin,
+      const grid = scene.grid;
+      const gridActive = snapEnabled && grid.type !== "none" && !e.evt.altKey;
+      // Quadrado/linha com grid ativo: SEMPRE um conjunto de células inteiras, nunca geometria livre
+      // (docs/plano-gabaritos.md §8) — a âncora é a CÉLULA sob o cursor, não um ponto.
+      if (gridActive && (templateTool.shape === "square" || templateTool.shape === "line")) {
+        const anchorCell = cellAt(p, grid);
+        templateCreateRef.current = { kind: "cell", shape: templateTool.shape, anchorCell, startPointer: p };
+        setTemplateDraftLive(buildClickCellTemplate(templateTool, anchorCell, grid, systemDef, me.id));
+        return;
+      }
+      // "Livre": círculo/cone sempre; quadrado/linha quando o grid está inativo ou Alt solta o snap.
+      // Origem por forma (Alt solta): círculo só no CENTRO da célula (a regra do centro decide as
+      // células, não precisa de vértice); cone entre vértice/centro (o mais perto); quadrado/linha
+      // aqui não recebem snap de origem (já caíram fora do ramo "célula" acima).
+      let origin = p;
+      if (gridActive) {
+        if (templateTool.shape === "circle") origin = snapToCellCenter(p.x, p.y, grid);
+        else if (templateTool.shape === "cone") origin = snapToVertexOrCenter(p.x, p.y, grid);
+      }
+      templateCreateRef.current = { kind: "free", shape: templateTool.shape, origin, startPointer: p };
+      setTemplateDraftLive(
+        newTemplate({
+          shape: templateTool.shape,
+          origin,
           sizeUnits: templateTool.sizeUnits,
           angleOverride: templateTool.angleOverride,
           widthOverride: templateTool.widthOverride,
           ownerId: me.id,
           def: systemDef,
-          cellSizePx,
-        });
-        onTemplateCreate({ ...built, rotation });
-        setPlacingTemplate(null);
-        return;
-      }
-      if (templateTool.shape === "cone" || templateTool.shape === "line") {
-        // Cone/linha: origem só, a rotação segue o mouse até o 2º clique (ramo acima).
-        setPlacingTemplate({ shape: templateTool.shape, origin, rotation: 0 });
-        return;
-      }
-      // Círculo/quadrado: confirma no próprio clique, sem fase de rotação.
-      onTemplateCreate(newTemplate({ shape: templateTool.shape, origin, sizeUnits: templateTool.sizeUnits, ownerId: me.id, def: systemDef, cellSizePx }));
+          cellSizePx: effectiveCellSize(grid),
+        }),
+      );
       return;
     }
     if (mode !== "select") return;
     const rotateTarget = templateRotateHandleAtPointer();
     if (rotateTarget) {
-      templateRotateRef.current = { id: rotateTarget.id };
+      templateRotateRef.current = { id: rotateTarget.id, startTemplate: rotateTarget };
       return;
     }
     // Alça de redimensionar tem prioridade sobre o token: geometricamente ela fica na borda dele,
@@ -931,18 +1021,49 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
 
   /** Soltou o mouse: fecha a régua (some) ou a caixa de seleção (seleciona o que está dentro). */
   const handleStageMouseUp = () => {
+    if (templateCreateRef.current && templateTool && systemDef) {
+      const gesture = templateCreateRef.current;
+      const draft = templateDraftLive;
+      templateCreateRef.current = null;
+      setTemplateDraftLive(null);
+      const p = pointerMapPos();
+      // Só conta como arrasto depois de andar alguns pixels de TELA (mesmo limiar da caixa de
+      // seleção); um clique parado usa o tamanho da barra — assim os presets continuam funcionando
+      // (escolhe o preset, clica), docs/plano-gabaritos.md §5/§8.
+      const dragged = !!p && Math.hypot(p.x - gesture.startPointer.x, p.y - gesture.startPointer.y) * stageScale > 4;
+      if (dragged && draft) {
+        // O rascunho já É o Template calculado ao vivo no último mousemove — reusa direto.
+        onTemplateCreate(draft);
+      } else if (gesture.kind === "cell") {
+        onTemplateCreate(buildClickCellTemplate(templateTool, gesture.anchorCell, scene.grid, systemDef, me.id));
+      } else {
+        onTemplateCreate(
+          newTemplate({
+            shape: gesture.shape,
+            origin: gesture.origin,
+            sizeUnits: templateTool.sizeUnits,
+            angleOverride: templateTool.angleOverride,
+            widthOverride: templateTool.widthOverride,
+            ownerId: me.id,
+            def: systemDef,
+            cellSizePx: effectiveCellSize(scene.grid),
+          }),
+        );
+      }
+      return;
+    }
     if (templateRotateRef.current) {
-      const { id } = templateRotateRef.current;
+      const { id, startTemplate } = templateRotateRef.current;
       templateRotateRef.current = null;
       const current = templates.find((t) => t.id === id);
-      if (current) onTemplateCommit(current);
+      if (current) onTemplateCommit(current, { x: startTemplate.x, y: startTemplate.y, rotation: startTemplate.rotation });
       return;
     }
     if (templateDragRef.current) {
-      const { id } = templateDragRef.current;
+      const { id, startTemplate } = templateDragRef.current;
       templateDragRef.current = null;
       const current = templates.find((t) => t.id === id);
-      if (current) onTemplateCommit(current);
+      if (current) onTemplateCommit(current, { x: startTemplate.x, y: startTemplate.y, rotation: startTemplate.rotation });
       return;
     }
     if (fogActive) return fogMouseUp();
@@ -1089,21 +1210,20 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
 
   // --- Gabaritos de área de efeito: preview durante a colocação, contagem/destaque de alvos e a
   // alça de rotação do selecionado (docs/plano-gabaritos.md).
-  const templateDraft = useMemo<Template | null>(() => {
-    if (!placingTemplate || !templateTool || !systemDef) return null;
-    return newTemplate({
-      shape: placingTemplate.shape,
-      origin: placingTemplate.origin,
-      sizeUnits: templateTool.sizeUnits,
-      angleOverride: templateTool.angleOverride,
-      widthOverride: templateTool.widthOverride,
-      ownerId: me.id,
-      def: systemDef,
-      cellSizePx: effectiveCellSize(scene.grid),
-      rotationOverride: placingTemplate.rotation,
-    });
+  // `templateDraftLive` já É o Template pronto (mousedown/mousemove montam ele direto — ver §7/§8);
+  // sem derivação nenhuma aqui, só o nome que o resto do componente já usava.
+  const templateDraft = templateDraftLive;
+
+  /** Rótulo ao vivo do rascunho: tamanho na unidade do sistema + contagem de alvos (docs/plano-gabaritos.md §5). */
+  const templateDraftLabel = useMemo(() => {
+    if (!templateDraft || !systemDef) return null;
+    const cellSizePx = effectiveCellSize(scene.grid);
+    const size = Math.round(pixelsToUnit(templateSizePx(templateDraft), systemDef, cellSizePx) * 10) / 10;
+    const unit = systemDef.grid?.unit ?? "";
+    const count = tokensInTemplate(tokens, templateDraft, cellSizePx).size;
+    return `${size}${unit ? ` ${unit}` : ""} • ${count} ${count === 1 ? "alvo" : "alvos"}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placingTemplate, templateTool, systemDef, scene.grid, me.id]);
+  }, [templateDraft, systemDef, scene.grid, tokens]);
 
   const templateTargets = useMemo(() => {
     const cellSizePx = effectiveCellSize(scene.grid);
@@ -1117,6 +1237,23 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     return { counts, highlighted: tokens.filter((t) => highlightedIds.has(t.id)) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templates, tokens, scene.grid]);
+
+  /** Preenchimento por célula (docs/plano-gabaritos.md §5): além do contorno geométrico, marca as
+   *  células cujo centro cai dentro — todo mundo vê o mesmo resultado discreto. Só com grid ("none"
+   *  não tem célula pra pintar), gabaritos reais e o rascunho durante o arrasto. */
+  const templateCoveredCellsById = useMemo(() => {
+    if (scene.grid.type === "none") return {};
+    const map: Record<string, { x: number; y: number }[]> = {};
+    for (const t of templates) map[t.id] = templateCoveredCells(t, scene.grid);
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templates, scene.grid]);
+
+  const templateDraftCoveredCells = useMemo(() => {
+    if (!templateDraft || scene.grid.type === "none") return [];
+    return templateCoveredCells(templateDraft, scene.grid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateDraft, scene.grid]);
 
   const templateRotateHandle = useMemo(() => {
     const selected = templates.find((t) => t.id === selectedTemplateId);
@@ -1264,10 +1401,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           <TemplateLayer
             templates={templates}
             draft={templateDraft}
+            draftLabel={templateDraftLabel}
             selectedId={selectedTemplateId}
             targetCounts={templateTargets.counts}
             rotateHandle={templateRotateHandle}
             highlightedTokens={templateTargets.highlighted}
+            coveredCellsById={templateCoveredCellsById}
+            draftCoveredCells={templateDraftCoveredCells}
+            cellSize={effectiveCellSize(scene.grid)}
             stageScale={stageScale}
           />
           {selectionBox && (

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Anchor, Check, FileText, Heart, Info, Plus, Shield, SlidersHorizontal, Sparkles, Swords, Trash2, X, Zap } from "lucide-react";
-import type { Character, CharacterItem, ComputedCharacter, ConditionDef, SystemDefinition, Token, TokenCondition } from "@tormenta-vtt/shared";
+import { formatArea, type Character, type CharacterItem, type ComputedCharacter, type ConditionDef, type SystemDefinition, type Token, type TokenCondition } from "@tormenta-vtt/shared";
 import { DamageTypeBadge } from "./DamageTypeBadge";
 
 /**
@@ -519,6 +519,7 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
                 const cost = activation.cost;
                 const costResourceDef = def.activation.resource ? def.resources.find((r) => r.key === def.activation.resource) : undefined;
                 const costUnit = costResourceDef?.abbr ?? costResourceDef?.label;
+                const areaText = formatArea(def, activation.area);
 
                 return (
                   <div key={item.id} className="p-1.5 rounded bg-[#1a1713] border border-[#2d2417] flex items-center justify-between gap-2">
@@ -532,6 +533,11 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
                           <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-cyan-950/50 text-cyan-300 border border-cyan-800/40">
                             {cost}
                             {costUnit ? ` ${costUnit}` : ""}
+                          </span>
+                        )}
+                        {areaText && (
+                          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-zinc-800/60 text-zinc-300 border border-zinc-700/40" title="Área">
+                            {areaText}
                           </span>
                         )}
                       </div>

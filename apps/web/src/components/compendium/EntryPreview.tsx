@@ -1,6 +1,6 @@
 import React from "react";
 import { AlertCircle, Replace } from "lucide-react";
-import { describeActivation, entryToItem, pendingChoices, type SystemDefinition } from "@tormenta-vtt/shared";
+import { describeActivation, entryToItem, formatArea, pendingChoices, type SystemDefinition } from "@tormenta-vtt/shared";
 import { signed } from "../../lib/system";
 import { summarizeField } from "../character/StructuredFields";
 import { seeBook } from "../../lib/compendium";
@@ -67,7 +67,8 @@ export const EntryPreview: React.FC<EntryPreviewProps> = ({ def, row, onReplace 
     if (d.range) lines.push({ label: "Alcance", value: d.range });
     if (d.duration) lines.push({ label: "Duração", value: d.duration });
     if (a.target) lines.push({ label: "Alvo", value: a.target });
-    if (a.area) lines.push({ label: "Área", value: a.area });
+    const areaText = formatArea(def, a.area);
+    if (areaText) lines.push({ label: "Área", value: areaText });
     if (a.effect) lines.push({ label: "Efeito", value: a.effect });
   }
   if (kind?.hasSave && entry.save) {

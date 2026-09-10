@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cellAt, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, normalizeOffset, snapToCellCenter, snapToGrid, tokensInBox } from "./grid";
+import { cellAt, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, normalizeOffset, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox } from "./grid";
 import type { GridConfig } from "@tormenta-vtt/shared";
 
 const grid: GridConfig = { type: "square", cellSize: 50, offsetX: 10, offsetY: 0, color: "#000", snap: true };
@@ -24,6 +24,12 @@ describe("grid", () => {
     expect(snapToCellCenter(12, 49, grid)).toEqual({ x: 35, y: 25 });
     expect(snapToCellCenter(59, 51, grid)).toEqual({ x: 35, y: 75 });
     expect(snapToCellCenter(12, 49, { ...grid, type: "none" })).toEqual({ x: 12, y: 49 });
+  });
+
+  it("snapToVertexOrCenter escolhe o mais perto entre vértice e centro (docs/plano-gabaritos.md §5)", () => {
+    expect(snapToVertexOrCenter(12, 2, grid)).toEqual(snapToGrid(12, 2, grid)); // perto do vértice (10,0)
+    expect(snapToVertexOrCenter(35, 25, grid)).toEqual(snapToCellCenter(35, 25, grid)); // exatamente no centro
+    expect(snapToVertexOrCenter(12, 49, { ...grid, type: "none" })).toEqual({ x: 12, y: 49 });
   });
 
   it("clamp segura o token dentro do mapa", () => {

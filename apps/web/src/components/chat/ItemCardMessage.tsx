@@ -1,6 +1,6 @@
 import React from "react";
 import { Dices, Shapes, Sparkles } from "lucide-react";
-import { parseAreaText, type ChatMessage, type ItemCard, type SystemDefinition } from "@tormenta-vtt/shared";
+import { formatArea, type ChatMessage, type ItemCard, type SystemDefinition } from "@tormenta-vtt/shared";
 import { useTools } from "../../store/tools";
 import { DamageFormula } from "../DamageTypeBadge";
 
@@ -33,17 +33,17 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
   if (card.range) meta.push({ label: "Alcance", value: card.range, enhanced: enhanced.has("range") });
   if (card.duration) meta.push({ label: "Duração", value: card.duration, enhanced: enhanced.has("duration") });
   if (card.target) meta.push({ label: "Alvo", value: card.target, enhanced: enhanced.has("target") });
-  if (card.area) meta.push({ label: "Área", value: card.area, enhanced: enhanced.has("area") });
+  const areaText = formatArea(def ?? { templates: undefined, grid: undefined }, card.area);
+  if (areaText) meta.push({ label: "Área", value: areaText, enhanced: enhanced.has("area") });
   const enhancements = card.enhancements ?? [];
   const notes = enhancements.filter((e) => e.note);
 
-  // "Colocar área" (docs/plano-gabaritos.md): só existe se a sala tem a ferramenta (def.templates)
-  // e o card declara uma área. Casa o texto com um padrão simples ("esfera de 6 m", "cone de 9 m")
-  // pra já abrir a ferramenta com a forma/tamanho certos; sem match, abre sem preset (como pedido).
-  const showAreaButton = canAct && !!card.area && !!def?.templates;
+  // "Colocar área" (docs/plano-gabaritos.md §6): só existe se a sala tem a ferramenta (def.templates)
+  // e a área do card é uma FORMA reconhecida (não texto livre) — a única fonte é o campo
+  // estruturado, sem reparsear texto.
+  const showAreaButton = canAct && card.area?.kind === "shape" && !!def?.templates;
   const placeArea = () => {
-    const parsed = parseAreaText(card.area);
-    if (parsed) useTools.getState().pickTemplatePreset({ shape: parsed.shape, size: parsed.size });
+    if (card.area?.kind === "shape") useTools.getState().pickTemplatePreset({ shape: card.area.shape, size: card.area.size });
     useTools.getState().setMode("template");
   };
 

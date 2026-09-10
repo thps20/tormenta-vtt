@@ -1,9 +1,13 @@
 import { useEffect } from "react";
+import { getSystemDefinition } from "@tormenta-vtt/shared";
 import { selectIsGm, useRoom } from "../store/room";
 import { useTokens } from "../store/tokens";
 import { useTemplates } from "../store/templates";
+import { useTemplateHistory } from "../store/templateHistory";
 import { useCharacters } from "../store/characters";
 import { isTyping } from "./isTyping";
+import { describeTemplateAreaChange } from "./templates";
+import { effectiveCellSize } from "./grid";
 
 /**
  * Apaga os tokens selecionados agora. Compartilhada pelo atalho Delete/Backspace (useDeleteSelectionShortcut,
@@ -43,12 +47,29 @@ export function deleteSelectedTokens(): void {
  * de `deleteSelectedTokens`: GM ou dono (o servidor confere de novo; selecionar um gabarito alheio
  * nem é possível pelo clique — VttCanvas só seleciona o que o usuário controla). Token e gabarito
  * nunca ficam selecionados juntos, então os dois `delete*` desta função nunca disparam ao mesmo tempo.
+ * Jogador (não-GM): empilha no Ctrl+Z local antes de apagar — o GM já tem isso pela pilha geral do
+ * servidor (socket/templates.ts empilha sozinho ao receber template:remove), docs/plano-gabaritos.md §4.
  */
 function deleteSelectedTemplate(): void {
   const { selectedId, byScene, remove } = useTemplates.getState();
   if (!selectedId) return;
   const sceneId = Object.keys(byScene).find((id) => byScene[id]?.[selectedId]);
-  if (sceneId) void remove(sceneId, selectedId);
+  const removed = sceneId ? byScene[sceneId]?.[selectedId] : undefined;
+  if (!sceneId || !removed) return;
+
+  if (!selectIsGm(useRoom.getState())) {
+    const { room, scenes } = useRoom.getState();
+    const def = room ? getSystemDefinition(room.systemId) : null;
+    const scene = scenes.find((sc) => sc.id === sceneId);
+    if (def && scene) {
+      const cellSizePx = effectiveCellSize(scene.grid);
+      useTemplateHistory.getState().push({
+        summary: describeTemplateAreaChange("apagar", def, removed, cellSizePx),
+        revert: () => useTemplates.getState().create(sceneId, removed),
+      });
+    }
+  }
+  void remove(sceneId, selectedId);
 }
 
 /**

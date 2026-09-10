@@ -3,6 +3,9 @@ import { navigate } from "../lib/router";
 import { selectActiveScene, selectViewedScene, useRoom } from "../store/room";
 import { sceneTokens, useTokens } from "../store/tokens";
 import { sceneTemplates, useTemplates } from "../store/templates";
+import { useTemplateHistory } from "../store/templateHistory";
+import { describeTemplateAreaChange } from "../lib/templates";
+import { effectiveCellSize } from "../lib/grid";
 import { useChat } from "../store/chat";
 import { activeCombatant, isMyTurn, sceneCombat, useCombat } from "../store/combat";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
@@ -15,7 +18,7 @@ import { useTurnTitle } from "../lib/useTurnTitle";
 import { useHistory } from "../store/history";
 import { useSceneList } from "../store/sceneList";
 import { selectEffectiveMode, useTools } from "../store/tools";
-import { computeCharacter, isPointRevealed, pickTokensToCarry, tokenCenter } from "@tormenta-vtt/shared";
+import { computeCharacter, isPointRevealed, pickTokensToCarry, tokenCenter, type Template, type TemplateChangeAction } from "@tormenta-vtt/shared";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { CombatBanner } from "./CombatBanner";
 import { type CombatPanelCallbacks } from "./CombatPanel";
@@ -355,6 +358,27 @@ function Table() {
   const linkableCharacters = characters.filter((c) => canEditCharacter(me, c));
   const isGm = me.role === "gm";
 
+  // --- Gabaritos de área de efeito: Ctrl+Z local do jogador (docs/plano-gabaritos.md §4) ---------
+  // O GM já tem tudo isso pela pilha geral do servidor (socket/templates.ts empilha sozinho); aqui
+  // só cobre o jogador, que não tem acesso a `history:undo` (gmOnly). Efêmero: some ao recarregar.
+  const pushTemplateUndo = (action: TemplateChangeAction, template: Template, revert: () => Promise<boolean>) => {
+    if (isGm || !scene || !systemDef) return;
+    const cellSizePx = effectiveCellSize(scene.grid);
+    useTemplateHistory.getState().push({ summary: describeTemplateAreaChange(action, systemDef, template, cellSizePx), revert });
+  };
+  const handleTemplateCreate = (t: Template) => {
+    if (!scene) return;
+    void createTemplate(scene.id, t);
+    pushTemplateUndo("colocar", t, () => useTemplates.getState().remove(scene.id, t.id));
+  };
+  const handleTemplateCommit = (t: Template, dragFrom?: { x: number; y: number; rotation: number }) => {
+    if (!scene) return;
+    void commitTemplate(scene.id, t, dragFrom);
+    if (!dragFrom) return; // sem dragFrom = não veio de um gesto de mover/girar (ou nada mudou)
+    const action = dragFrom.x !== t.x || dragFrom.y !== t.y ? "mover" : dragFrom.rotation !== t.rotation ? "girar" : null;
+    if (action) pushTemplateUndo(action, t, () => useTemplates.getState().commit(scene.id, { ...t, ...dragFrom }));
+  };
+
   // Salvar do modal: só emite o que mudou (mapa e/ou grid).
   const handleSaveMapConfig = async ({ map, grid }: MapConfigResult) => {
     if (!scene) return;
@@ -551,9 +575,9 @@ function Table() {
                 }
                 selectedTemplateId={selectedTemplateId}
                 onSelectTemplate={selectTemplate}
-                onTemplateCreate={(t) => scene && void createTemplate(scene.id, t)}
+                onTemplateCreate={handleTemplateCreate}
                 onTemplateLive={(t) => scene && templateLive(scene.id, t)}
-                onTemplateCommit={(t) => scene && void commitTemplate(scene.id, t)}
+                onTemplateCommit={handleTemplateCommit}
               />
               <Toolbar
                 isGm={isGm}

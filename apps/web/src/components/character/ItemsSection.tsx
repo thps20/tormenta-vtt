@@ -27,6 +27,7 @@ import {
   type ItemKindDef,
   type Save,
   type SystemDefinition,
+  type TemplateShape,
 } from "@tormenta-vtt/shared";
 import { PALETTE_SHORTCUT_LABEL, seeBook } from "../../lib/compendium";
 import { describeEffect, effectForKind, effectKindOptions } from "../../lib/enhancements";
@@ -503,7 +504,7 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onP
     onPatch({ enhancements: item.enhancements.map((e) => (e.id === id ? { ...e, ...p } : e)) });
   const costAbbr = def.activation.resource ? (def.resources.find((r) => r.key === def.activation.resource)?.abbr ?? "") : "";
   const patchActivation = (p: Partial<Activation>) => {
-    const base: Activation = item.activation ?? { cost: 0, execution: "", duration: { units: "", value: 0 }, range: { units: "", value: 0 }, target: "", area: "", effect: "" };
+    const base: Activation = item.activation ?? { cost: 0, execution: "", duration: { units: "", value: 0 }, range: { units: "", value: 0 }, target: "", area: null, effect: "" };
     onPatch({ activation: { ...base, ...p } });
   };
   const withEmpty = (options: { key: string; label: string }[]) => [{ value: "", label: "—" }, ...options.map((o) => ({ value: o.key, label: o.label }))];
@@ -607,7 +608,7 @@ const ItemEditor: React.FC<ItemEditorProps> = ({ def, character, kind, item, onP
               Alvo <TextInput value={item.activation?.target ?? ""} onCommit={(v) => patchActivation({ target: v })} className="w-40" maxLength={200} />
             </label>
             <label className="flex items-center gap-1 text-zinc-400">
-              Área <TextInput value={item.activation?.area ?? ""} onCommit={(v) => patchActivation({ area: v })} className="w-40" maxLength={200} />
+              Área <AreaField def={def} value={item.activation?.area ?? null} onChange={(area) => patchActivation({ area })} />
             </label>
           </div>
           <TextArea value={item.activation?.effect ?? ""} onCommit={(v) => patchActivation({ effect: v })} placeholder="Efeito" rows={2} />
@@ -713,6 +714,45 @@ const UnitsInput: React.FC<{ units: { key: string; label: string }[]; value: { u
     <Select value={value.units} onChange={(units) => onChange({ ...value, units })} options={units.map((u) => ({ value: u.key, label: u.label }))} title="Unidade que substitui a do item" />
   </>
 );
+
+type AreaMode = "none" | "shape" | "text";
+const areaModeOf = (area: Activation["area"]): AreaMode => (area === null ? "none" : area.kind);
+
+/**
+ * Campo "Área" do item ativo (docs/plano-gabaritos.md §6): modo Nenhuma/Forma/Especial — "Forma"
+ * só aparece quando o sistema declara `templates` (a ferramenta "Área" do mapa consegue colocar
+ * sozinha; sem isso, a área só pode ser texto livre). Rótulos das formas vêm do JSON
+ * (`def.templates.shapeLabels`), nunca hardcoded (regra número 1).
+ */
+const AreaField: React.FC<{ def: SystemDefinition; value: Activation["area"]; onChange: (area: Activation["area"]) => void }> = ({ def, value, onChange }) => {
+  const mode = areaModeOf(value);
+  const shapeOptions = def.templates
+    ? (Object.keys(def.templates.shapeLabels) as TemplateShape[]).map((shape) => ({ value: shape, label: def.templates!.shapeLabels[shape] }))
+    : [];
+  return (
+    <>
+      <Select
+        value={mode}
+        onChange={(m) => {
+          if (m === "none") onChange(null);
+          else if (m === "text") onChange({ kind: "text", text: value?.kind === "text" ? value.text : "" });
+          else onChange({ kind: "shape", shape: shapeOptions[0]?.value ?? "circle", size: def.grid?.cellSize ?? 1 });
+        }}
+        options={[{ value: "none", label: "Nenhuma" }, ...(def.templates ? [{ value: "shape", label: "Forma" }] : []), { value: "text", label: "Especial" }]}
+      />
+      {mode === "shape" && value?.kind === "shape" && def.templates && (
+        <>
+          <Select value={value.shape} onChange={(shape) => onChange({ kind: "shape", shape: shape as TemplateShape, size: value.size })} options={shapeOptions} />
+          <NumInput value={value.size} onCommit={(n) => onChange({ kind: "shape", shape: value.shape, size: Math.max(0.1, n ?? 0.1) })} className="w-14" />
+          {def.grid?.unit && <span className="text-zinc-500">{def.grid.unit}</span>}
+        </>
+      )}
+      {mode === "text" && value?.kind === "text" && (
+        <TextInput value={value.text} onCommit={(text) => onChange({ kind: "text", text: text.trim() })} placeholder="1 alvo por nível" className="w-40" maxLength={200} />
+      )}
+    </>
+  );
+};
 
 /**
  * Tipo e valor do efeito de um aprimoramento. Cada tipo tem os campos do seu

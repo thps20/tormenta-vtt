@@ -36,6 +36,14 @@ export function cellToPoint(cell: { col: number; row: number }, grid: GridConfig
   return { x: cell.col * size + ox, y: cell.row * size + oy };
 }
 
+/** Centro (pixels do mapa) de uma célula por índice — inverso de `cellAt` + meio lado. Gabaritos
+ *  ancorados em célula (quadrado/linha, docs/plano-gabaritos.md §8) usam pra achar de onde "sair". */
+export function cellCenter(cell: { col: number; row: number }, grid: GridConfig): { x: number; y: number } {
+  const size = effectiveCellSize(grid);
+  const corner = cellToPoint(cell, grid);
+  return { x: corner.x + size / 2, y: corner.y + size / 2 };
+}
+
 /** Retângulo em células ocupado por um token (o lado é arredondado pro grid; ver rules/placement.ts). */
 export function cellRect(token: { x: number; y: number; width: number }, grid: GridConfig): CellRect {
   const size = effectiveCellSize(grid);
@@ -62,6 +70,18 @@ export function snapToCellCenter(x: number, y: number, grid: GridConfig): { x: n
     x: Math.floor((x - ox) / grid.cellSize) * grid.cellSize + ox + grid.cellSize / 2,
     y: Math.floor((y - oy) / grid.cellSize) * grid.cellSize + oy + grid.cellSize / 2,
   };
+}
+
+/** Origem de um gabarito de área (docs/plano-gabaritos.md §5): gruda no vértice OU no centro de
+ *  célula mais próximo, o que estiver mais perto do ponto — nunca só um dos dois (senão a origem
+ *  "pularia" além do necessário perto da borda de uma célula). Grid "none" devolve o ponto como está. */
+export function snapToVertexOrCenter(x: number, y: number, grid: GridConfig): { x: number; y: number } {
+  if (grid.type === "none") return { x, y };
+  const vertex = snapToGrid(x, y, grid);
+  const center = snapToCellCenter(x, y, grid);
+  const dVertex = (vertex.x - x) ** 2 + (vertex.y - y) ** 2;
+  const dCenter = (center.x - x) ** 2 + (center.y - y) ** 2;
+  return dVertex <= dCenter ? vertex : center;
 }
 
 /** Mantém o token dentro dos limites do mapa. */
