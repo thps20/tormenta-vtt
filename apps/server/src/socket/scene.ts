@@ -40,6 +40,7 @@ import { emitCombat, loadCombatRow, removeTokenFromSceneCombat, toCombat } from 
 import { cellAt, cellRect, cellToPoint, effectiveCellSize, resnapToken } from "../services/grid.js";
 import { pushEntry, type HistoryEntry } from "../services/history.js";
 import { toScene, toToken } from "../services/serialize.js";
+import { clearTemplates, listTemplates } from "../services/templates.js";
 import { tokenVisibleTo } from "../services/visibility.js";
 import { guarded, HandlerError } from "./ack.js";
 import { emitHistoryUpdated } from "./history.js";
@@ -334,7 +335,7 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
       ]);
       const tokens = tokenRows.map(toToken).filter((t) => tokenVisibleTo(t, viewer, scene.fog));
       const combat = combatRow ? toCombat(combatRow, def, viewer, scene.fog) : null;
-      return { tokens, combat };
+      return { tokens, combat, templates: listTemplates(sceneId) };
     }),
   );
 
@@ -450,6 +451,9 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
 
         await prisma.scene.update({ where: { id: sceneId }, data: { deletedAt: new Date() } });
         io.to(rooms.all(ctx.roomId)).emit("scene:deleted", { sceneId });
+        // Gabaritos são efêmeros e nunca voltam (docs/plano-gabaritos.md): diferente de token/combate,
+        // não têm undo — o mapa apagado nem entra de novo na pilha de desfazer com eles.
+        clearTemplates(sceneId);
         if (moves.length > 0) await emitCombat(io, ctx.roomId, sceneId, { role: "gm", participantId: ctx.participantId });
 
         pushEntry(ctx.roomId, buildSceneDeleteHistoryEntry(io, ctx.roomId, sceneId, sceneRow.name, destSceneId, moves));

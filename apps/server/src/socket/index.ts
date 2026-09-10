@@ -7,6 +7,7 @@ import { registerCombatHandlers } from "./combat.js";
 import { registerCharacterHandlers } from "./character.js";
 import { registerRulerHandlers } from "./ruler.js";
 import { registerFogHandlers } from "./fog.js";
+import { registerTemplateHandlers } from "./templates.js";
 import { registerCompendiumHandlers } from "./compendium.js";
 import { registerHistoryHandlers } from "./history.js";
 import type { TypedServer } from "./types.js";
@@ -29,6 +30,7 @@ export function registerSocketHandlers(io: TypedServer, log: FastifyBaseLogger):
     registerCharacterHandlers(io, socket);
     registerRulerHandlers(io, socket);
     registerFogHandlers(io, socket);
+    registerTemplateHandlers(io, socket);
     registerCompendiumHandlers(io, socket);
     registerHistoryHandlers(io, socket);
 

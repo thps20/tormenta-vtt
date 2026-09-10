@@ -7,6 +7,7 @@ import { toChatMessage, toParticipant, toRoomPublic, toScene, toToken } from "./
 import { characterVisibleTo, toCharacter } from "./characters.js";
 import { tokenVisibleTo } from "./visibility.js";
 import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, tokenGateOk } from "./chatVisibility.js";
+import { listTemplates } from "./templates.js";
 
 const CHAT_HISTORY_LIMIT = 100;
 
@@ -60,6 +61,9 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     scenes: scenes.map(toScene),
     tokens: tokens.map(toToken).filter((t) => tokenVisibleTo(t, viewer, fog)),
     combat,
+    // Gabaritos são efêmeros (docs/plano-gabaritos.md): sem fog/visibilidade por token, todos que
+    // veem o mapa ativo veem todos os gabaritos dele.
+    templates: room.activeSceneId ? listTemplates(room.activeSceneId) : [],
     chat: chatMessages.flatMap((m) => {
       if (m.kind === "initiative-batch") {
         const view = initiativeBatchForViewer(m, viewer, tokenInfoById, room.activeSceneId);
