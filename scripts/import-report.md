@@ -44,6 +44,8 @@ Aprimoramentos (effects `onuse`+`self`): 743 em 281 entradas, 211 repetíveis (`
 
 Efeito mecânico preenchido só quando o texto inteiro casa um padrão estrito ("aumenta o dano em +XdY", "+XdY de dano", "muda o dano para XdY", "aumenta a cura em +XdY", "aumenta a CD em +N", "muda o alcance para <unidade>", "muda a duração para [N] <unidade>", "muda a área para <texto>", "aumenta o número de alvos em +N"): 1 `areaSet`, 26 `damageDiceAdd`, 10 `durationSet`, 2 `healDiceAdd`, 12 `rangeSet`, 17 `targetsAdd`. Frases compostas ("muda o alcance para médio e a duração para cena") e os demais ficam como só custo e estão listados por categoria no fim deste relatório.
 
+Área (docs/plano-gabaritos.md §6): 54 viraram forma reconhecida (`parseAreaText` casou o texto do Foundry — círculo/cone/linha/quadrado com tamanho) e 33 ficaram como texto livre (frase fora do padrão, ex.: "1 alvo por nível").
+
 Efeitos ativos (`effects[]` com `changes`) são ignorados de propósito; só a contagem:
 
 | Tipo Foundry | Documentos com efeitos |

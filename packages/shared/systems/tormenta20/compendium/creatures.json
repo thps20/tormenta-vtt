@@ -458,7 +458,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "Quadrado 3m",
+              "area": {
+                "kind": "text",
+                "text": "Quadrado 3m"
+              },
               "effect": ""
             },
             "save": {
@@ -705,7 +708,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -736,7 +739,7 @@
                 "value": 0
               },
               "target": "1 animal ou humanoide",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -791,7 +794,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -839,7 +842,7 @@
                 "value": 0
               },
               "target": "Criaturas Escolhidas",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -1116,7 +1119,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "page": 65
@@ -1139,7 +1142,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": "Paralisado ou Lento"
             },
             "save": {
@@ -2229,7 +2232,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "Cone 6m",
+              "area": {
+                "kind": "text",
+                "text": "Cone 6m"
+              },
               "effect": ""
             },
             "save": {
@@ -2473,7 +2479,7 @@
                 "value": 0
               },
               "target": "1 arma empunhada",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -2509,7 +2515,7 @@
                 "value": 0
               },
               "target": "Aliados",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -2555,7 +2561,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -2865,7 +2871,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -2887,7 +2893,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -3410,7 +3416,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -3453,7 +3459,11 @@
                 "value": 0
               },
               "target": "1 criatura ou 1 objeto mágico",
-              "area": "ou esfera com 3m de raio",
+              "area": {
+                "kind": "shape",
+                "shape": "circle",
+                "size": 3
+              },
               "effect": ""
             },
             "enhancements": [
@@ -3484,7 +3494,7 @@
                 "value": 0
               },
               "target": "você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -3546,7 +3556,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -3592,7 +3602,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -3675,7 +3685,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           }
@@ -4188,7 +4198,7 @@
                 "value": 0
               },
               "target": "1 arma (veja texto)",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -4233,7 +4243,11 @@
                 "value": 0
               },
               "target": "",
-              "area": "quadrado com 9m de lado",
+              "area": {
+                "kind": "shape",
+                "shape": "square",
+                "size": 9
+              },
               "effect": ""
             },
             "enhancements": [
@@ -4288,7 +4302,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -4602,7 +4616,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -4634,7 +4648,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -4674,7 +4688,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -5190,7 +5204,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -5212,7 +5226,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "save": {
@@ -5240,7 +5254,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -5338,7 +5352,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "Cone 12m",
+              "area": {
+                "kind": "text",
+                "text": "Cone 12m"
+              },
               "effect": ""
             },
             "save": {
@@ -5376,7 +5393,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -5627,7 +5644,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "save": {
@@ -5713,7 +5730,7 @@
                 "value": 0
               },
               "target": "1 arma empunhada",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -5749,7 +5766,7 @@
                 "value": 0
               },
               "target": "1 humanóide",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -5805,7 +5822,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -5853,7 +5870,7 @@
                 "value": 0
               },
               "target": "1 objeto",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -5922,7 +5939,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": "1 enxame Médio (quadrado de 1,5m)"
             },
             "enhancements": [
@@ -5987,7 +6004,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "nuvem com 6m de raio",
+              "area": {
+                "kind": "text",
+                "text": "nuvem com 6m de raio"
+              },
               "effect": ""
             },
             "enhancements": [
@@ -6264,7 +6284,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -6553,7 +6573,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "save": {
@@ -6590,7 +6610,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -6644,7 +6664,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -6692,7 +6712,11 @@
                 "value": 0
               },
               "target": "1 criatura ou 1 objeto mágico",
-              "area": "ou esfera com 3m de raio",
+              "area": {
+                "kind": "shape",
+                "shape": "circle",
+                "size": 3
+              },
               "effect": ""
             },
             "enhancements": [
@@ -6723,7 +6747,7 @@
                 "value": 0
               },
               "target": "1 humanóide",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -6768,7 +6792,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -6803,7 +6827,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -6850,7 +6874,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "Cone 12m",
+              "area": {
+                "kind": "text",
+                "text": "Cone 12m"
+              },
               "effect": ""
             },
             "save": {
@@ -6878,7 +6905,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -7161,7 +7188,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "Cone 6m",
+              "area": {
+                "kind": "text",
+                "text": "Cone 6m"
+              },
               "effect": ""
             },
             "save": {
@@ -7434,7 +7464,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "Cone 9m",
+              "area": {
+                "kind": "text",
+                "text": "Cone 9m"
+              },
               "effect": ""
             },
             "save": {
@@ -7462,7 +7495,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -7735,7 +7768,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "save": {
@@ -7778,7 +7811,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "page": 131
@@ -7810,7 +7843,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -7854,7 +7887,11 @@
                 "value": 0
               },
               "target": "",
-              "area": "cubo de 12m de lado",
+              "area": {
+                "kind": "shape",
+                "shape": "square",
+                "size": 12
+              },
               "effect": ""
             },
             "page": 186
@@ -7879,7 +7916,7 @@
                 "value": 0
               },
               "target": "veja texto",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "page": 187
@@ -7904,7 +7941,11 @@
                 "value": 0
               },
               "target": "1 criatura ou 1 objeto mágico",
-              "area": "ou esfera com 3m de raio",
+              "area": {
+                "kind": "shape",
+                "shape": "circle",
+                "size": 3
+              },
               "effect": ""
             },
             "enhancements": [
@@ -7935,7 +7976,7 @@
                 "value": 0
               },
               "target": "1 humanóide",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -7980,7 +8021,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -8025,7 +8066,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -8065,7 +8106,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -8112,7 +8153,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "Cone 18m",
+              "area": {
+                "kind": "text",
+                "text": "Cone 18m"
+              },
               "effect": ""
             },
             "save": {
@@ -8140,7 +8184,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -8413,7 +8457,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "save": {
@@ -8449,7 +8493,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "page": 131
@@ -8474,7 +8518,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -8518,7 +8562,11 @@
                 "value": 0
               },
               "target": "",
-              "area": "cubo de 12m de lado",
+              "area": {
+                "kind": "shape",
+                "shape": "square",
+                "size": 12
+              },
               "effect": ""
             },
             "page": 186
@@ -8553,7 +8601,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -8601,7 +8649,11 @@
                 "value": 0
               },
               "target": "1 criatura ou 1 objeto mágico",
-              "area": "ou esfera com 3m de raio",
+              "area": {
+                "kind": "shape",
+                "shape": "circle",
+                "size": 3
+              },
               "effect": ""
             },
             "enhancements": [
@@ -8632,7 +8684,7 @@
                 "value": 0
               },
               "target": "1 humanóide",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -8677,7 +8729,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -8712,7 +8764,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -8759,7 +8811,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "Cone 15m",
+              "area": {
+                "kind": "text",
+                "text": "Cone 15m"
+              },
               "effect": ""
             },
             "save": {
@@ -8787,7 +8842,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -9079,7 +9134,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -9111,7 +9166,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "linha",
+              "area": {
+                "kind": "text",
+                "text": "linha"
+              },
               "effect": ""
             }
           },
@@ -9143,7 +9201,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -9175,7 +9233,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "cone 9m",
+              "area": {
+                "kind": "text",
+                "text": "cone 9m"
+              },
               "effect": ""
             }
           },
@@ -9227,7 +9288,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -9495,7 +9556,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "save": {
@@ -9550,7 +9611,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           }
@@ -10650,7 +10711,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -11007,7 +11068,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -11087,7 +11148,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -11137,7 +11198,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -11177,7 +11238,7 @@
                 "value": 0
               },
               "target": "1 humanóide",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -11222,7 +11283,11 @@
                 "value": 0
               },
               "target": "",
-              "area": "Cone de 6m",
+              "area": {
+                "kind": "shape",
+                "shape": "cone",
+                "size": 6
+              },
               "effect": ""
             },
             "enhancements": [
@@ -11267,7 +11332,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -11318,7 +11383,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "linha",
+              "area": {
+                "kind": "text",
+                "text": "linha"
+              },
               "effect": ""
             },
             "enhancements": [
@@ -13360,7 +13428,7 @@
                 "value": 0
               },
               "target": "você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "page": 211
@@ -13395,7 +13463,11 @@
                 "value": 0
               },
               "target": "",
-              "area": "Cone de 9m",
+              "area": {
+                "kind": "shape",
+                "shape": "cone",
+                "size": 9
+              },
               "effect": ""
             },
             "save": {
@@ -13426,7 +13498,7 @@
                 "value": 0
               },
               "target": "Criaturas Escolhidas",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -13919,7 +13991,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "cubo 3m de lado",
+              "area": {
+                "kind": "text",
+                "text": "cubo 3m de lado"
+              },
               "effect": ""
             },
             "save": {
@@ -13947,7 +14022,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           }
@@ -14168,7 +14243,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -14700,7 +14775,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           }
@@ -15142,7 +15217,7 @@
                 "value": 0
               },
               "target": "1 animal ou humanoide",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -15187,7 +15262,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -15237,7 +15312,11 @@
                 "value": 0
               },
               "target": "",
-              "area": "esfera com 6m de raio",
+              "area": {
+                "kind": "shape",
+                "shape": "circle",
+                "size": 6
+              },
               "effect": ""
             },
             "enhancements": [
@@ -15287,7 +15366,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -15340,7 +15419,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -15430,7 +15509,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "slots": 0.5,
@@ -15954,7 +16033,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           }
@@ -16175,7 +16254,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -16207,7 +16286,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -16237,7 +16316,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -16269,7 +16348,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -16929,7 +17008,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -17404,7 +17483,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "save": {
@@ -17864,7 +17943,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "page": 131
@@ -17896,7 +17975,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -17942,7 +18021,10 @@
                 "value": 0
               },
               "target": "",
-              "area": "linha",
+              "area": {
+                "kind": "text",
+                "text": "linha"
+              },
               "effect": ""
             },
             "enhancements": [
@@ -17988,7 +18070,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -18496,7 +18578,7 @@
                 "value": 0
               },
               "target": "1 animal ou humanoide",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -18541,7 +18623,7 @@
                 "value": 0
               },
               "target": "Você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -18629,7 +18711,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "slots": 0.5,
@@ -18654,7 +18736,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -18676,7 +18758,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -18710,7 +18792,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -18767,7 +18849,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -19256,7 +19338,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -19770,7 +19852,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -20038,7 +20120,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -20767,7 +20849,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "page": 131
@@ -20809,7 +20891,7 @@
                 "value": 0
               },
               "target": "1 criatura",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -20857,7 +20939,7 @@
                 "value": 0
               },
               "target": "Criaturas Escolhidas",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -20889,7 +20971,7 @@
                 "value": 0
               },
               "target": "você",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -20930,7 +21012,11 @@
                 "value": 0
               },
               "target": "",
-              "area": "esfera com 6m de raio",
+              "area": {
+                "kind": "shape",
+                "shape": "circle",
+                "size": 6
+              },
               "effect": ""
             },
             "enhancements": [
@@ -21215,7 +21301,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -21533,7 +21619,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -21856,7 +21942,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -22435,7 +22521,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "page": 73
@@ -22826,7 +22912,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           }
@@ -23045,7 +23131,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -23079,7 +23165,11 @@
                 "value": 0
               },
               "target": "",
-              "area": "esfera com 6m de raio",
+              "area": {
+                "kind": "shape",
+                "shape": "circle",
+                "size": 6
+              },
               "effect": ""
             },
             "save": {
@@ -23109,7 +23199,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -23133,7 +23223,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -23466,7 +23556,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "save": {
@@ -24131,7 +24221,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -24153,7 +24243,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -24861,7 +24951,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             },
             "enhancements": [
@@ -25102,7 +25192,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           }
@@ -25332,7 +25422,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -25364,7 +25454,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -25386,7 +25476,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },
@@ -25408,7 +25498,7 @@
                 "value": 0
               },
               "target": "",
-              "area": "",
+              "area": null,
               "effect": ""
             }
           },

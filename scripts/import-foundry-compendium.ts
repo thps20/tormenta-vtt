@@ -29,6 +29,7 @@ import { CUSTOM_FILE, DESCRIPTIONS_FILE, compendiumDir, creatureItemTextKey, enh
 import { parseFormula } from "../packages/shared/src/dice/index.js";
 import { saveSkills } from "../packages/shared/src/rules/activation.js";
 import { computeCharacter } from "../packages/shared/src/rules/compute.js";
+import { parseAreaText } from "../packages/shared/src/rules/templates.js";
 import { createDefaultCharacterData } from "../packages/shared/src/rules/defaults.js";
 import { CharacterDataSchema, type ActionTemplate, type Activation, type EnhancementEffect, type Save, type SkillGrantsValue } from "../packages/shared/src/schemas/character.js";
 import type { CompendiumItemBody, CompendiumItemEntry } from "../packages/shared/src/schemas/compendium.js";
@@ -187,6 +188,9 @@ class Report {
   cantrips = 0;
   /** Effects `onuse` sem `self` (aprimoramentos que um poder concede a OUTRAS magias/ataques): fora do modelo. */
   grantedEffects = 0;
+  /** `activation.area` reconhecido como forma (parseAreaText casou) vs. sobrou texto livre (docs/plano-gabaritos.md §6). */
+  areaShapes = 0;
+  areaTexts = 0;
   /** Efeitos mecânicos preenchidos por padrão estrito, por tipo. */
   readonly effectsByKind = new Map<string, number>();
   /** Aprimoramentos SEM efeito mecânico (texto fora dos padrões), por categoria → "`id#eN`: texto". */
@@ -238,6 +242,10 @@ class Report {
     const kinds = [...this.effectsByKind.entries()].sort().map(([k, n]) => `${n} \`${k}\``).join(", ") || "nenhum";
     lines.push(
       `Efeito mecânico preenchido só quando o texto inteiro casa um padrão estrito ("aumenta o dano em +XdY", "+XdY de dano", "muda o dano para XdY", "aumenta a cura em +XdY", "aumenta a CD em +N", "muda o alcance para <unidade>", "muda a duração para [N] <unidade>", "muda a área para <texto>", "aumenta o número de alvos em +N"): ${kinds}. Frases compostas ("muda o alcance para médio e a duração para cena") e os demais ficam como só custo e estão listados por categoria no fim deste relatório.`,
+    );
+    lines.push("");
+    lines.push(
+      `Área (docs/plano-gabaritos.md §6): ${this.areaShapes} viraram forma reconhecida (\`parseAreaText\` casou o texto do Foundry — círculo/cone/linha/quadrado com tamanho) e ${this.areaTexts} ficaram como texto livre (frase fora do padrão, ex.: "1 alvo por nível").`,
     );
     lines.push("");
     lines.push("Efeitos ativos (`effects[]` com `changes`) são ignorados de propósito; só a contagem:");
@@ -449,13 +457,21 @@ class Converter {
     const durationUnits = this.activationKey(id, a.durationUnits, MAP.duration, str(duracao.units), "duração");
     const special = str(duracao.special).trim();
     if (special) this.report.todo("duração: texto livre no Foundry (só a unidade foi mapeada)", id, `"${special}"`);
+    // Área estruturada (docs/plano-gabaritos.md §6): casa o texto do Foundry com uma forma+tamanho
+    // reconhecidos (parseAreaText, mesmo padrão do botão "Colocar área"); sem match, vira texto
+    // livre. Contado no relatório pra eu reportar quantas viraram forma vs. texto.
+    const areaText = str(s.area).trim();
+    const parsedArea = areaText ? parseAreaText(areaText) : null;
+    const area: Activation["area"] = parsedArea ? { kind: "shape", ...parsedArea } : areaText ? { kind: "text", text: areaText.slice(0, 200) } : null;
+    if (parsedArea) this.report.areaShapes++;
+    else if (areaText) this.report.areaTexts++;
     const activation: Activation = {
       cost: Math.max(0, Math.round(num(ativacao.custo))),
       execution,
       duration: { units: durationUnits, value: num(duracao.value) },
       range: { units: rangeUnits, value: 0 },
       target: str(s.alvo).trim().slice(0, 200),
-      area: str(s.area).trim().slice(0, 200),
+      area,
       effect: str(s.efeito).trim().slice(0, 2000),
     };
     const isDefault =
