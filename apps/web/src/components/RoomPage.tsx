@@ -13,6 +13,7 @@ import { canEditCharacter, sortedCharacters, useCharacters } from "../store/char
 import { useSystemDef } from "../lib/system";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
 import { deleteSelectedTokens, useDeleteSelectionShortcut } from "../lib/useDeleteSelectionShortcut";
+import { useTokenMoveShortcuts } from "../lib/useTokenMoveShortcuts";
 import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
 import { useSidePanelShortcut } from "../lib/useSidePanelShortcut";
 import { useTurnTitle } from "../lib/useTurnTitle";
@@ -171,6 +172,7 @@ function Table() {
   const commitTemplate = useTemplates((s) => s.commit);
   useToolShortcuts();
   useDeleteSelectionShortcut();
+  useTokenMoveShortcuts();
 
   // Handouts (docs/SPEC.md §9.10): biblioteca por sala (só GM, carregada sob demanda ao abrir o
   // HandoutSelector) + pinos do mapa visitado + overlay em tela cheia atualmente aberto.

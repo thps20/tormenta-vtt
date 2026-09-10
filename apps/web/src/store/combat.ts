@@ -5,9 +5,12 @@ import type {
   CombatAddPayload,
   CombatRollPayload,
   CombatSetInitiativePayload,
+  CombatSetMovementLimitPayload,
+  CombatSetMovementPayload,
   CombatSetSurprisedPayload,
   CombatStartPayload,
   Participant,
+  Token,
 } from "@tormenta-vtt/shared";
 import { emitAck } from "./connection";
 import { toast } from "./ui";
@@ -39,6 +42,10 @@ interface CombatStoreState {
   delay: (sceneId: string, combatantId: string) => Promise<boolean>;
   resume: (sceneId: string, combatantId: string) => Promise<boolean>;
   end: (sceneId: string, clear?: boolean) => Promise<boolean>;
+  /** GM: ajusta orçamento/gasto de deslocamento de um combatente à mão (docs/plano-movimento.md). */
+  setMovement: (payload: CombatSetMovementPayload) => Promise<boolean>;
+  /** GM: liga/desliga a trava de deslocamento na sala. */
+  setMovementLimit: (payload: CombatSetMovementLimitPayload) => Promise<boolean>;
 }
 
 async function run<T>(p: Promise<{ ok: true; data: T } | { ok: false; error: string }>): Promise<boolean> {
@@ -63,6 +70,8 @@ export const useCombat = create<CombatStoreState>((set) => ({
   delay: (sceneId, combatantId) => run(emitAck("combat:delay", { sceneId, combatantId })),
   resume: (sceneId, combatantId) => run(emitAck("combat:resume", { sceneId, combatantId })),
   end: (sceneId, clear) => run(emitAck("combat:end", { sceneId, clear: clear ?? false })),
+  setMovement: (payload) => run(emitAck("combat:set-movement", payload)),
+  setMovementLimit: (payload) => run(emitAck("combat:set-movement-limit", payload)),
 }));
 
 /** Combate do mapa `sceneId` (ou null se nunca chegou nenhum). Função pura para useMemo. */
@@ -96,4 +105,19 @@ export function myPendingCombatants(state: Combat | null, me: Participant): Comb
 export function isMyTurn(state: Combat | null, me: Participant): boolean {
   const active = activeCombatant(state);
   return active !== null && isMine(active, me);
+}
+
+/**
+ * Pode mover este token AGORA (teclado ou arraste)? Espelha `checkMovement` do servidor
+ * (docs/plano-movimento.md §2.2/§3.2) — o servidor decide de novo, isto é só pra UI não deixar
+ * começar um arraste/passo que ele vai recusar. Sem combate ativo, ou token fora da lista de
+ * combatentes (D3): sempre "ok". Combatente da vez: "ok". Senão: GM sempre libera (não é dono do
+ * turno de ninguém em particular, mas o servidor também libera sem consumir); jogador não pode.
+ */
+export function canMoveNow(state: Combat | null, token: Pick<Token, "id">, me: Participant): "ok" | "not-my-turn" {
+  if (!state || state.status !== "active") return "ok";
+  const combatant = state.combatants.find((c) => c.tokenId === token.id);
+  if (!combatant) return "ok";
+  if (state.activeCombatantId === combatant.id) return "ok";
+  return me.role === "gm" ? "ok" : "not-my-turn";
 }

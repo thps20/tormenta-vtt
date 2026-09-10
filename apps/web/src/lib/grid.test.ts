@@ -46,6 +46,30 @@ describe("grid", () => {
     expect(effectiveCellSize({ ...grid, type: "none" })).toBe(70);
   });
 
+  // Passo por teclado (docs/plano-movimento.md §3.1, useTokenMoveShortcuts): delta de uma célula
+  // (ou 5 com Shift), snap ao grid, clamp na borda do mapa — mesma composição que o hook usa.
+  it("passo por teclado: uma célula com snap, e o clamp segura na borda do mapa", () => {
+    const map = { width: 200, height: 200 };
+    const size = { width: 40, height: 40 };
+    const step = effectiveCellSize(grid); // 50
+    const raw = { x: 60 + step, y: 50 }; // um passo pra direita
+    const snapped = snapToGrid(raw.x, raw.y, grid);
+    expect(clampToMap(snapped.x, snapped.y, size, map)).toEqual({ x: 110, y: 50 });
+
+    // Perto da borda direita: o passo estouraria o mapa, o clamp trava no limite.
+    const nearEdge = { x: 60 + step * 3, y: 50 }; // 210, além de map.width - size.width = 160
+    const snappedEdge = snapToGrid(nearEdge.x, nearEdge.y, grid);
+    expect(clampToMap(snappedEdge.x, snappedEdge.y, size, map)).toEqual({ x: 160, y: 50 });
+  });
+
+  it("passo por teclado com Shift (5 células) e grid none: sem snap, passo fixo de 70px", () => {
+    const noneGrid: GridConfig = { ...grid, type: "none" };
+    const step = effectiveCellSize(noneGrid) * 5; // 350
+    const raw = { x: 100 + step, y: 100 };
+    expect(snapToGrid(raw.x, raw.y, noneGrid)).toEqual(raw); // grid "none": sem snap
+    expect(clampToMap(raw.x, raw.y, { width: 20, height: 20 }, { width: 2000, height: 2000 })).toEqual(raw);
+  });
+
   it("cellAt/cellToPoint fazem o caminho de ida e volta (grid quadrado)", () => {
     expect(cellAt({ x: 10, y: 0 }, grid)).toEqual({ col: 0, row: 0 });
     expect(cellAt({ x: 65, y: 60 }, grid)).toEqual({ col: 1, row: 1 });
