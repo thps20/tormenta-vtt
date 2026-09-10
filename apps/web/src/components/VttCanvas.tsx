@@ -51,6 +51,8 @@ import { useImage } from "../lib/useImage";
 import { newId } from "../lib/ids";
 import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
 import { useCompendium } from "../store/compendium";
+import { canMoveNow, movementBudgetFallback } from "../store/combat";
+import { toast } from "../store/ui";
 import type { FogToolMode, FogToolShape, RemoteRuler, ToolMode } from "../store/tools";
 import { TokenInspector } from "./TokenInspector";
 import { NpcQuickCard } from "./NpcQuickCard";
@@ -58,6 +60,7 @@ import { ConditionMenu } from "./ConditionMenu";
 import { FogLayer } from "./FogLayer";
 import { TemplateLayer } from "./TemplateLayer";
 import { HandoutPinLayer, HANDOUT_PIN_RADIUS } from "./HandoutPinLayer";
+import { MovementLayer } from "./MovementLayer";
 
 /** Tamanho padrão quando a cena ainda não tem mapa (shared: o servidor usa o mesmo, ver compendium:spawn-creature). */
 export const DEFAULT_MAP = DEFAULT_MAP_SIZE;
@@ -80,6 +83,9 @@ interface VttCanvasProps {
   /** Combate da cena (round/status), pro campo de duração do ConditionMenu e pro badge de rodadas
    *  restantes no token. null = sem combate na cena. */
   combat: Combat | null;
+  /** Trava de orçamento de deslocamento da SALA (docs/plano-movimento.md §4.1) — desligada: sem
+   *  bloqueio de arraste/teclado, MovementLayer mostra só o gasto (sem vermelho). */
+  movementLimitEnabled: boolean;
   /** Único selecionado (inspector, redimensionar); null com 0 ou vários. */
   selectedTokenId: string | null;
   /** Todos os selecionados (anel dourado, movimento em grupo). */
@@ -267,6 +273,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   me,
   activeTurnTokenId,
   combat,
+  movementLimitEnabled,
   selectedTokenId,
   selectedIds,
   focusRequest,
@@ -1245,16 +1252,32 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     }
   };
 
+  /** Se o destino estoura o orçamento de deslocamento do combatente da vez, devolve a âncora em vez
+   *  do destino (docs/plano-movimento.md §4.2) — o servidor aceita (custo zero) e o broadcast
+   *  recoloca o token pra todo mundo. Toast só uma vez por gesto, mesmo em arraste de grupo. */
+  const clampToMovementBudget = (tok: Token, dest: { x: number; y: number }, warnRef: { warned: boolean }): { x: number; y: number } => {
+    if (!systemDef) return dest;
+    const cellSizePx = effectiveCellSize(scene.grid);
+    const fallback = movementBudgetFallback(systemDef, combat, movementLimitEnabled, cellSizePx, tok.id, dest);
+    if (!fallback) return dest;
+    if (!warnRef.warned) {
+      toast(`Deslocamento insuficiente (restam ${Math.round(fallback.remaining * 10) / 10} ${fallback.unit})`);
+      warnRef.warned = true;
+    }
+    return { x: fallback.x, y: fallback.y };
+  };
+
   const handleTokenDragEnd = (token: Token, node: Konva.Node) => {
     const g = groupDragRef.current;
     groupDragRef.current = null;
     const dx = node.x() - (g?.leader.x ?? node.x());
     const dy = node.y() - (g?.leader.y ?? node.y());
-    const pos = settle(node.x(), node.y(), token);
+    const warnRef = { warned: false };
+    const pos = clampToMovementBudget(token, settle(node.x(), node.y(), token), warnRef);
     node.position(pos);
     const patches: TokenPatch[] = [{ id: token.id, x: pos.x, y: pos.y, dragFrom: g?.leaderOrigin ?? { x: token.x, y: token.y } }];
     for (const o of g?.others ?? []) {
-      const p = settle(o.x + dx, o.y + dy, o.token);
+      const p = clampToMovementBudget(o.token, settle(o.x + dx, o.y + dy, o.token), warnRef);
       tokenGroup(o.token.id)?.position(p);
       patches.push({ id: o.token.id, x: p.x, y: p.y, dragFrom: { x: o.x, y: o.y } });
     }
@@ -1276,6 +1299,29 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   // combate mesmo "ended" sem clear (fica congelado no valor de quando encerrou).
   const menuCombatRound = combat && combat.status !== "ended" ? combat.round : null;
   const badgeCombatRound = combat?.round ?? null;
+
+  // --- Orçamento de deslocamento (docs/plano-movimento.md §4.1): caminho + rótulo do combatente da
+  // VEZ, só quando o sistema declara `movement` e o combate está com turno ativo. `path`/`current`
+  // já em CENTRO do token (visual), não canto superior esquerdo (como Combatant.movementPath grava).
+  const movementDisplay = useMemo(() => {
+    if (!systemDef?.movement || !systemDef.grid || combat?.status !== "active" || !combat.activeCombatantId) return null;
+    const active = combat.combatants.find((c) => c.id === combat.activeCombatantId);
+    if (!active || active.movementBudget === null || active.movementPath.length === 0) return null;
+    const activeToken = tokens.find((t) => t.id === active.tokenId);
+    if (!activeToken) return null;
+    const center = (p: { x: number; y: number }) => ({ x: p.x + activeToken.width / 2, y: p.y + activeToken.height / 2 });
+    return {
+      def: systemDef,
+      path: active.movementPath.map(center),
+      current: center(activeToken),
+      budget: active.movementBudget,
+      used: active.movementUsed,
+      diagonals: active.movementDiagonals,
+      cellSizePx: effectiveCellSize(scene.grid),
+      limitEnabled: movementLimitEnabled,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [combat, tokens, systemDef, scene.grid, movementLimitEnabled]);
 
   // --- Gabaritos de área de efeito: preview durante a colocação, contagem/destaque de alvos e a
   // alça de rotação do selecionado (docs/plano-gabaritos.md).
@@ -1342,7 +1388,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       conditionByKey={conditionByKey}
       combatRound={badgeCombatRound}
       stageScale={stageScale}
-      draggable={mode === "select" && canControl(me, token)}
+      draggable={mode === "select" && canControl(me, token) && canMoveNow(combat, token, me) === "ok"}
       selectable={mode === "select"}
       isSelected={selectedIds.includes(token.id)}
       isActiveTurn={token.id === activeTurnTokenId}
@@ -1481,6 +1527,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
             stageScale={stageScale}
           />
           <HandoutPinLayer pins={handoutPins} stageScale={stageScale} />
+          {movementDisplay && <MovementLayer {...movementDisplay} stageScale={stageScale} />}
           {selectionBox && (
             <Rect
               x={Math.min(selectionBox.x1, selectionBox.x2)}

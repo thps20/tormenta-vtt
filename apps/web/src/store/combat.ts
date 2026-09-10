@@ -1,16 +1,20 @@
 import { create } from "zustand";
-import type {
-  Combat,
-  Combatant,
-  CombatAddPayload,
-  CombatRollPayload,
-  CombatSetInitiativePayload,
-  CombatSetMovementLimitPayload,
-  CombatSetMovementPayload,
-  CombatSetSurprisedPayload,
-  CombatStartPayload,
-  Participant,
-  Token,
+import {
+  fitsInBudget,
+  movementRemaining,
+  type Combat,
+  type Combatant,
+  type CombatAddPayload,
+  type CombatRollPayload,
+  type CombatSetInitiativePayload,
+  type CombatSetMovementLimitPayload,
+  type CombatSetMovementPayload,
+  type CombatSetSurprisedPayload,
+  type CombatStartPayload,
+  type MovementState,
+  type Participant,
+  type SystemDefinition,
+  type Token,
 } from "@tormenta-vtt/shared";
 import { emitAck } from "./connection";
 import { toast } from "./ui";
@@ -120,4 +124,43 @@ export function canMoveNow(state: Combat | null, token: Pick<Token, "id">, me: P
   if (!combatant) return "ok";
   if (state.activeCombatantId === combatant.id) return "ok";
   return me.role === "gm" ? "ok" : "not-my-turn";
+}
+
+export interface MovementRejection {
+  /** Onde mandar o patch em vez do destino: a âncora (Combatant.movementPath[último]). */
+  x: number;
+  y: number;
+  /** Quanto sobrava, pra compor o toast ("restam 3 m"). */
+  remaining: number;
+  unit: string;
+}
+
+/**
+ * Antes de mandar o patch final de um movimento do combatente DA VEZ: o destino cabe no
+ * orçamento? Roda as MESMAS funções puras que o servidor usa (nunca reimplementa a regra), então
+ * concorda com ele quase sempre — mas o servidor decide de novo (D2): isto só evita o
+ * ida-e-volta de um patch que ele ia recusar mesmo. `null` = cabe, ou não há nada pra checar (sem
+ * `movement`/`grid`, sem combate ativo, este token não é o combatente da vez, ou a trava está
+ * desligada) — manda o destino normal. Quando não cabe, devolve a âncora: o servidor aceita
+ * (custo zero) e o broadcast recoloca o token pra todo mundo, corrigindo até os ecos "ao vivo"
+ * que já tinham sido gravados (docs/plano-movimento.md §4.2).
+ */
+export function movementBudgetFallback(
+  def: SystemDefinition,
+  combat: Combat | null,
+  movementLimitEnabled: boolean,
+  cellSizePx: number,
+  tokenId: string,
+  dest: { x: number; y: number },
+): MovementRejection | null {
+  if (!def.movement || !def.grid || !movementLimitEnabled || combat?.status !== "active") return null;
+  const combatant = combat.combatants.find((c) => c.tokenId === tokenId);
+  if (!combatant || combatant.id !== combat.activeCombatantId || combatant.movementBudget === null) return null;
+  const last = combatant.movementPath[combatant.movementPath.length - 1];
+  if (!last) return null;
+  const state: MovementState = { used: combatant.movementUsed, diagonals: combatant.movementDiagonals };
+  const dxCells = (dest.x - last.x) / cellSizePx;
+  const dyCells = (dest.y - last.y) / cellSizePx;
+  if (fitsInBudget(def, combatant.movementBudget, state, dxCells, dyCells)) return null;
+  return { x: last.x, y: last.y, remaining: movementRemaining(combatant.movementBudget, state), unit: def.grid.unit };
 }

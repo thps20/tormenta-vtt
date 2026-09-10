@@ -262,6 +262,9 @@ function Table() {
   const combatDelay = useCombat((s) => s.delay);
   const combatResume = useCombat((s) => s.resume);
   const combatEnd = useCombat((s) => s.end);
+  const combatSetMovement = useCombat((s) => s.setMovement);
+  const combatSetMovementLimit = useCombat((s) => s.setMovementLimit);
+  const movementLimitEnabled = useRoom((s) => s.movementLimitEnabled);
   // Callbacks do CombatPanel: cada um reempacota os argumentos "soltos" da UI no payload
   // que o evento combat:* espera (agora sempre com o sceneId do mapa VISITADO) e chama a ação
   // correspondente da store (server = fonte da verdade, sem otimismo — ver store/combat.ts).
@@ -284,6 +287,8 @@ function Table() {
       onSkip: () => viewedSceneId && void combatNext(viewedSceneId),
       onSetSurprised: (combatantId, surprised) => viewedSceneId && void combatSetSurprised({ sceneId: viewedSceneId, combatantId, surprised }),
       onEnd: (clear) => viewedSceneId && void combatEnd(viewedSceneId, clear),
+      onSetMovement: (combatantId, patch) => viewedSceneId && void combatSetMovement({ sceneId: viewedSceneId, combatantId, ...patch }),
+      onToggleMovementLimit: () => void combatSetMovementLimit({ enabled: !movementLimitEnabled }),
     }),
     [
       viewedSceneId,
@@ -299,6 +304,9 @@ function Table() {
       combatResume,
       combatSetSurprised,
       combatEnd,
+      combatSetMovement,
+      combatSetMovementLimit,
+      movementLimitEnabled,
     ],
   );
   const [centerOnActiveTurn, setCenterOnActiveTurn] = useState<boolean>(() => {
@@ -561,6 +569,7 @@ function Table() {
                 me={me}
                 activeTurnTokenId={activeTurnTokenId}
                 combat={combat}
+                movementLimitEnabled={movementLimitEnabled}
                 selectedTokenId={selectedTokenId}
                 selectedIds={selectedIds}
                 focusRequest={focusRequest}
@@ -700,6 +709,7 @@ function Table() {
           activeSceneId={scene?.id ?? null}
           selectedIds={selectedIds}
           combatCallbacks={combatCallbacks}
+          movementLimitEnabled={movementLimitEnabled}
           centerOnActiveTurn={centerOnActiveTurn}
           onToggleCenterOnActiveTurn={() => setCenterOnActiveTurn((v) => !v)}
           tokens={tokens}

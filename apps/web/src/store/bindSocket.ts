@@ -62,6 +62,7 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   });
 
   socket.on("combat:updated", ({ sceneId, combat }) => useCombat.getState().setSceneState(sceneId, combat));
+  socket.on("combat:movementLimitChanged", ({ enabled }) => useRoom.getState().setMovementLimitEnabled(enabled));
 
   socket.on("ruler:updated", (p) => useTools.getState().setRemoteRuler(p));
 

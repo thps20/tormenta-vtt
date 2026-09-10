@@ -18,8 +18,15 @@ import {
   ShieldAlert,
   FastForward,
   CheckCircle2,
+  RotateCcw,
 } from 'lucide-react';
 import type { Combat, Combatant, ConditionDef, RollVisibility, Token, TokenCondition } from '@tormenta-vtt/shared';
+
+/** "4,5" — 1 casa, sem zero à toa (docs/plano-movimento.md §4.3). */
+function fmt1(n: number): string {
+  const r = Math.round(n * 10) / 10;
+  return (Number.isInteger(r) ? String(r) : r.toFixed(1)).replace('.', ',');
+}
 
 /**
  * Callbacks do painel, um por ação de UI. Cada um reempacota seus argumentos no payload de um
@@ -41,6 +48,11 @@ export interface CombatPanelCallbacks {
   onSkip: (combatantId: string) => void;
   onSetSurprised: (combatantId: string, surprised: boolean) => void;
   onEnd: (clear?: boolean) => void;
+  /** Orçamento/gasto de deslocamento à mão (docs/plano-movimento.md §4.3). budget undefined = não
+   *  mexe nele; null = "voltar a seguir a ficha"; used undefined = não mexe no gasto. */
+  onSetMovement: (combatantId: string, patch: { budget?: number | null; used?: number }) => void;
+  /** Liga/desliga a trava de deslocamento NA SALA ("ignorar limite"). */
+  onToggleMovementLimit: () => void;
 }
 
 interface CombatPanelProps extends Partial<CombatPanelCallbacks> {
@@ -59,6 +71,8 @@ interface CombatPanelProps extends Partial<CombatPanelCallbacks> {
   tokens: Token[];
   /** conditions[] do sistema da sala, pra resolver ícone/cor/duração de cada condição. */
   conditions: ConditionDef[];
+  /** Trava de deslocamento da SALA (docs/plano-movimento.md §4.3) — todos veem o estado; só o GM muda. */
+  movementLimitEnabled: boolean;
 }
 
 export const CombatPanel: React.FC<CombatPanelProps> = ({
@@ -73,6 +87,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
   onToggleCenterOnActiveTurn,
   tokens,
   conditions,
+  movementLimitEnabled,
   onStart,
   onRoll,
   onSetInitiative,
@@ -86,6 +101,8 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
   onSkip,
   onSetSurprised,
   onEnd,
+  onSetMovement,
+  onToggleMovementLimit,
 }) => {
   // State for GM end combat dialog
   const [showEndOptions, setShowEndOptions] = useState(false);
@@ -351,6 +368,27 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
           />
           Centralizar no token da vez
         </label>
+
+        {/* Trava de deslocamento (docs/plano-movimento.md §4.3): GM liga/desliga na sala; jogador
+         *  só vê o estado. "Ignorar" = interruptor LIGADO quando movementLimitEnabled é false. */}
+        {viewer === 'gm' ? (
+          <label
+            className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer select-none"
+            title="Vale para a sala, até reiniciar o servidor"
+          >
+            <input
+              type="checkbox"
+              checked={!movementLimitEnabled}
+              onChange={onToggleMovementLimit}
+              className="cursor-pointer accent-[#d4af37]"
+            />
+            Ignorar limite de movimento
+          </label>
+        ) : (
+          !movementLimitEnabled && (
+            <div className="text-[10px] text-amber-400/80 font-serif italic">Limite de movimento desligado pelo Mestre</div>
+          )
+        )}
 
         {/* Big Turn Navigation Buttons: Anterior & Próximo (grandes, os mais usados) */}
         <div className="grid grid-cols-2 gap-2 pt-0.5">
@@ -791,6 +829,52 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* Orçamento de deslocamento do turno (docs/plano-movimento.md §4.3): barra fina +
+                  gasto/orçamento, só do combatente da VEZ e só quando o sistema tem `movement`
+                  (movementBudget != null). GM ganha o campo de orçamento à mão + botão de zerar. */}
+              {isActive && combatant.movementBudget !== null && (
+                <div className="mt-2 pt-2 border-t border-[#2d2417]/70 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="flex-1 h-1 rounded-full bg-[#0c0c0c] overflow-hidden"
+                    title={`Deslocamento: ${fmt1(combatant.movementUsed)} / ${fmt1(combatant.movementBudget)}`}
+                  >
+                    <div
+                      className={`h-full transition-all ${combatant.movementUsed >= combatant.movementBudget ? 'bg-red-500' : 'bg-[#d4af37]'}`}
+                      style={{ width: `${combatant.movementBudget > 0 ? Math.min(100, (combatant.movementUsed / combatant.movementBudget) * 100) : 100}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-400 shrink-0">
+                    {fmt1(combatant.movementUsed)}/{fmt1(combatant.movementBudget)}
+                  </span>
+                  {viewer === 'gm' && (
+                    <>
+                      <input
+                        key={`movement-budget-${combatant.id}-${combatant.movementBudget}`}
+                        type="number"
+                        defaultValue={combatant.movementBudget}
+                        placeholder="ficha"
+                        title="Orçamento de deslocamento do turno (vazio = volta a seguir a ficha)"
+                        className="w-12 h-5 px-1 text-[10px] font-mono bg-[#12100d] border border-[#3b3223] text-amber-200 rounded text-center focus:outline-none focus:border-[#d4af37]"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                        }}
+                        onBlur={(e) => {
+                          const raw = e.target.value.trim();
+                          onSetMovement && onSetMovement(combatant.id, { budget: raw === '' ? null : Number(raw) });
+                        }}
+                      />
+                      <button
+                        onClick={() => onSetMovement && onSetMovement(combatant.id, { used: 0 })}
+                        title="Zerar o gasto do turno"
+                        className="p-0.5 rounded text-zinc-500 hover:text-amber-300 hover:bg-[#2c2419] transition-colors cursor-pointer shrink-0"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}

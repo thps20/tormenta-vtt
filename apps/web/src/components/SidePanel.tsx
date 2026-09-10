@@ -18,6 +18,8 @@ interface SidePanelProps {
   activeSceneId: string | null;
   selectedIds: string[];
   combatCallbacks: CombatPanelCallbacks;
+  /** Trava de deslocamento da SALA (docs/plano-movimento.md §4.3), pro CombatPanel mostrar o interruptor do GM. */
+  movementLimitEnabled: boolean;
   centerOnActiveTurn: boolean;
   onToggleCenterOnActiveTurn: () => void;
   tokens: Token[];
@@ -62,6 +64,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   activeSceneId,
   selectedIds,
   combatCallbacks,
+  movementLimitEnabled,
   centerOnActiveTurn,
   onToggleCenterOnActiveTurn,
   tokens,
@@ -168,6 +171,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             sceneId={activeSceneId}
             tokens={tokens}
             conditions={conditions}
+            movementLimitEnabled={movementLimitEnabled}
             selectedTokenIds={selectedIds}
             onSelectToken={onSelectToken}
             selectedTokenId={selectedTokenId}

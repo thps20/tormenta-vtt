@@ -51,6 +51,9 @@ interface RoomState {
   viewingSceneId: string | null;
   /** Últimos parâmetros de join, para reconectar automaticamente. */
   lastJoin: JoinParams | null;
+  /** Trava de orçamento de deslocamento da SALA (docs/plano-movimento.md §4.3): true = vale o
+   *  orçamento; GM pode desligar ("ignorar limite") em `combat:set-movement-limit`. */
+  movementLimitEnabled: boolean;
 
   join: (params: JoinParams) => Promise<void>;
   leave: () => void;
@@ -87,6 +90,8 @@ interface RoomState {
   updateGrid: (grid: Partial<GridConfig>) => Promise<boolean>;
   /** Névoa da cena visitada: aplica a operação local (otimista), emite e reverte se o ack falhar. */
   fogOp: (op: FogOp) => Promise<boolean>;
+  /** `combat:movementLimitChanged` (broadcast) e o retorno do próprio `combat:set-movement-limit`. */
+  setMovementLimitEnabled: (enabled: boolean) => void;
 }
 
 export const useRoom = create<RoomState>((set, get) => ({
@@ -97,6 +102,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   scenes: [],
   viewingSceneId: null,
   lastJoin: null,
+  movementLimitEnabled: true,
 
   join: async (params) => {
     const socket = getSocket();
@@ -137,7 +143,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   },
 
   leave: () => {
-    set({ status: { kind: "idle" }, room: null, me: null, participants: [], scenes: [], viewingSceneId: null, lastJoin: null });
+    set({ status: { kind: "idle" }, room: null, me: null, participants: [], scenes: [], viewingSceneId: null, lastJoin: null, movementLimitEnabled: true });
     useTokens.getState().setAll([]);
     useChat.getState().setAll([]);
     useCombat.getState().setSnapshot(null, null);
@@ -153,7 +159,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   },
 
   applySnapshot: (snap) => {
-    set({ room: snap.room, me: snap.me, participants: snap.participants, scenes: snap.scenes });
+    set({ room: snap.room, me: snap.me, participants: snap.participants, scenes: snap.scenes, movementLimitEnabled: snap.movementLimitEnabled });
     useTokens.getState().setAll(snap.tokens);
     useChat.getState().setAll(snap.chat);
     useCombat.getState().setSnapshot(snap.room.activeSceneId, snap.combat);
@@ -343,6 +349,8 @@ export const useRoom = create<RoomState>((set, get) => ({
     get().applyFog(scene.id, res.data);
     return true;
   },
+
+  setMovementLimitEnabled: (enabled) => set({ movementLimitEnabled: enabled }),
 }));
 
 /** Mapa ATIVO da sala (derivado). Use para a faixa de aviso e o painel "Mapas". */

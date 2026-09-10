@@ -1,12 +1,22 @@
 import { useEffect, useRef } from "react";
-import { DEFAULT_MAP_SIZE, type Token } from "@tormenta-vtt/shared";
+import { DEFAULT_MAP_SIZE, getSystemDefinition, type SystemDefinition, type Token } from "@tormenta-vtt/shared";
 import { canControl } from "../components/VttCanvas";
-import { canMoveNow, sceneCombat, useCombat } from "../store/combat";
+import { canMoveNow, movementBudgetFallback, sceneCombat, useCombat } from "../store/combat";
 import { selectViewedScene, useRoom } from "../store/room";
 import { useTokens } from "../store/tokens";
 import { toast } from "../store/ui";
 import { clampToMap, effectiveCellSize, snapToGrid } from "./grid";
 import { isTyping } from "./isTyping";
+
+/** `getSystemDefinition` lança se o id não existir; fora de uma sala não há nada pra checar mesmo. */
+function safeSystemDef(systemId: string | undefined): SystemDefinition | null {
+  if (!systemId) return null;
+  try {
+    return getSystemDefinition(systemId);
+  } catch {
+    return null;
+  }
+}
 
 /** Tecla → direção (célula). Setas e WASD apontam pro mesmo lugar. */
 const KEY_TO_DELTA: Record<string, { dx: number; dy: number }> = {
@@ -46,17 +56,37 @@ export function useTokenMoveShortcuts(): void {
     };
 
     /** Fecha a rajada: manda o patch final (um token: patch; vários: patchMany, uma entrada de
-     *  histórico só — mesma convenção do arraste em grupo, ver VttCanvas#handleTokenDragEnd). */
+     *  histórico só — mesma convenção do arraste em grupo, ver VttCanvas#handleTokenDragEnd).
+     *  Se o destino não coube no orçamento de deslocamento (D2), manda a âncora em vez do destino
+     *  — mesma função que o arraste usa (movementBudgetFallback), o servidor decide de novo. */
     const confirmBurst = () => {
       clearTimer();
       const tokens = burstTokensRef.current;
       burstTokensRef.current = null;
       warnedRef.current = false;
       if (!tokens || tokens.length === 0) return;
+
+      const room = useRoom.getState();
+      const scene = selectViewedScene(room);
+      const def = safeSystemDef(room.room?.systemId);
+      const combat = scene ? sceneCombat(useCombat.getState().byScene, scene.id) : null;
+      const cellSizePx = scene ? effectiveCellSize(scene.grid) : 0;
+      let toastedInsufficient = false;
+
       const { byId, patch, patchMany } = useTokens.getState();
       const patches = tokens.flatMap((t) => {
         const current = byId[t.id];
-        return current ? [{ id: t.id, x: current.x, y: current.y }] : [];
+        if (!current) return [];
+        let dest = { x: current.x, y: current.y };
+        const fallback = def ? movementBudgetFallback(def, combat, room.movementLimitEnabled, cellSizePx, t.id, dest) : null;
+        if (fallback) {
+          dest = { x: fallback.x, y: fallback.y };
+          if (!toastedInsufficient) {
+            toast(`Deslocamento insuficiente (restam ${Math.round(fallback.remaining * 10) / 10} ${fallback.unit})`);
+            toastedInsufficient = true;
+          }
+        }
+        return [{ id: t.id, x: dest.x, y: dest.y }];
       });
       if (patches.length === 0) return;
       if (patches.length > 1) void patchMany(patches);
