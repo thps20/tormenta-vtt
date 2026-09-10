@@ -60,16 +60,23 @@ export async function requireCharacter(characterId: string, roomId: string): Pro
 }
 
 /**
- * Token vinculado a esta ficha, NA CENA ATIVA da sala (se houver). Usado só para saber a que
- * `tokenId` uma rolagem de ficha (character:roll / character:use-item) fica ligada — quem não
- * vê esse token não recebe a mensagem (ver services/chatVisibility.ts). Se o personagem tiver
- * mais de um token na cena (incomum; nada no MVP impede), pega o primeiro encontrado.
+ * Token vinculado a esta ficha (qualquer mapa da sala, não só o ativo). Usado só para saber a que
+ * `tokenId` uma rolagem de ficha (character:roll / character:use-item) fica ligada — quem não vê
+ * esse token, OU cujo mapa não é o ativo da sala, não recebe a mensagem (ver
+ * services/chatVisibility.ts, regras 2/2b). Prefere o token da cena ativa quando existe (o caso
+ * comum); sem um lá, cai pra qualquer outro mapa em vez de devolver `undefined` — voltar
+ * `undefined` faria a rolagem virar uma mensagem "solta" sem `tokenId`, sem gate nenhum, vazando
+ * pros jogadores mesmo com o GM olhando/rolando num mapa que a mesa não vê. Se o personagem tiver
+ * mais de um token (incomum; nada no MVP impede), pega o primeiro encontrado em cada busca.
  */
-export async function findActiveSceneTokenId(characterId: string, roomId: string): Promise<string | undefined> {
+export async function findLinkedTokenId(characterId: string, roomId: string): Promise<string | undefined> {
   const room = await prisma.room.findUnique({ where: { id: roomId } });
-  if (!room?.activeSceneId) return undefined;
-  const token = await prisma.token.findFirst({ where: { characterId, sceneId: room.activeSceneId, deletedAt: null } });
-  return token?.id;
+  const activeToken = room?.activeSceneId
+    ? await prisma.token.findFirst({ where: { characterId, sceneId: room.activeSceneId, deletedAt: null } })
+    : null;
+  if (activeToken) return activeToken.id;
+  const anyToken = await prisma.token.findFirst({ where: { characterId, deletedAt: null } });
+  return anyToken?.id;
 }
 
 /**

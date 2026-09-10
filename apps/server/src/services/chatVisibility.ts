@@ -13,6 +13,15 @@
  * por linha em vez de pela mensagem inteira (linha de token oculto some da cópia do jogador, sem
  * derrubar as outras), e a regra 1 decide só se `formula`/`result` aparecem em cada linha, não se
  * a linha existe — ver `initiativeBatchForViewer`.
+ *
+ * Regra 2b, mesmo mecanismo da 2: um token cujo MAPA não é o ativo da sala também some por
+ * completo para os demais jogadores (o GM pode estar preparando/rolando num mapa que a mesa não
+ * vê — docs/plano-mapas.md §5 — e um jogador nunca deveria saber disso), mesmo que o próprio token
+ * esteja `visible` e fora da névoa; GM e autor nunca são bloqueados por isso, igual à regra 2. Sem
+ * isso, `character:roll`/`character:use-item`/`combat:roll` feitos pelo GM num mapa que não é o
+ * ativo vazavam pro chat dos jogadores (o token, em si, podia estar perfeitamente visível — só o
+ * mapa é que não era o que a mesa está vendo). Quando o mapa vira ativo, a mensagem volta a ser
+ * entregue no próximo snapshot (`room:join`), igual à regra 2 — sem reenvio ao vivo.
  */
 import { FogConfigSchema, type ChatMessage, type FogConfig, type Token } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
@@ -38,17 +47,22 @@ export function messageVisibleTo(msg: ChatMessage, viewer: Viewer): boolean {
 
 /**
  * Ids dos jogadores (nunca o GM, nunca o autor) que não podem ver o token e por isso ficam de
- * fora da mensagem.
+ * fora da mensagem — por token oculto/névoa (regra 2) OU por o token estar num mapa que não é o
+ * ativo da sala (regra 2b).
  */
 async function blockedPlayerIds(roomId: string, tokenId: string, authorParticipantId: string): Promise<string[]> {
-  const row = await prisma.token.findUnique({ where: { id: tokenId }, include: { scene: true } });
+  const [row, room] = await Promise.all([
+    prisma.token.findUnique({ where: { id: tokenId }, include: { scene: true } }),
+    prisma.room.findUnique({ where: { id: roomId }, select: { activeSceneId: true } }),
+  ]);
   if (!row) return []; // token apagado: a FK já zerou tokenId na mensagem antes desta chamada acontecer de novo.
   const token = toToken(row);
   const fog = FogConfigSchema.parse(row.scene.fog ?? {});
+  const inactiveScene = token.sceneId !== room?.activeSceneId;
   const players = await prisma.participant.findMany({ where: { roomId, role: "player" } });
   return players
     .filter((p) => p.id !== authorParticipantId)
-    .filter((p) => !tokenVisibleTo(token, { role: "player", participantId: p.id }, fog))
+    .filter((p) => inactiveScene || !tokenVisibleTo(token, { role: "player", participantId: p.id }, fog))
     .map((p) => p.id);
 }
 
@@ -66,18 +80,23 @@ export async function loadTokenInfo(tokenIds: string[]): Promise<Map<string, { t
 /**
  * Mesma regra de `blockedPlayerIds`, mas para filtrar uma lista já carregada (histórico do
  * snapshot): passa `authorParticipantId` da própria mensagem (`msg.participantId`) — o autor
- * nunca é bloqueado por essa regra, mesmo que o token dele esteja oculto.
+ * nunca é bloqueado por essa regra, mesmo que o token dele esteja oculto ou no mapa que não é o
+ * ativo agora. `activeSceneId` é reavaliado a cada chamada (mapa da sala AGORA, não quando a
+ * mensagem foi criada) — é assim que uma mensagem represada volta a aparecer sozinha quando o
+ * mapa dela vira o ativo (no próximo snapshot).
  */
 export function tokenGateOk(
   tokenId: string | null | undefined,
   viewer: Viewer,
   authorParticipantId: string,
   tokenInfo: { token: Token; fog: FogConfig } | undefined,
+  activeSceneId: string | null,
 ): boolean {
   if (!tokenId) return true;
   if (viewer.role === "gm") return true;
   if (viewer.participantId === authorParticipantId) return true;
   if (!tokenInfo) return true; // referência órfã (não deveria acontecer, a FK zera); não trava o resto do chat por isso.
+  if (tokenInfo.token.sceneId !== activeSceneId) return false;
   return tokenVisibleTo(tokenInfo.token, { role: "player", participantId: viewer.participantId }, tokenInfo.fog);
 }
 
@@ -114,23 +133,31 @@ export async function emitChatMessage(io: TypedServer, roomId: string, msg: Chat
 
 /**
  * Card de iniciativa em lote do ponto de vista de UM viewer: linha a linha, quem não vê o token
- * daquela linha (oculto/névoa) fica sem ela — a linha simplesmente não existe pra ele, não um
- * placeholder (diferente do `tokenId` único de cima, que bloqueia a mensagem inteira). Nas linhas
- * que sobram, `formula`/`result` só aparecem se `visibility` (all/gm/self) permite a este viewer
- * (mesma regra de sempre); os demais recebem só `name`/`tokenId`/`combatantId` (a UI mostra
- * "rolou"). `undefined` = nenhuma linha sobrou — o viewer não recebe o card.
+ * daquela linha (oculto/névoa, regra 2) OU cujo mapa não é o ativo da sala (regra 2b) fica sem
+ * ela — a linha simplesmente não existe pra ele, não um placeholder (diferente do `tokenId` único
+ * de cima, que bloqueia a mensagem inteira). Todo combatente de um mesmo combate está sempre no
+ * mesmo mapa, então a regra 2b costuma valer (ou não) pra linha inteira de uma vez — checada por
+ * linha do mesmo jeito, por simetria com a 2 e porque o token pode ter mudado de mapa depois
+ * (§9.7). Nas linhas que sobram, `formula`/`result` só aparecem se `visibility` (all/gm/self)
+ * permite a este viewer (mesma regra de sempre); os demais recebem só
+ * `name`/`tokenId`/`combatantId` (a UI mostra "rolou"). `undefined` = nenhuma linha sobrou — o
+ * viewer não recebe o card.
  */
 export function initiativeBatchForViewer(
   msg: ChatMessage,
   viewer: Viewer,
   tokenInfoById: Map<string, { token: Token; fog: FogConfig }>,
+  activeSceneId: string | null,
 ): ChatMessage | undefined {
   if (!msg.initiativeBatch) return undefined;
   const showValues = messageVisibleTo(msg, viewer);
   const entries = msg.initiativeBatch.entries
     .filter((e) => {
       const info = tokenInfoById.get(e.tokenId);
-      return !info || tokenVisibleTo(info.token, viewer, info.fog); // referência órfã: não trava (mesma regra do resto)
+      if (!info) return true; // referência órfã: não trava (mesma regra do resto)
+      if (viewer.role === "gm") return true;
+      if (info.token.sceneId !== activeSceneId) return false;
+      return tokenVisibleTo(info.token, viewer, info.fog);
     })
     .map((e) => (showValues ? e : { combatantId: e.combatantId, tokenId: e.tokenId, name: e.name }));
   if (entries.length === 0) return undefined;
@@ -140,10 +167,13 @@ export function initiativeBatchForViewer(
 /** Manda a cópia de `initiativeBatchForViewer` pra cada participante que tem alguma linha a ver. */
 async function emitInitiativeBatchMessage(io: TypedServer, roomId: string, msg: ChatMessage): Promise<void> {
   if (!msg.initiativeBatch) return;
-  const tokenInfoById = await loadTokenInfo([...new Set(msg.initiativeBatch.entries.map((e) => e.tokenId))]);
-  const participants = await prisma.participant.findMany({ where: { roomId } });
+  const [tokenInfoById, room, participants] = await Promise.all([
+    loadTokenInfo([...new Set(msg.initiativeBatch.entries.map((e) => e.tokenId))]),
+    prisma.room.findUnique({ where: { id: roomId }, select: { activeSceneId: true } }),
+    prisma.participant.findMany({ where: { roomId } }),
+  ]);
   for (const p of participants) {
-    const view = initiativeBatchForViewer(msg, { role: p.role === "gm" ? "gm" : "player", participantId: p.id }, tokenInfoById);
+    const view = initiativeBatchForViewer(msg, { role: p.role === "gm" ? "gm" : "player", participantId: p.id }, tokenInfoById, room?.activeSceneId ?? null);
     if (view) io.to(rooms.participant(p.id)).emit("chat:message", view);
   }
 }

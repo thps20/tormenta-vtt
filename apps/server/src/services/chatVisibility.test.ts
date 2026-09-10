@@ -87,39 +87,60 @@ const tokenFixture: Token = {
   conditions: [],
 };
 
+// tokenFixture.sceneId = "s1": maioria dos testes trata "s1" como mapa ATIVO da sala.
 describe("tokenGateOk", () => {
   it("sem tokenId: sempre ok (regra normal de visibility)", () => {
-    expect(tokenGateOk(null, other, "p-author", undefined)).toBe(true);
+    expect(tokenGateOk(null, other, "p-author", undefined, "s1")).toBe(true);
   });
 
   it("GM sempre recebe, mesmo com o token oculto", () => {
     const tokenInfo = { token: { ...tokenFixture, visible: false }, fog: openFog };
-    expect(tokenGateOk("t1", gm, "p-author", tokenInfo)).toBe(true);
+    expect(tokenGateOk("t1", gm, "p-author", tokenInfo, "s1")).toBe(true);
   });
 
   it("o autor sempre recebe a própria mensagem, mesmo com o token oculto do GM", () => {
     const tokenInfo = { token: { ...tokenFixture, visible: false }, fog: openFog };
-    expect(tokenGateOk("t1", author, "p-author", tokenInfo)).toBe(true);
+    expect(tokenGateOk("t1", author, "p-author", tokenInfo, "s1")).toBe(true);
   });
 
   it("outro jogador que não vê o token (oculto) fica de fora", () => {
     const tokenInfo = { token: { ...tokenFixture, visible: false }, fog: openFog };
-    expect(tokenGateOk("t1", other, "p-author", tokenInfo)).toBe(false);
+    expect(tokenGateOk("t1", other, "p-author", tokenInfo, "s1")).toBe(false);
   });
 
   it("outro jogador que não vê o token (sob a névoa, sem ser dono) fica de fora", () => {
     const tokenInfo = { token: { ...tokenFixture, visible: true, ownerId: null }, fog: hiddenFog };
-    expect(tokenGateOk("t1", other, "p-author", tokenInfo)).toBe(false);
+    expect(tokenGateOk("t1", other, "p-author", tokenInfo, "s1")).toBe(false);
   });
 
   it("outro jogador que é dono do token vê normalmente", () => {
     const tokenInfo = { token: { ...tokenFixture, visible: true, ownerId: "p-other" }, fog: hiddenFog };
-    expect(tokenGateOk("t1", other, "p-author", tokenInfo)).toBe(true);
+    expect(tokenGateOk("t1", other, "p-author", tokenInfo, "s1")).toBe(true);
   });
 
   it("outro jogador vê quando o token está revelado", () => {
     const tokenInfo = { token: { ...tokenFixture, visible: true }, fog: openFog };
-    expect(tokenGateOk("t1", other, "p-author", tokenInfo)).toBe(true);
+    expect(tokenGateOk("t1", other, "p-author", tokenInfo, "s1")).toBe(true);
+  });
+
+  it("outro jogador não recebe: token perfeitamente visível, mas num mapa que não é o ativo", () => {
+    const tokenInfo = { token: { ...tokenFixture, visible: true }, fog: openFog };
+    expect(tokenGateOk("t1", other, "p-author", tokenInfo, "outro-mapa")).toBe(false);
+  });
+
+  it("GM continua recebendo mesmo com o token num mapa que não é o ativo", () => {
+    const tokenInfo = { token: { ...tokenFixture, visible: true }, fog: openFog };
+    expect(tokenGateOk("t1", gm, "p-author", tokenInfo, "outro-mapa")).toBe(true);
+  });
+
+  it("o autor continua recebendo a própria mensagem mesmo com o token num mapa que não é o ativo", () => {
+    const tokenInfo = { token: { ...tokenFixture, visible: true }, fog: openFog };
+    expect(tokenGateOk("t1", author, "p-author", tokenInfo, "outro-mapa")).toBe(true);
+  });
+
+  it("mapa volta a ser o ativo: mensagem represada volta a ser entregue (mesma checagem, activeSceneId novo)", () => {
+    const tokenInfo = { token: { ...tokenFixture, visible: true }, fog: openFog };
+    expect(tokenGateOk("t1", other, "p-author", tokenInfo, "s1")).toBe(true);
   });
 });
 
@@ -194,13 +215,14 @@ const batchBase: ChatMessage = {
 const visibleOrc: Token = { ...tokenFixture, id: "t2", name: "Orc" };
 const hiddenOrc: Token = { ...visibleOrc, visible: false };
 
+// tokenFixture/visibleOrc/hiddenOrc.sceneId = "s1": maioria dos testes trata "s1" como o ATIVO.
 describe("initiativeBatchForViewer", () => {
   it("token oculto: a linha some da cópia do jogador, as outras ficam", () => {
     const tokenInfoById = new Map([
       ["t1", { token: tokenFixture, fog: openFog }],
       ["t2", { token: hiddenOrc, fog: openFog }],
     ]);
-    const view = initiativeBatchForViewer(batchBase, other, tokenInfoById);
+    const view = initiativeBatchForViewer(batchBase, other, tokenInfoById, "s1");
     expect(view?.initiativeBatch?.entries).toEqual([{ combatantId: "c1", tokenId: "t1", name: "Goblin", formula: "1d20+2", result: 15 }]);
   });
 
@@ -209,7 +231,7 @@ describe("initiativeBatchForViewer", () => {
       ["t1", { token: tokenFixture, fog: openFog }],
       ["t2", { token: hiddenOrc, fog: openFog }],
     ]);
-    const view = initiativeBatchForViewer(batchBase, gm, tokenInfoById);
+    const view = initiativeBatchForViewer(batchBase, gm, tokenInfoById, "s1");
     expect(view?.initiativeBatch?.entries).toHaveLength(2);
   });
 
@@ -218,7 +240,7 @@ describe("initiativeBatchForViewer", () => {
       ["t1", { token: { ...tokenFixture, visible: false }, fog: openFog }],
       ["t2", { token: hiddenOrc, fog: openFog }],
     ]);
-    expect(initiativeBatchForViewer(batchBase, other, tokenInfoById)).toBeUndefined();
+    expect(initiativeBatchForViewer(batchBase, other, tokenInfoById, "s1")).toBeUndefined();
   });
 
   it("rolagem secreta (visibility gm): jogador vê a linha (nome), mas sem fórmula/resultado", () => {
@@ -227,7 +249,7 @@ describe("initiativeBatchForViewer", () => {
       ["t1", { token: tokenFixture, fog: openFog }],
       ["t2", { token: visibleOrc, fog: openFog }],
     ]);
-    const view = initiativeBatchForViewer(secret, other, tokenInfoById);
+    const view = initiativeBatchForViewer(secret, other, tokenInfoById, "s1");
     expect(view?.initiativeBatch?.entries).toEqual([
       { combatantId: "c1", tokenId: "t1", name: "Goblin" },
       { combatantId: "c2", tokenId: "t2", name: "Orc" },
@@ -240,7 +262,7 @@ describe("initiativeBatchForViewer", () => {
       ["t1", { token: tokenFixture, fog: openFog }],
       ["t2", { token: visibleOrc, fog: openFog }],
     ]);
-    const view = initiativeBatchForViewer(secret, gm, tokenInfoById);
+    const view = initiativeBatchForViewer(secret, gm, tokenInfoById, "s1");
     expect(view?.initiativeBatch?.entries).toEqual(batchBase.initiativeBatch!.entries);
   });
 
@@ -250,8 +272,25 @@ describe("initiativeBatchForViewer", () => {
       ["t1", { token: tokenFixture, fog: openFog }],
       ["t2", { token: hiddenOrc, fog: openFog }],
     ]);
-    const view = initiativeBatchForViewer(revealed, other, tokenInfoById);
+    const view = initiativeBatchForViewer(revealed, other, tokenInfoById, "s1");
     // t2 (Orc) continua oculto pro jogador mesmo revelado: o Revelar só muda visibility, não o token.
     expect(view?.initiativeBatch?.entries).toEqual([{ combatantId: "c1", tokenId: "t1", name: "Goblin", formula: "1d20+2", result: 15 }]);
+  });
+
+  it("combate rolado num mapa que não é o ativo: nenhuma linha sobra pro jogador, mesmo com os tokens visíveis", () => {
+    const tokenInfoById = new Map([
+      ["t1", { token: tokenFixture, fog: openFog }],
+      ["t2", { token: visibleOrc, fog: openFog }],
+    ]);
+    expect(initiativeBatchForViewer(batchBase, other, tokenInfoById, "outro-mapa")).toBeUndefined();
+  });
+
+  it("combate rolado num mapa que não é o ativo: o GM continua vendo todas as linhas", () => {
+    const tokenInfoById = new Map([
+      ["t1", { token: tokenFixture, fog: openFog }],
+      ["t2", { token: visibleOrc, fog: openFog }],
+    ]);
+    const view = initiativeBatchForViewer(batchBase, gm, tokenInfoById, "outro-mapa");
+    expect(view?.initiativeBatch?.entries).toHaveLength(2);
   });
 });

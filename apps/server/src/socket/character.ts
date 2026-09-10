@@ -17,7 +17,7 @@ import {
   broadcastCharacter,
   canEditCharacter,
   characterDataOf,
-  findActiveSceneTokenId,
+  findLinkedTokenId,
   requireCharacter,
   requireSystem,
   toCharacter,
@@ -119,7 +119,7 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
         throw err;
       }
 
-      const tokenId = await findActiveSceneTokenId(character.id, ctx.roomId);
+      const tokenId = await findLinkedTokenId(character.id, ctx.roomId);
       const { message } = await createRollMessage(io, ctx.roomId, me, {
         formula: built.formula,
         label: `${character.name}: ${built.label}`,
@@ -162,7 +162,7 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
 
       // 2. Publica o card. Sempre "all" (SPEC: cards de item são sempre públicos), mas ligado
       // ao token da ficha na cena ativa — quem não vê esse token não recebe o card.
-      const tokenId = await findActiveSceneTokenId(character.id, ctx.roomId);
+      const tokenId = await findLinkedTokenId(character.id, ctx.roomId);
       const msg = toChatMessage(
         await prisma.chatMessage.create({
           data: { roomId: ctx.roomId, participantId: me.id, nickname: me.nickname, kind: "item", item: use.card, tokenId: tokenId ?? null },

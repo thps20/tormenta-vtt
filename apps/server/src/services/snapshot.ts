@@ -62,10 +62,12 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     combat,
     chat: chatMessages.flatMap((m) => {
       if (m.kind === "initiative-batch") {
-        const view = initiativeBatchForViewer(m, viewer, tokenInfoById);
+        const view = initiativeBatchForViewer(m, viewer, tokenInfoById, room.activeSceneId);
         return view ? [view] : [];
       }
-      return tokenGateOk(m.tokenId, viewer, m.participantId, tokenInfoById.get(m.tokenId ?? "")) && messageVisibleTo(m, viewer) ? [m] : [];
+      return tokenGateOk(m.tokenId, viewer, m.participantId, tokenInfoById.get(m.tokenId ?? ""), room.activeSceneId) && messageVisibleTo(m, viewer)
+        ? [m]
+        : [];
     }),
     characters: characters.map(toCharacter).filter((c) => characterVisibleTo(c, me.role)),
   };
