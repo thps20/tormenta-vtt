@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ChatMessage, FogConfig, Token } from "@tormenta-vtt/shared";
-import { emitChatMessage, initiativeBatchForViewer, messageVisibleTo, redactForAuthor, tokenGateOk, whisperGateOk } from "./chatVisibility.js";
+import type { ChatMessage, FogConfig, RollTarget, Token } from "@tormenta-vtt/shared";
+import { emitChatMessage, initiativeBatchForViewer, messageVisibleTo, redactForAuthor, rollTargetsForViewer, tokenGateOk, whisperGateOk } from "./chatVisibility.js";
 import { rooms, type TypedServer } from "../socket/types.js";
 
 const base: ChatMessage = {
@@ -23,6 +23,8 @@ const base: ChatMessage = {
     modifier: 0,
     total: 7,
     applied: [],
+    natural: null,
+    targets: [],
     createdAt: new Date().toISOString(),
   },
 };
@@ -215,6 +217,50 @@ describe("emitChatMessage", () => {
     expect(calls[0]!.room).toBe(rooms.all("r1"));
     expect(calls[0]!.msg.roll).toBeDefined();
     expect(calls[0]!.msg.id).toBe("m1");
+  });
+});
+
+// Sistema de alvos (docs/plano-alvos.md, regra 4): rollTargetsForViewer.
+describe("rollTargetsForViewer", () => {
+  const targets: RollTarget[] = [
+    { tokenId: "t1", name: "Goblin", hit: true, targetValue: 15, reason: "compare" },
+    { tokenId: "t2", name: "Orc", hit: false, targetValue: 18, reason: "compare" },
+  ];
+
+  it("GM vê todo mundo, com o targetValue", () => {
+    const tokenInfoById = new Map([
+      ["t1", { token: tokenFixture, fog: openFog }],
+      ["t2", { token: { ...tokenFixture, id: "t2", name: "Orc" }, fog: openFog }],
+    ]);
+    expect(rollTargetsForViewer(targets, gm, tokenInfoById, "s1")).toEqual(targets);
+  });
+
+  it("dono do token alvo vê o targetValue; outro jogador vê hit sem o número", () => {
+    const tokenInfoById = new Map([
+      ["t1", { token: { ...tokenFixture, ownerId: "p-other" }, fog: openFog }],
+      ["t2", { token: { ...tokenFixture, id: "t2", name: "Orc" }, fog: openFog }],
+    ]);
+    const view = rollTargetsForViewer(targets, other, tokenInfoById, "s1");
+    expect(view).toEqual([
+      { tokenId: "t1", name: "Goblin", hit: true, targetValue: 15, reason: "compare" },
+      { tokenId: "t2", name: "Orc", hit: false, reason: "compare" },
+    ]);
+  });
+
+  it("linha de token oculto (ou de outro mapa) some da cópia do jogador; GM continua vendo", () => {
+    const tokenInfoById = new Map([
+      ["t1", { token: { ...tokenFixture, visible: false }, fog: openFog }],
+      ["t2", { token: { ...tokenFixture, id: "t2", name: "Orc" }, fog: openFog }],
+    ]);
+    const view = rollTargetsForViewer(targets, other, tokenInfoById, "s1");
+    expect(view.map((t) => t.tokenId)).toEqual(["t2"]);
+    expect(rollTargetsForViewer(targets, gm, tokenInfoById, "s1")).toHaveLength(2);
+  });
+
+  it("hit null (sem regra de acerto, ou alvo sem ficha) passa igual, sem targetValue pra ninguém", () => {
+    const noRule: RollTarget[] = [{ tokenId: "t1", name: "Goblin", hit: null, reason: "no-rule" }];
+    const tokenInfoById = new Map([["t1", { token: tokenFixture, fog: openFog }]]);
+    expect(rollTargetsForViewer(noRule, other, tokenInfoById, "s1")).toEqual(noRule);
   });
 });
 

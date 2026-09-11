@@ -9,8 +9,10 @@ import {
   RollBuildError,
   buildCharacterRoll,
   buildItemUse,
+  computeCharacter,
   createDefaultCharacterData,
   validateCharacterItems,
+  type SystemDefinition,
 } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import {
@@ -24,11 +26,32 @@ import {
   toJson,
 } from "../services/characters.js";
 import { emitChatMessage } from "../services/chatVisibility.js";
-import { createRollMessage } from "../services/rolls.js";
+import { createRollMessage, type RollTargetInput } from "../services/rolls.js";
 import { toChatMessage, toScene, toToken } from "../services/serialize.js";
 import { guarded, HandlerError } from "./ack.js";
 import { broadcastToken } from "./token.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
+
+/**
+ * Alvos marcados pelo autor (docs/plano-alvos.md) prontos pra `createRollMessage`: só ações de
+ * ATAQUE constroem `roll.targets[]` (dano ignora — "Aplicar" usa os alvos AO VIVO do autor, não
+ * os congelados aqui). Ids inválidos (token apagado, de outra sala) são descartados em silêncio.
+ */
+async function loadRollTargets(roomId: string, def: SystemDefinition, targetTokenIds: string[]): Promise<RollTargetInput[]> {
+  if (targetTokenIds.length === 0) return [];
+  const rows = await prisma.token.findMany({ where: { id: { in: targetTokenIds }, deletedAt: null, scene: { roomId } } });
+  const charIds = [...new Set(rows.map((r) => r.characterId).filter((id): id is string => id !== null))];
+  const chars = charIds.length > 0 ? await prisma.character.findMany({ where: { id: { in: charIds } } }) : [];
+  const charById = new Map(chars.map((c) => [c.id, toCharacter(c)]));
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  // Preserva a ordem em que o autor marcou (targetTokenIds), não a ordem que o banco devolveu.
+  return targetTokenIds.flatMap((id) => {
+    const row = rowById.get(id);
+    if (!row) return [];
+    const targetCharacter = row.characterId ? charById.get(row.characterId) : undefined;
+    return [{ tokenId: row.id, name: row.name, computed: targetCharacter ? computeCharacter(def, targetCharacter) : null }];
+  });
+}
 
 async function requireOwnerInRoom(ownerId: string | null, roomId: string): Promise<void> {
   if (!ownerId) return;
@@ -104,7 +127,7 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
 
   socket.on(
     "character:roll",
-    guarded(socket, CharacterRollSchema, async ({ characterId, roll, visibility }, ctx) => {
+    guarded(socket, CharacterRollSchema, async ({ characterId, roll, visibility, targetTokenIds }, ctx) => {
       const me = await prisma.participant.findUnique({ where: { id: ctx.participantId } });
       if (!me) throw new HandlerError("Participante não encontrado");
       const character = toCharacter(await requireCharacter(characterId, ctx.roomId));
@@ -120,6 +143,8 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
       }
 
       const tokenId = await findLinkedTokenId(character.id, ctx.roomId);
+      // Alvos (docs/plano-alvos.md): só ações de ataque constroem roll.targets.
+      const targets = built.isAttack ? await loadRollTargets(ctx.roomId, def, targetTokenIds) : [];
       const { message } = await createRollMessage(io, ctx.roomId, me, {
         formula: built.formula,
         label: `${character.name}: ${built.label}`,
@@ -129,6 +154,9 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
         damage: built.damage,
         allowNoDice: true,
         tokenId,
+        targets,
+        isAttack: built.isAttack,
+        def,
       });
       return message;
     }),

@@ -28,8 +28,16 @@
  * fora por completo (nem card, nem placeholder), independente de `visibility` (que fica "all"
  * nessas mensagens). Como só o GM publica handout, "autor sempre recebe" já vale de graça (GM
  * nunca é bloqueado por regra nenhuma aqui).
+ *
+ * Regra 4 (`roll.targets[]`, docs/plano-alvos.md — ataque com alvo marcado): mesma ideia da regra
+ * 2/2b, mas por LINHA de alvo em vez de pela mensagem inteira (a linha some da cópia de quem não
+ * vê aquele token — `rollTargetsForViewer`), MAIS uma redação por campo: `targetValue` (a Defesa
+ * do alvo, por exemplo) só vai a quem é GM ou dono do token alvo; os demais veem só
+ * "Acertou/Errou" (`hit`), sem o número. Como o resultado muda por pessoa, uma rolagem COM alvos
+ * vira "uma cópia por participante" (mesmo mecanismo do card de iniciativa em lote), mas ainda
+ * respeitando `visibility`/`tokenId`/`whisperTo` da mensagem como um todo primeiro.
  */
-import { FogConfigSchema, type ChatMessage, type FogConfig, type Token } from "@tormenta-vtt/shared";
+import { FogConfigSchema, type ChatMessage, type FogConfig, type RollTarget, type Token } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { rooms, type TypedServer } from "../socket/types.js";
 import { toToken } from "./serialize.js";
@@ -137,6 +145,7 @@ async function blockedPlayerIdsForWhisper(roomId: string, whisperTo: string | nu
  */
 export async function emitChatMessage(io: TypedServer, roomId: string, msg: ChatMessage): Promise<void> {
   if (msg.kind === "initiative-batch") return emitInitiativeBatchMessage(io, roomId, msg);
+  if (msg.kind === "roll" && msg.roll?.targets && msg.roll.targets.length > 0) return emitRollWithTargetsMessage(io, roomId, msg);
 
   const [tokenBlocked, whisperBlocked] = await Promise.all([
     msg.tokenId ? blockedPlayerIds(roomId, msg.tokenId, msg.participantId) : Promise.resolve([]),
@@ -186,6 +195,67 @@ export function initiativeBatchForViewer(
     .map((e) => (showValues ? e : { combatantId: e.combatantId, tokenId: e.tokenId, name: e.name }));
   if (entries.length === 0) return undefined;
   return { ...msg, initiativeBatch: { round: msg.initiativeBatch.round, entries } };
+}
+
+/**
+ * Alvos de uma rolagem (`DiceRoll.targets[]`) do ponto de vista de UM viewer (regra 4): linha de
+ * token que ele não vê (oculto/névoa) OU cujo mapa não é o ativo da sala some da lista (mesma
+ * regra 2/2b de sempre — token sem info carregada, "referência órfã", não trava: passa como
+ * está). Nas que sobram, `targetValue` só continua pra GM ou pro dono do token daquela linha.
+ */
+export function rollTargetsForViewer(
+  targets: RollTarget[],
+  viewer: Viewer,
+  tokenInfoById: Map<string, { token: Token; fog: FogConfig }>,
+  activeSceneId: string | null,
+): RollTarget[] {
+  return targets.flatMap((t) => {
+    const info = tokenInfoById.get(t.tokenId);
+    if (info && viewer.role !== "gm") {
+      if (info.token.sceneId !== activeSceneId) return [];
+      if (!tokenVisibleTo(info.token, viewer, info.fog)) return [];
+    }
+    if (viewer.role === "gm" || info?.token.ownerId === viewer.participantId || t.targetValue === undefined) return [t];
+    const { targetValue: _drop, ...rest } = t;
+    return [rest];
+  });
+}
+
+/** Mesma regra de `rollTargetsForViewer`, mas fazendo as consultas (mapa ativo + token/névoa de
+ *  cada alvo) por conta própria — usado pelo ack do AUTOR (`createRollMessage`), que é uma
+ *  chamada só, ao contrário do broadcast (que já carrega isso uma vez para todos os viewers). */
+export async function rollTargetsForRoomViewer(roomId: string, targets: RollTarget[], viewer: Viewer): Promise<RollTarget[]> {
+  if (targets.length === 0) return targets;
+  const [room, tokenInfoById] = await Promise.all([
+    prisma.room.findUnique({ where: { id: roomId }, select: { activeSceneId: true } }),
+    loadTokenInfo(targets.map((t) => t.tokenId)),
+  ]);
+  return rollTargetsForViewer(targets, viewer, tokenInfoById, room?.activeSceneId ?? null);
+}
+
+/**
+ * Rolagem com alvos (regra 4): mesmo desenho de `emitInitiativeBatchMessage` (uma cópia por
+ * participante), mas por cima da regra normal de `tokenId`/`whisperTo`/`visibility` — a rolagem em
+ * si continua ligada ao token de QUEM ROLOU (o atacante), não aos alvos.
+ */
+async function emitRollWithTargetsMessage(io: TypedServer, roomId: string, msg: ChatMessage): Promise<void> {
+  const targets = msg.roll?.targets ?? [];
+  const [tokenBlocked, whisperBlocked, room, participants, tokenInfoById] = await Promise.all([
+    msg.tokenId ? blockedPlayerIds(roomId, msg.tokenId, msg.participantId) : Promise.resolve([]),
+    blockedPlayerIdsForWhisper(roomId, msg.whisperTo),
+    prisma.room.findUnique({ where: { id: roomId }, select: { activeSceneId: true } }),
+    prisma.participant.findMany({ where: { roomId } }),
+    loadTokenInfo(targets.map((t) => t.tokenId)),
+  ]);
+  const blocked = new Set([...tokenBlocked, ...whisperBlocked]);
+  for (const p of participants) {
+    if (blocked.has(p.id)) continue;
+    const viewer: Viewer = { role: p.role === "gm" ? "gm" : "player", participantId: p.id };
+    const view = messageVisibleTo(msg, viewer)
+      ? { ...msg, roll: { ...msg.roll!, targets: rollTargetsForViewer(targets, viewer, tokenInfoById, room?.activeSceneId ?? null) } }
+      : redactMessage(msg);
+    io.to(rooms.participant(p.id)).emit("chat:message", view);
+  }
 }
 
 /** Manda a cópia de `initiativeBatchForViewer` pra cada participante que tem alguma linha a ver. */

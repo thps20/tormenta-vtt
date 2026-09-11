@@ -6,10 +6,11 @@ import { loadCombatRow, toCombat } from "./combat.js";
 import { toChatMessage, toParticipant, toRoomPublic, toScene, toToken } from "./serialize.js";
 import { characterVisibleTo, toCharacter } from "./characters.js";
 import { tokenVisibleTo } from "./visibility.js";
-import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, tokenGateOk, whisperGateOk } from "./chatVisibility.js";
+import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, rollTargetsForViewer, tokenGateOk, whisperGateOk } from "./chatVisibility.js";
 import { listTemplates } from "./templates.js";
 import { handoutPinVisibleTo, toHandoutPin } from "./handouts.js";
 import { isMovementLimitEnabled } from "./movementLimit.js";
+import { listTargets } from "./targets.js";
 
 const CHAT_HISTORY_LIMIT = 100;
 
@@ -53,10 +54,27 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
       chatMessages.flatMap((m) => [
         ...(m.tokenId ? [m.tokenId] : []),
         ...(m.initiativeBatch?.entries.map((e) => e.tokenId) ?? []),
+        ...(m.roll?.targets.map((t) => t.tokenId) ?? []),
       ]),
     ),
   ];
   const tokenInfoById = await loadTokenInfo(tokenIds);
+
+  // Alvos (docs/plano-alvos.md): GM vê tudo. Jogador vê os próprios sempre, nunca os do GM, e dos
+  // outros jogadores só os ids de token que ele mesmo pode ver (mesmo filtro de tokenVisibleTo de
+  // sempre — reaproveita loadTokenInfo, que já carrega token+névoa por id).
+  const rawTargets = listTargets(room.id);
+  const roleByParticipant = new Map(participants.map((p) => [p.id, p.role]));
+  const targetTokenInfo = viewer.role === "player" ? await loadTokenInfo([...new Set(rawTargets.flatMap((t) => t.tokenIds))]) : new Map();
+  const targets = rawTargets.flatMap((t) => {
+    if (viewer.role === "gm" || t.participantId === viewer.participantId) return [t];
+    if (roleByParticipant.get(t.participantId) === "gm") return []; // alvos do GM nunca vão a jogador
+    const tokenIds = t.tokenIds.filter((id) => {
+      const info = targetTokenInfo.get(id);
+      return info !== undefined && tokenVisibleTo(info.token, viewer, info.fog);
+    });
+    return tokenIds.length > 0 ? [{ ...t, tokenIds }] : [];
+  });
 
   return {
     room: toRoomPublic(room),
@@ -75,13 +93,20 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
         const view = initiativeBatchForViewer(m, viewer, tokenInfoById, room.activeSceneId);
         return view ? [view] : [];
       }
-      return tokenGateOk(m.tokenId, viewer, m.participantId, tokenInfoById.get(m.tokenId ?? ""), room.activeSceneId) &&
+      const ok =
+        tokenGateOk(m.tokenId, viewer, m.participantId, tokenInfoById.get(m.tokenId ?? ""), room.activeSceneId) &&
         whisperGateOk(m, viewer) &&
-        messageVisibleTo(m, viewer)
-        ? [m]
-        : [];
+        messageVisibleTo(m, viewer);
+      if (!ok) return [];
+      // Rolagem com alvos (docs/plano-alvos.md, regra 4): mesma redação por linha/campo do
+      // broadcast ao vivo, reavaliada com o token/névoa/mapa ativo de AGORA.
+      if (m.roll?.targets.length) {
+        return [{ ...m, roll: { ...m.roll, targets: rollTargetsForViewer(m.roll.targets, viewer, tokenInfoById, room.activeSceneId) } }];
+      }
+      return [m];
     }),
     characters: characters.map(toCharacter).filter((c) => characterVisibleTo(c, me.role)),
     movementLimitEnabled: isMovementLimitEnabled(room.id),
+    targets,
   };
 }

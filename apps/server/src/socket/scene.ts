@@ -44,8 +44,10 @@ import { toScene, toToken } from "../services/serialize.js";
 import { clearTemplates, listTemplates } from "../services/templates.js";
 import { tokenVisibleTo } from "../services/visibility.js";
 import { handoutPinVisibleTo, toHandoutPin } from "../services/handouts.js";
+import { clearSceneTargets } from "../services/targets.js";
 import { guarded, HandlerError } from "./ack.js";
 import { emitHistoryUpdated } from "./history.js";
+import { clearPlayerTargetsOnActivate } from "./targets.js";
 import { broadcastToken } from "./token.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
@@ -315,6 +317,9 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
         }
 
         io.to(rooms.all(ctx.roomId)).emit("room:activeSceneChanged", { sceneId });
+        // Mapa ativo mudou: os alvos dos jogadores (do mapa anterior) deixam de fazer sentido —
+        // o GM mantém os dele, pode estar preparando o próximo (docs/plano-alvos.md §2.2).
+        await clearPlayerTargetsOnActivate(io, ctx.roomId);
       },
       gmOnly,
     ),
@@ -458,6 +463,9 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
         // Gabaritos são efêmeros e nunca voltam (docs/plano-gabaritos.md): diferente de token/combate,
         // não têm undo — o mapa apagado nem entra de novo na pilha de desfazer com eles.
         clearTemplates(sceneId);
+        // Idem para alvos apontando pro mapa apagado (docs/plano-alvos.md): sem chamador do lado do
+        // cliente pra saber que sumiram, mas nada renderiza um mapa que não existe mais.
+        clearSceneTargets(ctx.roomId, sceneId);
         if (moves.length > 0) await emitCombat(io, ctx.roomId, sceneId, { role: "gm", participantId: ctx.participantId });
 
         pushEntry(ctx.roomId, buildSceneDeleteHistoryEntry(io, ctx.roomId, sceneId, sceneRow.name, destSceneId, moves));

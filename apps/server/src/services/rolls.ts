@@ -1,11 +1,56 @@
 import { randomUUID } from "node:crypto";
 import type { Participant as DbParticipant } from "@prisma/client";
-import { DiceParseError, parseFormula, rollParsed, rollParsedMany, type ChatMessage, type DamageComponent, type DiceRoll, type RollVisibility } from "@tormenta-vtt/shared";
+import {
+  DiceParseError,
+  evaluateHitRule,
+  naturalD20,
+  parseFormula,
+  resolveTargetPlaceholder,
+  rollParsed,
+  rollParsedMany,
+  type ChatMessage,
+  type ComputedCharacter,
+  type DamageComponent,
+  type DiceRoll,
+  type RollTarget,
+  type RollVisibility,
+  type SystemDefinition,
+} from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { HandlerError } from "../socket/ack.js";
 import type { TypedServer } from "../socket/types.js";
-import { emitChatMessage, redactForAuthor } from "./chatVisibility.js";
+import { emitChatMessage, redactForAuthor, rollTargetsForRoomViewer } from "./chatVisibility.js";
 import { toChatMessage } from "./serialize.js";
+
+/** Um alvo marcado pelo autor no momento da rolagem (docs/plano-alvos.md). */
+export interface RollTargetInput {
+  tokenId: string;
+  name: string;
+  /** null = token sem ficha vinculada (token solto): sem stat pra comparar, `hit` fica null. */
+  computed: ComputedCharacter | null;
+}
+
+/**
+ * Calcula `hit`/`targetValue`/`reason` de UM alvo (docs/plano-alvos.md): `attackAutoHit`/
+ * `attackAutoMiss` decidem primeiro (só {natural}, T20: 20/1 natural); senão `attackHit` (compara
+ * {total} com um stat do alvo). Ausência de qualquer uma das três, ou nada decidindo, devolve
+ * `hit: null` — o card só lista o alvo, sem "Acertou/Errou".
+ */
+function computeRollTarget(def: SystemDefinition, ctx: { total: number; natural: number | null }, t: RollTargetInput): RollTarget {
+  const evalCtx = { total: ctx.total, natural: ctx.natural ?? undefined };
+  if (def.rolls.attackAutoHit && evaluateHitRule(def.rolls.attackAutoHit, evalCtx)?.hit) {
+    return { tokenId: t.tokenId, name: t.name, hit: true, reason: "auto-hit" };
+  }
+  if (def.rolls.attackAutoMiss && evaluateHitRule(def.rolls.attackAutoMiss, evalCtx)?.hit) {
+    return { tokenId: t.tokenId, name: t.name, hit: false, reason: "auto-miss" };
+  }
+  if (def.rolls.attackHit) {
+    const resolveTarget = t.computed ? (path: string) => resolveTargetPlaceholder(t.computed!, path) : undefined;
+    const result = evaluateHitRule(def.rolls.attackHit, evalCtx, resolveTarget);
+    if (result) return { tokenId: t.tokenId, name: t.name, hit: result.hit, targetValue: result.targetValue, reason: "compare" };
+  }
+  return { tokenId: t.tokenId, name: t.name, hit: null, reason: "no-rule" };
+}
 
 export interface RollMessageInput {
   /** Fórmula já sem placeholders. */
@@ -26,6 +71,14 @@ export interface RollMessageInput {
    * placeholder, independente de `visibility` (ver services/chatVisibility.ts).
    */
   tokenId?: string;
+  /**
+   * Alvos marcados pelo autor (docs/plano-alvos.md) — só ações de ATAQUE (`isAttack`) constroem
+   * `roll.targets[]`; ação de dano ignora (o "Aplicar" usa os alvos AO VIVO do autor, não os
+   * congelados aqui). `def` é exigido junto: sem ele os alvos são ignorados (lista vazia).
+   */
+  targets?: RollTargetInput[];
+  isAttack?: boolean;
+  def?: SystemDefinition;
 }
 
 export interface RollMessageResult {
@@ -57,6 +110,12 @@ export async function createRollMessage(io: TypedServer, roomId: string, me: DbP
     throw err;
   }
 
+  // Alvos (docs/plano-alvos.md): só ações de ATAQUE constroem roll.targets — o total já existe
+  // aqui (outcome.total), então dá pra avaliar attackHit/attackAutoHit/attackAutoMiss de uma vez.
+  const natural = input.isAttack && input.targets?.length ? naturalD20(outcome.groups) : null;
+  const targets: DiceRoll["targets"] =
+    input.isAttack && input.def && input.targets?.length ? input.targets.map((t) => computeRollTarget(input.def!, { total: outcome.total, natural }, t)) : [];
+
   const diceRoll: DiceRoll = {
     id: randomUUID(),
     roomId,
@@ -71,6 +130,8 @@ export async function createRollMessage(io: TypedServer, roomId: string, me: DbP
     critThreshold: input.critThreshold,
     damage,
     applied: [],
+    natural,
+    targets,
     createdAt: new Date().toISOString(),
   };
 
@@ -89,7 +150,13 @@ export async function createRollMessage(io: TypedServer, roomId: string, me: DbP
   );
 
   await emitChatMessage(io, roomId, msg);
-  const message = redactForAuthor(msg, { role: me.role === "gm" ? "gm" : "player", participantId: me.id });
+  const authorViewer = { role: me.role === "gm" ? ("gm" as const) : ("player" as const), participantId: me.id };
+  let message = redactForAuthor(msg, authorViewer);
+  // O ack do autor também não pode vazar targetValue que ele mesmo não veria no broadcast (regra 4
+  // de chatVisibility.ts) — ex.: jogador atacando um NPC não vê a Defesa dele nem no próprio ack.
+  if (targets.length > 0 && message.roll) {
+    message = { ...message, roll: { ...message.roll, targets: await rollTargetsForRoomViewer(roomId, targets, authorViewer) } };
+  }
   return { message, total: outcome.total };
 }
 

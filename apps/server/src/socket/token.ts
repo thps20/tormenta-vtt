@@ -46,6 +46,7 @@ import { toChatMessage, toScene, toToken } from "../services/serialize.js";
 import { canAccessScene, emitTokenToPlayers, isActiveScene } from "../services/visibility.js";
 import { guarded, HandlerError, type Ctx } from "./ack.js";
 import { emitHistoryUpdated } from "./history.js";
+import { syncTargetsAfterTokenRemoval } from "./targets.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
 /**
@@ -250,6 +251,7 @@ function buildDeleteHistoryEntry(io: TypedServer, roomId: string, def: SystemDef
         const snap = await adjustCombatForTokenRemoval(def, item.sceneId, item.tokenId);
         await prisma.token.update({ where: { id: item.tokenId }, data: { deletedAt: new Date() } });
         io.to(rooms.all(roomId)).emit("token:deleted", { tokenId: item.tokenId });
+        await syncTargetsAfterTokenRemoval(io, roomId, item.tokenId);
         if (snap) affectedScenes.add(item.sceneId);
       }
       for (const sceneId of affectedScenes) await emitCombat(io, roomId, sceneId, { role: "gm", participantId: "" });
@@ -327,6 +329,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       // characterId, Combatant intactos) para o desfazer restaurar tudo sem precisar de snapshot.
       await prisma.token.update({ where: { id: tokenId }, data: { deletedAt: new Date() } });
       io.to(rooms.all(ctx.roomId)).emit("token:deleted", { tokenId });
+      await syncTargetsAfterTokenRemoval(io, ctx.roomId, tokenId);
       if (combatSnapshot) await emitCombat(io, ctx.roomId, row.sceneId, { role: ctx.role, participantId: ctx.participantId });
 
       if (ctx.role === "gm") {
@@ -352,6 +355,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
         const combatSnapshot = await adjustCombatForTokenRemoval(def, row.sceneId, row.id);
         await prisma.token.update({ where: { id: row.id }, data: { deletedAt: new Date() } });
         io.to(rooms.all(ctx.roomId)).emit("token:deleted", { tokenId: row.id });
+        await syncTargetsAfterTokenRemoval(io, ctx.roomId, row.id);
         if (combatSnapshot) affectedScenes.add(row.sceneId);
         items.push({ tokenId: row.id, name: row.name, sceneId: row.sceneId, combatSnapshot });
       }
