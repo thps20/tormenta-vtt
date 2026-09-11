@@ -54,7 +54,7 @@
       "perLevel": { "classField": "hpPerLevel", "firstLevelField": "hpInitial", "attribute": "con", "minPerLevel": 1 }
     },
     {
-      "key": "pm", "label": "Pontos de Mana", "abbr": "PM",
+      "key": "pm", "label": "Pontos de Mana", "abbr": "PM", "color": "#378ADD",
       "perLevel": { "classField": "mpPerLevel" }
     }
   ],

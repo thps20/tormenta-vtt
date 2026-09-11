@@ -52,6 +52,11 @@ import type {
   HandoutUnpinPayload,
   HandoutUpdatePayload,
   Participant,
+  PartyAddPayload,
+  PartyEntry,
+  PartyRemovePayload,
+  PartyReorderPayload,
+  PartySetHiddenPayload,
   RoomJoinPayload,
   RoomPublic,
   Ruler,
@@ -105,6 +110,12 @@ export interface RoomSnapshot {
   chat: ChatMessage[];
   /** Fichas da sala (jogadores não recebem as de kind = "npc"). */
   characters: Character[];
+  /**
+   * Grupo da "Visão de grupo" (SPEC §9.15), gerenciado pelo Mestre — já filtrado por quem recebe:
+   * jogador nunca recebe entrada oculta (`hidden`), nem de ficha que deixou de ser PC; GM recebe
+   * tudo, ocultas inclusive (a UI dele esmaece).
+   */
+  party: PartyEntry[];
   /** Trava de orçamento de deslocamento (docs/plano-movimento.md), por SALA — em memória, não vai
    *  ao banco. `true` = ninguém excede o orçamento sem confirmação do GM (padrão). */
   movementLimitEnabled: boolean;
@@ -327,6 +338,18 @@ export interface ClientToServerEvents {
   /** GM: liga/desliga a trava de deslocamento NA SALA (memória, broadcast `combat:movementLimitChanged`). */
   "combat:set-movement-limit": (payload: CombatSetMovementLimitPayload, ack: Ack<{ enabled: boolean }>) => void;
 
+  // Grupo (Visão de grupo, SPEC §9.15): lista de PCs gerenciada pelo Mestre, persistida em
+  // Room.party. Todos gmOnly — o servidor devolve, no ack, a visão do GM (tudo, ocultas inclusive);
+  // quem muda de verdade é o broadcast `party:updated` (visões diferentes por papel).
+  /** Um PC novo (character:create) já entra sozinho; isto é só pra "+ Adicionar ao grupo" (PC que
+   *  não entrou junto, ex.: sala antiga sem este recurso, ou removido antes). Idempotente. */
+  "party:add": (payload: PartyAddPayload, ack: Ack<PartyEntry[]>) => void;
+  /** Idempotente (já não estar no grupo não é erro). */
+  "party:remove": (payload: PartyRemovePayload, ack: Ack<PartyEntry[]>) => void;
+  "party:set-hidden": (payload: PartySetHiddenPayload, ack: Ack<PartyEntry[]>) => void;
+  /** Nova ordem completa (arrastar na faixa), tudo ou nada — ver reorderParty. */
+  "party:reorder": (payload: PartyReorderPayload, ack: Ack<PartyEntry[]>) => void;
+
   // Desfazer/refazer (docs/plano-desfazer.md): pilha por sala, só do GM, em memória no servidor.
   /** Desfaz o topo da pilha da sala. `null` no ack = pilha vazia (nada pra desfazer). */
   "history:undo": (payload: Record<string, never>, ack: Ack<HistoryActionResult | null>) => void;
@@ -366,6 +389,13 @@ export interface ServerToClientEvents {
   "character:created": (character: Character) => void;
   "character:updated": (character: Character) => void;
   "character:deleted": (p: { characterId: string }) => void;
+
+  /**
+   * Lista do grupo mudou (party:add/remove/set-hidden/reorder, ou um PC novo entrou sozinho ao ser
+   * criado; ou saiu porque a ficha foi apagada / deixou de ser PC). Lista COMPLETA, já filtrada por
+   * quem recebe (ver RoomSnapshot.party) — o cliente substitui a que tinha, não faz merge.
+   */
+  "party:updated": (p: { party: PartyEntry[] }) => void;
 
   /**
    * Estado completo do combate DE UM MAPA (já ordenado e filtrado por quem recebe). `combat: null`

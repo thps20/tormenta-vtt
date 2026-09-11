@@ -108,6 +108,15 @@ export const ResourceDefSchema = z.object({
   /** Se true, a ficha tem um campo de pontos temporários. */
   hasTemp: z.boolean().default(false),
   /**
+   * Cor fixa da barra deste recurso (hex), onde a UI desenha uma barra "de relance" sem espaço pra
+   * texto explicando o que é (chip da Visão de grupo, §9.15; ficha rápida de NPC). Ausente = a UI
+   * usa a régua por faixa de %  (verde/dourado/vermelho, mesma do PV no token/na ficha) — reservada
+   * pro recurso PRINCIPAL (`tokenBar`), que é sempre "quanto falta pra zerar importa". Recursos
+   * secundários (PM em T20) normalmente têm cor própria aqui, porque não são "vida": ficar baixo
+   * neles não é urgência da mesma forma, e usar a régua vermelha assustaria à toa.
+   */
+  color: HexColorSchema.optional(),
+  /**
    * Máximo acumulado por nível de classe (itens do tipo level.classes.kind).
    * Para cada classe: o 1º nível da classe inicial soma `firstLevelField`
    * (ou `classField` se ausente); os demais somam `classField`; cada nível soma
