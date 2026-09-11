@@ -601,8 +601,11 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   `grid` da cena. Se a troca muda a geometria efetiva (`cellSize`, `offsetX/Y` ou `type` — inclusive
   a célula virtual de 70px do grid "none") de um jeito que desalinha algum token já no mapa, o
   servidor reencaixa a POSIÇÃO de TODOS os tokens da cena na mesma chamada: mesma célula (col/row,
-  recalculada no grid novo — `resnapTokenPosition`, `apps/server/src/services/grid.ts`) — sem isso,
-  mudar o grid de um mapa com tokens deixaria cada um desalinhado da célula. O TAMANHO (`cells`)
+  recalculada no grid novo), grudada dentro do mapa (`resnapTokenPosition`,
+  `apps/server/src/services/grid.ts`, achado da revisão do plano do grid — `docs/revisao-grid.md`
+  §2: sem o clamp, um token já encostado numa borda podia sair do mapa se a célula nova empurrasse
+  a posição reencaixada pra fora) — sem isso, mudar o grid de um mapa com tokens deixaria cada um
+  desalinhado da célula, ou fora do mapa. O TAMANHO (`cells`)
   nunca precisa mudar aqui (docs/plano-grid.md: já é sempre `cells × cellSize do grid ATUAL`, então
   recalibrar/trocar `cellSize` nunca redimensiona nada, só reencaixa posição). Um patch que só muda
   cor/`snap` não reencaixa ninguém (`resnapTokenPosition` detecta que nada mudou). Cada token
@@ -631,7 +634,8 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   `canDeleteScene` (bloqueado/precisa confirmar/ok). `tokenPixelSize`/`cellsFromPixels`
   (`packages/shared/src/rules/placement.ts`, `placement.test.ts`) e o reencaixe de posição
   (`resnapTokenPosition`, `apps/server/src/services/grid.ts`, `grid.test.ts`: troca de `cellSize`,
-  só offset, grid "none" ↔ square, sem mudança nenhuma) são testados à parte, sem banco.
+  só offset, grid "none" ↔ square, sem mudança nenhuma, e o clamp na borda do mapa com token 1×1 e
+  2×2) são testados à parte, sem banco.
 
 ### 9.8 Painel lateral recolhível
 

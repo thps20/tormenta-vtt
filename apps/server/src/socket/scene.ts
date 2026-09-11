@@ -532,15 +532,18 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
       const merged = { ...current.grid, ...grid };
 
       // cellSize/offset (ou o tipo) pode ter mudado de um jeito que afeta a geometria — reencaixa
-      // a posição de cada token da cena pra continuar na mesma célula (`resnapTokenPosition`,
-      // services/grid.ts): sem isso, os tokens ficariam desalinhados do grid novo. `cells`
-      // (tamanho, docs/plano-grid.md) nunca precisa mudar aqui: já é sempre `cells × cellSize do
-      // grid ATUAL`. Um patch que só muda cor/`snap` não move token nenhum (`resnapTokenPosition`
-      // devolve a mesma referência), então isto não tem custo nesse caso além da própria consulta.
+      // a posição de cada token da cena pra continuar na mesma célula, grudado dentro do mapa
+      // (`resnapTokenPosition`, services/grid.ts): sem isso, os tokens ficariam desalinhados do
+      // grid novo, ou fora do mapa se a célula nova empurrasse um token que já estava na borda
+      // (docs/revisao-grid.md §2). `cells` (tamanho, docs/plano-grid.md) nunca precisa mudar aqui:
+      // já é sempre `cells × cellSize do grid ATUAL`. Um patch que só muda cor/`snap` não move
+      // token nenhum (`resnapTokenPosition` devolve a mesma referência), então isto não tem custo
+      // nesse caso além da própria consulta.
+      const map = { width: current.mapWidth ?? DEFAULT_MAP_SIZE.width, height: current.mapHeight ?? DEFAULT_MAP_SIZE.height };
       const tokenRows = await prisma.token.findMany({ where: { sceneId, deletedAt: null } });
       const moves: GridTokenMove[] = [];
       for (const row of tokenRows) {
-        const resnapped = resnapTokenPosition(row, current.grid, merged);
+        const resnapped = resnapTokenPosition(row, current.grid, merged, map);
         if (resnapped === row) continue;
         moves.push({
           tokenId: row.id,

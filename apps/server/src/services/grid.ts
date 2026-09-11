@@ -57,18 +57,37 @@ export function cellRect(token: { x: number; y: number; cells: number }, grid: G
   return { ...cellAt(token, grid), cells: token.cells };
 }
 
+/** Prende o canto superior esquerdo dentro do mapa (mesma conta de `apps/web/src/lib/grid.ts#clampToMap`,
+ *  que o servidor não importa — apps diferentes). */
+function clampToMap(pos: { x: number; y: number }, size: { width: number; height: number }, map: { width: number; height: number }): { x: number; y: number } {
+  return {
+    x: Math.max(0, Math.min(pos.x, map.width - size.width)),
+    y: Math.max(0, Math.min(pos.y, map.height - size.height)),
+  };
+}
+
 /**
  * Posição de um token depois de uma troca de grid na MESMA cena (`scene:updateGrid`,
  * docs/plano-mapas.md/docs/plano-grid.md): mantém a mesma célula (col/row, recalculada com o grid
  * novo) — sem isso, mudar `cellSize`/offset deixaria os tokens existentes desalinhados do grid
  * novo. `cells` (fonte da verdade do tamanho, docs/plano-grid.md) nunca muda aqui: o tamanho em
  * pixels já é sempre `cells × cellSize do grid ATUAL`, então trocar de grid nunca precisa
- * recalcular tamanho nenhum — só reencaixar a posição. Devolve o MESMO objeto de entrada (mesma
- * referência) quando nada muda — quem chama usa isso pra decidir se vale a pena escrever/emitir
- * esse token.
+ * recalcular tamanho nenhum — só reencaixar a posição. O ponto reencaixado é grudado dentro do
+ * `map` (mesma regra de "não deixar o token sair do mapa" que `findFreeCells`/o botão de novo
+ * token já seguem): sem isso, um token que já estava encostado numa borda podia sair do mapa
+ * quando a célula nova (calibração pela imagem, por exemplo) empurra a posição reencaixada pra
+ * fora do retângulo do mapa — achado na revisão do plano do grid (`docs/revisao-grid.md` §2).
+ * Devolve o MESMO objeto de entrada (mesma referência) quando nada muda — quem chama usa isso pra
+ * decidir se vale a pena escrever/emitir esse token.
  */
-export function resnapTokenPosition<T extends { x: number; y: number }>(token: T, fromGrid: GridConfig, toGrid: GridConfig): T {
-  const point = cellToPoint(cellAt(token, fromGrid), toGrid);
+export function resnapTokenPosition<T extends { x: number; y: number; cells: number }>(
+  token: T,
+  fromGrid: GridConfig,
+  toGrid: GridConfig,
+  map: { width: number; height: number },
+): T {
+  const side = token.cells * effectiveCellSize(toGrid);
+  const point = clampToMap(cellToPoint(cellAt(token, fromGrid), toGrid), { width: side, height: side }, map);
   if (point.x === token.x && point.y === token.y) return token;
   return { ...token, ...point };
 }

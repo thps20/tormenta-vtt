@@ -45,23 +45,15 @@ Divergências do texto do plano, todas mecânicas/de execução, não de desenho
 
 ## 2. Casos de borda pedidos explicitamente
 
-- **Token 2×2 na borda do mapa depois de recalibrar.** `scene:updateGrid` (server) reencaixa a
-  POSIÇÃO de cada token com `resnapTokenPosition` (`cellToPoint(cellAt(token, fromGrid), toGrid)`)
-  — **sem grudar no limite do mapa**. Se a calibração muda o `cellSize` de um jeito que empurra a
-  célula de um token 2×2 que já estava encostado na borda direita/inferior, o token reencaixado
-  pode ficar parcialmente ou totalmente fora do retângulo do mapa (`mapWidth`/`mapHeight`) — nada
-  quebra (não há `clampToMap` nenhum nesse caminho, então não há exceção nem dado inconsistente; o
-  token só fica visualmente "pra fora", arrastável de volta como qualquer outro). **Não é uma
-  regressão desta feature**: `resnapToken` (a função de antes, que também redimensionava) tinha
-  exatamente essa mesma lacuna — nunca houve clamp de mapa em `scene:updateGrid`, só em
-  `findFreeCells`/`scene:activate` (posicionar token NOVO ou levado de outro mapa). O que muda na
-  prática é a PROBABILIDADE: editar `cellSize`/offset à mão costuma ser um ajuste fino (poucos
-  pixels); calibrar pela imagem pode saltar de um `cellSize` errado (ex.: 50) pro correto (ex.: 84)
-  numa tacada só, então o deslocamento acumulado por célula de distância até a borda fica bem maior.
-  Vale considerar pro backlog: `resnapTokenPosition` ganhar um `clampToMap` opcional, ou o handler
-  de `scene:updateGrid` grudar cada token reencaixado dentro do mapa antes de gravar. Não corrigido
-  agora — o plano não pedia clamp, só reencaixe; fica registrado aqui como achado, não como bug
-  desta implementação.
+- **Token 2×2 na borda do mapa depois de recalibrar.** ~~`scene:updateGrid` (server) reencaixava a
+  POSIÇÃO de cada token com `resnapTokenPosition` sem grudar no limite do mapa~~ — **corrigido**
+  (11/09/2026, a pedido do dono do projeto, depois desta revisão): `resnapTokenPosition` agora
+  recebe `map: {width, height}` e gruda o canto reencaixado dentro dele com o mesmo `clampToMap`
+  que `findFreeCells`/o botão de novo token já usam (`side = cells × cellSize do grid NOVO`, então
+  um token 2×2 gruda pelo próprio lado de 2 células, não só 1). Testado em `grid.test.ts`
+  (`apps/server`): token 1×1 e 2×2 na borda, calibração que empurraria pra fora fica grudada no
+  maior x/y que ainda cabe no mapa; token já dentro do mapa continua devolvendo a MESMA referência
+  (sem custo extra quando o clamp não muda nada). Ver SPEC §9.7.
 - **Calibrar com grid "none" e tokens no mapa.** Funciona pelo mesmo caminho de qualquer troca de
   tipo de grid: o botão "Calibrar pela imagem" já troca `gridType` pra `"square"` no estado local do
   modal (decisão do plano — "recalibrar nunca faz sentido continuar sem grid"), mas **nada é
@@ -132,8 +124,6 @@ Divergências do texto do plano, todas mecânicas/de execução, não de desenho
 - **Tokens de meia célula** (Minúsculo 0,5 em T20) continuam arredondando pra 1 célula cheia ao
   soltar do compêndio — anotado no backlog (`docs/backlog.md`), não corrigido: exigiria `cells`
   fracionário, fora do escopo deste plano.
-- **Sem clamp de mapa em `scene:updateGrid`** — ver §2 acima ("token na borda"). Pré-existente, não
-  corrigido, registrado como achado a considerar pro backlog.
 - **Gabaritos não são reencaixados por `scene:updateGrid`/calibração** — ver §2 acima ("Colocar
   área"). Pré-existente (gabaritos são efêmeros e em pixels absolutos desde sempre), não corrigido.
 - **Calibração é só manual** (decisão do plano, confirmada): nenhuma tentativa de detectar grid já
@@ -145,9 +135,9 @@ Os três commits (`Token.cells` como fonte da verdade + migration/backfill/confe
 `GridConfig` decimal, calibração pela imagem) implementam o plano sem desvio de desenho — só
 ajustes mecânicos de execução (ferramenta de migration, escopo de commit único na Parte A, e a
 separação linha a linha de arquivos compartilhados com features pendentes de outra sessão). Dos
-seis casos de borda pedidos, quatro funcionam corretamente por construção (grid "none" → calibrado,
-desfazer resize, levar token 2×2 entre mapas, contagem de alvos em gabarito) e dois expõem
-limitações reais, ambas **pré-existentes** ao plano (falta de clamp de mapa em
-`scene:updateGrid`; gabaritos não acompanham mudança de grid) que a calibração pela imagem só torna
-mais prováveis de aparecer na prática — nenhuma delas quebra o app, as duas ficam registradas acima
-para o dono do projeto decidir se valem um fix futuro.
+seis casos de borda pedidos, cinco funcionam corretamente (grid "none" → calibrado, desfazer
+resize, levar token 2×2 entre mapas, contagem de alvos em gabarito, e — depois do fix acima —
+token na borda do mapa após recalibrar) e um expõe uma limitação real **pré-existente** ao plano
+(gabaritos não acompanham mudança de grid, decisão de design de longa data — efêmeros, em pixels
+absolutos) que a calibração pela imagem só torna mais provável de aparecer na prática — não quebra
+o app, fica registrada acima para o dono do projeto decidir se vale um fix futuro.
