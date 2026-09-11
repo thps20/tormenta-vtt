@@ -74,3 +74,25 @@ export function clearSceneTargets(roomId: string, sceneId: string): void {
 export function clearRoomTargets(roomId: string): void {
   byRoomAndParticipant.delete(roomId);
 }
+
+/**
+ * `character:roll` (docs/revisao-alvos.md §5.2): filtra e ORDENA as linhas de token pelos ids que
+ * o autor marcou, descartando as que não estão no mapa que ele está VENDO agora — o `sceneId`
+ * gravado da última vez que ele chamou `target:set`, não o mapa do personagem nem o da ação. Sem
+ * isso, um alvo marcado num mapa e esquecido lá (o GM não tem os alvos limpos ao trocar de mapa,
+ * §2.2) continuava entrando na conta de um ataque feito depois, em outro mapa (achado na revisão).
+ * `viewingSceneId` ausente (autor nunca chamou `target:set` nesta sala) descarta tudo — sem um
+ * mapa pra comparar, nenhum alvo tem como ser validado. Pura: sem I/O, fácil de testar.
+ */
+export function filterTargetTokensByScene<T extends { id: string; sceneId: string }>(
+  targetTokenIds: string[],
+  rows: T[],
+  viewingSceneId: string | undefined,
+): T[] {
+  if (viewingSceneId === undefined) return [];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return targetTokenIds.flatMap((id) => {
+    const row = byId.get(id);
+    return row && row.sceneId === viewingSceneId ? [row] : [];
+  });
+}

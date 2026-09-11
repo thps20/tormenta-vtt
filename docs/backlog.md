@@ -116,3 +116,17 @@ comprometido — só um lugar para não perder a ideia até o dono do projeto pr
   precisaria perguntar qual), e um sub-modo novo da ferramenta Área ("apontar": origem travada no
   token, só o `mousemove`/clique decide a rotação) separado do clique-e-arrasto livre de hoje.
   Anotado em 10/09/2026 (`docs/plano-gabaritos.md` §6).
+- **Autor da rolagem vê a linha do próprio alvo mesmo se o token ficar oculto (hoje segue a regra de
+  linha do card de iniciativa).** No sistema de alvos (§9.12 do SPEC), `rollTargetsForViewer`
+  (`apps/server/src/services/chatVisibility.ts`) tira a linha de um alvo cujo token o viewer não vê
+  — **inclusive o autor da rolagem**, seguindo à risca a mesma regra por LINHA que
+  `initiativeBatchForViewer` já usava (o plano pediu pra espelhar essa função, docs/plano-alvos.md
+  §2.4). Efeito prático: um jogador que ataca um monstro que fica invisível/sai da névoa no meio do
+  ataque não vê se o próprio ataque acertou — só o GM vê. É diferente da regra de MENSAGEM inteira
+  (`tokenId`/`blockedPlayerIds`), que sempre isenta o autor. Se o dono do projeto preferir que o
+  autor sempre veja o resultado do próprio ataque (mesmo contra um alvo que ficou oculto pra ele
+  depois de rolar), precisaria de uma exceção por autor dentro de `rollTargetsForViewer` — parecida
+  com a que a regra de mensagem já tem, mas nova pra regra de linha (nem `initiativeBatchForViewer`
+  tem isso hoje, então mudar só pra alvos criaria uma assimetria entre os dois cards). Achado na
+  revisão de 10/09/2026 (`docs/revisao-alvos.md` §5.3); não corrigido — comportamento consistente
+  com o que já existia, não uma regressão.

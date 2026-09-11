@@ -126,9 +126,14 @@ nova minha).
 
 ### 5.2 Ataque com alvo em outro mapa
 
-**Achado real, mas só afeta a própria visão do GM — nunca vaza pra jogador.**
+**Achado real (só afetava a própria visão do GM, nunca vazava pra jogador) — corrigido em seguida.**
+`loadRollTargets` (`socket/character.ts`) passou a descartar alvos cujo `sceneId` não bate o mapa
+que o autor está VENDO agora (`getTargets(roomId, participantId)?.sceneId`, gravado da última vez
+que ele chamou `target:set`), via a função pura `filterTargetTokensByScene`
+(`services/targets.ts`, testada em `targets.test.ts`). O relato abaixo descreve o problema como
+estava ANTES da correção — mantido pelo raciocínio, o comportamento já não existe mais.
 
-Jogador: impossível na prática. `target:set` de jogador exige `requirePlayerOnActiveScene` (só marca
+Jogador: impossível na prática, mesmo antes da correção. `target:set` de jogador exige `requirePlayerOnActiveScene` (só marca
 no mapa ATIVO da sala) e `scene:activate` chama `clearPlayerTargetsOnActivate` sempre que o mapa
 ativo muda — então o `mine` de um jogador nunca aponta pra um mapa que não é mais o ativo.
 
@@ -208,13 +213,13 @@ marcar alvo.
 ## 6. Resumo
 
 Nenhum bug encontrado que vaze informação (jogador nunca vê alvo do GM, nunca vê `targetValue` de
-token que não é dele, nunca vê linha de token que não pode ver). O único achado de comportamento
-(§5.2, alvo fantasma do GM entre mapas) é uma inconsistência cosmética visível só pro próprio GM,
-não corrigida nesta rodada — decisão deliberada de não estender a limpeza automática de alvos ao GM
-(o plano já dizia "o GM mantém os dele"). §5.3 documenta uma interação sutil (autor não é isento na
-redação por LINHA, é isento na redação por MENSAGEM) que já existia pro card de iniciativa em lote e
-passou a valer pra alvos por seguir a mesma regra pedida no plano — não é uma regressão, mas vale a
-pena o dono do projeto saber que existe. `make typecheck && make test` verde em todo o monorepo;
-recomendo a passada manual com `make dev`/`make seed-test` antes de considerar a feature fechada,
-sobretudo §5.4 (só verificado por leitura) e o risco de Alt do plano §6 (comportamento real do
-navegador, não simulável por teste automatizado).
+token que não é dele, nunca vê linha de token que não pode ver). O achado de comportamento (§5.2,
+alvo fantasma do GM entre mapas) foi corrigido nesta mesma revisão — `loadRollTargets` agora
+descarta alvos de um mapa que não é o que o autor está vendo, com teste (`targets.test.ts`). §5.3
+documenta uma interação sutil (autor não é isento na redação por LINHA, é isento na redação por
+MENSAGEM) que já existia pro card de iniciativa em lote e passou a valer pra alvos por seguir a
+mesma regra pedida no plano — não é uma regressão, mas registrada em `docs/backlog.md` pro dono do
+projeto decidir se quer mudar. `make typecheck && make test` verde em todo o monorepo; recomendo a
+passada manual com `make dev`/`make seed-test` antes de considerar a feature fechada, sobretudo
+§5.4 (só verificado por leitura) e o risco de Alt do plano §6 (comportamento real do navegador, não
+simulável por teste automatizado).
