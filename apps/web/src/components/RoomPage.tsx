@@ -52,8 +52,9 @@ import { SidePanel, type SidePanelTab } from "./SidePanel";
 import { CharacterMenu } from "./CharacterMenu";
 import { NicknamePrompt } from "./NicknamePrompt";
 import { CompendiumPalette } from "./compendium/CompendiumPalette";
-import { DragGhost } from "./compendium/DragGhost";
+import { DragGhost, EncounterDragGhost } from "./compendium/DragGhost";
 import { useCompendium } from "../store/compendium";
+import { useEncounters } from "../store/encounters";
 import { CREATURE_FILTER } from "../lib/compendium";
 
 const CENTER_ON_TURN_KEY = "tvtt:centerOnActiveTurn";
@@ -248,6 +249,16 @@ function Table() {
     if (!scene) return false;
     const result = await spawnFromCompendium({ sceneId: scene.id, entryId, count: opts.count, visible: opts.visible, x: point.x, y: point.y });
     return result !== null;
+  };
+  const spawnEncounter = useEncounters((s) => s.spawn);
+  /** Solta o encontro inteiro na cena ativa (§9.14) — mesma dualidade Enter/arrasto de spawnCreatureAt. */
+  const spawnEncounterAt = async (
+    encounterId: string,
+    point: { x: number; y: number },
+    opts: { startCombat: boolean; rollNpcInitiative: boolean },
+  ): Promise<boolean> => {
+    if (!scene) return false;
+    return spawnEncounter(encounterId, scene.id, point, opts);
   };
 
   const messages = useChat((s) => s.messages);
@@ -723,6 +734,7 @@ function Table() {
                   void fogOp({ type: "add", shape });
                 }}
                 onSpawnCreature={isGm ? (entryId, point, opts) => void spawnCreatureAt(entryId, point, opts) : undefined}
+                onSpawnEncounter={isGm ? (encounterId, point, opts) => void spawnEncounterAt(encounterId, point, opts) : undefined}
                 arrivalPickMode={isGm && settingArrivalSceneId === scene.id}
                 onPickArrival={handlePickArrival}
                 templates={templates}
@@ -796,8 +808,11 @@ function Table() {
                 mode="map"
                 onClose={closeCompendium}
                 onSpawnCreature={isGm ? (entryId, opts) => spawnCreatureAt(entryId, vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 }, opts) : undefined}
+                onSpawnEncounter={isGm ? (id, opts) => spawnEncounterAt(id, vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 }, opts) : undefined}
+                selectedTokenIds={isGm ? selectedIds : []}
               />
               <DragGhost def={systemDef} />
+              <EncounterDragGhost />
             </>
           )}
         </main>

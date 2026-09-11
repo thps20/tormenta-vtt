@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, Check, Plus, Search, X } from "lucide-react";
-import { type Character, type CompendiumCreatureEntry, type CompendiumItemEntry, type SystemDefinition } from "@tormenta-vtt/shared";
-import { checkInsert, matchesQuery, CREATURE_FILTER, ROOM_FILTER, type InsertCheck } from "../../lib/compendium";
+import { BookOpen, Check, Plus, Save, Search, Users, X } from "lucide-react";
+import { type Character, type CompendiumCreatureEntry, type CompendiumItemEntry, type SavedEncounter, type SystemDefinition } from "@tormenta-vtt/shared";
+import { checkInsert, matchesQuery, CREATURE_FILTER, ENCOUNTER_FILTER, ROOM_FILTER, type InsertCheck } from "../../lib/compendium";
 import { useCompendium } from "../../store/compendium";
+import { useEncounters } from "../../store/encounters";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { creatureIcon, kindIcon } from "../character/kindIcons";
 import { EntryPreview } from "./EntryPreview";
 import { CreaturePreview } from "./CreaturePreview";
-import { useCompendiumDrag } from "./DragGhost";
+import { EncounterPreview, encounterIcon } from "./EncounterPreview";
+import { useCompendiumDrag, useEncounterDrag } from "./DragGhost";
 
 /**
  * "docked": painel lateral encaixado à esquerda da ficha (irmão dela no drawer).
@@ -29,6 +31,10 @@ export interface CompendiumPaletteProps {
   onInsert?: (entryId: string, opts?: { replace?: boolean }) => Promise<string | null>;
   /** Solta N cópias de uma criatura no mapa (Enter/botão no preview). Ausente/ignorado fora do contexto "map". */
   onSpawnCreature?: (entryId: string, opts: { count: number; visible: boolean }) => Promise<boolean>;
+  /** Solta um encontro salvo inteiro no mapa (§9.14). Ausente/ignorado fora do contexto "map". */
+  onSpawnEncounter?: (encounterId: string, opts: { startCombat: boolean; rollNpcInitiative: boolean }) => Promise<boolean>;
+  /** Tokens selecionados no mapa agora (GM): habilita "Salvar seleção do mapa como encontro". */
+  selectedTokenIds?: string[];
   onClose: () => void;
 }
 
@@ -43,7 +49,17 @@ interface CreaturePaletteRow {
   kind: "creature";
   entry: CompendiumCreatureEntry;
 }
-export type PaletteRow = ItemPaletteRow | CreaturePaletteRow;
+/** Uma linha de encontro salvo (§9.14): solta o grupo inteiro no mapa, não se insere na ficha. */
+interface EncounterPaletteRow {
+  kind: "encounter";
+  encounter: SavedEncounter;
+}
+export type PaletteRow = ItemPaletteRow | CreaturePaletteRow | EncounterPaletteRow;
+
+/** Id de uma linha, qualquer que seja o kind — item/criatura usam `.entry.id`, encontro usa `.encounter.id`. */
+function rowId(row: PaletteRow): string {
+  return row.kind === "encounter" ? row.encounter.id : row.entry.id;
+}
 
 const NO_SHEET_CHECK: InsertCheck = { ok: false, reason: null, replaces: null };
 
@@ -57,7 +73,7 @@ const NO_SHEET_CHECK: InsertCheck = { ok: false, reason: null, replaces: null };
  * itens (comportamento de sempre); "map" lista itens (só consulta, sem `character`) e, se houver,
  * criaturas — que o GM solta no mapa (fantasma e evento chegam nos passos 8/9).
  */
-export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, character, mode, onInsert, onSpawnCreature, onClose }) => {
+export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, character, mode, onInsert, onSpawnCreature, onSpawnEncounter, selectedTokenIds = [], onClose }) => {
   const entries = useCompendium((s) => s.entries);
   const roomIds = useCompendium((s) => s.roomIds);
   const status = useCompendium((s) => s.status);
@@ -85,8 +101,19 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
     [context, entries],
   );
 
-  // Linhas visíveis, agrupadas: Criaturas primeiro (quando há alguma), depois itemKinds[] na ordem
-  // do sistema. Os chips "Criaturas"/"Sala" filtram por tipo/origem, não por itemKinds[].key.
+  // Encontros salvos (§9.14): mesma regra de "só no contexto map" das criaturas; carrega sob
+  // demanda na primeira vez que a paleta abre sobre o mapa (mesmo padrão de useCompendium.load()).
+  const allEncounters = useEncounters((s) => s.items);
+  useEffect(() => {
+    if (context === "map" && onSpawnEncounter) void useEncounters.getState().load();
+  }, [context, onSpawnEncounter]);
+  const encounterEntries = useMemo(() => (context === "map" && onSpawnEncounter ? allEncounters : []), [context, onSpawnEncounter, allEncounters]);
+  const cart = useEncounters((s) => s.cart);
+  const { onRowPointerDown: onEncounterRowPointerDown } = useEncounterDrag();
+
+  // Linhas visíveis, agrupadas: Criaturas primeiro (quando há alguma), depois Encontros, depois
+  // itemKinds[] na ordem do sistema. Os chips "Criaturas"/"Encontros"/"Sala" filtram por
+  // tipo/origem, não por itemKinds[].key.
   const groups = useMemo(() => {
     const matchesChips = (id: string, roomOnly: boolean) => kinds.size === 0 || (kinds.has(ROOM_FILTER) && roomIds.includes(id)) || roomOnly;
     const out: { key: string; label: string; Icon: typeof creatureIcon; rows: PaletteRow[] }[] = [];
@@ -98,6 +125,13 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
         .map((entry) => ({ kind: "creature", entry }));
       if (rows.length > 0) out.push({ key: CREATURE_FILTER, label: "Criaturas", Icon: creatureIcon, rows });
     }
+    if (encounterEntries.length > 0) {
+      const rows: PaletteRow[] = encounterEntries
+        .filter((e) => matchesChips(e.id, kinds.has(ENCOUNTER_FILTER)) && matchesQuery(e, query))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((encounter) => ({ kind: "encounter", encounter }));
+      if (rows.length > 0) out.push({ key: ENCOUNTER_FILTER, label: "Encontros", Icon: encounterIcon, rows });
+    }
     def.itemKinds.forEach((kind, index) => {
       const rows: PaletteRow[] = items
         .filter((e) => e.kind === kind.key && matchesChips(e.id, kinds.has(kind.key)) && matchesQuery(e, query))
@@ -106,7 +140,7 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
       if (rows.length > 0) out.push({ key: kind.key, label: kind.label, Icon: kindIcon(index), rows });
     });
     return out;
-  }, [def, character, items, creatureEntries, kinds, roomIds, query]);
+  }, [def, character, items, creatureEntries, encounterEntries, kinds, roomIds, query]);
   const flat = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
   const current = flat[Math.min(focused, Math.max(0, flat.length - 1))] ?? null;
 
@@ -115,7 +149,7 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
   // Mantém a linha focada à vista ao navegar com as setas.
   useEffect(() => {
     if (!current) return;
-    listRef.current?.querySelector<HTMLElement>(`[data-entry-id="${current.entry.id}"]`)?.scrollIntoView({ block: "nearest" });
+    listRef.current?.querySelector<HTMLElement>(`[data-entry-id="${rowId(current)}"]`)?.scrollIntoView({ block: "nearest" });
   }, [current]);
 
   const insert = async (row: PaletteRow, keepOpen: boolean, replace = false) => {
@@ -153,6 +187,29 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
     onClose();
   };
 
+  // Checkboxes "iniciar combate"/"rolar iniciativa" (EncounterPreview): vivem na store porque o
+  // drop no mapa (VttCanvas) também precisa deles — mesmo motivo de spawnCount/spawnInvisible acima.
+  const spawnStartCombat = useEncounters((s) => s.spawnStartCombat);
+  const setSpawnStartCombat = useEncounters((s) => s.setSpawnStartCombat);
+  const spawnRollNpcInitiative = useEncounters((s) => s.spawnRollNpcInitiative);
+  const setSpawnRollNpcInitiative = useEncounters((s) => s.setSpawnRollNpcInitiative);
+
+  const spawnEncounterRow = async (row: EncounterPaletteRow, keepOpen: boolean) => {
+    if (!onSpawnEncounter) return;
+    const ok = await onSpawnEncounter(row.encounter.id, { startCombat: spawnStartCombat, rollNpcInitiative: spawnRollNpcInitiative });
+    if (!ok || keepOpen) return;
+    onClose();
+  };
+
+  // "Salvar carrinho"/"salvar seleção do mapa"/"editar" (§9.14): o mesmo formulariozinho pequeno
+  // (EncounterMetaForm) serve pros três, só o que ele chama ao confirmar muda.
+  const [cartFormOpen, setCartFormOpen] = useState(false);
+  const [selectionFormOpen, setSelectionFormOpen] = useState(false);
+  const [editingEncounter, setEditingEncounter] = useState<SavedEncounter | null>(null);
+  // Trocou de linha focada (ou saiu do grupo Encontros): fecha o formulário de edição pendente.
+  const currentEncounterId = current?.kind === "encounter" ? current.encounter.id : null;
+  useEffect(() => setEditingEncounter(null), [currentEncounterId]);
+
   const toggleKind = (key: string) =>
     setKinds((prev) => {
       const next = new Set(prev);
@@ -174,6 +231,7 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
     } else if (e.key === "Enter" && current) {
       e.preventDefault();
       if (current.kind === "creature") void spawn(current, e.ctrlKey || e.metaKey);
+      else if (current.kind === "encounter") void spawnEncounterRow(current, e.ctrlKey || e.metaKey);
       else void insert(current, e.ctrlKey || e.metaKey);
     }
   };
@@ -181,7 +239,7 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
   const preview = current ? (
     current.kind === "item" ? (
       <EntryPreview def={def} row={current} onReplace={() => void insert(current, false, true)} />
-    ) : (
+    ) : current.kind === "creature" ? (
       <CreaturePreview
         def={def}
         entry={current.entry}
@@ -193,9 +251,30 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
                 invisible: spawnInvisible,
                 onInvisibleChange: setSpawnInvisible,
                 onSpawn: () => void spawn(current, false),
+                onAddToCart: () => useEncounters.getState().addToCart(current.entry.id, spawnCount),
               }
             : undefined
         }
+      />
+    ) : (
+      <EncounterPreview
+        def={def}
+        encounter={current.encounter}
+        compendiumEntries={entries}
+        spawn={
+          onSpawnEncounter
+            ? {
+                startCombat: spawnStartCombat,
+                onStartCombatChange: setSpawnStartCombat,
+                rollNpcInitiative: spawnRollNpcInitiative,
+                onRollNpcInitiativeChange: setSpawnRollNpcInitiative,
+                onSpawn: () => void spawnEncounterRow(current, false),
+              }
+            : undefined
+        }
+        onEdit={() => setEditingEncounter(current.encounter)}
+        onDuplicate={() => void useEncounters.getState().duplicate(current.encounter)}
+        onDelete={() => void useEncounters.getState().remove(current.encounter.id)}
       />
     )
   ) : (
@@ -203,6 +282,22 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
       <BookOpen className="w-6 h-6" />
       Selecione uma entrada para ver o resumo.
     </div>
+  );
+  // "Editar" (EncounterPreview) troca o preview pelo formulário, sem perder a navegação da lista.
+  const previewOrEdit = editingEncounter ? (
+    <div className="p-3">
+      <EncounterMetaForm
+        initial={{ name: editingEncounter.name, tags: editingEncounter.tags, notes: editingEncounter.notes }}
+        submitLabel="Salvar alterações"
+        onSubmit={async (name, tags, notes) => {
+          const ok = await useEncounters.getState().update(editingEncounter.id, { name, tags, notes });
+          if (ok) setEditingEncounter(null);
+        }}
+        onCancel={() => setEditingEncounter(null)}
+      />
+    </div>
+  ) : (
+    preview
   );
 
   const list = (
@@ -220,19 +315,27 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
               <PaletteRowView
                 key={row.entry.id}
                 row={row}
-                focused={current?.entry.id === row.entry.id}
+                focused={current !== null && rowId(current) === rowId(row)}
                 inserted={justInserted === row.entry.id}
                 onFocus={() => setFocused(flat.indexOf(row))}
                 onInsert={() => void insert(row, true)}
                 onPointerDown={(e) => row.check.ok && onRowPointerDown(e, row.entry.id)}
               />
-            ) : (
+            ) : row.kind === "creature" ? (
               <CreatureRowView
                 key={row.entry.id}
                 entry={row.entry}
-                focused={current?.entry.id === row.entry.id}
+                focused={current !== null && rowId(current) === rowId(row)}
                 onFocus={() => setFocused(flat.indexOf(row))}
                 onPointerDown={(e) => !!onSpawnCreature && onRowPointerDown(e, row.entry.id)}
+              />
+            ) : (
+              <EncounterRowView
+                key={row.encounter.id}
+                encounter={row.encounter}
+                focused={current !== null && rowId(current) === rowId(row)}
+                onFocus={() => setFocused(flat.indexOf(row))}
+                onPointerDown={(e) => !!onSpawnEncounter && onEncounterRowPointerDown(e, row.encounter.id)}
               />
             ),
           )}
@@ -281,6 +384,16 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
               onClick={() => toggleKind(CREATURE_FILTER)}
             />
           )}
+          {encounterEntries.length > 0 && (
+            <ChipButton
+              id={`compendium-chip-${ENCOUNTER_FILTER}`}
+              Icon={encounterIcon}
+              label="Encontros"
+              count={encounterEntries.length}
+              active={kinds.has(ENCOUNTER_FILTER)}
+              onClick={() => toggleKind(ENCOUNTER_FILTER)}
+            />
+          )}
           {def.itemKinds.map((kind, index) => (
             <ChipButton
               key={kind.key}
@@ -303,6 +416,58 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
         </div>
       </div>
 
+      {/* Carrinho / seleção do mapa → encontro (§9.14): só GM sobre o mapa, só quando há algo pra salvar. */}
+      {context === "map" && onSpawnEncounter && (cart.length > 0 || selectedTokenIds.length > 0) && (
+        <div className="border-b border-[#2d2417] p-2 space-y-2">
+          {cart.length > 0 &&
+            (cartFormOpen ? (
+              <EncounterMetaForm
+                initial={{ name: "", tags: [], notes: "" }}
+                submitLabel="Salvar"
+                onSubmit={async (name, tags, notes) => {
+                  const created = await useEncounters.getState().createFromCart(name, tags, notes);
+                  if (created) setCartFormOpen(false);
+                }}
+                onCancel={() => setCartFormOpen(false)}
+              />
+            ) : (
+              <button
+                id="encounter-save-cart"
+                onClick={() => setCartFormOpen(true)}
+                className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded border border-zinc-700 text-[11px] font-serif text-zinc-300 hover:border-[#d4af37] hover:text-[#d4af37] cursor-pointer transition-colors"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Save className="w-3.5 h-3.5" /> Salvar carrinho como encontro
+                </span>
+                <span className="font-mono text-[10px] opacity-70">{cart.reduce((sum, c) => sum + c.count, 0)} criatura(s)</span>
+              </button>
+            ))}
+          {selectedTokenIds.length > 0 &&
+            (selectionFormOpen ? (
+              <EncounterMetaForm
+                initial={{ name: "", tags: [], notes: "" }}
+                submitLabel="Salvar"
+                onSubmit={async (name, tags, notes) => {
+                  const ok = await useEncounters.getState().createFromTokens(selectedTokenIds, name, tags, notes);
+                  if (ok) setSelectionFormOpen(false);
+                }}
+                onCancel={() => setSelectionFormOpen(false)}
+              />
+            ) : (
+              <button
+                id="encounter-save-selection"
+                onClick={() => setSelectionFormOpen(true)}
+                className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded border border-zinc-700 text-[11px] font-serif text-zinc-300 hover:border-[#d4af37] hover:text-[#d4af37] cursor-pointer transition-colors"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" /> Salvar tokens selecionados como encontro
+                </span>
+                <span className="font-mono text-[10px] opacity-70">{selectedTokenIds.length} token(s)</span>
+              </button>
+            ))}
+        </div>
+      )}
+
       {/* Resultados + preview: empilhados (janela alta) ou em abas (janela baixa) */}
       {short ? (
         <>
@@ -318,12 +483,12 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
               </button>
             ))}
           </div>
-          {pane === "list" ? list : <div className="flex-1 min-h-0 overflow-y-auto bg-[#0b0a09]">{preview}</div>}
+          {pane === "list" ? list : <div className="flex-1 min-h-0 overflow-y-auto bg-[#0b0a09]">{previewOrEdit}</div>}
         </>
       ) : (
         <>
           {list}
-          <div id="compendium-preview-pane" className="shrink-0 max-h-[45%] min-h-24 border-t border-[#2d2417] overflow-y-auto bg-[#0b0a09]">{preview}</div>
+          <div id="compendium-preview-pane" className="shrink-0 max-h-[45%] min-h-24 border-t border-[#2d2417] overflow-y-auto bg-[#0b0a09]">{previewOrEdit}</div>
         </>
       )}
 
@@ -337,7 +502,7 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
             <span>arraste uma entrada para a ficha</span>
           </>
         ) : (
-          onSpawnCreature && (
+          (onSpawnCreature || onSpawnEncounter) && (
             <>
               <span><kbd className="font-mono">Enter</kbd> soltar no mapa</span>
               <span><kbd className="font-mono">Ctrl+Enter</kbd> soltar e continuar</span>
@@ -476,3 +641,100 @@ const CreatureRowView: React.FC<CreatureRowViewProps> = ({ entry, focused, onFoc
     </div>
   </div>
 );
+
+interface EncounterRowViewProps {
+  encounter: SavedEncounter;
+  focused: boolean;
+  onFocus: () => void;
+  /** Início de um possível arrasto pro mapa (§9.14, mesmo mecanismo de CreatureRowView). */
+  onPointerDown: (e: React.PointerEvent) => void;
+}
+
+const EncounterRowView: React.FC<EncounterRowViewProps> = ({ encounter, focused, onFocus, onPointerDown }) => {
+  const total = encounter.entries.reduce((sum, e) => sum + e.count, 0);
+  return (
+    <div
+      data-entry-id={encounter.id}
+      onPointerEnter={onFocus}
+      onPointerDown={onPointerDown}
+      onClick={onFocus}
+      title="Arraste para o mapa ou pressione Enter"
+      className={`flex items-center gap-2 mx-1 px-2 py-1.5 rounded transition-colors cursor-grab active:cursor-grabbing ${focused ? "bg-[#1e1a14] ring-1 ring-[#d4af37]/60" : "hover:bg-[#161412]"}`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-serif truncate text-zinc-100">{encounter.name}</div>
+        <div className="text-[10px] text-zinc-500 truncate">
+          {total} criatura{total === 1 ? "" : "s"}
+          {encounter.tags.length > 0 ? ` · ${encounter.tags.join(" · ")}` : ""}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface EncounterMetaFormProps {
+  initial: { name: string; tags: string[]; notes: string };
+  submitLabel: string;
+  onSubmit: (name: string, tags: string[], notes: string) => Promise<void>;
+  onCancel: () => void;
+}
+
+/**
+ * Formulário pequeno (nome/tags/notas) reaproveitado por "salvar carrinho", "salvar seleção do
+ * mapa" e "editar" (§9.14) — só o que `onSubmit` chama muda entre os três.
+ */
+const EncounterMetaForm: React.FC<EncounterMetaFormProps> = ({ initial, submitLabel, onSubmit, onCancel }) => {
+  const [name, setName] = useState(initial.name);
+  const [tags, setTags] = useState(initial.tags.join(", "));
+  const [notes, setNotes] = useState(initial.notes);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    await onSubmit(
+      name.trim(),
+      tags.split(",").map((t) => t.trim()).filter(Boolean),
+      notes,
+    );
+    setBusy(false);
+  };
+
+  return (
+    <div className="p-2 space-y-1.5 rounded bg-[#161412] border border-[#2d2417]" onKeyDown={(e) => e.stopPropagation()}>
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Nome do encontro"
+        className="w-full bg-[#0f0e0c] border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-[#d4af37]"
+      />
+      <input
+        value={tags}
+        onChange={(e) => setTags(e.target.value)}
+        placeholder="Tags (separadas por vírgula)"
+        className="w-full bg-[#0f0e0c] border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-[#d4af37]"
+      />
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Notas (opcional)"
+        rows={2}
+        className="w-full bg-[#0f0e0c] border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 placeholder:text-zinc-600 resize-none focus:outline-none focus:border-[#d4af37]"
+      />
+      <div className="flex items-center gap-1.5 justify-end">
+        <button onClick={onCancel} className="px-2 py-1 rounded text-[10px] text-zinc-400 hover:text-zinc-200 cursor-pointer">
+          Cancelar
+        </button>
+        <button
+          onClick={() => void submit()}
+          disabled={!name.trim() || busy}
+          className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#d4af37] text-zinc-950 font-serif font-bold text-[11px] hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <Save className="w-3 h-3" />
+          {submitLabel}
+        </button>
+      </div>
+    </div>
+  );
+};

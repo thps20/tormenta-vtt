@@ -24,6 +24,7 @@ import {
   type HandoutPin,
   type Participant,
   type Ruler,
+  type SavedEncounter,
   type Scene,
   type SystemDefinition,
   type Template,
@@ -52,6 +53,7 @@ import { useImage } from "../lib/useImage";
 import { newId } from "../lib/ids";
 import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
 import { useCompendium } from "../store/compendium";
+import { useEncounters } from "../store/encounters";
 import { canMoveNow, movementBudgetFallback } from "../store/combat";
 import { toast } from "../store/ui";
 import type { FogToolMode, FogToolShape, RemoteRuler, ToolMode } from "../store/tools";
@@ -149,6 +151,12 @@ interface VttCanvasProps {
    * segue funcionando por Enter/botão, que usam o centro da viewport em vez do ponto de soltura).
    */
   onSpawnCreature?: (entryId: string, point: { x: number; y: number }, opts: { count: number; visible: boolean }) => void;
+  /**
+   * Solta um ENCONTRO salvo inteiro no ponto (§9.14) — mesmo mecanismo de onSpawnCreature, mesmo
+   * alvo "map" (os dois registros convivem, ver lib/dropTargets.ts). GM only; ausente = o mapa não
+   * aceita o drop (a paleta segue funcionando por Enter/botão, que usam o centro da viewport).
+   */
+  onSpawnEncounter?: (encounterId: string, point: { x: number; y: number }, opts: { startCombat: boolean; rollNpcInitiative: boolean }) => void;
   /**
    * "Definir ponto de chegada" (docs/plano-mapas.md §9): true entre o clique no menu do card do
    * mapa e o próximo clique no canvas, que grava o ponto (`onPickArrival`) em vez do comportamento
@@ -316,6 +324,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   fogTool,
   onFogShape,
   onSpawnCreature,
+  onSpawnEncounter,
   arrivalPickMode,
   onPickArrival,
   templates,
@@ -576,6 +585,20 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       onDrop: (handout, point) => onHandoutDrop(handout, mapPointFromClient(point)),
     });
   }, [onHandoutDrop]);
+
+  // Terceiro alvo no MESMO id "map" (§9.14): arrastar um encontro salvo solta ele inteiro no ponto.
+  // `accepts` distingue pela forma (SavedEncounter tem `entries`, que nem CompendiumEntry nem Handout têm).
+  useEffect(() => {
+    if (!onSpawnEncounter) return;
+    return registerDropTarget<SavedEncounter>({
+      id: MAP_DROP_TARGET,
+      accepts: (entry) => typeof entry === "object" && entry !== null && "entries" in entry,
+      onDrop: (encounter, point) => {
+        const { spawnStartCombat, spawnRollNpcInitiative } = useEncounters.getState();
+        onSpawnEncounter(encounter.id, mapPointFromClient(point), { startCombat: spawnStartCombat, rollNpcInitiative: spawnRollNpcInitiative });
+      },
+    });
+  }, [onSpawnEncounter]);
 
   // Fantasma de soltura: N retângulos de célula, na cor do tipo da criatura, seguindo o arrasto —
   // MESMA findFreeCells que o servidor roda ao criar, então onde você vê é onde os tokens caem.
@@ -1499,7 +1522,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     <div
       ref={containerRef}
       id="vtt-canvas-container"
-      {...(onSpawnCreature || onHandoutDrop ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
+      {...(onSpawnCreature || onHandoutDrop || onSpawnEncounter ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
       className={`relative flex-1 h-full w-full bg-stone-950 overflow-hidden select-none ${mode === "pan" ? "cursor-grab" : mode === "select" ? "cursor-default" : "cursor-crosshair"}`}
     >
       <Stage

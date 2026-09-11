@@ -35,6 +35,11 @@ import type {
   CombatStartPayload,
   CompendiumEntry,
   CompendiumSpawnCreaturePayload,
+  EncounterCreateFromTokensPayload,
+  EncounterCreatePayload,
+  EncounterDeletePayload,
+  EncounterSpawnPayload,
+  EncounterUpdatePayload,
   FogConfig,
   FogUpdatePayload,
   Handout,
@@ -51,6 +56,7 @@ import type {
   RoomPublic,
   Ruler,
   RulerUpdatePayload,
+  SavedEncounter,
   Scene,
   SceneActivatePayload,
   SceneCreatePayload,
@@ -224,6 +230,27 @@ export interface ClientToServerEvents {
    */
   "compendium:spawn-creature": (payload: CompendiumSpawnCreaturePayload, ack: Ack<Token[]>) => void;
 
+  // Encontros salvos (§9.14): biblioteca por sala, só GM — mesmo desenho de handout:* (list/create/
+  // update/delete, broadcast pra rooms.gm porque pode haver mais de uma aba/GM olhando a sala).
+  "encounter:list": (payload: Record<string, never>, ack: Ack<SavedEncounter[]>) => void;
+  /** Salva a "receita" (entryId + quantidade); nenhuma cópia de ficha é feita aqui. Duplicar reusa
+   *  este evento no cliente (mesmos dados, nome + " (cópia)"), sem evento próprio. */
+  "encounter:create": (payload: EncounterCreatePayload, ack: Ack<SavedEncounter>) => void;
+  /** A partir de tokens já no mapa cujo Character tem `compendiumEntryId` (vieram de uma soltura do
+   *  compêndio antes); agrupa por entrada. Tokens sem essa origem são ignorados — `ignoredTokens`
+   *  avisa quantos, para o cliente informar o GM. */
+  "encounter:create-from-tokens": (payload: EncounterCreateFromTokensPayload, ack: Ack<{ encounter: SavedEncounter; ignoredTokens: number }>) => void;
+  "encounter:update": (payload: EncounterUpdatePayload, ack: Ack<SavedEncounter>) => void;
+  /** Soft delete (mesmo padrão de handout:delete). */
+  "encounter:delete": (payload: EncounterDeletePayload, ack: Ack) => void;
+  /**
+   * Solta TODAS as criaturas do encontro na cena, numa espiral só a partir do ponto (GM). Uma
+   * transação (N fichas NPC + N tokens); `skippedEntryIds` avisa quais entradas não existem mais no
+   * compêndio (solta o resto em vez de falhar tudo). Broadcast de character:created/token:created
+   * por cópia, como compendium:spawn-creature; entra na pilha de desfazer como UMA entrada.
+   */
+  "encounter:spawn": (payload: EncounterSpawnPayload, ack: Ack<{ tokens: Token[]; skippedEntryIds: string[] }>) => void;
+
   // Régua (efêmera: só broadcast, nada vai ao banco)
   /** Enviado com throttle enquanto o participante arrasta a régua; `ruler: null` ao soltar. */
   "ruler:update": (payload: RulerUpdatePayload, ack: Ack) => void;
@@ -365,6 +392,11 @@ export interface ServerToClientEvents {
   "handout:deleted": (p: { id: string }) => void;
   "handout:pinned": (p: { sceneId: string; pin: HandoutPin }) => void;
   "handout:unpinned": (p: { sceneId: string; pinId: string }) => void;
+
+  // Encontros salvos (§9.14): biblioteca por sala, só pro GM (rooms.gm) — mesmo desenho de handout:*.
+  "encounter:created": (encounter: SavedEncounter) => void;
+  "encounter:updated": (encounter: SavedEncounter) => void;
+  "encounter:deleted": (p: { id: string }) => void;
   /** Efêmero: instrui quem via a mensagem a fechar o overlay (a mensagem em si não muda no chat). */
   "handout:closed": (p: { messageId: string }) => void;
 

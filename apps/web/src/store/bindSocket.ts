@@ -11,6 +11,7 @@ import { useHistory } from "./history";
 import { useSceneList } from "./sceneList";
 import { useTools } from "./tools";
 import { useHandouts } from "./handouts";
+import { useEncounters } from "./encounters";
 import { toast } from "./ui";
 
 /**
@@ -85,6 +86,10 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("handout:pinned", ({ sceneId, pin }) => useHandouts.getState().upsertPin(sceneId, pin));
   socket.on("handout:unpinned", ({ sceneId, pinId }) => useHandouts.getState().removePin(sceneId, pinId));
   socket.on("handout:closed", ({ messageId }) => useHandouts.getState().closeIfOpen(messageId));
+
+  socket.on("encounter:created", (e) => useEncounters.getState().upsert(e));
+  socket.on("encounter:updated", (e) => useEncounters.getState().upsert(e));
+  socket.on("encounter:deleted", ({ id }) => useEncounters.getState().removeLocal(id));
 
   socket.on("server:error", ({ message }) => toast(message));
 }

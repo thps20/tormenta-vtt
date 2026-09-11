@@ -22,6 +22,7 @@ import { useTargets } from "./targets";
 import { useCharacters } from "./characters";
 import { useCompendium } from "./compendium";
 import { useHandouts } from "./handouts";
+import { useEncounters } from "./encounters";
 import { useSceneList } from "./sceneList";
 import { toast } from "./ui";
 
@@ -153,6 +154,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useCharacters.getState().setAll([]);
     useCompendium.getState().reset();
     useHandouts.getState().reset();
+    useEncounters.getState().reset();
     useSceneList.getState().reset();
     // Desconectar e reconectar é o jeito simples de sair das salas do Socket.io.
     const socket = getSocket();

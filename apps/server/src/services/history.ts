@@ -127,3 +127,8 @@ export function describeDelete(names: string[]): string {
 export function describeSpawn(count: number, creatureName: string): string {
   return count === 1 ? `soltar ${creatureName}` : `soltar ${count} cópias de ${creatureName}`;
 }
+
+/** "soltar encontro <nome>" (encounter:spawn — várias criaturas, uma entrada de histórico só). */
+export function describeEncounterSpawn(encounterName: string): string {
+  return `soltar encontro ${encounterName}`;
+}

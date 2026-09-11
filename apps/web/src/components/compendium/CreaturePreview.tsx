@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Eye, EyeOff, Skull } from "lucide-react";
+import { Eye, EyeOff, ListPlus, Skull } from "lucide-react";
 import { characterTiebreakBonus, computeCharacter, entryToCharacter, type CompendiumCreatureEntry, type SystemDefinition } from "@tormenta-vtt/shared";
 import { signed } from "../../lib/system";
 import { seeBook } from "../../lib/compendium";
@@ -12,6 +12,8 @@ export interface CreatureSpawnControls {
   invisible: boolean;
   onInvisibleChange: (v: boolean) => void;
   onSpawn: () => void;
+  /** "+ ao encontro" (§9.14): empurra {entryId, count} pro carrinho. Ausente = sem carrinho aberto. */
+  onAddToCart?: () => void;
 }
 
 interface CreaturePreviewProps {
@@ -98,6 +100,17 @@ export const CreaturePreview: React.FC<CreaturePreviewProps> = ({ def, entry, sp
             {spawn.invisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
             Invisível
           </button>
+          {spawn.onAddToCart && (
+            <button
+              id="creature-add-to-encounter"
+              onClick={spawn.onAddToCart}
+              title="Adicionar ao carrinho de encontro (não solta agora)"
+              className="flex items-center gap-1 px-2 py-1 rounded border border-zinc-700 text-zinc-400 hover:border-[#d4af37] hover:text-[#d4af37] text-[10px] font-serif cursor-pointer transition-colors"
+            >
+              <ListPlus className="w-3.5 h-3.5" />
+              + ao encontro
+            </button>
+          )}
           <button
             id="creature-spawn-button"
             onClick={spawn.onSpawn}

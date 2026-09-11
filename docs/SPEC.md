@@ -148,6 +148,7 @@ Scene 0/1─* Combat 1───* Combatant *───1 Token
 Room 1───* Character *───? Participant (owner)
 Token *───? Character
 Room 1───* ChatMessage *───? Token
+Room 1───* SavedEncounter
 ```
 
 | Entidade | Campos principais | Notas |
@@ -156,10 +157,11 @@ Room 1───* ChatMessage *───? Token
 | **Participant** | `id, roomId, nickname, role, sessionToken` | `connected` é estado em memória, não persistido |
 | **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON), order, arrival(JSON), deletedAt?` | Múltiplos mapas por sala (§9.7). `grid` e `fog` são JSON para evoluir sem migration; `fog` segue `FogConfigSchema` (§9.3). `order`: posição no painel "Mapas", renumerada 0..n-1 a cada `scene:reorder`. `arrival` = `{x,y} \| null` (pixels do mapa): onde tokens levados de outro mapa aparecem ao ativar. `deletedAt` (coluna só do banco, nunca serializada no `Scene` do shared, mesmo padrão de `Token.deletedAt`): soft delete de `scene:delete` — todo lugar que lista "mapas da sala agora" filtra `deletedAt: null`; limpeza definitiva depois de 30 dias (`services/cleanup.ts`) |
 | **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[]), deletedAt?` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto). `deletedAt` (coluna só do banco, nunca serializada no `Token` do shared): soft delete de `token:delete`/`token:delete-many` (§9.6) — todo lugar que lista "tokens da cena agora" filtra `deletedAt: null`; a limpeza definitiva apaga a linha de vez depois de 30 dias (`services/cleanup.ts`) |
-| **Character** | `id, roomId, ownerId?, name, kind, data(JSON)` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration |
+| **Character** | `id, roomId, ownerId?, name, kind, data(JSON), compendiumEntryId?` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration. `compendiumEntryId` (coluna só do banco, nunca serializada no `Character` do shared): id da entrada do compêndio que gerou este NPC (`compendium:spawn-creature`/`encounter:spawn`, §9.5/§9.14) — metadado de app, não regra de sistema; `null` = ficha feita à mão (ou PC). Usado só por "salvar tokens selecionados como encontro" (§9.14) pra reconstruir de qual criatura cada token veio |
 | **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), initiativeBatch?(JSON), handout?(JSON), visibility, tokenId?, whisperTo?` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3; `natural`/`targets[]` são o sistema de alvos, §9.12 — ataque OU dano com alvo marcado, congelados na hora da rolagem, ataque com acerto/erro calculado e dano só com o nome; `criticalConfirmed` é o crítico confirmado de "Rolar dano junto com o ataque", §9.13); `item` segue `ItemCardSchema` (kind `item`); `initiativeBatch` segue `InitiativeBatchSchema` (kind `initiative-batch`: `{ round, entries: [{ combatantId, tokenId, name, formula?, result? }] }`, `combat:roll` rolando mais de um combatente, §3.5); `handout` segue `HandoutCardSchema` (kind `handout`, §9.10: cópia denormalizada do handout mostrado); `visibility` = `all \| gm \| self` (§3.4, sempre `all` num handout — quem recebe é decidido por `whisperTo`); `tokenId?` liga a rolagem a um token (combate/ficha), filtrado à parte de `visibility` (§3.4/§3.5) — um `initiative-batch` não usa este campo (várias linhas, vários tokens): o gate é por linha, dentro de `initiativeBatch.entries`; `whisperTo?` (§9.10) é um sussurro visual por PESSOA (`participantId`): setado, só o GM e ele recebem a mensagem, nem card nem placeholder pros demais — mesmo mecanismo de exclusão de `tokenId`, só que por pessoa |
 | **Handout** | `id, roomId, name, kind, imageUrl?, width?, height?, text?, tags[], deletedAt?` | Biblioteca por sala (§9.10), só o GM vê (`handout:list` é `gmOnly`). `kind` = `image \| text`; imagem reaproveita `POST /api/upload` (mesmo limite de 20 MB do mapa), texto vai até 20 000 caracteres, sem parser de markdown (texto puro). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Token.deletedAt`): soft delete de `handout:delete`, que também soft-deleta os pinos deste handout em qualquer mapa (§9.10) |
 | **HandoutPin** | `id, sceneId, handoutId, x, y, visible, name, kind, imageUrl?, width?, height?, text?, deletedAt?` | Handout fixado no mapa como um ícone (§9.10). Geometria em pixels do mapa, como `Token`/`Template`. Campos de conteúdo são uma CÓPIA denormalizada do `Handout` no momento de `handout:pin` (mesmo padrão de `Combatant.name/color`): editar o handout original depois não atualiza pinos já fixados — reposicionar/atualizar é apagar e fixar de novo. `visible` = GM controla se o pino aparece pros jogadores (mesma regra de `Token.visible`, sem névoa). `deletedAt`: soft delete de `handout:unpin` (e da cascata de `handout:delete`), entra no desfazer do GM (§9.6) |
+| **SavedEncounter** | `id, roomId, name, tags[], notes, entries(JSON), deletedAt?` | Encontro salvo (§9.14): grupo de criaturas do compêndio que o GM monta uma vez e solta de uma vez. `entries` = `{ entryId, count, visibleOnSpawn, nameOverride? }[]` (`SavedEncounterEntrySchema`) — só a "receita", nunca cópia de ficha; resolvida contra o compêndio ATUAL na hora de soltar (`encounter:spawn`). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Handout.deletedAt`): soft delete de `encounter:delete` |
 | **Combat** | `id, roomId, sceneId (único: um combate por cena), round, status, activeCombatantId?` | `status` = `rolling \| active \| ended` (§3.5). Persistido (ao contrário da iniciativa manual anterior, que vivia em memória) |
 | **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound, movementBudget?, movementUsed, movementDiagonals, movementAnchorX?, movementAnchorY?, movementPath?(JSON)` | `initiative = null` = ainda não rolou. `combat:remove` apaga o combatente (e ajusta `activeCombatantId`/`round` se o removido era o ativo, `stateAfterRemoval`, §3.5). `token:delete`/`token:delete-many` **não** apagam mais a linha do combatente (o token agora é soft delete, §9.6): só param de listá-lo (o combate ignora combatente cujo token tem `deletedAt`) e fazem o mesmo ajuste de turno/`order`; a linha volta se o GM desfizer. Os seis últimos campos são o orçamento de deslocamento do turno (§9.11): `movementAnchorX/Y` (de onde o próximo movimento é medido) e `movementPath` (o caminho desenhado) são colunas só do banco, nunca serializadas no `Combatant` do shared — o cliente só recebe `movementBudget/Used/Diagonals` e `movementPath` via `Combat` (§5) |
 | **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), skillTotal, rolls{} (inclui `attackHit?`/`attackAutoHit?`/`attackAutoMiss?`, §9.12, e `critical?`, §9.13), combat{} (§3.5), damageAttribute, tokenBar, grid?, race? (§9.11), movement? (§9.11), trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código. `race?` aponta o `itemKinds[]` que alimenta o placeholder `{race.<campo>}` nas fórmulas (§9.11); `movement?` declara o orçamento de deslocamento por turno (ausente = sistema sem a regra); `rolls.attackHit?`/`attackAutoHit?`/`attackAutoMiss?` são a regra de acerto do sistema de alvos (§9.12, ausentes = sistema sem a regra); `rolls.critical?` confirma um crítico ameaçado ao rolar dano junto com o ataque (§9.13, mesma gramática de `attackAutoHit`, só `{natural}`; ausente = sistema não confirma sozinho) |
@@ -205,6 +207,12 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `character:use-item` | `{ characterId, itemId, enhancements?: [{ id, times }] }` | GM ou owner | `character:updated` (se houve custo) + `chat:message` (`kind:"item"`); recurso insuficiente ou aprimoramento inválido = ack erro, sem broadcast |
 | `compendium:list` | `{}` | todos | ack `{ entries: CompendiumEntry[], roomIds: string[] }` do sistema da sala (sem broadcast; §9.4); jogador nunca recebe `type: "creature"` — filtro no servidor, `roomIds` só para o chip "Sala" (§9.5) |
 | `compendium:spawn-creature` | `{ sceneId, entryId, count (1..20), visible, x, y }` (`x, y` em pixels do mapa) | GM | `character:created` (uma por cópia) + `token:created`; ack com os `Token[]` criados (§9.5) |
+| `encounter:list` | `{}` | GM | ack `SavedEncounter[]` da sala; sem broadcast (§9.14) |
+| `encounter:create` | `{ name, tags?, notes?, entries: SavedEncounterEntry[] }` | GM | `encounter:created` (só GM); duplicar reusa este evento no cliente (§9.14) |
+| `encounter:create-from-tokens` | `{ tokenIds[], name, tags?, notes? }` | GM | `encounter:created` (só GM); ack `{ encounter, ignoredTokens }` — tokens sem `Character.compendiumEntryId` são ignorados e contados (§9.14) |
+| `encounter:update` | `{ id, patch: { name?, tags?, notes?, entries? } }` | GM | `encounter:updated` (só GM) |
+| `encounter:delete` | `{ id }` | GM | ack; `encounter:deleted` (só GM, soft delete) |
+| `encounter:spawn` | `{ id, sceneId, x, y }` (pixels do mapa) | GM | `character:created`/`token:created` por cópia, como `compendium:spawn-creature`; ack `{ tokens: Token[], skippedEntryIds: string[] }` — entradas cuja criatura sumiu do compêndio são puladas e avisadas, não derrubam a soltura inteira (§9.14) |
 | `chat:send` | `{ text, visibility? }` (`visibility` = modo de rolagem do autor; `/gmr` e `/pr` no texto forçam) | todos | `chat:message` a todos (texto sempre público); rolagem fora de "Pública" vai a todos, mas quem `visibility` não permite recebe sem `roll` (placeholder, §3.4); ack sem `roll` quando o autor não pode ver (às cegas) |
 | `chat:reveal` | `{ messageId }` | GM | `chat:message` da mesma mensagem com `visibility: "all"` para todos (cliente faz upsert) |
 | `combat:start` | `{ sceneId, tokenIds[] }` | GM | `combat:updated`; substitui um combate anterior do mapa, se houver |
@@ -258,6 +266,8 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `handout:deleted` | `{ id }` (só pra `rooms.gm`) |
 | `handout:pinned` / `handout:unpinned` | `{ sceneId, pin }` / `{ sceneId, pinId }` (§9.10; mesma regra de broadcast de mapa de sempre — GM sempre, jogador só se `pin.visible` e `sceneId` é o mapa ATIVO) |
 | `handout:closed` | `{ messageId }` (efêmero: instrui quem via a mensagem a fechar o overlay, sem mudar a mensagem no chat) |
+| `encounter:created` / `encounter:updated` | `SavedEncounter` (§9.14; só pra `rooms.gm`, cliente faz upsert por id) |
+| `encounter:deleted` | `{ id }` (só pra `rooms.gm`) |
 | `server:error` | `{ message }` |
 
 ### HTTP (fora do socket)
@@ -471,7 +481,8 @@ revisão pós-implementação em `docs/revisao-desfazer.md`.
 - **Escopo**: apagar token — um ou vários (`token:delete`/`token:delete-many`), mover e redimensionar
   — um token ou vários selecionados juntos (`token:update`/`token:update-many`), alternar condição e
   alterar visibilidade (também `token:update`, mesmos campos rastreados), soltar criaturas do
-  compêndio (`compendium:spawn-creature`), apagar mapa (`scene:delete`, §9.7), editar o grid de um
+  compêndio (`compendium:spawn-creature`) ou um encontro salvo inteiro (`encounter:spawn`, §9.14 —
+  mesmo mecanismo, uma entrada só pro encontro todo), apagar mapa (`scene:delete`, §9.7), editar o grid de um
   mapa quando isso reencaixa/redimensiona algum token (`scene:updateGrid`, §9.7 — só quando há
   token pra reencaixar; um patch que só muda cor/`snap` não entra na pilha), colocar/mover/girar/
   apagar um gabarito de área de efeito do GM (`template:upsert`/`template:remove`, §9.9 — do
@@ -491,8 +502,9 @@ revisão pós-implementação em `docs/revisao-desfazer.md`.
   nova do GM limpa o redo. Só ações com `role === "gm"` empilham (jogador movendo o próprio token
   não conta — ver `docs/plano-desfazer.md` §6 pela justificativa). Uma entrada cobre tudo que saiu
   na MESMA chamada de socket: `token:delete-many`/`token:update-many` (lote explícito) e
-  `compendium:spawn-creature` (N cópias) já nascem como uma entrada só; ecos "ao vivo" do arraste
-  (`TokenPatch.live`) nunca empilham, só o patch final do gesto.
+  `compendium:spawn-creature` (N cópias) ou `encounter:spawn` (várias criaturas diferentes do
+  encontro, §9.14) já nascem como uma entrada só; ecos "ao vivo" do arraste (`TokenPatch.live`)
+  nunca empilham, só o patch final do gesto.
 - **Apagar token = soft delete** (`Token.deletedAt`, §4): a linha continua no banco (PV, condições,
   `characterId`, `Combatant`), então desfazer restaura tudo sem precisar de snapshot manual; se o
   token era combatente, o desfazer também devolve `round`/`activeCombatantId`/`order` do combate ao
@@ -502,7 +514,9 @@ revisão pós-implementação em `docs/revisao-desfazer.md`.
 - **Spawn de criatura desfaz com hard delete** (assimetria proposital com o soft delete acima:
   cópias recém-criadas, sem histórico próprio ainda) — apaga a ficha NPC e o token de vez; refazer
   recria as mesmas linhas (mesmos ids) a partir do snapshot capturado na hora do spawn.
-  `entryToCharacter`/o restante do fluxo de spawn (§9.5) não mudam. Se o token spawnado entrou num
+  `entryToCharacter`/o restante do fluxo de spawn (§9.5) não mudam; `encounter:spawn` (§9.14) monta
+  a mesma entrada (`buildMultiSpawnHistoryEntry`, reaproveitado pelos dois handlers) para todas as
+  cópias de todas as criaturas do encontro de uma vez. Se o token spawnado entrou num
   combate depois (`combat:add`, manual — spawn nunca entra sozinho, §9.5), o desfazer roda o mesmo
   ajuste de `round`/`activeCombatantId`/`order` de sempre antes do hard delete (o combatente cai
   junto pelo `onDelete: Cascade`, mas o combate não fica com o cursor de turno apontando pra alguém
@@ -1021,3 +1035,62 @@ avulsa continua existindo (pra rolar só o dano, sem combinar nada).
   `rolls.critical` decide na hora, com o que já foi rolado"); multiplicar só parte do dano (por
   tipo); desfazer/reverter um crítico confirmado por engano — o Mestre ajusta o valor à mão no
   seletor de "Aplicar", como em qualquer outro ajuste manual de dano.
+
+### 9.14 Encontros salvos
+
+Grupo de criaturas do compêndio (ou homebrew da sala) que o GM monta uma vez e solta no mapa de uma
+vez (setembro/2026). Mesmo princípio de §9.5: guarda só a "receita", nunca cópias de ficha —
+resolvida contra o compêndio ATUAL na hora de soltar, então editar/apagar uma entrada do compêndio
+depois de salvar um encontro não quebra nada (a entrada some da soltura seguinte, avisado, não
+falha).
+
+- **Modelo**: `SavedEncounter` (§4) = `{ id, roomId, name, tags[], notes, entries[], deletedAt? }`.
+  `entries: SavedEncounterEntry[] = { entryId, count (1..20), visibleOnSpawn, nameOverride? }`
+  (`packages/shared/src/schemas/encounter.ts`) — sem posição: o posicionamento é decidido na hora de
+  soltar, igual a `compendium:spawn-creature`. Biblioteca por sala, só o GM vê (mesmo padrão de
+  `Handout`/§9.10: `encounter:list` é `gmOnly`, soft delete em `encounter:delete`).
+- **Origem de compêndio de um NPC**: `Character.compendiumEntryId?` (§4, coluna só do banco) —
+  gravado por `compendium:spawn-creature` e por `encounter:spawn` ao criar o NPC. Metadado de app
+  (não é regra de sistema, por isso não entra em `CharacterDataSchema`); serve só para "salvar
+  tokens selecionados como encontro" reconstruir de qual criatura cada token veio.
+- **Criar**: três caminhos, todos batem em `encounter:create` ou `encounter:create-from-tokens` (§5).
+  Na paleta (modo mapa, GM), um **carrinho** só em memória (`store/encounters.ts#cart`, reseta ao
+  trocar de sala): o botão "+ ao encontro" no preview de uma criatura (ao lado de "Soltar") empurra
+  `{ entryId, count }`; um botão "Salvar carrinho como encontro" some/aparece conforme o carrinho
+  tem itens, abre um formulário pequeno (nome/tags/notas) e chama `encounter:create`. **Salvar
+  tokens selecionados como encontro**: mesmo formulário, a partir da seleção de tokens do mapa
+  (GM, ferramenta Selecionar) — chama `encounter:create-from-tokens { tokenIds }`; o servidor agrupa
+  por `Character.compendiumEntryId` (tokens sem ficha do compêndio são ignorados, contados em
+  `ignoredTokens` no ack, nunca derrubam a criação do resto). **Duplicar** reaproveita
+  `encounter:create` no cliente (mesmos dados, nome + " (cópia)") — sem evento próprio.
+- **Paleta**: aba "Encontros" (`ENCOUNTER_FILTER`, mesmo truque de chip virtual de `CREATURE_FILTER`/
+  `ROOM_FILTER`, §9.5), só no contexto "map"/GM, busca por nome/tags. `EncounterPreview.tsx`: lista
+  as entradas (nome × quantidade, "sumiu do compêndio" em vermelho se a entrada não existe mais), ND
+  somado só informativo (`sumChallengeRating`, best-effort: soma inteiros e frações simples como
+  "1/4"/"1/2" do `traits[ndField]` de cada entrada resolvida; entradas com ND fora desse formato
+  ficam de fora da soma, contadas à parte — nunca inventa um total), notas, e (se `onSpawnEncounter`)
+  os checkboxes "Iniciar combate com eles"/"Rolar iniciativa dos NPCs" + botão Soltar. Editar
+  (`encounter:update`) troca o preview por um formulário — só nome/tags/notas; mudar a composição
+  (`entries`) é salvar de novo a partir do carrinho ou da seleção.
+- **Soltar**: `encounter:spawn { id, sceneId, x, y }` (§5) — o cliente manda só o ponto, como
+  `compendium:spawn-creature`. `expandEncounterEntries` (`packages/shared/src/rules/encounter.ts`,
+  testada) resolve cada `SavedEncounterEntry` contra o compêndio mesclado e roda `findFreeCells`/
+  `numberedNames` (§9.5) **em sequência**, com `occupied`/nomes já usados acumulando de uma entrada
+  pra próxima — assim a segunda espécie do encontro já pula as células/nomes que a primeira usou, e
+  a espiral inteira parte do MESMO ponto clicado. Entrada cujo `entryId` sumiu do compêndio (ou
+  deixou de ser `type: "creature"`) entra em `missingIds`/`skippedEntryIds`: o resto solta normal, o
+  ack avisa quais faltaram. Servidor roda **uma** `prisma.$transaction` para todas as cópias de todas
+  as criaturas do encontro; histórico entra como **uma** entrada ("soltar encontro X",
+  `buildMultiSpawnHistoryEntry` em `socket/spawnHistory.ts`, extraído de `compendium:spawn-creature`
+  e reaproveitado pelos dois — hard delete no desfazer, mesma regra de §9.6).
+- **Combate ao soltar**: "iniciar combate com eles"/"rolar iniciativa dos NPCs" não são um passo
+  novo no servidor — o CLIENTE encadeia, depois do ack de `encounter:spawn`, os eventos que já
+  existem: `combat:add` (ou `combat:start` se o mapa não tem combate) com os tokens criados, e
+  `combat:roll { scope: "npcs" }` se pedido (`store/encounters.ts#spawn`). Fica fora da
+  transação/entrada de undo do spawn, mesma regra de sempre (§9.5/§9.6: soltura nunca entra sozinha
+  no combate) — só que aqui o GM pediu explicitamente com o checkbox. Falha nesse passo não desfaz o
+  spawn: os botões normais do painel de combate terminam à mão.
+- **Simplificações deliberadas**: o fantasma de arrasto de um encontro (`EncounterDragGhost`,
+  `components/compendium/DragGhost.tsx`) é um rótulo simples (nome + "N criaturas"), não a espiral
+  exata multi-espécie — duplicar `expandEncounterEntries` no cliente só para o preview visual não
+  valia a complexidade; o servidor calcula a posição real de cada cópia ao soltar, como sempre.

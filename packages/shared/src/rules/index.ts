@@ -19,3 +19,4 @@ export * from "./damageResponse.js";
 export * from "./scenes.js";
 export * from "./templates.js";
 export * from "./targets.js";
+export * from "./encounter.js";

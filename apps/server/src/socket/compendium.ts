@@ -10,92 +10,19 @@ import {
   numberedNames,
   type CellRect,
   type Character,
-  type SystemDefinition,
   type Token,
 } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { listCompendium } from "../services/compendium.js";
-import { broadcastCharacter, characterDataOf, toCharacter, toJson } from "../services/characters.js";
+import { broadcastCharacter, toCharacter, toJson } from "../services/characters.js";
 import { cellAt, cellRect, cellToPoint, effectiveCellSize } from "../services/grid.js";
-import { describeSpawn, pushEntry, type HistoryEntry } from "../services/history.js";
-import { emitCombat } from "../services/combat.js";
+import { describeSpawn, pushEntry } from "../services/history.js";
 import { toScene, toToken } from "../services/serialize.js";
 import { guarded, HandlerError } from "./ack.js";
 import { emitHistoryUpdated } from "./history.js";
-import { adjustCombatForTokenRemoval, broadcastToken, hpJson } from "./token.js";
-import { rooms, type TypedServer, type TypedSocket } from "./types.js";
-
-/**
- * Desfazer o spawn (docs/plano-desfazer.md §4): diferente de token:delete (soft delete), aqui é
- * HARD delete — cópias recém-criadas, sem histórico próprio ainda (dano recebido, condições...),
- * então apagar de vez é seguro e não precisa esticar o conceito de "lixeira com prazo" pra
- * Character (que não tem deletedAt). O redo recria as MESMAS linhas (mesmos ids) a partir do
- * snapshot capturado na hora do spawn.
- */
-function buildSpawnHistoryEntry(
-  io: TypedServer,
-  roomId: string,
-  sceneId: string,
-  def: SystemDefinition,
-  creatureName: string,
-  results: { character: Character; token: Token }[],
-): HistoryEntry {
-  return {
-    summary: describeSpawn(results.length, creatureName),
-    async revert() {
-      // Um token spawnado pode ter entrado num combate depois (combat:add, manual — spawn nunca
-      // entra sozinho, §9.5): mesmo ajuste de round/activeCombatantId/order de sempre ANTES do hard
-      // delete (o snapshot devolvido não serve pra nada aqui — não tem "restaurar" num hard delete,
-      // só evita o combate ficar com um combatente fantasma).
-      let combatAffected = false;
-      for (const { token } of results) {
-        if (await adjustCombatForTokenRemoval(def, token.sceneId, token.id)) combatAffected = true;
-      }
-      const tokenIds = results.map((r) => r.token.id);
-      const characterIds = results.map((r) => r.character.id);
-      await prisma.token.deleteMany({ where: { id: { in: tokenIds } } });
-      await prisma.character.deleteMany({ where: { id: { in: characterIds } } });
-      for (const { token, character } of results) {
-        io.to(rooms.all(roomId)).emit("token:deleted", { tokenId: token.id });
-        // Mesmo padrão de character:delete (socket/character.ts): broadcast geral, sem vazar nada
-        // (é só o id) — jogador nunca teve o NPC no cache, então o remove() dele é um no-op.
-        io.to(rooms.all(roomId)).emit("character:deleted", { characterId: character.id });
-      }
-      if (combatAffected) await emitCombat(io, roomId, sceneId, { role: "gm", participantId: "" });
-    },
-    async apply() {
-      const scene = await prisma.scene.findUniqueOrThrow({ where: { id: sceneId } });
-      const fog = toScene(scene).fog;
-      for (const { character, token } of results) {
-        const characterRow = await prisma.character.create({
-          data: { id: character.id, roomId: character.roomId, ownerId: character.ownerId, name: character.name, kind: character.kind, data: toJson(characterDataOf(character)) },
-        });
-        const tokenRow = await prisma.token.create({
-          data: {
-            id: token.id,
-            sceneId: token.sceneId,
-            name: token.name,
-            imageUrl: token.imageUrl,
-            x: token.x,
-            y: token.y,
-            width: token.width,
-            height: token.height,
-            rotation: token.rotation,
-            zIndex: token.zIndex,
-            visible: token.visible,
-            ownerId: token.ownerId,
-            color: token.color,
-            characterId: token.characterId,
-            hp: hpJson(token.hp),
-            conditions: token.conditions,
-          },
-        });
-        broadcastCharacter(io, roomId, toCharacter(characterRow), "character:created");
-        broadcastToken(io, roomId, toToken(tokenRow), "token:created", fog);
-      }
-    },
-  };
-}
+import { buildMultiSpawnHistoryEntry } from "./spawnHistory.js";
+import { broadcastToken } from "./token.js";
+import { type TypedServer, type TypedSocket } from "./types.js";
 
 export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket): void {
   socket.on(
@@ -157,7 +84,7 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
             const name = names[i] ?? entry.name;
             const copy = entryToCharacter(def, entry, randomUUID, { name });
             const characterRow = await tx.character.create({
-              data: { roomId: ctx.roomId, ownerId: null, name: copy.name, kind: copy.kind, data: toJson(copy.data) },
+              data: { roomId: ctx.roomId, ownerId: null, name: copy.name, kind: copy.kind, data: toJson(copy.data), compendiumEntryId: entry.id },
             });
             const tokenRow = await tx.token.create({
               data: {
@@ -189,7 +116,7 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
 
         // compendium:spawn-creature já é gmOnly (guarded abaixo), então sempre empilha.
         if (results.length > 0) {
-          pushEntry(ctx.roomId, buildSpawnHistoryEntry(io, ctx.roomId, data.sceneId, def, entry.name, results));
+          pushEntry(ctx.roomId, buildMultiSpawnHistoryEntry(io, ctx.roomId, data.sceneId, def, describeSpawn(results.length, entry.name), results));
           emitHistoryUpdated(io, ctx.roomId);
         }
 

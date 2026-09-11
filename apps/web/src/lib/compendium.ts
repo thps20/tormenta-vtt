@@ -1,4 +1,4 @@
-import { entryToItem, type Character, type CharacterItem, type CharacterPatch, type CompendiumEntry, type CompendiumItemEntry, type SystemDefinition } from "@tormenta-vtt/shared";
+import { entryToItem, type Character, type CharacterItem, type CharacterPatch, type CompendiumItemEntry, type SystemDefinition } from "@tormenta-vtt/shared";
 
 /**
  * Regras de inserção de uma entrada do compêndio numa ficha. Funções puras
@@ -14,6 +14,8 @@ import { entryToItem, type Character, type CharacterItem, type CharacterPatch, t
 export const CREATURE_FILTER = "__creature__";
 /** Filtra por ORIGEM (id veio do compêndio da sala), não por tipo — junta itens e criaturas homebrew. */
 export const ROOM_FILTER = "__room__";
+/** Grupo dos encontros salvos (§9.14), não uma entrada do compêndio — mesmo truque de id fora do alfabeto de chave. */
+export const ENCOUNTER_FILTER = "__encounter__";
 
 export interface InsertCheck {
   /** Pode inserir direto (Enter, "+", soltar). */
@@ -72,8 +74,9 @@ export function buildInsertPatch(
   return { item, patch };
 }
 
-/** Busca simples: todas as palavras da consulta aparecem no nome, nas tags ou no id (sem acento, sem caixa). */
-export function matchesQuery(entry: CompendiumEntry, query: string): boolean {
+/** Busca simples: todas as palavras da consulta aparecem no nome, nas tags ou no id (sem acento, sem caixa).
+ *  Aceita qualquer coisa com essa forma — entrada do compêndio ou encontro salvo (§9.14), ambos têm `name`/`tags`. */
+export function matchesQuery(entry: { name: string; id: string; tags: string[] }, query: string): boolean {
   const words = normalize(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return true;
   const haystack = normalize([entry.name, entry.id, ...entry.tags].join(" "));

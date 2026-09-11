@@ -25,12 +25,13 @@ model Room {
   activeSceneId String?
   createdAt     DateTime @default(now())
 
-  scenes       Scene[]
-  participants Participant[]
-  messages     ChatMessage[]
-  combats      Combat[]
-  characters   Character[]
-  handouts     Handout[]
+  scenes          Scene[]
+  participants    Participant[]
+  messages        ChatMessage[]
+  combats         Combat[]
+  characters      Character[]
+  handouts        Handout[]
+  savedEncounters SavedEncounter[]
 }
 
 model Participant {
@@ -50,19 +51,19 @@ model Participant {
 }
 
 model Scene {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   roomId    String
   name      String
   mapUrl    String?
   mapWidth  Int?
   mapHeight Int?
   /// GridConfig serializado (ver GridConfigSchema). JSON para não migrar a cada campo novo.
-  grid      Json     @default("{\"type\":\"square\",\"cellSize\":70,\"offsetX\":0,\"offsetY\":0,\"color\":\"#00000055\",\"snap\":true}")
+  grid      Json      @default("{\"type\":\"square\",\"cellSize\":70,\"offsetX\":0,\"offsetY\":0,\"color\":\"#00000055\",\"snap\":true}")
   /// FogConfig serializado (ver FogConfigSchema): névoa manual da fase 2.
-  fog       Json     @default("{\"enabled\":false,\"base\":\"hidden\",\"shapes\":[]}")
+  fog       Json      @default("{\"enabled\":false,\"base\":\"hidden\",\"shapes\":[]}")
   /// Ordem no painel "Mapas" (arrastar reordena, scene:reorder). Renumerado 0..n-1 a cada reorder;
   /// o backfill desta migration numera as salas existentes por createdAt.
-  order     Int      @default(0)
+  order     Int       @default(0)
   /// Soft delete (mesmo padrão de Token.deletedAt, docs/plano-mapas.md §10): a linha e tudo que
   /// pende dela (tokens, combate) continuam no banco pra desfazer restaurar; a limpeza definitiva
   /// apaga depois de 30 dias (services/cleanup.ts). null = mapa "existe" normalmente.
@@ -70,7 +71,7 @@ model Scene {
   /// ArrivalPointSchema serializado ({ x, y } em pixels do mapa): onde tokens levados de outro mapa
   /// aparecem ao ativar (docs/plano-mapas.md §9). null = sem marcador definido (usa o centro do mapa).
   arrival   Json?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
   tokens      Token[]
@@ -81,7 +82,7 @@ model Scene {
 }
 
 model Token {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   sceneId     String
   name        String
   imageUrl    String?
@@ -89,11 +90,11 @@ model Token {
   y           Float
   width       Float
   height      Float
-  rotation    Float    @default(0)
-  zIndex      Int      @default(0)
-  visible     Boolean  @default(true)
+  rotation    Float     @default(0)
+  zIndex      Int       @default(0)
+  visible     Boolean   @default(true)
   ownerId     String?
-  color       String   @default("#e11d48")
+  color       String    @default("#e11d48")
   /// Ficha vinculada (token:link-character). Apagar a ficha só desvincula.
   characterId String?
   /// PV do token solto (sem characterId), editado no Inspector: { current, max }. Ver TokenHpSchema.
@@ -102,7 +103,7 @@ model Token {
   /// Condições ativas: array de string (chave, permanente) ou { key, expiresRound } (expira em
   /// combat:next comparado a Combat.round). Ver TokenConditionEntrySchema — Json porque o formato
   /// mistura os dois (campo flexível, mesma convenção de grid/fog/hp).
-  conditions  Json     @default("[]")
+  conditions  Json      @default("[]")
   /// Soft delete (docs/plano-desfazer.md §2): token:delete/token:delete-many só marcam esta data,
   /// não apagam a linha — assim PV/condições/characterId/Combatant sobrevivem pro desfazer restaurar
   /// tudo de graça. null = token "existe" normalmente. Consultas de "tokens da cena agora" filtram
@@ -123,14 +124,19 @@ model Token {
 /// perícias, itens...) é agnóstico de sistema e vai em `data`, validado pelo
 /// CharacterDataSchema (Zod) antes de entrar e ao sair.
 model Character {
-  id        String   @id @default(cuid())
-  roomId    String
-  ownerId   String?
-  name      String
-  kind      String // "pc" | "npc"
-  data      Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id @default(cuid())
+  roomId            String
+  ownerId           String?
+  name              String
+  kind              String // "pc" | "npc"
+  data              Json
+  /// Id da entrada do compêndio que gerou este NPC (compendium:spawn-creature / encounter:spawn).
+  /// Só metadado de app (não é regra de sistema, por isso é coluna e não um campo de `data` validado
+  /// por CharacterDataSchema): permite "salvar tokens selecionados como encontro" (§9.14) reconstruir
+  /// de qual criatura cada token veio. null = ficha feita à mão (ou PC) — não entra nesse fluxo.
+  compendiumEntryId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   room   Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
   owner  Participant? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
@@ -140,35 +146,35 @@ model Character {
 }
 
 model ChatMessage {
-  id            String   @id @default(cuid())
-  roomId        String
-  participantId String
-  nickname      String
-  kind          String // "text" | "roll" | "system" | "item" | "initiative-batch"
-  text          String?
+  id              String   @id @default(cuid())
+  roomId          String
+  participantId   String
+  nickname        String
+  kind            String // "text" | "roll" | "system" | "item" | "initiative-batch"
+  text            String?
   /// DiceRoll serializado (ver DiceRollSchema) quando kind == "roll".
-  roll          Json?
+  roll            Json?
   /// ItemCard serializado (ver ItemCardSchema) quando kind == "item".
-  item          Json?
+  item            Json?
   /// InitiativeBatch serializado (ver InitiativeBatchSchema) quando kind == "initiative-batch":
   /// combat:roll rolando mais de um combatente publica um card só, em vez de um por combatente.
   initiativeBatch Json?
   /// HandoutCard serializado (ver HandoutCardSchema) quando kind == "handout": cópia denormalizada
   /// do handout no momento de handout:show (§9.10) — não muda se o handout original for editado.
-  handout       Json?
+  handout         Json?
   /// Quem vê: "all" | "gm" | "self" (ver RollVisibilitySchema). Filtrado no broadcast e no snapshot.
-  visibility    String   @default("all")
+  visibility      String   @default("all")
   /// Token ao qual a rolagem está ligada (combatente de combat:roll, ou personagem com token
   /// vinculado na cena ativa). Quem não vê esse token não recebe a mensagem, nem placeholder
   /// (ver services/chatVisibility.ts). null = sem token, regra normal de visibility. Cards de
   /// iniciativa em lote citam vários tokens dentro de `initiativeBatch`, não aqui (o gate deles
   /// é por linha, não pela mensagem inteira).
-  tokenId       String?
+  tokenId         String?
   /// Sussurro visual (handout:show "para X", §9.10): setado, só o GM e este participantId recebem
   /// a mensagem — nem card, nem placeholder pros demais (mesmo espírito do gate de tokenId, mas por
   /// pessoa). null = sem sussurro, regra normal de visibility.
-  whisperTo     String?
-  createdAt     DateTime @default(now())
+  whisperTo       String?
+  createdAt       DateTime @default(now())
 
   room  Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
   token Token? @relation(fields: [tokenId], references: [id], onDelete: SetNull)
@@ -224,8 +230,8 @@ model Combatant {
   movementBudget    Float?
   /// Gasto acumulado no turno (mesma unidade) e diagonais já contadas (regra 1-2-1), zerados a
   /// cada troca de turno.
-  movementUsed      Float   @default(0)
-  movementDiagonals Int     @default(0)
+  movementUsed      Float  @default(0)
+  movementDiagonals Int    @default(0)
   /// Posição (pixels do mapa) de onde o PRÓXIMO movimento é medido: início do turno, ou fim do
   /// último movimento confirmado (D2 do plano — nunca a posição "ao vivo" de um arraste em curso).
   movementAnchorX   Float?
@@ -292,4 +298,26 @@ model HandoutPin {
 
   @@index([sceneId])
   @@index([handoutId])
+}
+
+/// Encontro salvo (docs/SPEC.md §9.14): grupo de criaturas do compêndio que o GM monta uma vez e
+/// solta no mapa de uma vez (encounter:spawn). Guarda só a "receita" (entryId + quantidade), nunca
+/// cópias de ficha — resolvida contra o compêndio ATUAL na hora de soltar.
+model SavedEncounter {
+  id        String    @id @default(cuid())
+  roomId    String
+  name      String
+  tags      String[]  @default([])
+  notes     String    @default("")
+  /// SavedEncounterEntry[] serializado (ver SavedEncounterEntrySchema): { entryId, count,
+  /// visibleOnSpawn, nameOverride }[].
+  entries   Json
+  /// Soft delete (mesmo padrão de Handout.deletedAt). null = existe.
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
 }
