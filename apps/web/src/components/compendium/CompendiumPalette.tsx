@@ -574,7 +574,17 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
     return (
       <div id="compendium-palette" data-mode="map" className="absolute inset-0 z-30 flex items-stretch justify-start p-4 pointer-events-none">
         <div className={`h-full transition-opacity ${dragging ? "opacity-25 pointer-events-none" : "pointer-events-auto"}`}>{panel}</div>
-        {openFullSheetEntry && <CreatureFullSheet def={def} entry={openFullSheetEntry} onClose={() => setOpenFullSheetEntry(null)} />}
+        {openFullSheetEntry && (
+          <CreatureFullSheet
+            def={def}
+            entry={openFullSheetEntry}
+            onClose={() => {
+              setOpenFullSheetEntry(null);
+              // Volta o foco pra busca da paleta (o painel tinha roubado o foco pra si ao abrir).
+              inputRef.current?.focus();
+            }}
+          />
+        )}
       </div>
     );
   }

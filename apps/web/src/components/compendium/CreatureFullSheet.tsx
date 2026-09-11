@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { X } from "lucide-react";
 import { characterTiebreakBonus, computeCharacter, entryToCharacter, formatArea, type CompendiumCreatureEntry, type SystemDefinition } from "@tormenta-vtt/shared";
 import { signed } from "../../lib/system";
@@ -37,13 +37,14 @@ export const CreatureFullSheet: React.FC<CreatureFullSheetProps> = ({ def, entry
   const computed = useMemo(() => computeCharacter(def, character), [def, character]);
   const initiative = useMemo(() => characterTiebreakBonus(def, character), [def, character]);
 
+  // Foco vai pro painel ao abrir (dialog root, tabIndex -1: não é um controle de verdade, só um alvo
+  // de teclado) — sem isso o Esc/clique cairiam na busca da paleta por trás, que tem outro handler de
+  // Esc (fecha a paleta inteira). Como o painel é IRMÃO da paleta no DOM (não filho), um keydown
+  // originado nele nunca borbulha até o `onKeyDown` da paleta — não precisa de stopPropagation.
+  const dialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    dialogRef.current?.focus();
+  }, []);
 
   const creatures = def.creatures;
   const typeValue = creatures ? sheet.traits[creatures.typeField] : undefined;
@@ -74,16 +75,34 @@ export const CreatureFullSheet: React.FC<CreatureFullSheetProps> = ({ def, entry
   return (
     <div
       id="creature-full-sheet"
-      role="dialog"
-      aria-label={`Bloco completo: ${entry.name}`}
       onPointerDown={onClose}
-      className="absolute inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-[1px]"
+      // pointer-events-auto é OBRIGATÓRIO aqui: este painel é irmão de #compendium-palette (não
+      // filho), mas os dois vivem dentro de um wrapper "absolute inset-0 ... pointer-events-none"
+      // (RoomPage/mode "map" — o wrapper todo é inerte por padrão pra não bloquear cliques no mapa
+      // fora da paleta; só quem precisa capturar clique liga de volta). pointer-events é herdado, e
+      // sem essa classe o painel INTEIRO (fundo, botão de fechar, scroll) fica "vazado": cliques e a
+      // rolagem do mouse atravessam pra paleta por trás dele.
+      className="absolute inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-[1px] pointer-events-auto"
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Bloco completo: ${entry.name}`}
+        tabIndex={-1}
         onPointerDown={(e) => e.stopPropagation()}
-        className="w-full max-w-xl max-h-full overflow-y-auto rounded-lg border border-[#3a3022] bg-[#0f0e0c] shadow-[0_0_40px_rgba(0,0,0,0.8)] text-xs"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+        // flex-col + o corpo com flex-1 min-h-0 overflow-y-auto (abaixo) é o padrão certo pra um
+        // cabeçalho fixo + conteúdo rolável dentro de uma altura máxima em vh (não %, que dependeria
+        // da altura do ancestral posicionado — aqui é sempre a viewport, não o retângulo do mapa).
+        className="w-full max-w-xl max-h-[90vh] flex flex-col rounded-lg border border-[#3a3022] bg-[#0f0e0c] shadow-[0_0_40px_rgba(0,0,0,0.8)] text-xs outline-none"
       >
-        <div className="sticky top-0 flex items-start justify-between gap-2 p-3 border-b border-[#2d2417] bg-[#0f0e0c]">
+        <div className="shrink-0 flex items-start justify-between gap-2 p-3 border-b border-[#2d2417]">
           <div>
             <div className="text-base font-serif font-bold text-amber-200">{entry.name}</div>
             <div className="text-[10px] text-zinc-500 font-serif flex flex-wrap gap-x-1.5">
@@ -98,7 +117,7 @@ export const CreatureFullSheet: React.FC<CreatureFullSheetProps> = ({ def, entry
           </button>
         </div>
 
-        <div className="p-3 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {def.attributes.map((a) => (
               <div key={a.key} className="text-center">
