@@ -24,6 +24,10 @@ model Room {
   systemId      String   @default("tormenta20")
   activeSceneId String?
   createdAt     DateTime @default(now())
+  /// Grupo da "Visão de grupo" (SPEC §9.15): PartyEntry[] = { characterId, hidden }[], gerenciado
+  /// pelo Mestre. Json (não tabela própria) porque é uma lista pequena, sempre reescrita inteira —
+  /// mesmo raciocínio de Scene.grid/fog.
+  party         Json     @default("[]")
 
   scenes          Scene[]
   participants    Participant[]

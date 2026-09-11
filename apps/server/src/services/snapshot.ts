@@ -10,6 +10,7 @@ import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, rollTargetsF
 import { listTemplates } from "./templates.js";
 import { handoutPinVisibleTo, toHandoutPin } from "./handouts.js";
 import { isMovementLimitEnabled } from "./movementLimit.js";
+import { partyFor, partyOf } from "./party.js";
 import { listTargets } from "./targets.js";
 
 const CHAT_HISTORY_LIMIT = 100;
@@ -106,6 +107,9 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
       return [m];
     }),
     characters: characters.map(toCharacter).filter((c) => characterVisibleTo(c, me.role)),
+    // Visão de grupo (SPEC §9.15): reusa os `characters` já carregados acima pra saber quem ainda é
+    // PC, em vez de repetir a consulta (ver pcIdsOf, mesma regra, usada pelos eventos party:*).
+    party: partyFor(partyOf(room), new Set(characters.filter((c) => c.kind === "pc").map((c) => c.id)), viewer.role),
     movementLimitEnabled: isMovementLimitEnabled(room.id),
     targets,
   };

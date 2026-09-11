@@ -7,10 +7,12 @@ import {
   CharacterUseItemSchema,
   ItemUseError,
   RollBuildError,
+  addToParty,
   buildCharacterRoll,
   buildItemUse,
   computeCharacter,
   createDefaultCharacterData,
+  removeFromParty,
   validateCharacterItems,
   type SystemDefinition,
 } from "@tormenta-vtt/shared";
@@ -26,6 +28,7 @@ import {
   toJson,
 } from "../services/characters.js";
 import { emitChatMessage } from "../services/chatVisibility.js";
+import { partyOf, pruneFromParty, saveAndBroadcastParty } from "../services/party.js";
 import { createRollMessage, type RollTargetInput } from "../services/rolls.js";
 import { toChatMessage, toScene, toToken } from "../services/serialize.js";
 import { filterTargetTokensByScene, getTargets } from "../services/targets.js";
@@ -78,6 +81,11 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
       });
       const character = toCharacter(row);
       broadcastCharacter(io, ctx.roomId, character, "character:created");
+      // Visão de grupo (SPEC §9.15): todo PC novo já entra no grupo sozinho, no fim da faixa.
+      if (kind === "pc") {
+        const currentParty = await prisma.room.findUnique({ where: { id: ctx.roomId }, select: { party: true } });
+        if (currentParty) await saveAndBroadcastParty(io, ctx.roomId, addToParty(partyOf(currentParty), character.id));
+      }
       return character;
     }),
   );
@@ -107,6 +115,10 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
         }),
       );
       broadcastCharacter(io, ctx.roomId, updated, "character:updated", current.kind);
+      // Visão de grupo (SPEC §9.15): deixou de ser PC → sai do grupo (não é mais "o grupo" pra
+      // ninguém, GM inclusive — mesma regra de partyFor). Vira NPC de novo não volta sozinho: o GM
+      // usa "+ Adicionar ao grupo" se quiser, igual a qualquer PC que nunca entrou.
+      if (current.kind === "pc" && nextKind !== "pc") await pruneFromParty(io, ctx.roomId, id);
       return updated;
     }),
   );
@@ -126,6 +138,8 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
       await prisma.character.delete({ where: { id: characterId } });
       io.to(rooms.all(ctx.roomId)).emit("character:deleted", { characterId });
       for (const t of linked) broadcastToken(io, ctx.roomId, toToken({ ...t, characterId: null }), "token:updated", toScene(t.scene).fog);
+      // Visão de grupo (SPEC §9.15): ficha apagada some do grupo também.
+      await pruneFromParty(io, ctx.roomId, characterId);
     }),
   );
 
