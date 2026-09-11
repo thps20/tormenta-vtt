@@ -3,7 +3,8 @@ import { ChevronLeft, ChevronRight, MessageSquare, Swords, Users } from 'lucide-
 import { ChatTab } from './ChatTab';
 import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
 import { CharactersTab } from './CharactersTab';
-import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, Participant, Token } from '@tormenta-vtt/shared';
+import { PartyView } from './PartyView';
+import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, Participant, SystemDefinition, Token } from '@tormenta-vtt/shared';
 
 export type SidePanelTab = 'chat' | 'initiative' | 'characters';
 
@@ -32,6 +33,13 @@ interface SidePanelProps {
   tokens: Token[];
   /** conditions[] do sistema da sala, pro CombatPanel resolver ícone/cor/duração da linha do combatente. */
   conditions: ConditionDef[];
+  /** Definição completa do sistema, pra Visão de grupo (PV/PM, condições) — null enquanto carrega. */
+  systemDef: SystemDefinition | null;
+  /** Token de quem está agindo agora no mapa visto, pra Visão de grupo acender o ícone de turno. */
+  activeTurnTokenId: string | null;
+  /** Preferência "mostrar visão de grupo" (por usuário, padrão ligada — ver RoomPage). */
+  partyViewExpanded: boolean;
+  onTogglePartyView: () => void;
   isGm: boolean;
   onSendMessage: (text: string) => void;
   onSelectToken: (tokenId: string) => void;
@@ -82,6 +90,10 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   onToggleClearTargetsOnTurnEnd,
   tokens,
   conditions,
+  systemDef,
+  activeTurnTokenId,
+  partyViewExpanded,
+  onTogglePartyView,
   isGm,
   onSendMessage,
   onSelectToken,
@@ -147,6 +159,22 @@ export const SidePanel: React.FC<SidePanelProps> = ({
       >
         <ChevronRight className="w-3.5 h-3.5" />
       </button>
+
+      {/* Visão de grupo (SPEC §3.6): os PCs da sala de relance, sempre visível, qualquer que seja a
+          aba aberta abaixo. Preferência própria (partyViewExpanded) — não é a mesma coisa que
+          recolher o painel inteiro (some junto por estar dentro deste <aside>). */}
+      {systemDef && (
+        <PartyView
+          characters={characters}
+          tokens={tokens}
+          def={systemDef}
+          activeTurnTokenId={activeTurnTokenId}
+          onOpenCharacter={onOpenCharacter}
+          expanded={partyViewExpanded}
+          onToggleExpanded={onTogglePartyView}
+        />
+      )}
+
       {/* Tab Navigation Header - Elegant Dark Style. `@container` deixa cada TabButton decidir, pela
           própria largura disponível, entre ícone+rótulo e só ícone (com tooltip e badge no canto). */}
       <div className="flex h-11 border-b border-[#2d2417] bg-[#141414] shrink-0 @container">

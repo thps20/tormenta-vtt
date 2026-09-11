@@ -59,6 +59,8 @@ import { CREATURE_FILTER } from "../lib/compendium";
 
 const CENTER_ON_TURN_KEY = "tvtt:centerOnActiveTurn";
 const SIDE_PANEL_COLLAPSED_KEY = "tvtt:sidePanelCollapsed";
+// Visão de grupo (SPEC §3.6): preferência por usuário, padrão ligada — mesmo padrão de CENTER_ON_TURN_KEY.
+const PARTY_VIEW_EXPANDED_KEY = "tvtt:partyViewExpanded";
 // Sistema de alvos (docs/plano-alvos.md): preferências por usuário, mesmo padrão de CENTER_ON_TURN_KEY.
 const SHOW_OTHER_TARGETS_KEY = "tvtt:showOtherTargets";
 const CLEAR_TARGETS_ON_TURN_END_KEY = "tvtt:clearTargetsOnTurnEnd";
@@ -146,6 +148,21 @@ function Table() {
     }
   }, [sidePanelCollapsed]);
   useSidePanelShortcut(() => setSidePanelCollapsed((v) => !v));
+  const [partyViewExpanded, setPartyViewExpanded] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(PARTY_VIEW_EXPANDED_KEY);
+      return saved === null ? true : saved === "1";
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(PARTY_VIEW_EXPANDED_KEY, partyViewExpanded ? "1" : "0");
+    } catch {
+      /* ignora (aba anônima etc.) */
+    }
+  }, [partyViewExpanded]);
   // Mapas (docs/plano-mapas.md §8/§9): diálogo "Levar para o mapa" ao ativar, e o modo "definir
   // ponto de chegada" (o próximo clique no canvas do mapa X grava, ver VttCanvas#arrivalPickMode).
   const [carryDialogSceneId, setCarryDialogSceneId] = useState<string | null>(null);
@@ -838,6 +855,10 @@ function Table() {
           onToggleClearTargetsOnTurnEnd={() => setClearTargetsOnTurnEnd((v) => !v)}
           tokens={tokens}
           conditions={systemDef?.conditions ?? []}
+          systemDef={systemDef}
+          activeTurnTokenId={activeTurnTokenId}
+          partyViewExpanded={partyViewExpanded}
+          onTogglePartyView={() => setPartyViewExpanded((v) => !v)}
           onRollCharacter={(characterId, request) => void rollCharacter(characterId, request)}
           isGm={isGm}
           onSendMessage={(text) => void sendMessage(text)}

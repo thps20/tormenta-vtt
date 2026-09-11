@@ -1110,3 +1110,32 @@ falha).
   `components/compendium/DragGhost.tsx`) é um rótulo simples (nome + "N criaturas"), não a espiral
   exata multi-espécie — duplicar `expandEncounterEntries` no cliente só para o preview visual não
   valia a complexidade; o servidor calcula a posição real de cada cópia ao soltar, como sempre.
+
+### 9.15 Visão de grupo
+
+Faixa compacta com os personagens de jogador (`kind: "pc"`) "de relance" (setembro/2026),
+`components/PartyView.tsx`. Sem evento/schema novo: só recompõe dado que já chega por
+`character:updated`/`token:updated`/`combat:updated`, igual ao resto da UI (atualiza ao vivo sem
+nenhum código extra de sincronização).
+
+- **Onde**: dentro do `<aside>` do `SidePanel`, acima da navegação de abas — visível não importa
+  qual aba (Chat/Iniciativa/Fichas) esteja aberta, e some junto com o painel lateral recolhido
+  (`\` ou Ctrl+B) por estar dentro dele; não duplica outra faixa fixa fora do painel.
+- **Conteúdo por ficha**: avatar (`Character.imageUrl` ou inicial do nome) com o anel na cor do
+  token vinculado no mapa atual (cinza sem token aqui — ficha ainda não entrou neste mapa, ou o
+  token está oculto/na névoa); nome; barra do recurso de `SystemDefinition.tokenBar` (PV em T20, com
+  temporário no texto "12/20 +3") cheia/dourada/vermelha pela mesma régua de cor da barra do token
+  no mapa (`VttCanvas`: >50% verde, >25% dourado, senão vermelho); os demais `resources[]` do
+  sistema (PM em T20) como texto compacto "PM 4/6" — nenhuma chave de recurso é hardcoded, um
+  sistema com outro `tokenBar`/outros `resources[]` muda a faixa sozinho; até 3 ícones de condição
+  do token (`+N` se houver mais) com tooltip; um ponto dourado pulsante no avatar quando é a vez
+  dele (combate do mapa que este cliente está vendo). Clique abre a ficha.
+- **Token usado por ficha**: o primeiro token do mapa atual com `characterId` = a ficha, dentre os
+  tokens que este cliente já recebe (mesma lista filtrada por visibilidade/névoa do canvas) — sem
+  token nesse mapa, a ficha aparece só com PV/PM (sem cor, condições ou indicador de turno).
+- **Visibilidade**: NPC nunca entra aqui (já existe a ficha rápida do Mestre, §3.3); todo PC entra
+  para GM e jogadores igualmente, números de PV/PM incluídos — é assim na mesa, ninguém esconde a
+  vida dos próprios personagens uns dos outros.
+- **Preferência por usuário** (`localStorage`, padrão ligada, independente de recolher o painel
+  inteiro): um chevron no cabeçalho "Grupo" alterna só esta faixa entre expandida (chips) e
+  recolhida (só o cabeçalho, pra reabrir rápido).
