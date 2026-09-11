@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Settings, Upload, Image as ImageIcon, X, Check, RotateCcw, Sliders, Grid, Eye, EyeOff, Palette, Magnet } from "lucide-react";
+import { Settings, Upload, Image as ImageIcon, X, Check, RotateCcw, Sliders, Grid, Eye, EyeOff, Palette, Magnet, Crosshair } from "lucide-react";
 import type { GridConfig, Scene } from "@tormenta-vtt/shared";
 import { assetUrl, uploadImage } from "../lib/api";
 import { normalizeOffset } from "../lib/grid";
 import { useImage } from "../lib/useImage";
 import { toast } from "../store/ui";
 import { DEFAULT_MAP } from "./VttCanvas";
+import { GridCalibrator } from "./GridCalibrator";
 
 export interface MapConfigResult {
   map: { mapUrl: string | null; mapWidth: number | null; mapHeight: number | null };
@@ -77,6 +78,7 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({ isOpen, scene, o
   const [gridHexColor, setGridHexColor] = useState<string>(parseColor(scene.grid.color).hex);
   const [gridOpacity, setGridOpacity] = useState<number>(parseColor(scene.grid.color).opacity);
   const [snap, setSnap] = useState<boolean>(scene.grid.snap);
+  const [calibratorOpen, setCalibratorOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -327,6 +329,21 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({ isOpen, scene, o
               </button>
             </div>
 
+            <button
+              type="button"
+              id="btn-calibrate-grid"
+              disabled={!mapUrl}
+              onClick={() => {
+                if (gridType === "none") setGridType("square");
+                setCalibratorOpen(true);
+              }}
+              title={mapUrl ? "Arrastar um retângulo sobre uma célula do desenho" : "Envie uma imagem antes de calibrar"}
+              className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-serif font-bold cursor-pointer border bg-[#252525] text-zinc-300 border-[#3d3d3d] hover:border-[#d4af37]/50 hover:text-[#d4af37] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-[#3d3d3d] disabled:hover:text-zinc-300"
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+              Calibrar pela imagem
+            </button>
+
             <Field label="Tamanho da célula" value={cellSize} min={8} max={1000} onChange={setCellSize} inputClass={`${numberInput} text-[#d4af37]`} sliderMin={20} sliderMax={200} />
             <Field label="Deslocamento X" value={offsetX} onChange={setOffsetX} inputClass={numberInput} sliderMin={0} sliderMax={cellSize} />
             <Field label="Deslocamento Y" value={offsetY} onChange={setOffsetY} inputClass={numberInput} sliderMin={0} sliderMax={cellSize} />
@@ -401,6 +418,26 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({ isOpen, scene, o
           </button>
         </div>
       </div>
+
+      {calibratorOpen && (
+        <GridCalibrator
+          mapUrl={mapUrl}
+          mapWidth={mapWidth}
+          mapHeight={mapHeight}
+          initial={{ cellSize, offsetX, offsetY }}
+          gridColor={toHex8(gridHexColor, gridOpacity)}
+          onApply={(result) => {
+            // Só preenche os campos deste modal — quem salva de verdade continua sendo "Salvar"
+            // (docs/plano-grid.md, Parte B): dá pra calibrar, olhar a prévia, recalibrar, e só
+            // então confirmar; "Cancelar" do modal descarta tudo, como já descartava antes.
+            setCellSize(result.cellSize);
+            setOffsetX(result.offsetX);
+            setOffsetY(result.offsetY);
+            setCalibratorOpen(false);
+          }}
+          onClose={() => setCalibratorOpen(false)}
+        />
+      )}
     </div>
   );
 };
