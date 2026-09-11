@@ -115,3 +115,15 @@ comprometido — só um lugar para não perder a ideia até o dono do projeto pr
   `Token.cells` fracionário (ex.: `0.5`), o que muda a espiral de posicionamento (`findFreeCells`,
   hoje em células inteiras) e o snap do Transformer (§ do plano) pra aceitar meio passo. Anotado em
   11/09/2026, ao trocar `Token.width/height` por `Token.cells`.
+- **Gabaritos não acompanham recalibração do grid (efêmeros; limitação aceita).** `scene:updateGrid`
+  (inclusive via "Calibrar pela imagem", docs/plano-grid.md) reencaixa a posição de cada TOKEN da
+  cena (`resnapTokenPosition`), mas não toca em `Template` nenhum: um gabarito criado antes de
+  mudar/calibrar o grid mantém a geometria em pixels absolutos de quando foi desenhado, então passa
+  a cobrir um número de células diferente do que cobria na hora (maior se o `cellSize` diminuiu,
+  menor se aumentou) — não quebra nem desalinha do próprio ponto de origem, só do grid ao redor
+  dele. Não é uma regressão: gabaritos já eram efêmeros e em pixels absolutos desde
+  `docs/plano-gabaritos.md` (não sobrevivem a um restart do servidor, SPEC §9.9), e `scene:updateGrid`
+  nunca os tocou. Corrigir exigiria dar a `Template` uma referência ao `cellSize` de criação e
+  reescalar geometria dentro do handler de `scene:updateGrid` — escopo bem maior que "reencaixar
+  posição de token". Achado na revisão do plano do grid (`docs/revisao-grid.md` §2, "Colocar área
+  de magia com cone antes e depois de recalibrar"); não corrigido — limitação aceita.
