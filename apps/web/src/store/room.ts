@@ -20,6 +20,7 @@ import { useCombat } from "./combat";
 import { useTemplates } from "./templates";
 import { useTargets } from "./targets";
 import { useCharacters } from "./characters";
+import { useParty } from "./party";
 import { useCompendium } from "./compendium";
 import { useHandouts } from "./handouts";
 import { useEncounters } from "./encounters";
@@ -152,6 +153,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useTemplates.getState().setSnapshot(null, []);
     useTargets.getState().reset();
     useCharacters.getState().setAll([]);
+    useParty.getState().setAll([]);
     useCompendium.getState().reset();
     useHandouts.getState().reset();
     useEncounters.getState().reset();
@@ -171,6 +173,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useHandouts.getState().setSnapshot(snap.room.activeSceneId, snap.handoutPins);
     useTargets.getState().setSnapshot(snap.targets, snap.me.id);
     useCharacters.getState().setAll(snap.characters);
+    useParty.getState().setAll(snap.party);
 
     // Jogador sempre vê o ativo (derivado, sem sessionStorage). GM: restaura o mapa que estava
     // visitando (F5 no meio da preparação); se o id salvo não existe mais (mapa apagado) ou é o

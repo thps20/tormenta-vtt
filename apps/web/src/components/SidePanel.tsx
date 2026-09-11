@@ -4,7 +4,7 @@ import { ChatTab } from './ChatTab';
 import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
 import { CharactersTab } from './CharactersTab';
 import { PartyView } from './PartyView';
-import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, Participant, SystemDefinition, Token } from '@tormenta-vtt/shared';
+import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, Participant, PartyEntry, SystemDefinition, Token } from '@tormenta-vtt/shared';
 
 export type SidePanelTab = 'chat' | 'initiative' | 'characters';
 
@@ -40,6 +40,12 @@ interface SidePanelProps {
   /** Preferência "mostrar visão de grupo" (por usuário, padrão ligada — ver RoomPage). */
   partyViewExpanded: boolean;
   onTogglePartyView: () => void;
+  /** Grupo gerenciado pelo Mestre (SPEC §9.15), já filtrado pra este cliente — ver store/party.ts. */
+  party: PartyEntry[];
+  onAddToParty: (characterId: string) => void;
+  onRemoveFromParty: (characterId: string) => void;
+  onSetPartyHidden: (characterId: string, hidden: boolean) => void;
+  onReorderParty: (characterIds: string[]) => void;
   isGm: boolean;
   onSendMessage: (text: string) => void;
   onSelectToken: (tokenId: string) => void;
@@ -94,6 +100,11 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   activeTurnTokenId,
   partyViewExpanded,
   onTogglePartyView,
+  party,
+  onAddToParty,
+  onRemoveFromParty,
+  onSetPartyHidden,
+  onReorderParty,
   isGm,
   onSendMessage,
   onSelectToken,
@@ -165,6 +176,8 @@ export const SidePanel: React.FC<SidePanelProps> = ({
           recolher o painel inteiro (some junto por estar dentro deste <aside>). */}
       {systemDef && (
         <PartyView
+          isGm={isGm}
+          entries={party}
           characters={characters}
           tokens={tokens}
           def={systemDef}
@@ -172,6 +185,10 @@ export const SidePanel: React.FC<SidePanelProps> = ({
           onOpenCharacter={onOpenCharacter}
           expanded={partyViewExpanded}
           onToggleExpanded={onTogglePartyView}
+          onAdd={onAddToParty}
+          onRemove={onRemoveFromParty}
+          onSetHidden={onSetPartyHidden}
+          onReorder={onReorderParty}
         />
       )}
 

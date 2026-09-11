@@ -316,10 +316,14 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
                 {secondaryResources.map((res) => {
                   const cur = character.resources[res.key]?.current ?? 0;
                   const max = computed.resources[res.key]?.max ?? 0;
+                  // Cor do recurso vem de `resources[].color` no JSON do sistema (PM é azul em
+                  // T20, docs/SPEC.md §9.15) — sem cor configurada, cai no ciano de sempre.
+                  const color = res.color ?? "#22d3ee";
                   return (
                     <span
                       key={res.key}
-                      className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/50 text-cyan-300 border border-cyan-800/40"
+                      className="px-1.5 py-0.5 rounded text-[10px] font-mono border"
+                      style={{ backgroundColor: `${color}26`, borderColor: `${color}66`, color }}
                       title={res.label}
                     >
                       {res.abbr}: {cur}/{max}

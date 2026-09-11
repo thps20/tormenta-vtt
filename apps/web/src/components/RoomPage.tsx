@@ -11,6 +11,7 @@ import { effectiveCellSize } from "../lib/grid";
 import { useChat } from "../store/chat";
 import { activeCombatant, isMyTurn, sceneCombat, useCombat } from "../store/combat";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
+import { useParty } from "../store/party";
 import { useSystemDef } from "../lib/system";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
 import { deleteSelectedTokens, useDeleteSelectionShortcut } from "../lib/useDeleteSelectionShortcut";
@@ -473,6 +474,13 @@ function Table() {
   const linkCharacter = useTokens((s) => s.linkCharacter);
   const systemDef = useSystemDef();
 
+  // Visão de grupo (SPEC §9.15): grupo já filtrado pra este cliente (jogador nunca recebe oculto).
+  const party = useParty((s) => s.entries);
+  const addToParty = useParty((s) => s.add);
+  const removeFromParty = useParty((s) => s.remove);
+  const setPartyHidden = useParty((s) => s.setHidden);
+  const reorderParty = useParty((s) => s.reorder);
+
   // Paleta do compêndio sobre o mapa (Mesa em foco, nenhuma ficha aberta — docs/plano-criaturas.md §2.2).
   const compendiumOpen = useCompendium((s) => s.isOpen);
   const compendiumContext = useCompendium((s) => s.context);
@@ -859,6 +867,11 @@ function Table() {
           activeTurnTokenId={activeTurnTokenId}
           partyViewExpanded={partyViewExpanded}
           onTogglePartyView={() => setPartyViewExpanded((v) => !v)}
+          party={party}
+          onAddToParty={(characterId) => void addToParty(characterId)}
+          onRemoveFromParty={(characterId) => void removeFromParty(characterId)}
+          onSetPartyHidden={(characterId, hidden) => void setPartyHidden(characterId, hidden)}
+          onReorderParty={(characterIds) => void reorderParty(characterIds)}
           onRollCharacter={(characterId, request) => void rollCharacter(characterId, request)}
           isGm={isGm}
           onSendMessage={(text) => void sendMessage(text)}

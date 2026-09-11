@@ -7,6 +7,7 @@ import { useCombat } from "./combat";
 import { useTemplates } from "./templates";
 import { useTargets } from "./targets";
 import { useCharacters } from "./characters";
+import { useParty } from "./party";
 import { useHistory } from "./history";
 import { useSceneList } from "./sceneList";
 import { useTools } from "./tools";
@@ -76,6 +77,9 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("character:created", (c) => useCharacters.getState().upsert(c));
   socket.on("character:updated", (c) => useCharacters.getState().upsert(c));
   socket.on("character:deleted", ({ characterId }) => useCharacters.getState().remove(characterId));
+
+  // Visão de grupo (SPEC §9.15): lista completa, já filtrada por quem recebe — substitui, não faz merge.
+  socket.on("party:updated", ({ party }) => useParty.getState().setAll(party));
 
   socket.on("history:updated", (p) => useHistory.getState().setState(p));
 
