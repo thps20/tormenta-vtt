@@ -153,7 +153,7 @@ Room 1───* SavedEncounter
 
 | Entidade | Campos principais | Notas |
 |---|---|---|
-| **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`). `activeSceneId` sempre aponta pra um mapa não apagado da sala (invariante mantida por `scene:activate`/`scene:delete`, §9.7) |
+| **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId, party(JSON)` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`). `activeSceneId` sempre aponta pra um mapa não apagado da sala (invariante mantida por `scene:activate`/`scene:delete`, §9.7). `party` = `PartyEntry[]` da Visão de grupo (§9.15, `{ characterId, hidden }[]`), não serializado em `RoomPublic`/`Room` do shared — vai à parte, já filtrado por papel, em `RoomSnapshot.party` (§5) |
 | **Participant** | `id, roomId, nickname, role, sessionToken` | `connected` é estado em memória, não persistido |
 | **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON), order, arrival(JSON), deletedAt?` | Múltiplos mapas por sala (§9.7). `grid` e `fog` são JSON para evoluir sem migration; `fog` segue `FogConfigSchema` (§9.3). `order`: posição no painel "Mapas", renumerada 0..n-1 a cada `scene:reorder`. `arrival` = `{x,y} \| null` (pixels do mapa): onde tokens levados de outro mapa aparecem ao ativar. `deletedAt` (coluna só do banco, nunca serializada no `Scene` do shared, mesmo padrão de `Token.deletedAt`): soft delete de `scene:delete` — todo lugar que lista "mapas da sala agora" filtra `deletedAt: null`; limpeza definitiva depois de 30 dias (`services/cleanup.ts`) |
 | **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[]), deletedAt?` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto). `deletedAt` (coluna só do banco, nunca serializada no `Token` do shared): soft delete de `token:delete`/`token:delete-many` (§9.6) — todo lugar que lista "tokens da cena agora" filtra `deletedAt: null`; a limpeza definitiva apaga a linha de vez depois de 30 dias (`services/cleanup.ts`) |
@@ -164,7 +164,7 @@ Room 1───* SavedEncounter
 | **SavedEncounter** | `id, roomId, name, tags[], notes, entries(JSON), deletedAt?` | Encontro salvo (§9.14): grupo de criaturas do compêndio que o GM monta uma vez e solta de uma vez. `entries` = `{ entryId, count, visibleOnSpawn, nameOverride? }[]` (`SavedEncounterEntrySchema`) — só a "receita", nunca cópia de ficha; resolvida contra o compêndio ATUAL na hora de soltar (`encounter:spawn`). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Handout.deletedAt`): soft delete de `encounter:delete` |
 | **Combat** | `id, roomId, sceneId (único: um combate por cena), round, status, activeCombatantId?` | `status` = `rolling \| active \| ended` (§3.5). Persistido (ao contrário da iniciativa manual anterior, que vivia em memória) |
 | **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound, movementBudget?, movementUsed, movementDiagonals, movementAnchorX?, movementAnchorY?, movementPath?(JSON)` | `initiative = null` = ainda não rolou. `combat:remove` apaga o combatente (e ajusta `activeCombatantId`/`round` se o removido era o ativo, `stateAfterRemoval`, §3.5). `token:delete`/`token:delete-many` **não** apagam mais a linha do combatente (o token agora é soft delete, §9.6): só param de listá-lo (o combate ignora combatente cujo token tem `deletedAt`) e fazem o mesmo ajuste de turno/`order`; a linha volta se o GM desfizer. Os seis últimos campos são o orçamento de deslocamento do turno (§9.11): `movementAnchorX/Y` (de onde o próximo movimento é medido) e `movementPath` (o caminho desenhado) são colunas só do banco, nunca serializadas no `Combatant` do shared — o cliente só recebe `movementBudget/Used/Diagonals` e `movementPath` via `Combat` (§5) |
-| **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), skillTotal, rolls{} (inclui `attackHit?`/`attackAutoHit?`/`attackAutoMiss?`, §9.12, e `critical?`, §9.13), combat{} (§3.5), damageAttribute, tokenBar, grid?, race? (§9.11), movement? (§9.11), trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código. `race?` aponta o `itemKinds[]` que alimenta o placeholder `{race.<campo>}` nas fórmulas (§9.11); `movement?` declara o orçamento de deslocamento por turno (ausente = sistema sem a regra); `rolls.attackHit?`/`attackAutoHit?`/`attackAutoMiss?` são a regra de acerto do sistema de alvos (§9.12, ausentes = sistema sem a regra); `rolls.critical?` confirma um crítico ameaçado ao rolar dano junto com o ataque (§9.13, mesma gramática de `attackAutoHit`, só `{natural}`; ausente = sistema não confirma sozinho) |
+| **SystemDefinition** | `id, name, attributes[], skills[], resources[] (com `color?`, §9.15), derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), skillTotal, rolls{} (inclui `attackHit?`/`attackAutoHit?`/`attackAutoMiss?`, §9.12, e `critical?`, §9.13), combat{} (§3.5), damageAttribute, tokenBar, grid?, race? (§9.11), movement? (§9.11), trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código. `race?` aponta o `itemKinds[]` que alimenta o placeholder `{race.<campo>}` nas fórmulas (§9.11); `movement?` declara o orçamento de deslocamento por turno (ausente = sistema sem a regra); `rolls.attackHit?`/`attackAutoHit?`/`attackAutoMiss?` são a regra de acerto do sistema de alvos (§9.12, ausentes = sistema sem a regra); `rolls.critical?` confirma um crítico ameaçado ao rolar dano junto com o ataque (§9.13, mesma gramática de `attackAutoHit`, só `{natural}`; ausente = sistema não confirma sozinho) |
 
 Decisão: coordenadas em pixels (não células) para o token poder ficar "fora do grid" e para suportar `grid.type = none`. A conversão célula↔pixel é uma função pura usando `cellSize` e `offset`.
 
@@ -240,6 +240,10 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `handout:pin` | `{ sceneId, handoutId, x, y, visible }` (pixels do mapa) | GM | `handout:pinned`; entra no desfazer do GM (§9.6) |
 | `handout:unpin` | `{ sceneId, pinId }` | GM | `handout:unpinned`; entra no desfazer do GM (§9.6) |
 | `history:undo` / `history:redo` | `{}` | GM | desfaz/refaz o topo da pilha da sala (§9.6); ack `{ summary } \| null` (`null` = pilha vazia); broadcasts normais das entidades afetadas + `history:updated` |
+| `party:add` | `{ characterId }` (idempotente) | GM | Visão de grupo (§9.15); ack `PartyEntry[]` (visão do GM); `party:updated` (uma lista por papel) |
+| `party:remove` | `{ characterId }` (idempotente) | GM | idem |
+| `party:set-hidden` | `{ characterId, hidden }` | GM | idem |
+| `party:reorder` | `{ characterIds }` (lista completa, permutação do grupo atual) | GM | idem |
 
 ### Servidor → Cliente
 
@@ -268,6 +272,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `handout:closed` | `{ messageId }` (efêmero: instrui quem via a mensagem a fechar o overlay, sem mudar a mensagem no chat) |
 | `encounter:created` / `encounter:updated` | `SavedEncounter` (§9.14; só pra `rooms.gm`, cliente faz upsert por id) |
 | `encounter:deleted` | `{ id }` (só pra `rooms.gm`) |
+| `party:updated` | `{ party: PartyEntry[] }` (§9.15; lista COMPLETA — cliente substitui, não faz merge — já filtrada por papel: jogador nunca recebe entrada oculta nem de ficha que não é mais PC) |
 | `server:error` | `{ message }` |
 
 ### HTTP (fora do socket)
@@ -1113,29 +1118,68 @@ falha).
 
 ### 9.15 Visão de grupo
 
-Faixa compacta com os personagens de jogador (`kind: "pc"`) "de relance" (setembro/2026),
-`components/PartyView.tsx`. Sem evento/schema novo: só recompõe dado que já chega por
-`character:updated`/`token:updated`/`combat:updated`, igual ao resto da UI (atualiza ao vivo sem
-nenhum código extra de sincronização).
+Faixa compacta com os personagens de jogador "de relance" (setembro/2026), `components/PartyView.tsx`.
+O chip é por **ficha** (`kind: "pc"`), não por token: um personagem só sai da faixa se a ficha for
+apagada ou removida do grupo — perder/trocar de token não tira ninguém dali. O grupo em si (quem
+está na faixa, em que ordem, quem está oculto) é gerenciado pelo Mestre e persistido no servidor.
 
+- **Modelo**: `Room.party: PartyEntry[] = { characterId, hidden }[]` (§4, coluna `Json`, mesmo
+  raciocínio de `Scene.grid`/`fog` — lista pequena, sempre reescrita inteira, sem tabela própria). A
+  ORDEM do array é a ordem de exibição — sem coluna `order`, é sempre a lista completa da sala.
+  `packages/shared/src/rules/party.ts` (testado): `addToParty`/`removeFromParty`/`setPartyHidden`
+  (idempotentes) e `reorderParty` (mesma régua de `reorderScenes`: `requestedIds` precisa ser uma
+  permutação exata do grupo atual).
+- **Eventos** (`party:add|remove|set-hidden|reorder`, todos `gmOnly`, §5): o ack devolve a visão do
+  GM (grupo inteiro, ocultas inclusive — quem chama estes eventos só pode ser o GM); quem atualiza
+  os clientes de verdade é o broadcast `party:updated { party }`, com uma lista DIFERENTE por papel
+  (`services/party.ts#partyFor`, testado): GM recebe toda entrada cujo personagem ainda é PC nesta
+  sala (ocultas inclusive — a UI dele esmaece); jogador só as não ocultas. Uma entrada cujo
+  personagem foi apagado, ou deixou de ser PC (`character:update` virando `kind: "npc"`), some pra
+  TODOS, GM inclusive — deixou de ser "o grupo". `RoomSnapshot.party` (§5) manda a mesma lista já
+  filtrada no `room:join`.
+- **Entra/sai sozinho**: `character:create` de um PC novo já entra no fim do grupo
+  (`addToParty`); `character:delete` e `character:update` que vira `kind: "npc"` tiram a entrada
+  (`services/party.ts#pruneFromParty`). Sala criada antes desta feature começa com `party: []` — os
+  PCs que já existiam não entram sozinhos, o Mestre usa "+ Adicionar ao grupo" (abaixo) pra trazê-los.
 - **Onde**: dentro do `<aside>` do `SidePanel`, acima da navegação de abas — visível não importa
   qual aba (Chat/Iniciativa/Fichas) esteja aberta, e some junto com o painel lateral recolhido
   (`\` ou Ctrl+B) por estar dentro dele; não duplica outra faixa fixa fora do painel.
-- **Conteúdo por ficha**: avatar (`Character.imageUrl` ou inicial do nome) com o anel na cor do
-  token vinculado no mapa atual (cinza sem token aqui — ficha ainda não entrou neste mapa, ou o
-  token está oculto/na névoa); nome; barra do recurso de `SystemDefinition.tokenBar` (PV em T20, com
-  temporário no texto "12/20 +3") cheia/dourada/vermelha pela mesma régua de cor da barra do token
-  no mapa (`VttCanvas`: >50% verde, >25% dourado, senão vermelho); os demais `resources[]` do
-  sistema (PM em T20) como texto compacto "PM 4/6" — nenhuma chave de recurso é hardcoded, um
-  sistema com outro `tokenBar`/outros `resources[]` muda a faixa sozinho; até 3 ícones de condição
-  do token (`+N` se houver mais) com tooltip; um ponto dourado pulsante no avatar quando é a vez
-  dele (combate do mapa que este cliente está vendo). Clique abre a ficha.
-- **Token usado por ficha**: o primeiro token do mapa atual com `characterId` = a ficha, dentre os
-  tokens que este cliente já recebe (mesma lista filtrada por visibilidade/névoa do canvas) — sem
-  token nesse mapa, a ficha aparece só com PV/PM (sem cor, condições ou indicador de turno).
-- **Visibilidade**: NPC nunca entra aqui (já existe a ficha rápida do Mestre, §3.3); todo PC entra
-  para GM e jogadores igualmente, números de PV/PM incluídos — é assim na mesa, ninguém esconde a
-  vida dos próprios personagens uns dos outros.
+- **Conteúdo por chip**: avatar (`Character.imageUrl` ou inicial do nome) com o anel na cor do token
+  vinculado no mapa que este cliente está vendo (cinza sem token aqui — ficha ainda não entrou nesse
+  mapa, ou o token está oculto/na névoa: só a cor/condições/turno somem, o chip continua); nome;
+  barra PRINCIPAL do recurso de `SystemDefinition.tokenBar` (PV em T20, com temporário no texto
+  "12/20 +3", número escrito na própria barra) cheia/dourada/vermelha pela régua de % — SEMPRE essa
+  régua, mesmo se o recurso tiver `color` configurada (ver abaixo): é "vida", a cor precisa reagir ao
+  nível — mesma convenção da barra do token no mapa (`VttCanvas`: >50% verde, >25% dourado, senão
+  vermelho); os demais `resources[]` do sistema (PM em T20) como uma barra SECUNDÁRIA fina (4px, sem
+  número — não cabe; hover/`title` mostra o texto exato, "PM 6/9") na cor de `resources[].color` do
+  JSON do sistema quando definida (PM é azul, `#378ADD` em T20 — não é "vida", ficar baixo nele não é
+  a mesma urgência, a régua vermelha assustaria à toa), senão cai na mesma régua por % da principal;
+  só aparece se o máximo daquele recurso for > 0 (nenhuma chave de recurso é hardcoded: um sistema
+  com outro `tokenBar`/outros `resources[]`/outra `color` muda a faixa sozinho, e um recurso ainda
+  não definido não polui o chip com "0/0"); a mesma `resources[].color` também tinge o selo do
+  recurso secundário na ficha rápida de NPC (`NpcQuickCard`, §3.3) — sem cor configurada, ambos
+  caem no visual de sempre (ciano); até 3 ícones de condição do token (`+N` se houver mais) com tooltip; um
+  ponto dourado pulsante no avatar quando é a vez dele (combate do mapa que este cliente está
+  vendo). Clique abre a ficha; todo número já aparece no chip, sem precisar de hover (só o `title`
+  do elemento repete o texto, pro hover confirmar o valor exato).
+- **Token usado por um chip**: o primeiro token do mapa visto com `characterId` = a ficha, dentre os
+  tokens que este cliente já recebe (mesma lista filtrada por visibilidade/névoa do canvas).
+- **Visibilidade**: NPC nunca entra aqui (já existe a ficha rápida do Mestre, §3.3, e o servidor tira
+  qualquer entrada cujo personagem não é PC — ver acima); todo PC do grupo (não oculto) entra para
+  GM e jogadores igualmente, números de PV/PM incluídos — é assim na mesa, ninguém esconde a vida dos
+  próprios personagens uns dos outros.
+- **Gerenciamento do grupo (Mestre)**: botão "⋯" em cada chip abre um menu (portal em
+  `document.body`, `position: fixed` — a faixa rola horizontalmente, um menu `absolute` normal seria
+  cortado nela, mesmo problema/solução do menu do painel "Mapas") com "Ocultar do grupo"/"Mostrar" e
+  "Remover do grupo"; oculto pro Mestre aparece esmaecido (opacidade) com um ícone de olho riscado,
+  mas continua com PV/PM/arrastável normalmente — só some da cópia que os jogadores recebem. Botão
+  "+ Adicionar ao grupo" no fim da faixa (dashed, só aparece havendo candidato) abre a mesma espécie
+  de menu listando os PCs da sala que ainda não estão no grupo. Arrastar um chip solta uma nova ordem
+  completa (`party:reorder`); mesmo padrão de drag-and-drop do `CombatPanel` (sem otimismo — o
+  broadcast `party:updated`, que chega pro autor também, é quem aplica de verdade, como
+  `combat:reorder`).
 - **Preferência por usuário** (`localStorage`, padrão ligada, independente de recolher o painel
   inteiro): um chevron no cabeçalho "Grupo" alterna só esta faixa entre expandida (chips) e
-  recolhida (só o cabeçalho, pra reabrir rápido).
+  recolhida (só o cabeçalho, pra reabrir rápido) — some só pra quem desligou, o grupo em si (§ acima)
+  não muda pra ninguém.
