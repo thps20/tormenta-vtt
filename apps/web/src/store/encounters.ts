@@ -6,10 +6,12 @@ import { useCombat } from "./combat";
 import { useTokens } from "./tokens";
 import { toast } from "./ui";
 
-/** Item do carrinho (§9.14): uma criatura + quantidade, antes de virar SavedEncounterEntry ao salvar. */
+/** Item do carrinho (§9.14): uma criatura + quantidade + visibilidade, antes de virar
+ *  SavedEncounterEntry ao salvar. */
 export interface EncounterCartItem {
   entryId: string;
   count: number;
+  visible: boolean;
 }
 
 /** Opções de "soltar" (checkboxes do EncounterPreview): reaproveitam combat:add/start/roll — nada de novo no servidor. */
@@ -45,8 +47,10 @@ interface EncountersState {
   /** Solta o encontro inteiro na cena; encadeia combat:add/start + combat:roll se pedido (§9.14). */
   spawn: (id: string, sceneId: string, point: { x: number; y: number }, opts: EncounterSpawnOptions) => Promise<boolean>;
 
-  addToCart: (entryId: string, count?: number) => void;
+  /** `visible` só vale pra entrada NOVA (uma já no carrinho mantém a que tinha, só soma a quantidade). */
+  addToCart: (entryId: string, count?: number, visible?: boolean) => void;
   setCartCount: (entryId: string, count: number) => void;
+  setCartVisible: (entryId: string, visible: boolean) => void;
   removeFromCart: (entryId: string) => void;
   clearCart: () => void;
   setSpawnStartCombat: (v: boolean) => void;
@@ -95,7 +99,7 @@ export const useEncounters = create<EncountersState>((set, get) => ({
   },
 
   createFromCart: async (name, tags, notes) => {
-    const entries: SavedEncounterEntry[] = get().cart.map((c) => ({ entryId: c.entryId, count: c.count, visibleOnSpawn: true, nameOverride: null }));
+    const entries: SavedEncounterEntry[] = get().cart.map((c) => ({ entryId: c.entryId, count: c.count, visibleOnSpawn: c.visible, nameOverride: null }));
     if (entries.length === 0) return null;
     const encounter = await get().create({ name, tags, notes, entries });
     if (encounter) get().clearCart();
@@ -164,13 +168,14 @@ export const useEncounters = create<EncountersState>((set, get) => ({
     return true;
   },
 
-  addToCart: (entryId, count = 1) =>
+  addToCart: (entryId, count = 1, visible = true) =>
     set((s) => {
       const existing = s.cart.find((c) => c.entryId === entryId);
-      if (!existing) return { cart: [...s.cart, { entryId, count: Math.min(20, Math.max(1, count)) }] };
+      if (!existing) return { cart: [...s.cart, { entryId, count: Math.min(20, Math.max(1, count)), visible }] };
       return { cart: s.cart.map((c) => (c.entryId === entryId ? { ...c, count: Math.min(20, c.count + count) } : c)) };
     }),
   setCartCount: (entryId, count) => set((s) => ({ cart: s.cart.map((c) => (c.entryId === entryId ? { ...c, count: Math.min(20, Math.max(1, count)) } : c)) })),
+  setCartVisible: (entryId, visible) => set((s) => ({ cart: s.cart.map((c) => (c.entryId === entryId ? { ...c, visible } : c)) })),
   removeFromCart: (entryId) => set((s) => ({ cart: s.cart.filter((c) => c.entryId !== entryId) })),
   clearCart: () => set({ cart: [] }),
   setSpawnStartCombat: (v) => set({ spawnStartCombat: v, spawnRollNpcInitiative: v ? get().spawnRollNpcInitiative : false }),

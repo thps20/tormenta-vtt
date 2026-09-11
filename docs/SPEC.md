@@ -428,11 +428,20 @@ que já existem.
 - **Paleta contextual**: a mesma paleta do compêndio (§9.4), não uma segunda. Com a Mesa em foco (sem
   ficha aberta, sem modal) e Ctrl+Espaço/Ctrl+Shift+Espaço/"/" fora de campo de texto
   (`useMapPaletteShortcut`), abre flutuando 384 px à esquerda do mapa, sem escurecer o fundo — o mapa
-  continua o alvo da soltura. GM vê itens + criaturas (chip "Criaturas" ativo por padrão); jogador só
-  consulta itens (o servidor nem manda criaturas). `CreaturePreview.tsx` mostra ND/tamanho/tipo,
-  recursos e derivados, iniciativa (`characterTiebreakBonus`), resistências (`DamageTypeBadge`),
-  ataques e nomes de poderes, mais **quantidade** (1..20) e o toggle **"invisível ao soltar"**
-  (padrão ligado, lembrado na sessão).
+  continua o alvo da soltura. GM vê itens + criaturas + encontros salvos (§9.14; chips "Criaturas"/
+  "Encontros" sempre à mostra no contexto mapa, os `itemKinds[]` do sistema e "Sala" atrás do chip
+  "todos ▾"); jogador só consulta itens (o servidor nem manda criaturas nem encontros), chips como
+  no contexto ficha (§9.4). `CreaturePreview.tsx` é **compacto** por padrão: nome; "ND · tamanho ·
+  tipo"; uma linha com PV/Defesa/Deslocamento (best-effort e genérico — PV via `tokenBar`, Defesa via
+  o stat do alvo que `rolls.attackHit`/`attackAutoHit` referencia — `hitRuleTargetPath`,
+  `rules/targets.ts` — e Deslocamento via `movement.derived`; sistema sem um desses blocos
+  simplesmente omite aquele stat) e Iniciativa (`characterTiebreakBonus`); ataques, um por linha
+  (nome do item + fórmula de dano + `DamageTypeBadge`). Sem atributos/perícias/CD/resistências/
+  poderes/descrição — isso é o **bloco completo** (`CreatureFullSheet.tsx`, overlay maior, só
+  leitura, nunca solta no mapa): botão "Ver bloco completo" no rodapé do preview, ou duplo clique na
+  linha da lista. Rodapé do preview: só **quantidade** (1..20) e o toggle **"invisível ao soltar"**
+  (padrão ligado, lembrado na sessão) — soltar em si não tem botão próprio, é Enter/Ctrl+Enter/
+  arrastar (mesmo de sempre).
 - **Soltar no mapa**: `VttCanvas` registra o alvo `"map"` em `dropTargets` (só GM, só `type:
   "creature"`); durante o arrasto desenha um fantasma de `count` retângulos de célula (lado pelo
   `sizes[].tokenCells`, cor do tipo) numa espiral a partir da célula do cursor. Enter no preview
@@ -1054,17 +1063,24 @@ falha).
   (não é regra de sistema, por isso não entra em `CharacterDataSchema`); serve só para "salvar
   tokens selecionados como encontro" reconstruir de qual criatura cada token veio.
 - **Criar**: três caminhos, todos batem em `encounter:create` ou `encounter:create-from-tokens` (§5).
-  Na paleta (modo mapa, GM), um **carrinho** só em memória (`store/encounters.ts#cart`, reseta ao
-  trocar de sala): o botão "+ ao encontro" no preview de uma criatura (ao lado de "Soltar") empurra
-  `{ entryId, count }`; um botão "Salvar carrinho como encontro" some/aparece conforme o carrinho
-  tem itens, abre um formulário pequeno (nome/tags/notas) e chama `encounter:create`. **Salvar
-  tokens selecionados como encontro**: mesmo formulário, a partir da seleção de tokens do mapa
-  (GM, ferramenta Selecionar) — chama `encounter:create-from-tokens { tokenIds }`; o servidor agrupa
-  por `Character.compendiumEntryId` (tokens sem ficha do compêndio são ignorados, contados em
-  `ignoredTokens` no ack, nunca derrubam a criação do resto). **Duplicar** reaproveita
-  `encounter:create` no cliente (mesmos dados, nome + " (cópia)") — sem evento próprio.
-- **Paleta**: aba "Encontros" (`ENCOUNTER_FILTER`, mesmo truque de chip virtual de `CREATURE_FILTER`/
-  `ROOM_FILTER`, §9.5), só no contexto "map"/GM, busca por nome/tags. `EncounterPreview.tsx`: lista
+  Na paleta (modo mapa, GM), um botão "Montar encontro" no cabeçalho **liga um modo** (painel ganha
+  borda destacada): cada linha de criatura na lista ganha um "+" que soma
+  `{ entryId, count: quantidade do preview, visible: !invisível do preview }` a um **carrinho** só em
+  memória (`store/encounters.ts#cart`, reseta ao trocar de sala — desligar o modo NÃO esvazia o
+  carrinho, só "Cancelar" abaixo esvazia); ligado, o rodapé da paleta troca o preview pelo carrinho
+  (`EncounterCartPanel`): uma linha por criatura (nome, quantidade editável, toggle invisível por
+  linha, remover), ND total (mesmo `sumChallengeRating` do preview de encontro salvo) e três botões —
+  "Salvar encontro" (abre o formulariozinho nome/tags/notas, chama `encounter:create`), "Dos
+  selecionados" (mesmo formulário a partir da seleção de tokens do mapa — GM, ferramenta Selecionar
+  — chama `encounter:create-from-tokens { tokenIds }`; o servidor agrupa por
+  `Character.compendiumEntryId`, tokens sem ficha do compêndio são ignorados e contados em
+  `ignoredTokens` no ack, nunca derrubam a criação do resto) e "Cancelar" (esvazia o carrinho e
+  desliga o modo). **Duplicar** reaproveita `encounter:create` no cliente (mesmos dados, nome +
+  " (cópia)") — sem evento próprio.
+- **Paleta**: no contexto "map"/GM, chips "Criaturas" e "Encontros" (`ENCOUNTER_FILTER`, mesmo truque
+  de chip virtual de `CREATURE_FILTER`/`ROOM_FILTER`, §9.5) ficam sempre à mostra; os `itemKinds[]`
+  do sistema e "Sala" entram atrás de um chip "todos ▾" (clique expande/recolhe — não muda nenhum
+  filtro já ativo, só a visibilidade dos chips). Busca por nome/tags. `EncounterPreview.tsx`: lista
   as entradas (nome × quantidade, "sumiu do compêndio" em vermelho se a entrada não existe mais), ND
   somado só informativo (`sumChallengeRating`, best-effort: soma inteiros e frações simples como
   "1/4"/"1/2" do `traits[ndField]` de cada entrada resolvida; entradas com ND fora desse formato

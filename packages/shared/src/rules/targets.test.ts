@@ -7,6 +7,7 @@ import { createDefaultCharacterData } from "./defaults.js";
 import {
   evaluateHitRule,
   hitRuleTargetLabel,
+  hitRuleTargetPath,
   naturalD20,
   parseHitRule,
   pruneTargets,
@@ -67,6 +68,17 @@ describe("hitRuleTargetLabel", () => {
   it("devolve 'alvo' sem match ou fórmula inválida", () => {
     expect(hitRuleTargetLabel(def, "{natural} == 20")).toBe("alvo");
     expect(hitRuleTargetLabel(def, "sem operador")).toBe("alvo");
+  });
+});
+
+describe("hitRuleTargetPath", () => {
+  it("extrai kind/key do stat do alvo (T20: derived.defense)", () => {
+    expect(hitRuleTargetPath("{total} >= {target.derived.defense}")).toEqual({ kind: "derived", key: "defense" });
+  });
+
+  it("null sem referência ao alvo ou fórmula inválida (mesmos casos de hitRuleTargetLabel)", () => {
+    expect(hitRuleTargetPath("{natural} == 20")).toBeNull();
+    expect(hitRuleTargetPath("sem operador")).toBeNull();
   });
 });
 

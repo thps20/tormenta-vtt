@@ -109,17 +109,25 @@ export interface HitRuleLabelSource {
   resources: { key: string; label: string }[];
 }
 
-/** Rótulo do stat do alvo usado na comparação, na linguagem do sistema ("Defesa" em T20); "alvo" sem match. */
-export function hitRuleTargetLabel(def: HitRuleLabelSource, ruleStr: string): string {
+/** `kind`/`key` do stat do alvo referenciado ("target.derived.defense" -> {kind:"derived",key:"defense"}); null = a fórmula não referencia o alvo, ou é inválida. */
+export function hitRuleTargetPath(ruleStr: string): { kind: string; key: string } | null {
   let rule: HitRule;
   try {
     rule = parseHitRule(ruleStr);
   } catch {
-    return "alvo";
+    return null;
   }
   const path = targetPlaceholderPath(rule);
-  if (!path) return "alvo";
+  if (!path) return null;
   const [kind, key] = path.split(".");
+  return kind && key ? { kind, key } : null;
+}
+
+/** Rótulo do stat do alvo usado na comparação, na linguagem do sistema ("Defesa" em T20); "alvo" sem match. */
+export function hitRuleTargetLabel(def: HitRuleLabelSource, ruleStr: string): string {
+  const path = hitRuleTargetPath(ruleStr);
+  if (!path) return "alvo";
+  const { kind, key } = path;
   if (kind === "derived") return def.derived.find((d) => d.key === key)?.label ?? "alvo";
   if (kind === "attr") return def.attributes.find((a) => a.key === key)?.label ?? "alvo";
   if (kind === "resource") return def.resources.find((r) => r.key === key)?.label ?? "alvo";

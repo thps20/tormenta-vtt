@@ -35,7 +35,7 @@ export const EncounterPreview: React.FC<EncounterPreviewProps> = ({ def, encount
   const { total: ndTotal, unparsed } = sumChallengeRating(def, encounter.entries, compendiumEntries);
 
   return (
-    <div className="p-3 space-y-3 text-xs" id="encounter-preview">
+    <div className="p-2 space-y-1.5 text-xs" id="encounter-preview">
       <div>
         <div className="text-sm font-serif font-bold text-amber-200">{encounter.name}</div>
         <div className="text-[10px] text-zinc-500 font-serif flex flex-wrap gap-x-1.5">
@@ -115,8 +115,9 @@ export const EncounterPreview: React.FC<EncounterPreviewProps> = ({ def, encount
   );
 };
 
-/** "1/4", "1/2" ou o inteiro — mesma convenção de texto do sistema, sem casas decimais espúrias. */
-function formatChallenge(value: number): string {
+/** "1/4", "1/2" ou o inteiro — mesma convenção de texto do sistema, sem casas decimais espúrias.
+ *  Exportada: o carrinho de "montar encontro" (CompendiumPalette) mostra o mesmo ND total. */
+export function formatChallenge(value: number): string {
   if (Number.isInteger(value)) return String(value);
   if (Math.abs(value - 0.25) < 1e-9) return "1/4";
   if (Math.abs(value - 0.5) < 1e-9) return "1/2";
