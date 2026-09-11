@@ -317,7 +317,11 @@
   "rolls": {
     "attributeCheck": "1d20 + {attr}",
     "skillCheck": "1d20 + {skill}",
-    "attack": "1d20 + {skill}"
+    "attack": "1d20 + {skill}",
+    "$comment_alvos": "Sistema de alvos (docs/plano-alvos.md): 20 natural acerta sempre, 1 natural erra sempre, senão compara o total com a Defesa do alvo.",
+    "attackAutoHit": "{natural} == 20",
+    "attackAutoMiss": "{natural} == 1",
+    "attackHit": "{total} >= {target.derived.defense}"
   },
 
   "combat": {

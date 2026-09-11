@@ -467,6 +467,23 @@ export const SystemDefinitionSchema = z.object({
     skillCheck: FormulaSchema,
     /** Ataque de uma ação; {skill} é a perícia da ação. Ausente = skillCheck. */
     attack: FormulaSchema.optional(),
+    /**
+     * Sistema de alvos (docs/plano-alvos.md): compara o total do ataque com um stat do alvo.
+     * Exatamente UM operador de comparação (==, >=, <=, >, <); um lado usa {total}, o outro
+     * {target.<caminho>} (ex.: "{total} >= {target.derived.defense}"). Avaliada depois de
+     * `attackAutoHit`/`attackAutoMiss` — se nenhuma delas decidir, e sem alvo marcado nenhum
+     * card de ataque continua mostrando só o resultado, como hoje. Ausente = sistema sem essa
+     * regra: o card lista os alvos sem "Acertou/Errou".
+     */
+    attackHit: FormulaSchema.optional(),
+    /**
+     * "Acerta sempre" (T20: 20 natural). Um lado usa só {natural} (resultado natural do d20, sem
+     * bônus); o outro, uma constante. Avaliada ANTES de `attackHit` — decide o card sem olhar a
+     * Defesa do alvo nenhuma. Ausente = sistema sem a regra.
+     */
+    attackAutoHit: FormulaSchema.optional(),
+    /** "Erra sempre" (T20: 1 natural). Mesma gramática de `attackAutoHit`. */
+    attackAutoMiss: FormulaSchema.optional(),
   }),
   /** Regras do modo de combate (iniciativa, desempate, surpresa). Ver docs/plano-combate.md. */
   combat: z.object({
@@ -662,6 +679,58 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
   check(def.rolls.attributeCheck, "rolls.attributeCheck", CONTEXTUAL.attributeCheck ?? []);
   check(def.rolls.skillCheck, "rolls.skillCheck", CONTEXTUAL.skillCheck ?? []);
   if (def.rolls.attack) check(def.rolls.attack, "rolls.attack", CONTEXTUAL.attack ?? []);
+
+  // Sistema de alvos (docs/plano-alvos.md): fórmulas de "acerto", não fórmulas de dado — cada uma
+  // precisa de exatamente um operador de comparação; placeholders contextuais próprios ({natural},
+  // {target.<caminho>}) em vez dos globais de `check()`. A divisão em lados repete
+  // `rules/targets.ts#parseHitRule` (mesma gramática) em vez de importar de lá: `rules/compute.ts`
+  // (via `rules/progression.ts`) importa de `schemas/character.ts`, que importa `KeySchema` DESTE
+  // arquivo — um import de `rules/targets.ts` aqui fecharia um ciclo (this file -> rules/targets.ts
+  // -> rules/compute.ts -> rules/progression.ts -> schemas/character.ts -> this file de novo),
+  // deixando `KeySchema` `undefined` no meio da inicialização do módulo.
+  const HIT_OPERATORS = ["==", ">=", "<=", ">", "<"] as const;
+  const splitHitRuleOrFail = (formula: string, where: string): { left: string; right: string } => {
+    for (const op of HIT_OPERATORS) {
+      const idx = formula.indexOf(op);
+      if (idx === -1) continue;
+      const left = formula.slice(0, idx).trim();
+      const right = formula.slice(idx + op.length).trim();
+      if (!left || !right) continue;
+      if (HIT_OPERATORS.some((other) => left.includes(other) || right.includes(other))) {
+        fail(def, `${where}: fórmula de acerto precisa de exatamente um operador de comparação (==, >=, <=, >, <)`);
+      }
+      return { left, right };
+    }
+    fail(def, `${where}: fórmula de acerto precisa de um operador de comparação (==, >=, <=, >, <)`);
+  };
+  const checkHitFormula = (formula: string, where: string, allowedContextual: string[], allowTarget: boolean) => {
+    const rule = splitHitRuleOrFail(formula, where);
+    for (const side of [rule.left, rule.right]) {
+      for (const path of collectPlaceholders(side)) {
+        if (allowedContextual.includes(path)) continue;
+        if (path.startsWith("target.")) {
+          if (!allowTarget) fail(def, `${where}: placeholder {${path}} não é reconhecido (só {natural} vale aqui)`);
+          const parts = path.slice("target.".length).split(".");
+          const [kind, key] = parts;
+          const ok =
+            parts.length === 2 &&
+            key !== undefined &&
+            ((kind === "attr" && attrKeys.has(key)) ||
+              (kind === "skill" && skillKeys.has(key.split(":")[0] ?? "")) ||
+              (kind === "derived" && derivedSoFar.has(key)) ||
+              (kind === "equip" && equipKeys.has(key)) ||
+              (kind === "resource" && resourceKeys.has(key)));
+          if (!ok) fail(def, `${where}: placeholder {${path}} não é reconhecido`);
+          continue;
+        }
+        fail(def, `${where}: placeholder {${path}} não é reconhecido`);
+      }
+    }
+  };
+  if (def.rolls.attackAutoHit) checkHitFormula(def.rolls.attackAutoHit, "rolls.attackAutoHit", ["natural"], false);
+  if (def.rolls.attackAutoMiss) checkHitFormula(def.rolls.attackAutoMiss, "rolls.attackAutoMiss", ["natural"], false);
+  if (def.rolls.attackHit) checkHitFormula(def.rolls.attackHit, "rolls.attackHit", ["total"], true);
+
   check(def.combat.initiative, "combat.initiative", CONTEXTUAL.combatInitiative ?? []);
   check(def.combat.initiativeNoSheet, "combat.initiativeNoSheet", CONTEXTUAL.combatInitiativeNoSheet ?? []);
   check(def.combat.tiebreakBonus, "combat.tiebreakBonus", CONTEXTUAL.combatTiebreakBonus ?? []);

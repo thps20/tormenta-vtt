@@ -18,3 +18,4 @@ export * from "./placement.js";
 export * from "./damageResponse.js";
 export * from "./scenes.js";
 export * from "./templates.js";
+export * from "./targets.js";

@@ -53,6 +53,33 @@ export const AppliedDamageSchema = z.object({
 });
 export type AppliedDamage = z.infer<typeof AppliedDamageSchema>;
 
+/**
+ * Um alvo de uma rolagem de ataque/dano (docs/plano-alvos.md). `hit`/`reason` são calculados no
+ * SERVIDOR na hora da rolagem (a partir de `rolls.attackHit`/`attackAutoHit`/`attackAutoMiss` do
+ * sistema) e ficam congelados no card — mudar a Defesa do alvo depois não reescreve o chat.
+ *   hit: null      sem regra de acerto no sistema, ou não deu pra avaliar (alvo sem ficha) — o
+ *                  card só lista o nome, sem "Acertou/Errou".
+ *   reason:
+ *     "auto-hit"   attackAutoHit decidiu (T20: 20 natural) — card mostra "(N natural)", sem número do alvo.
+ *     "auto-miss"  attackAutoMiss decidiu (T20: 1 natural) — idem.
+ *     "compare"    attackHit decidiu pela comparação normal — `targetValue` é o stat do alvo usado.
+ *     "no-rule"    nenhuma regra decidiu (mesmo caso de `hit: null`).
+ */
+export const RollTargetSchema = z.object({
+  tokenId: IdSchema,
+  /** Nome do token no momento da rolagem (sobrevive a renomear/apagar o token). */
+  name: z.string().max(64),
+  hit: z.boolean().nullable(),
+  /**
+   * Valor do stat do alvo usado na comparação (ex.: a Defesa). Ausente quando não há regra, ou
+   * quando o viewer não pode ver esse número (jogador que não é GM nem dono do token alvo, ver
+   * services/chatVisibility.ts#rollTargetsForViewer no servidor).
+   */
+  targetValue: z.number().int().optional(),
+  reason: z.enum(["auto-hit", "auto-miss", "compare", "no-rule"]).default("no-rule"),
+});
+export type RollTarget = z.infer<typeof RollTargetSchema>;
+
 export const DiceRollSchema = z.object({
   id: IdSchema,
   roomId: IdSchema,
@@ -79,6 +106,14 @@ export const DiceRollSchema = z.object({
   damage: z.array(DamageRollComponentSchema).optional(),
   /** Dano/cura já aplicado em tokens a partir deste card (token:apply-damage). */
   applied: z.array(AppliedDamageSchema).default([]),
+  /**
+   * Resultado natural do d20 (docs/plano-alvos.md), só em rolagens de ATAQUE (`type: "attack"` da
+   * ação) — usado por `rolls.attackAutoHit`/`attackAutoMiss` e pelo card pra mostrar "(20 natural)"/
+   * "(1 natural)". `null` = rolagem sem alvo, ou não é ataque.
+   */
+  natural: z.number().int().nullable().default(null),
+  /** Alvos marcados pelo autor no momento da rolagem (vazio = sem alvo, card como sempre). */
+  targets: z.array(RollTargetSchema).default([]),
   createdAt: z.string().datetime(),
 });
 export type DiceRoll = z.infer<typeof DiceRollSchema>;

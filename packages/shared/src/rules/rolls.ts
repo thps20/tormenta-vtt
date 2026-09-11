@@ -23,6 +23,11 @@ export interface BuiltRoll {
    * junção; o servidor rola cada parcela em separado para o chat mostrar o total por tipo.
    */
   damage?: DamageComponent[];
+  /**
+   * true = ação de ataque (docs/plano-alvos.md): o servidor calcula `roll.targets[]` a partir de
+   * `rolls.attackHit`/`attackAutoHit`/`attackAutoMiss` quando a rolagem tem alvos marcados.
+   */
+  isAttack?: true;
 }
 
 export class RollBuildError extends Error {
@@ -131,7 +136,7 @@ export function buildCharacterRoll(def: SystemDefinition, character: Character |
             const bonus = sumModifiers(mods, (t) => t.kind === "attack" && (t.skill === null || t.skill === action.skill));
             const base = substitutePlaceholders(def.rolls.attack ?? def.rolls.skillCheck, (p) => (p === "skill" ? total : resolveGlobal(p)));
             const enhanced = applyAttackEnhancements(joinParts(base, [action.bonus, bonus]), selected);
-            return { formula: enhanced.formula, label, critThreshold: action.critRange, breakdown: enhanced.breakdown };
+            return { formula: enhanced.formula, label, critThreshold: action.critRange, breakdown: enhanced.breakdown, isAttack: true };
           }
           case "damage": {
             const attrKey = action.attribute === "auto" ? autoDamageAttribute(def, item) : action.attribute;

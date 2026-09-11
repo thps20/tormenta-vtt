@@ -171,6 +171,17 @@ export const TokenApplyDamageSchema = z.object({
 });
 export type TokenApplyDamagePayload = z.infer<typeof TokenApplyDamageSchema>;
 
+// --- Alvos (efêmeros, docs/plano-alvos.md) ----------------------------------
+
+/**
+ * Lista COMPLETA dos alvos de quem chamou nesta cena (não "adiciona/remove"): dois cliques
+ * rápidos não se atropelam, mesmo raciocínio de `fog:update`. Jogador só marca tokens que vê, e
+ * só no mapa ATIVO da sala (mesma regra de `template:upsert`); ids fora disso são descartados em
+ * silêncio pelo servidor, sem erro — o ack devolve a lista que valeu.
+ */
+export const TargetSetSchema = z.object({ sceneId: IdSchema, tokenIds: z.array(IdSchema).max(50) });
+export type TargetSetPayload = z.infer<typeof TargetSetSchema>;
+
 // --- Régua (efêmera) -------------------------------------------------------
 
 /** Ponto em pixels do mapa. */
@@ -214,6 +225,12 @@ export const CharacterRollSchema = z.object({
   roll: CharacterRollRequestSchema,
   /** Modo de rolagem escolhido pelo autor (ver RollVisibilitySchema). */
   visibility: RollVisibilitySchema.default("all"),
+  /**
+   * Alvos marcados pelo autor no momento da rolagem (docs/plano-alvos.md): só entra em
+   * `roll.targets[]` quando a ação é ataque ou tem `damage[]`; ids inválidos (token apagado, fora
+   * de vista) são descartados em silêncio no servidor, nunca rejeitam a rolagem.
+   */
+  targetTokenIds: z.array(IdSchema).max(50).default([]),
 });
 export type CharacterRollPayload = z.infer<typeof CharacterRollSchema>;
 

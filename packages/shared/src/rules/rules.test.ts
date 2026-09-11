@@ -204,6 +204,7 @@ describe("buildCharacterRoll", () => {
       label: "Espada longa: Ataque",
       critThreshold: 20,
       breakdown: null,
+      isAttack: true,
     });
     expect(buildCharacterRoll(def, data, { type: "action", itemId: "bow", actionId: "atk" })).toMatchObject({
       formula: "1d20 + 4",

@@ -64,6 +64,7 @@ import type {
   SceneSetArrivalPayload,
   SceneSetMapPayload,
   SceneUpdateGridPayload,
+  TargetSetPayload,
   Template,
   TemplateRemovePayload,
   TemplateUpsertPayload,
@@ -101,6 +102,13 @@ export interface RoomSnapshot {
   /** Trava de orçamento de deslocamento (docs/plano-movimento.md), por SALA — em memória, não vai
    *  ao banco. `true` = ninguém excede o orçamento sem confirmação do GM (padrão). */
   movementLimitEnabled: boolean;
+  /**
+   * Alvos marcados (docs/plano-alvos.md), por participante — efêmeros, em memória, já filtrados
+   * pra quem recebe (alvos do GM nunca vão a jogadores; jogador só vê os alvos dos outros
+   * jogadores em tokens que ele próprio pode ver). `sceneId` é o mapa onde os `tokenIds` foram
+   * marcados — pode não ser mais o mapa que o viewer está vendo agora.
+   */
+  targets: { participantId: string; sceneId: string; tokenIds: string[] }[];
 }
 
 /**
@@ -180,6 +188,11 @@ export interface ClientToServerEvents {
    * normal também sai em token:updated/character:updated + chat:message).
    */
   "token:apply-damage": (payload: TokenApplyDamagePayload, ack: Ack<ChatMessage>) => void;
+
+  // Alvos (efêmeros, docs/plano-alvos.md): quem mira quem. Lista completa (não adiciona/remove).
+  /** GM: qualquer mapa vivo da sala. Jogador: só o mapa ATIVO, só tokens que vê — o servidor
+   *  descarta o resto em silêncio e o ack devolve a lista que valeu. */
+  "target:set": (payload: TargetSetPayload, ack: Ack<{ tokenIds: string[] }>) => void;
 
   // Ficha de personagem
   /** Jogador cria só para si (ownerId = ele, kind = pc); GM cria qualquer uma. */
@@ -315,6 +328,10 @@ export interface ServerToClientEvents {
   "token:created": (token: Token) => void;
   "token:updated": (token: Token) => void;
   "token:deleted": (p: { tokenId: string }) => void;
+
+  /** Alvos de UM participante mudaram (docs/plano-alvos.md) — o cliente substitui a lista dele.
+   *  Jogador nunca recebe isto pro GM (alvos do GM nunca vão a jogadores). */
+  "target:updated": (p: { participantId: string; sceneId: string; tokenIds: string[] }) => void;
 
   /** Mensagem nova ou revelada (mesmo id, visibility nova): o cliente faz upsert. */
   "chat:message": (msg: ChatMessage) => void;

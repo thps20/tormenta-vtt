@@ -183,6 +183,36 @@ describe("validateSystemDefinition (integridade)", () => {
     const creatures = { ...(base.creatures as Record<string, unknown>), typeColors: { nope: "#ffffff" } };
     expect(() => validateSystemDefinition(withPatch({ creatures }))).toThrow(/typeColors.*"nope"/);
   });
+
+  // Sistema de alvos (docs/plano-alvos.md): rolls.attackHit/attackAutoHit/attackAutoMiss.
+  it("rejeita fórmula de acerto sem operador de comparação, ou com mais de um", () => {
+    const rolls = base.rolls as Record<string, unknown>;
+    expect(() => validateSystemDefinition(withPatch({ rolls: { ...rolls, attackHit: "{total} + {target.derived.defense}" } }))).toThrow(
+      /precisa de um operador de comparação/,
+    );
+    expect(() => validateSystemDefinition(withPatch({ rolls: { ...rolls, attackHit: "{total} >= {target.derived.defense} >= 0" } }))).toThrow(
+      /exatamente um operador de comparação/,
+    );
+  });
+
+  it("rejeita {target.*} apontando para algo que não existe no sistema", () => {
+    const rolls = base.rolls as Record<string, unknown>;
+    expect(() => validateSystemDefinition(withPatch({ rolls: { ...rolls, attackHit: "{total} >= {target.derived.nope}" } }))).toThrow(
+      /rolls.attackHit.*placeholder \{target\.derived\.nope\}/,
+    );
+    expect(() => validateSystemDefinition(withPatch({ rolls: { ...rolls, attackHit: "{total} >= {target.attr.nope}" } }))).toThrow(/placeholder/);
+  });
+
+  it("rejeita attackAutoHit/attackAutoMiss usando {total} ou {target.*} (só aceitam {natural})", () => {
+    const rolls = base.rolls as Record<string, unknown>;
+    expect(() => validateSystemDefinition(withPatch({ rolls: { ...rolls, attackAutoHit: "{total} == 20" } }))).toThrow(/attackAutoHit/);
+    expect(() => validateSystemDefinition(withPatch({ rolls: { ...rolls, attackAutoMiss: "{target.derived.defense} == 1" } }))).toThrow(/attackAutoMiss/);
+  });
+
+  it("aceita attackHit lendo o outro lado (target.* primeiro)", () => {
+    const rolls = base.rolls as Record<string, unknown>;
+    expect(() => validateSystemDefinition(withPatch({ rolls: { ...rolls, attackHit: "{target.derived.defense} <= {total}" } }))).not.toThrow();
+  });
 });
 
 describe("conditions[] (todas as definições de sistema)", () => {
