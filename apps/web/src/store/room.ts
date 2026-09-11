@@ -57,6 +57,9 @@ interface RoomState {
   /** Trava de orçamento de deslocamento da SALA (docs/plano-movimento.md §4.3): true = vale o
    *  orçamento; GM pode desligar ("ignorar limite") em `combat:set-movement-limit`. */
   movementLimitEnabled: boolean;
+  /** "Rolar iniciativa dos NPCs ao iniciar o combate" da SALA (SPEC §3.5), padrão ligada — GM
+   *  desliga em `combat:set-auto-roll-npc-initiative`. */
+  autoRollNpcInitiativeEnabled: boolean;
 
   join: (params: JoinParams) => Promise<void>;
   leave: () => void;
@@ -95,6 +98,8 @@ interface RoomState {
   fogOp: (op: FogOp) => Promise<boolean>;
   /** `combat:movementLimitChanged` (broadcast) e o retorno do próprio `combat:set-movement-limit`. */
   setMovementLimitEnabled: (enabled: boolean) => void;
+  /** `combat:autoRollNpcInitiativeChanged` (broadcast) e o retorno de `combat:set-auto-roll-npc-initiative`. */
+  setAutoRollNpcInitiativeEnabled: (enabled: boolean) => void;
 }
 
 export const useRoom = create<RoomState>((set, get) => ({
@@ -106,6 +111,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   viewingSceneId: null,
   lastJoin: null,
   movementLimitEnabled: true,
+  autoRollNpcInitiativeEnabled: true,
 
   join: async (params) => {
     const socket = getSocket();
@@ -146,7 +152,17 @@ export const useRoom = create<RoomState>((set, get) => ({
   },
 
   leave: () => {
-    set({ status: { kind: "idle" }, room: null, me: null, participants: [], scenes: [], viewingSceneId: null, lastJoin: null, movementLimitEnabled: true });
+    set({
+      status: { kind: "idle" },
+      room: null,
+      me: null,
+      participants: [],
+      scenes: [],
+      viewingSceneId: null,
+      lastJoin: null,
+      movementLimitEnabled: true,
+      autoRollNpcInitiativeEnabled: true,
+    });
     useTokens.getState().setAll([]);
     useChat.getState().setAll([]);
     useCombat.getState().setSnapshot(null, null);
@@ -165,7 +181,14 @@ export const useRoom = create<RoomState>((set, get) => ({
   },
 
   applySnapshot: (snap) => {
-    set({ room: snap.room, me: snap.me, participants: snap.participants, scenes: snap.scenes, movementLimitEnabled: snap.movementLimitEnabled });
+    set({
+      room: snap.room,
+      me: snap.me,
+      participants: snap.participants,
+      scenes: snap.scenes,
+      movementLimitEnabled: snap.movementLimitEnabled,
+      autoRollNpcInitiativeEnabled: snap.autoRollNpcInitiativeEnabled,
+    });
     useTokens.getState().setAll(snap.tokens);
     useChat.getState().setAll(snap.chat);
     useCombat.getState().setSnapshot(snap.room.activeSceneId, snap.combat);
@@ -359,6 +382,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   },
 
   setMovementLimitEnabled: (enabled) => set({ movementLimitEnabled: enabled }),
+  setAutoRollNpcInitiativeEnabled: (enabled) => set({ autoRollNpcInitiativeEnabled: enabled }),
 }));
 
 /** Mapa ATIVO da sala (derivado). Use para a faixa de aviso e o painel "Mapas". */

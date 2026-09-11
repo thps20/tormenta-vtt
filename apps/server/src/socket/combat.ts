@@ -1,3 +1,4 @@
+import type { Participant as DbParticipant } from "@prisma/client";
 import {
   CombatAddSchema,
   CombatDelaySchema,
@@ -7,6 +8,7 @@ import {
   CombatResumeSchema,
   CombatRollSchema,
   CombatSceneSchema,
+  CombatSetAutoRollNpcInitiativeSchema,
   CombatSetInitiativeSchema,
   CombatSetMovementLimitSchema,
   CombatSetMovementSchema,
@@ -18,6 +20,8 @@ import {
   startTurns,
   stateAfterRemoval,
   type Combat,
+  type RollVisibility,
+  type SystemDefinition,
 } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import {
@@ -36,12 +40,67 @@ import {
   type Viewer,
 } from "../services/combat.js";
 import { requireSystem } from "../services/characters.js";
+import { isAutoRollNpcInitiativeEnabled, setAutoRollNpcInitiativeEnabled } from "../services/autoRollNpcInitiative.js";
 import { resolveBudget, startTurnMovement, startTurnMovementIfChanged } from "../services/movement.js";
 import { isMovementLimitEnabled, setMovementLimitEnabled } from "../services/movementLimit.js";
 import { createInitiativeBatchRoll, createRollMessage } from "../services/rolls.js";
 import { guarded, HandlerError } from "./ack.js";
 import { requireScene } from "./scene.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
+
+/** Participante do banco, GM que chamou combat:start/add/roll — precisa pra `createRollMessage`/`createInitiativeBatchRoll` (autor do card). */
+async function requireParticipant(participantId: string): Promise<DbParticipant> {
+  const me = await prisma.participant.findUnique({ where: { id: participantId } });
+  if (!me) throw new HandlerError("Participante não encontrado");
+  return me;
+}
+
+/**
+ * Rola iniciativa de `targets` no servidor: um card em lote (`InitiativeBatch`) se houver mais de
+ * um combatente, um card normal de rolagem se só um — mesma escolha de `combat:roll` (§3.5). Grava
+ * `Combatant.initiative`/`lastRollVisibility` de cada um. Extraído pra ser reaproveitado pela
+ * rolagem automática de NPCs (`combat:start`/`combat:add` com a opção da sala ligada) além do
+ * próprio `combat:roll`; não-op com lista vazia.
+ */
+async function rollCombatantsInitiative(
+  io: TypedServer,
+  roomId: string,
+  me: DbParticipant,
+  def: SystemDefinition,
+  round: number,
+  targets: CombatantRow[],
+  visibility: RollVisibility,
+): Promise<void> {
+  if (targets.length === 0) return;
+  if (targets.length > 1) {
+    const built = await Promise.all(targets.map((row) => buildCombatantInitiativeRoll(def, row)));
+    const { results } = await createInitiativeBatchRoll(io, roomId, me, {
+      round,
+      visibility,
+      entries: targets.map((row, i) => ({ combatantId: row.id, tokenId: row.tokenId, name: row.token.name, formula: built[i]!.formula })),
+    });
+    // lastRollVisibility: "gm" (rolagem às cegas) esconde o valor até do próprio dono na lista
+    // (toCombat) — mesma regra do chat: quem rolou não vê o próprio resultado.
+    await Promise.all(
+      targets.map((row) =>
+        prisma.combatant.update({ where: { id: row.id }, data: { initiative: results.get(row.id)!, lastRollVisibility: visibility } }),
+      ),
+    );
+  } else {
+    for (const row of targets) {
+      const built = await buildCombatantInitiativeRoll(def, row);
+      const { total } = await createRollMessage(io, roomId, me, {
+        formula: built.formula,
+        label: built.label,
+        visibility,
+        characterId: built.characterId,
+        tokenId: row.tokenId,
+        allowNoDice: true,
+      });
+      await prisma.combatant.update({ where: { id: row.id }, data: { initiative: total, lastRollVisibility: visibility } });
+    }
+  }
+}
 
 function viewerOf(ctx: { role: "gm" | "player"; participantId: string }): Viewer {
   return { role: ctx.role, participantId: ctx.participantId };
@@ -69,7 +128,7 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
     guarded(
       socket,
       CombatStartSchema,
-      async ({ sceneId, tokenIds: rawTokenIds }, ctx) => {
+      async ({ sceneId, tokenIds: rawTokenIds, visibility }, ctx) => {
         await requireScene(sceneId, ctx.roomId);
         // Dedup: `IN` no banco não repete linha pra id repetido, então comparar por tamanho cru rejeitaria à toa.
         const tokenIds = [...new Set(rawTokenIds)];
@@ -89,6 +148,19 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
           });
         }
 
+        // "Rolar iniciativa dos NPCs ao iniciar o combate" (SPEC §3.5, opção da sala — padrão
+        // ligada): rola sozinho, num card em lote, os combatentes sem dono; jogadores continuam
+        // rolando a própria pelo botão de sempre. `visibility` = modo de rolagem de quem chamou
+        // (o GM — ausente = "all"), mesmo campo que combat:roll usa.
+        if (isAutoRollNpcInitiativeEnabled(ctx.roomId)) {
+          const fresh = await requireCombat(sceneId, ctx.roomId);
+          const npcs = fresh.combatants.filter((c) => c.token.ownerId === null && c.initiative === null);
+          if (npcs.length > 0) {
+            const me = await requireParticipant(ctx.participantId);
+            await rollCombatantsInitiative(io, ctx.roomId, me, def, fresh.round, npcs, visibility ?? "all");
+          }
+        }
+
         return sendCombat(io, ctx.roomId, sceneId, viewerOf(ctx));
       },
       { gmOnly: true },
@@ -100,7 +172,7 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
     guarded(
       socket,
       CombatAddSchema,
-      async ({ sceneId, tokenIds }, ctx) => {
+      async ({ sceneId, tokenIds, visibility }, ctx) => {
         const combat = await requireCombat(sceneId, ctx.roomId);
         const already = new Set(combat.combatants.map((c) => c.tokenId));
         // Dedup por Set: mesmo motivo do combat:start (IN no banco não repete linha).
@@ -118,6 +190,17 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
             data: { combatId: combat.id, tokenId: token.id, characterId: token.characterId, bonus, order: order++, addedRound: combat.round },
           });
         }
+
+        // Mesma rolagem automática de NPCs de combat:start (SPEC §3.5) — só entre os reforços recém-criados.
+        if (isAutoRollNpcInitiativeEnabled(ctx.roomId)) {
+          const fresh = await requireCombat(sceneId, ctx.roomId);
+          const npcs = fresh.combatants.filter((c) => newIds.includes(c.tokenId) && c.token.ownerId === null);
+          if (npcs.length > 0) {
+            const me = await requireParticipant(ctx.participantId);
+            await rollCombatantsInitiative(io, ctx.roomId, me, def, fresh.round, npcs, visibility ?? "all");
+          }
+        }
+
         return sendCombat(io, ctx.roomId, sceneId, viewerOf(ctx));
       },
       { gmOnly: true },
@@ -151,8 +234,7 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
       await requirePlayerOnActiveScene(ctx.roomId, sceneId, ctx.role);
       const combat = await requireCombat(sceneId, ctx.roomId);
       const def = await requireSystem(ctx.roomId);
-      const me = await prisma.participant.findUnique({ where: { id: ctx.participantId } });
-      if (!me) throw new HandlerError("Participante não encontrado");
+      const me = await requireParticipant(ctx.participantId);
 
       if ((scope === "npcs" || scope === "missing") && ctx.role !== "gm") throw new HandlerError("Apenas o GM pode fazer isso");
 
@@ -179,38 +261,9 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
           break;
       }
 
-      const rollVisibility = visibility ?? "all";
-
       // Mais de um combatente de uma vez: um card só (initiative-batch), não um por combatente
       // (§3.5). Um combatente só (o caso comum de scope self/one) continua como card individual.
-      if (targets.length > 1) {
-        const built = await Promise.all(targets.map((row) => buildCombatantInitiativeRoll(def, row)));
-        const { results } = await createInitiativeBatchRoll(io, ctx.roomId, me, {
-          round: combat.round,
-          visibility: rollVisibility,
-          entries: targets.map((row, i) => ({ combatantId: row.id, tokenId: row.tokenId, name: row.token.name, formula: built[i]!.formula })),
-        });
-        // lastRollVisibility: "gm" (rolagem às cegas) esconde o valor até do próprio dono na lista
-        // (toCombat) — mesma regra do chat: quem rolou não vê o próprio resultado.
-        await Promise.all(
-          targets.map((row) =>
-            prisma.combatant.update({ where: { id: row.id }, data: { initiative: results.get(row.id)!, lastRollVisibility: rollVisibility } }),
-          ),
-        );
-      } else {
-        for (const row of targets) {
-          const built = await buildCombatantInitiativeRoll(def, row);
-          const { total } = await createRollMessage(io, ctx.roomId, me, {
-            formula: built.formula,
-            label: built.label,
-            visibility: rollVisibility,
-            characterId: built.characterId,
-            tokenId: row.tokenId,
-            allowNoDice: true,
-          });
-          await prisma.combatant.update({ where: { id: row.id }, data: { initiative: total, lastRollVisibility: rollVisibility } });
-        }
-      }
+      await rollCombatantsInitiative(io, ctx.roomId, me, def, combat.round, targets, visibility ?? "all");
 
       return sendCombat(io, ctx.roomId, sceneId, viewerOf(ctx));
     }),
@@ -438,6 +491,20 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
       async ({ enabled }, ctx) => {
         setMovementLimitEnabled(ctx.roomId, enabled);
         io.to(rooms.all(ctx.roomId)).emit("combat:movementLimitChanged", { enabled });
+        return { enabled };
+      },
+      { gmOnly: true },
+    ),
+  );
+
+  socket.on(
+    "combat:set-auto-roll-npc-initiative",
+    guarded(
+      socket,
+      CombatSetAutoRollNpcInitiativeSchema,
+      async ({ enabled }, ctx) => {
+        setAutoRollNpcInitiativeEnabled(ctx.roomId, enabled);
+        io.to(rooms.all(ctx.roomId)).emit("combat:autoRollNpcInitiativeChanged", { enabled });
         return { enabled };
       },
       { gmOnly: true },

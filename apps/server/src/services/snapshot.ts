@@ -11,6 +11,7 @@ import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, rollTargetsF
 import { listTemplates } from "./templates.js";
 import { handoutPinVisibleTo, toHandoutPin } from "./handouts.js";
 import { isMovementLimitEnabled } from "./movementLimit.js";
+import { isAutoRollNpcInitiativeEnabled } from "./autoRollNpcInitiative.js";
 import { partyFor, partyOf } from "./party.js";
 import { listTargets } from "./targets.js";
 
@@ -114,6 +115,7 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     // PC, em vez de repetir a consulta (ver pcIdsOf, mesma regra, usada pelos eventos party:*).
     party: partyFor(partyOf(room), new Set(characters.filter((c) => c.kind === "pc").map((c) => c.id)), viewer.role),
     movementLimitEnabled: isMovementLimitEnabled(room.id),
+    autoRollNpcInitiativeEnabled: isAutoRollNpcInitiativeEnabled(room.id),
     targets,
   };
 }

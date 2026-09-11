@@ -269,15 +269,22 @@ export const EmptySchema = z.object({}).strict();
 const TokenIdListSchema = z.array(IdSchema).min(1).max(100);
 
 /** GM seleciona tokens e inicia o combate no mapa indicado. Substitui um combate anterior dele, se houver. */
-export const CombatStartSchema = z.object({ sceneId: IdSchema, tokenIds: TokenIdListSchema });
+/**
+ * `visibility` só importa quando "Rolar iniciativa dos NPCs ao iniciar o combate" está ligada na
+ * sala (`combat:set-auto-roll-npc-initiative`, padrão ligada): é o modo de rolagem de quem chamou
+ * (o GM — ausente = "all"), usado na rolagem automática dos combatentes sem dono. Sem efeito quando
+ * a opção está desligada, ou quando nenhum combatente entrando é NPC.
+ */
+export const CombatStartSchema = z.object({ sceneId: IdSchema, tokenIds: TokenIdListSchema, visibility: RollVisibilitySchema.optional() });
 export type CombatStartPayload = z.infer<typeof CombatStartSchema>;
 
 /** `combat:next`/`combat:prev`: payload é só o mapa (não há mais "a cena ativa da sala"). */
 export const CombatSceneSchema = z.object({ sceneId: IdSchema });
 export type CombatScenePayload = z.infer<typeof CombatSceneSchema>;
 
-/** Reforços: entram sem iniciativa, no fim da ordem. Token já no combate é ignorado. */
-export const CombatAddSchema = z.object({ sceneId: IdSchema, tokenIds: TokenIdListSchema });
+/** Reforços: entram sem iniciativa, no fim da ordem. Token já no combate é ignorado. `visibility`:
+ *  mesma regra de `CombatStartSchema` acima (rolagem automática dos NPCs que entraram, se ligada). */
+export const CombatAddSchema = z.object({ sceneId: IdSchema, tokenIds: TokenIdListSchema, visibility: RollVisibilitySchema.optional() });
 export type CombatAddPayload = z.infer<typeof CombatAddSchema>;
 
 export const CombatRemoveSchema = z.object({ sceneId: IdSchema, combatantIds: z.array(IdSchema).min(1).max(100) });
@@ -342,6 +349,15 @@ export type CombatSetMovementPayload = z.infer<typeof CombatSetMovementSchema>;
 /** Liga/desliga a trava de orçamento de deslocamento NA SALA (memória, não vai ao banco — GM only). */
 export const CombatSetMovementLimitSchema = z.object({ enabled: z.boolean() });
 export type CombatSetMovementLimitPayload = z.infer<typeof CombatSetMovementLimitSchema>;
+
+/**
+ * Liga/desliga "Rolar iniciativa dos NPCs ao iniciar o combate" NA SALA (memória, não vai ao banco
+ * — mesmo padrão de `CombatSetMovementLimitSchema` acima — GM only). Ligada (padrão): `combat:start`
+ * e `combat:add` rolam sozinhos, num card em lote, os combatentes sem dono que entraram sem
+ * iniciativa; jogadores continuam rolando a própria pelo botão de sempre.
+ */
+export const CombatSetAutoRollNpcInitiativeSchema = z.object({ enabled: z.boolean() });
+export type CombatSetAutoRollNpcInitiativePayload = z.infer<typeof CombatSetAutoRollNpcInitiativeSchema>;
 
 // --- Compêndio: soltar criatura no mapa (docs/plano-criaturas.md) ----------
 

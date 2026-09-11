@@ -311,21 +311,25 @@ function Table() {
   const combatEnd = useCombat((s) => s.end);
   const combatSetMovement = useCombat((s) => s.setMovement);
   const combatSetMovementLimit = useCombat((s) => s.setMovementLimit);
+  const combatSetAutoRollNpcInitiative = useCombat((s) => s.setAutoRollNpcInitiative);
   const movementLimitEnabled = useRoom((s) => s.movementLimitEnabled);
+  const autoRollNpcInitiativeEnabled = useRoom((s) => s.autoRollNpcInitiativeEnabled);
   // Callbacks do CombatPanel: cada um reempacota os argumentos "soltos" da UI no payload
   // que o evento combat:* espera (agora sempre com o sceneId do mapa VISITADO) e chama a ação
   // correspondente da store (server = fonte da verdade, sem otimismo — ver store/combat.ts).
   const viewedSceneId = scene?.id ?? null;
   const combatCallbacks: CombatPanelCallbacks = useMemo(
     () => ({
-      onStart: (sceneId, tokenIds) => void combatStart({ sceneId, tokenIds }),
+      // visibility: modo de rolagem ATUAL do GM (useChat.rollMode) — só importa pra rolagem
+      // automática de NPCs (§3.5); lido na hora do clique, não precisa entrar nas deps do useMemo.
+      onStart: (sceneId, tokenIds) => void combatStart({ sceneId, tokenIds, visibility: useChat.getState().rollMode }),
       onRoll: (scope, combatantId, visibility) => viewedSceneId && void combatRoll({ sceneId: viewedSceneId, scope, combatantId, visibility }),
       onSetInitiative: (combatantId, initiative, bonus) =>
         viewedSceneId && void combatSetInitiative({ sceneId: viewedSceneId, combatantId, initiative, bonus }),
       onNext: () => viewedSceneId && void combatNext(viewedSceneId),
       onPrev: () => viewedSceneId && void combatPrev(viewedSceneId),
       onReorder: (combatantIds) => viewedSceneId && void combatReorder(viewedSceneId, combatantIds),
-      onAdd: (tokenIds) => viewedSceneId && void combatAddCombatants({ sceneId: viewedSceneId, tokenIds }),
+      onAdd: (tokenIds) => viewedSceneId && void combatAddCombatants({ sceneId: viewedSceneId, tokenIds, visibility: useChat.getState().rollMode }),
       onRemove: (combatantIds) => viewedSceneId && void combatRemove(viewedSceneId, combatantIds),
       onDelay: (combatantId) => viewedSceneId && void combatDelay(viewedSceneId, combatantId),
       onResume: (combatantId) => viewedSceneId && void combatResume(viewedSceneId, combatantId),
@@ -336,6 +340,7 @@ function Table() {
       onEnd: (clear) => viewedSceneId && void combatEnd(viewedSceneId, clear),
       onSetMovement: (combatantId, patch) => viewedSceneId && void combatSetMovement({ sceneId: viewedSceneId, combatantId, ...patch }),
       onToggleMovementLimit: () => void combatSetMovementLimit({ enabled: !movementLimitEnabled }),
+      onToggleAutoRollNpcInitiative: () => void combatSetAutoRollNpcInitiative({ enabled: !autoRollNpcInitiativeEnabled }),
     }),
     [
       viewedSceneId,
@@ -354,6 +359,8 @@ function Table() {
       combatSetMovement,
       combatSetMovementLimit,
       movementLimitEnabled,
+      combatSetAutoRollNpcInitiative,
+      autoRollNpcInitiativeEnabled,
     ],
   );
   const [centerOnActiveTurn, setCenterOnActiveTurn] = useState<boolean>(() => {
@@ -855,6 +862,7 @@ function Table() {
           selectedIds={selectedIds}
           combatCallbacks={combatCallbacks}
           movementLimitEnabled={movementLimitEnabled}
+          autoRollNpcInitiativeEnabled={autoRollNpcInitiativeEnabled}
           centerOnActiveTurn={centerOnActiveTurn}
           onToggleCenterOnActiveTurn={() => setCenterOnActiveTurn((v) => !v)}
           myTargetTokenIds={myTargetIds}

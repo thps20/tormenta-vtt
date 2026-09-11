@@ -21,6 +21,8 @@ interface SidePanelProps {
   combatCallbacks: CombatPanelCallbacks;
   /** Trava de deslocamento da SALA (docs/plano-movimento.md §4.3), pro CombatPanel mostrar o interruptor do GM. */
   movementLimitEnabled: boolean;
+  /** "Rolar iniciativa dos NPCs ao iniciar o combate" (§3.5), pro CombatPanel mostrar o interruptor do GM. */
+  autoRollNpcInitiativeEnabled: boolean;
   centerOnActiveTurn: boolean;
   onToggleCenterOnActiveTurn: () => void;
   /** Sistema de alvos (docs/plano-alvos.md), pro CombatPanel: ícone de mira + as duas preferências. */
@@ -86,6 +88,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   selectedIds,
   combatCallbacks,
   movementLimitEnabled,
+  autoRollNpcInitiativeEnabled,
   centerOnActiveTurn,
   onToggleCenterOnActiveTurn,
   myTargetTokenIds,
@@ -230,6 +233,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             tokens={tokens}
             conditions={conditions}
             movementLimitEnabled={movementLimitEnabled}
+            autoRollNpcInitiativeEnabled={autoRollNpcInitiativeEnabled}
             selectedTokenIds={selectedIds}
             onSelectToken={onSelectToken}
             selectedTokenId={selectedTokenId}

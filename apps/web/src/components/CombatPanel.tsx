@@ -54,6 +54,8 @@ export interface CombatPanelCallbacks {
   onSetMovement: (combatantId: string, patch: { budget?: number | null; used?: number }) => void;
   /** Liga/desliga a trava de deslocamento NA SALA ("ignorar limite"). */
   onToggleMovementLimit: () => void;
+  /** Liga/desliga "Rolar iniciativa dos NPCs ao iniciar o combate" NA SALA (§3.5). */
+  onToggleAutoRollNpcInitiative: () => void;
 }
 
 interface CombatPanelProps extends Partial<CombatPanelCallbacks> {
@@ -74,6 +76,8 @@ interface CombatPanelProps extends Partial<CombatPanelCallbacks> {
   conditions: ConditionDef[];
   /** Trava de deslocamento da SALA (docs/plano-movimento.md §4.3) — todos veem o estado; só o GM muda. */
   movementLimitEnabled: boolean;
+  /** "Rolar iniciativa dos NPCs ao iniciar o combate" (§3.5) — todos veem o estado; só o GM muda. */
+  autoRollNpcInitiativeEnabled: boolean;
   /** Sistema de alvos (docs/plano-alvos.md): meus alvos (ícone de mira na linha do combatente),
    *  os ids que ALGUM outro participante mira (já filtrado pela opção — vazio quando desligada;
    *  sem nome de quem, só "alguém mira"), e as duas preferências por usuário. */
@@ -98,6 +102,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
   tokens,
   conditions,
   movementLimitEnabled,
+  autoRollNpcInitiativeEnabled,
   myTargetTokenIds,
   othersTargetTokenIds,
   showOtherTargets,
@@ -119,6 +124,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
   onEnd,
   onSetMovement,
   onToggleMovementLimit,
+  onToggleAutoRollNpcInitiative,
 }) => {
   // State for GM end combat dialog
   const [showEndOptions, setShowEndOptions] = useState(false);
@@ -395,6 +401,23 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
           <input type="checkbox" checked={clearTargetsOnTurnEnd} onChange={onToggleClearTargetsOnTurnEnd} className="cursor-pointer accent-[#d4af37]" />
           Limpar meus alvos ao fim do meu turno
         </label>
+
+        {/* "Rolar iniciativa dos NPCs ao iniciar o combate" (§3.5): opção da sala, só o GM vê/muda —
+         *  combat:start/combat:add rolam sozinhos, num card em lote, quem entra sem dono. */}
+        {viewer === 'gm' && (
+          <label
+            className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer select-none"
+            title="combat:start e combat:add rolam sozinhos a iniciativa dos combatentes sem dono"
+          >
+            <input
+              type="checkbox"
+              checked={autoRollNpcInitiativeEnabled}
+              onChange={onToggleAutoRollNpcInitiative}
+              className="cursor-pointer accent-[#d4af37]"
+            />
+            Rolar iniciativa dos NPCs ao iniciar o combate
+          </label>
+        )}
 
         {/* Trava de deslocamento (docs/plano-movimento.md §4.3): GM liga/desliga na sala; jogador
          *  só vê o estado. "Ignorar" = interruptor LIGADO quando movementLimitEnabled é false. */}

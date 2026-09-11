@@ -28,6 +28,7 @@ import type {
   CombatResumePayload,
   CombatRollPayload,
   CombatScenePayload,
+  CombatSetAutoRollNpcInitiativePayload,
   CombatSetInitiativePayload,
   CombatSetMovementLimitPayload,
   CombatSetMovementPayload,
@@ -119,6 +120,10 @@ export interface RoomSnapshot {
   /** Trava de orçamento de deslocamento (docs/plano-movimento.md), por SALA — em memória, não vai
    *  ao banco. `true` = ninguém excede o orçamento sem confirmação do GM (padrão). */
   movementLimitEnabled: boolean;
+  /** "Rolar iniciativa dos NPCs ao iniciar o combate" (§3.5), por SALA — em memória, mesmo padrão
+   *  de `movementLimitEnabled` acima. `true` (padrão) = combat:start/combat:add rolam sozinhos os
+   *  combatentes sem dono que entram sem iniciativa. */
+  autoRollNpcInitiativeEnabled: boolean;
   /**
    * Alvos marcados (docs/plano-alvos.md), por participante — efêmeros, em memória, já filtrados
    * pra quem recebe (alvos do GM nunca vão a jogadores; jogador só vê os alvos dos outros
@@ -337,6 +342,9 @@ export interface ClientToServerEvents {
   "combat:set-movement": (payload: CombatSetMovementPayload, ack: Ack<Combat | null>) => void;
   /** GM: liga/desliga a trava de deslocamento NA SALA (memória, broadcast `combat:movementLimitChanged`). */
   "combat:set-movement-limit": (payload: CombatSetMovementLimitPayload, ack: Ack<{ enabled: boolean }>) => void;
+  /** GM: liga/desliga "Rolar iniciativa dos NPCs ao iniciar o combate" NA SALA (memória, broadcast
+   *  `combat:autoRollNpcInitiativeChanged`). */
+  "combat:set-auto-roll-npc-initiative": (payload: CombatSetAutoRollNpcInitiativePayload, ack: Ack<{ enabled: boolean }>) => void;
 
   // Grupo (Visão de grupo, SPEC §9.15): lista de PCs gerenciada pelo Mestre, persistida em
   // Room.party. Todos gmOnly — o servidor devolve, no ack, a visão do GM (tudo, ocultas inclusive);
@@ -407,6 +415,10 @@ export interface ServerToClientEvents {
 
   /** `combat:set-movement-limit`: novo estado da trava de deslocamento da SALA, para todos. */
   "combat:movementLimitChanged": (p: { enabled: boolean }) => void;
+
+  /** `combat:set-auto-roll-npc-initiative`: novo estado de "Rolar iniciativa dos NPCs ao iniciar o
+   *  combate" da SALA, para todos. */
+  "combat:autoRollNpcInitiativeChanged": (p: { enabled: boolean }) => void;
 
   /** Régua de outro participante (o autor não recebe eco: já desenha a própria). ruler null = apagar. */
   "ruler:updated": (p: { participantId: string; nickname: string; sceneId: string; ruler: Ruler | null }) => void;

@@ -6,6 +6,7 @@ import {
   type Combatant,
   type CombatAddPayload,
   type CombatRollPayload,
+  type CombatSetAutoRollNpcInitiativePayload,
   type CombatSetInitiativePayload,
   type CombatSetMovementLimitPayload,
   type CombatSetMovementPayload,
@@ -50,6 +51,8 @@ interface CombatStoreState {
   setMovement: (payload: CombatSetMovementPayload) => Promise<boolean>;
   /** GM: liga/desliga a trava de deslocamento na sala. */
   setMovementLimit: (payload: CombatSetMovementLimitPayload) => Promise<boolean>;
+  /** GM: liga/desliga "Rolar iniciativa dos NPCs ao iniciar o combate" na sala. */
+  setAutoRollNpcInitiative: (payload: CombatSetAutoRollNpcInitiativePayload) => Promise<boolean>;
 }
 
 async function run<T>(p: Promise<{ ok: true; data: T } | { ok: false; error: string }>): Promise<boolean> {
@@ -76,6 +79,7 @@ export const useCombat = create<CombatStoreState>((set) => ({
   end: (sceneId, clear) => run(emitAck("combat:end", { sceneId, clear: clear ?? false })),
   setMovement: (payload) => run(emitAck("combat:set-movement", payload)),
   setMovementLimit: (payload) => run(emitAck("combat:set-movement-limit", payload)),
+  setAutoRollNpcInitiative: (payload) => run(emitAck("combat:set-auto-roll-npc-initiative", payload)),
 }));
 
 /** Combate do mapa `sceneId` (ou null se nunca chegou nenhum). Função pura para useMemo. */
