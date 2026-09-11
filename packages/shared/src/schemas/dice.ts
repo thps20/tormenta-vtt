@@ -46,10 +46,22 @@ export const AppliedDamageSchema = z.object({
   tokenId: IdSchema,
   /** Nome do token no momento da aplicação (sobrevive a renomear/apagar o token). */
   tokenName: z.string().max(64),
-  /** Já com sinal: negativo = tirou PV, positivo = curou. */
+  /** Já com sinal: negativo = tirou PV, positivo = curou. Sempre o que foi de fato aplicado
+   *  (confirmado pelo Mestre) — pode ou não bater com `raw + adjustment` abaixo. */
   amount: z.number().int(),
   /** Multiplicador usado no seletor (×1/×½/×2/×0); ausente = valor digitado à mão. */
   multiplier: z.enum(["1", "0.5", "2", "0"]).optional(),
+  /**
+   * Decomposição (bruto, ajuste, final — este último é `amount` acima) calculada pelo SERVIDOR a
+   * partir de `damageResponses` do alvo (rules/damageResponse.ts#suggestDamage), gravada só como
+   * registro/auditoria do card — não muda o que foi aplicado. `raw` = total bruto da rolagem, já
+   * com sinal, antes de qualquer resistência; `adjustment` = quanto a resistência do alvo mudaria
+   * esse bruto (`suggestDamage`, com sinal) — NÃO é `amount - raw`: o Mestre pode ter confirmado
+   * um valor diferente do sugerido. Alvo sem ficha (token solto) não tem `damageResponses`:
+   * `adjustment` sempre 0. Default 0 nos dois: cards de antes desta feature não têm a decomposição.
+   */
+  raw: z.number().int().default(0),
+  adjustment: z.number().int().default(0),
 });
 export type AppliedDamage = z.infer<typeof AppliedDamageSchema>;
 

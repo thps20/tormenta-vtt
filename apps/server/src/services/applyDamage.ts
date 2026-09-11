@@ -4,7 +4,7 @@
  * no token que possui. Além disso, o alvo precisa ter PV pra mexer: ficha
  * vinculada exige que o sistema defina `tokenBar`; token solto exige `hp`.
  */
-import type { SystemDefinition } from "@tormenta-vtt/shared";
+import { damageRollSign, suggestDamage, type DamageResponses, type DamageRollComponent, type SystemDefinition } from "@tormenta-vtt/shared";
 import type { Ctx } from "../socket/ack.js";
 import { canEditToken } from "./permissions.js";
 
@@ -28,4 +28,27 @@ export function checkApplyDamageTarget(
     return `"${token.name}" não tem PV definido`;
   }
   return null;
+}
+
+/**
+ * Decomposição (bruto, ajuste) gravada em `AppliedDamage` ao confirmar um `token:apply-damage`
+ * (docs/plano-criaturas.md §0.3-0.4, decisão revista): usa a MESMA `suggestDamage` do shared que já
+ * sugeria o multiplicador no seletor — agora também chamada aqui, no servidor, pra registrar a
+ * conta de verdade no card, mesmo que o Mestre tenha confirmado outro valor. `raw` = total bruto da
+ * rolagem, já com sinal (dano negativo/cura positiva, `damageRollSign`); `adjustment` = quanto a
+ * resistência do alvo (`responses`) mudaria esse bruto, também com sinal — NÃO é `amount - raw`: o
+ * que foi de fato aplicado (`amount`, no card) é o que o Mestre confirmou, que pode divergir do
+ * sugerido. Alvo sem ficha (token solto): `responses` neutra (`DamageResponsesSchema.parse({})`),
+ * `adjustment` sempre 0.
+ */
+export function computeDamageBreakdown(
+  def: SystemDefinition,
+  damage: DamageRollComponent[],
+  responses: DamageResponses,
+): { raw: number; adjustment: number } {
+  const sign = damageRollSign(def, damage);
+  const suggestion = suggestDamage(def, damage, responses);
+  const raw = sign * suggestion.raw;
+  const suggested = sign * suggestion.amount;
+  return { raw, adjustment: suggested - raw };
 }

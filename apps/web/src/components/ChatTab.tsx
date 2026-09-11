@@ -445,7 +445,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                         {roll.applied.map((a, i) => (
                           <React.Fragment key={i}>
                             {i > 0 && ', '}
-                            <span className={a.amount < 0 ? 'text-red-400' : 'text-emerald-400'}>
+                            <span
+                              className={a.amount < 0 ? 'text-red-400' : 'text-emerald-400'}
+                              // Decomposição (§3.3): bruto/ajuste calculados pelo SERVIDOR pela
+                              // resposta a dano do alvo — só num tooltip, pra não inchar a linha
+                              // (cards de antes desta feature têm os dois em 0: sem tooltip).
+                              title={a.adjustment !== 0 ? `Bruto ${a.raw >= 0 ? '+' : ''}${a.raw} · resistência ${a.adjustment >= 0 ? '+' : ''}${a.adjustment} · aplicado ${a.amount >= 0 ? '+' : ''}${a.amount}` : undefined}
+                            >
                               {a.tokenName} {a.amount >= 0 ? '+' : '−'}
                               {Math.abs(a.amount)}
                             </span>

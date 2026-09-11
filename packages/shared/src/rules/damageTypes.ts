@@ -20,6 +20,16 @@ export function isHealingType(def: Pick<SystemDefinition, "damageTypes">, key: s
   return key !== null && (def.damageTypes.find((d) => d.key === key)?.healing ?? false);
 }
 
+/**
+ * Sinal pra aplicar um card de dano/cura em PV (token:apply-damage): decide pela PRIMEIRA parcela
+ * (um card não mistura dano com cura na mesma rolagem, ver `isCombinedAttackRoll`/dano avulso).
+ * Cliente (`ApplyDamageButton`) e servidor (`services/applyDamage.ts`) usam a MESMA função, pra não
+ * arriscar os dois lados decidindo sinais diferentes pro mesmo card.
+ */
+export function damageRollSign(def: Pick<SystemDefinition, "damageTypes">, damage: { damageType: string | null }[]): 1 | -1 {
+  return damage.length > 0 && isHealingType(def, damage[0]?.damageType ?? null) ? 1 : -1;
+}
+
 export function damageTypeInfo(def: Pick<SystemDefinition, "damageTypes" | "damageTypeGroups">, key: string): DamageTypeInfo {
   const type = def.damageTypes.find((d) => d.key === key);
   if (!type) return { key, label: key, color: null, known: false };

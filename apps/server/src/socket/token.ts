@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import {
   CharacterDataSchema,
+  DamageResponsesSchema,
   TokenApplyDamageSchema,
   TokenCreateSchema,
   TokenDeleteManySchema,
@@ -27,7 +28,7 @@ import {
   toCharacter,
   toJson,
 } from "../services/characters.js";
-import { checkApplyDamageTarget } from "../services/applyDamage.js";
+import { checkApplyDamageTarget, computeDamageBreakdown } from "../services/applyDamage.js";
 import { emitCombat, loadCombatRow, maybeReemitCombatForToken, prepareTokenRemovalFromCombat } from "../services/combat.js";
 import { emitChatMessage, messageVisibleTo } from "../services/chatVisibility.js";
 import { sceneGeometry, type SceneGeometry } from "../services/grid.js";
@@ -395,6 +396,8 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       if (!messageVisibleTo(msg, { role: ctx.role, participantId: ctx.participantId })) throw new HandlerError("Mensagem não encontrada");
       if (msg.kind !== "roll" || !msg.roll?.damage?.length) throw new HandlerError("Essa rolagem não tem dano/cura pra aplicar");
       const roll = msg.roll;
+      // O guard acima já garante damage não-vazio; TS não carrega essa narrowing pro `roll` recém-atribuído.
+      const damage = roll.damage!;
 
       // 1. Valida TUDO antes de aplicar qualquer alvo (tudo-ou-nada): permissão (dono ou GM)
       // e se o alvo tem PV pra mexer (ficha com recurso `tokenBar`, ou hp do token solto).
@@ -413,10 +416,15 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       for (let i = 0; i < targets.length; i++) {
         const target = targets[i]!;
         const tokenRow = tokenRows[i]!;
+        // Decomposição (bruto, ajuste — §3.3): calculada pela resposta a dano do alvo (ficha
+        // vinculada) ou neutra (token solto, que não tem `damageResponses`); registrada no card
+        // abaixo, mas NÃO muda `target.amount`, que é sempre o que o Mestre confirmou.
+        let breakdown: { raw: number; adjustment: number };
 
         if (tokenRow.characterId) {
           const resourceKey = def.tokenBar!;
           const character = toCharacter(await requireCharacter(tokenRow.characterId, ctx.roomId));
+          breakdown = computeDamageBreakdown(def, damage, character.damageResponses);
           const computed = computeCharacter(def, character);
           const bounds = computed.resources[resourceKey] ?? { max: 0, min: 0, detail: null };
           const res = character.resources[resourceKey] ?? { current: 0, temp: 0, maxOverride: null };
@@ -428,6 +436,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
           const updated = toCharacter(await prisma.character.update({ where: { id: character.id }, data: { data: toJson(data) } }));
           broadcastCharacter(io, ctx.roomId, updated, "character:updated");
         } else {
+          breakdown = computeDamageBreakdown(def, damage, DamageResponsesSchema.parse({}));
           const fresh = await requireToken(tokenRow.id, ctx.roomId);
           const hp = TokenHpSchema.parse(fresh.hp);
           const next = applyResourceDelta({ current: hp.current, temp: 0 }, target.amount, { min: 0, max: hp.max });
@@ -437,7 +446,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
           broadcastToken(io, ctx.roomId, updatedToken, "token:updated", sceneGeometry(toScene(tokenRow.scene)));
         }
 
-        applied.push({ tokenId: tokenRow.id, tokenName: tokenRow.name, amount: target.amount, multiplier: target.multiplier });
+        applied.push({ tokenId: tokenRow.id, tokenName: tokenRow.name, amount: target.amount, multiplier: target.multiplier, ...breakdown });
       }
 
       // 3. Acrescenta ao registro do card (nunca sobrescreve) e reemite pra quem já via a mensagem.

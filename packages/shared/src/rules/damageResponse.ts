@@ -47,6 +47,13 @@ export interface DamageSuggestion {
   amount: number;
   /** Aviso curto, com os rótulos do sistema; "" = nada a avisar. Uma frase por parcela afetada, sem repetir. */
   note: string;
+  /**
+   * Total bruto (soma das parcelas, SEM sinal e SEM nenhum ajuste de resistência) — mesmo valor de
+   * `damage.reduce((s, d) => s + d.total, 0)`, devolvido aqui pra quem sugere (`ApplyDamageButton`)
+   * e quem registra a decomposição no servidor (`services/applyDamage.ts`) usarem o MESMO número,
+   * calculado uma vez só.
+   */
+  raw: number;
 }
 
 /**
@@ -61,7 +68,7 @@ export interface DamageSuggestion {
 export function suggestDamage(def: SystemDefinition, damage: DamageRollComponent[], responses: CharacterData["damageResponses"]): DamageSuggestion {
   const total = damage.reduce((sum, d) => sum + d.total, 0);
   if (damage.length === 0 || damage.every((d) => isHealingType(def, d.damageType))) {
-    return { multiplier: "1", amount: total, note: "" };
+    return { multiplier: "1", amount: total, note: "", raw: total };
   }
 
   let amount = 0;
@@ -95,5 +102,5 @@ export function suggestDamage(def: SystemDefinition, damage: DamageRollComponent
   }
 
   const multiplier = !sawReduction && uniform && uniform !== "mixed" ? uniform : null;
-  return { multiplier, amount, note: notes.join(", ") };
+  return { multiplier, amount, note: notes.join(", "), raw: total };
 }

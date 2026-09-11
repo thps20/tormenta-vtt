@@ -37,13 +37,6 @@ comprometido — só um lugar para não perder a ideia até o dono do projeto pr
   sem erro: o ack só traz o `Token[]` menor. Hoje o cliente aplica o que veio e não avisa o GM que
   pediu 10 e ganhou 6, por exemplo. Precisa comparar `payload.count` com `res.length` em
   `apps/web/src/store/tokens.ts` (spawnCreature) e mostrar um toast quando forem diferentes.
-- **Aplicar resistências/imunidades/vulnerabilidades automaticamente no dano.** `CharacterData.damageResponses`
-  guarda RD, "reduz à metade", imunidade e vulnerabilidade por tipo de dano, mas `token:apply-damage`
-  continua aplicando o valor que o cliente manda: o ajuste é só uma **sugestão de UI** no seletor de
-  "Aplicar" (multiplicador pré-selecionado + aviso "resistente a fogo"), e o Mestre confirma. Automatizar
-  no servidor exigiria decidir o que fazer quando o Mestre discorda da conta (hoje ele simplesmente
-  digita outro valor), como registrar isso em `roll.applied` e o que vale para alvos sem ficha vinculada
-  (`token.hp`, que não tem resposta a dano nenhuma). Anotado em 08/09/2026 (`docs/plano-criaturas.md` §0.3–0.4).
 - **"Encerrar cena": expira durações "até o fim da cena" de magias/poderes/condições.** Em Tormenta20
   **cena** é uma unidade de tempo de jogo ("dura uma cena"), diferente do **mapa** (a imagem com grid e
   tokens — a entidade que o código chama de `Scene`, ver `docs/plano-mapas.md` §1). Falta um botão

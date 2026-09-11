@@ -71,10 +71,20 @@ damageResponses: z.object({
 }).default({}),
 ```
 
-**Decisão (sua, 08/09/2026): o servidor não muda.** `token:apply-damage` continua aplicando o valor
-que o cliente manda; nenhum cálculo novo em `services/applyDamage.ts`. A resposta a dano é dado +
-exibição (preview da criatura, ficha rápida, detalhes da ficha) **e** uma sugestão no seletor de
-"Aplicar" — descrita no §0.4. O Mestre sempre confirma.
+**Decisão original (sua, 08/09/2026): o servidor não muda.** `token:apply-damage` aplicava o valor
+que o cliente mandava sem recalcular nada; a resposta a dano era dado + exibição (preview da
+criatura, ficha rápida, detalhes da ficha) **e** uma sugestão no seletor de "Aplicar" — descrita no
+§0.4. O Mestre sempre confirmava.
+
+**Revisão (sua, 11/09/2026): o servidor passa a calcular também, mas só pra registro.** O que é
+efetivamente APLICADO (`amount` de cada alvo em `token:apply-damage`) continua sendo exatamente o
+que o Mestre confirmou — isso não mudou, e não é negociável: ele pode discordar da conta e digitar
+outro valor, como sempre. O que muda é que o servidor agora chama a MESMA `suggestDamage` (§0.4,
+`services/applyDamage.ts#computeDamageBreakdown`) contra a resposta a dano ATUAL do alvo (token
+solto: resposta neutra) e grava o resultado em `AppliedDamage.raw`/`adjustment` — bruto e quanto a
+resistência mudaria esse bruto, ambos com sinal — junto do `amount` de sempre. É registro/auditoria
+do card, não uma segunda fonte de verdade: `raw + adjustment` é o SUGERIDO, que pode divergir do que
+foi de fato aplicado quando o Mestre edita à mão. Ver SPEC §3.3.
 
 ### 0.4 Sugestão no seletor de "Aplicar dano"
 
@@ -92,6 +102,8 @@ export interface DamageSuggestion {
   amount: number;
   /** Aviso curto para a UI, com os rótulos do sistema. "" = nada a avisar. */
   note: string;
+  /** Total bruto, sem sinal e sem ajuste — mesmo cálculo usado pelo servidor (revisão de 11/09/2026, §0.3). */
+  raw: number;
 }
 
 /** Sugestão de aplicação de um card de dano num alvo, pela resposta a dano dele. */

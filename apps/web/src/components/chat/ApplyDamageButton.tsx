@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Heart, Search, Swords, X } from 'lucide-react';
 import {
   computeCharacter,
-  isHealingType,
+  damageRollSign,
   suggestDamage,
   type Character,
   type DamageSuggestion,
@@ -46,9 +46,10 @@ interface TargetRow {
   max: number;
   ownerLabel: string;
   /**
-   * Sugestão pela resposta a dano da ficha vinculada (rules/damageResponse.ts). Token solto (sem
-   * ficha) não tem damageResponses: sugestão neutra (×1, sem aviso) — o servidor não muda de
-   * qualquer forma, isto é só o que vem PRÉ-SELECIONADO ao marcar o alvo.
+   * Sugestão pela resposta a dano da ficha vinculada (rules/damageResponse.ts#suggestDamage).
+   * Token solto (sem ficha) não tem damageResponses: sugestão neutra (×1, sem aviso). É o que vem
+   * PRÉ-SELECIONADO ao marcar o alvo — o Mestre sempre pode trocar o multiplicador ou digitar outro
+   * valor antes de confirmar.
    */
   suggestion: DamageSuggestion;
 }
@@ -65,6 +66,13 @@ function withMultiplier(total: number, sign: 1 | -1, mult: '1' | '0.5' | '2' | '
  * vê todos; jogador só os que possui) com busca, multi-seleção e multiplicador
  * por alvo. Confirma → token:apply-damage. O servidor valida permissão nos
  * mesmos moldes (tudo-ou-nada); aqui só filtramos pra não oferecer o que ele ia recusar.
+ *
+ * Preview de resistência (§3.3, "sugerido 7 → 3 · Resistente a corte (RD 4)"): calculado aqui, no
+ * CLIENTE, chamando a mesma `suggestDamage` pura do shared que o servidor chama em
+ * `services/applyDamage.ts#computeDamageBreakdown` — mesmo cálculo, sem round-trip nenhum (decisão
+ * documentada em docs/plano-criaturas.md §0.4: não existe um evento `apply-damage:preview`). O
+ * servidor recalcula por conta própria ao confirmar (não confia neste preview) e é quem decide o
+ * que fica gravado no card; esta função nunca aplica nada sozinha.
  */
 export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId, roll, tokens, characters, participants, def, me, onApply, preselectTokenIds }) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -77,7 +85,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
   const didPreselectRef = useRef(false);
 
   const damage = roll.damage ?? [];
-  const isHeal = def !== null && damage.length > 0 && isHealingType(def, damage[0]?.damageType ?? null);
+  const isHeal = def !== null && damage.length > 0 && damageRollSign(def, damage) === 1;
   const sign: 1 | -1 = isHeal ? 1 : -1;
 
   const charById = useMemo(() => new Map(characters.map((c) => [c.id, c])), [characters]);
@@ -106,7 +114,9 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
       }
       const ownerLabel = token.ownerId ? (participants.find((p) => p.id === token.ownerId)?.nickname ?? 'Jogador') : 'GM';
       // Token solto (sem ficha) não tem damageResponses: sugestão sempre neutra pra ele.
-      const suggestion = character ? suggestDamage(def, damage, character.damageResponses) : { multiplier: '1' as const, amount: roll.total, note: '' };
+      const suggestion = character
+        ? suggestDamage(def, damage, character.damageResponses)
+        : { multiplier: '1' as const, amount: roll.total, note: '', raw: roll.total };
       out.push({ token, current, max, ownerLabel, suggestion });
     }
     return out.sort((a, b) => a.token.name.localeCompare(b.token.name));
@@ -231,7 +241,11 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
                       {current}/{max} · {ownerLabel}
                     </span>
                   </label>
-                  {suggestion.note && <div className="pl-6 -mt-0.5 text-[10px] text-amber-400">{suggestion.note}</div>}
+                  {suggestion.note && (
+                    <div className="pl-6 -mt-0.5 text-[10px] text-amber-400">
+                      sugerido {suggestion.raw} → {suggestion.amount} · {suggestion.note}
+                    </div>
+                  )}
                   {selected && (
                     <div className="flex items-center gap-1 mt-1.5 pl-5">
                       {(['1', '0.5', '2', '0'] as const).map((m) => (
