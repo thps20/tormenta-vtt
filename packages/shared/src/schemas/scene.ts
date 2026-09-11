@@ -7,11 +7,16 @@ export const GridTypeSchema = z.enum(["square", "none"]);
 
 export const GridConfigSchema = z.object({
   type: GridTypeSchema.default("square"),
-  /** Tamanho da célula em pixels da imagem do mapa. */
-  cellSize: z.number().int().min(8).max(1000).default(70),
-  /** Deslocamento do grid em relação ao canto superior esquerdo da imagem. */
-  offsetX: z.number().int().default(0),
-  offsetY: z.number().int().default(0),
+  /**
+   * Tamanho da célula em pixels da imagem do mapa. Decimal (não `.int()`): a calibração pela
+   * imagem (docs/plano-grid.md, Parte B) quase nunca acerta um inteiro exato — um mapa de 2048px
+   * com 28 células dá 73,14. Inteiro continua válido (nenhum grid existente quebra).
+   */
+  cellSize: z.number().min(8).max(1000).default(70),
+  /** Deslocamento do grid em relação ao canto superior esquerdo da imagem. Decimal pelo mesmo
+   *  motivo de `cellSize` acima. */
+  offsetX: z.number().default(0),
+  offsetY: z.number().default(0),
   color: z.string().default("#00000055"),
   /** Se true, tokens "grudam" nas células ao soltar. */
   snap: z.boolean().default(true),

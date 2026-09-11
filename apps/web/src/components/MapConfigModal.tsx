@@ -28,6 +28,11 @@ const GRID_COLOR_PRESETS = [
   { name: "Arcano Azul", hex: "#38bdf8" },
 ];
 
+/** Arredonda pra 1 casa decimal (GridConfig.cellSize/offsetX/offsetY, docs/plano-grid.md D6). */
+function round1(v: number): number {
+  return Math.round(v * 10) / 10;
+}
+
 /** Cor + opacidade -> "#rrggbbaa" (formato usado no GridConfig; o Konva aceita). */
 function toHex8(hex: string, alpha: number): string {
   const a = Math.round(Math.max(0, Math.min(1, alpha)) * 255)
@@ -188,9 +193,12 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({ isOpen, scene, o
       map: { mapUrl, mapWidth: mapUrl ? mapWidth : null, mapHeight: mapUrl ? mapHeight : null },
       grid: {
         type: gridType,
-        cellSize: Math.max(8, Math.min(1000, Math.round(cellSize))),
-        offsetX: Math.round(offsetX),
-        offsetY: Math.round(offsetY),
+        // 1 casa decimal (não inteiro): a calibração pela imagem (docs/plano-grid.md, Parte B)
+        // quase nunca acerta um valor redondo — arredondar pro inteiro mais próximo destruiria a
+        // precisão que a calibração ganhou.
+        cellSize: Math.max(8, Math.min(1000, round1(cellSize))),
+        offsetX: round1(offsetX),
+        offsetY: round1(offsetY),
         color: toHex8(gridHexColor, gridOpacity),
         snap,
       },
