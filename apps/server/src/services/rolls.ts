@@ -3,6 +3,7 @@ import type { Participant as DbParticipant } from "@prisma/client";
 import {
   DiceParseError,
   evaluateHitRule,
+  multiplyFormulaDice,
   naturalD20,
   parseFormula,
   resolveTargetPlaceholder,
@@ -52,6 +53,35 @@ function computeRollTarget(def: SystemDefinition, ctx: { total: number; natural:
   return { tokenId: t.tokenId, name: t.name, hit: null, reason: "no-rule" };
 }
 
+/**
+ * Congela `roll.targets[]` pra um card (docs/plano-alvos.md, §9.13): ataque (sozinho ou combinado
+ * com dano) avalia acerto de verdade contra `attackCtx` (o total/natural do ATAQUE); dano avulso
+ * (sem ataque) só lista quem foi mirado, `hit` sempre `null` — não há total de ataque pra comparar,
+ * mas o "Aplicar" do card já sabe quem pré-selecionar, mesmo que quem for aplicar não seja quem
+ * rolou. Pura, sem RNG nem I/O: fácil de testar isolada da rolagem de verdade.
+ */
+export function buildRollTargets(
+  inputTargets: RollTargetInput[] | undefined,
+  opts: { isAttack: boolean; hasDamage: boolean; def?: SystemDefinition; attackCtx: { total: number; natural: number | null } },
+): RollTarget[] {
+  if (!inputTargets?.length) return [];
+  if (opts.isAttack && opts.def) return inputTargets.map((t) => computeRollTarget(opts.def!, opts.attackCtx, t));
+  if (opts.hasDamage) return inputTargets.map((t): RollTarget => ({ tokenId: t.tokenId, name: t.name, hit: null, reason: "no-rule" }));
+  return [];
+}
+
+/**
+ * Crítico CONFIRMADO ao "Rolar dano junto com o ataque" (SPEC §9.13): o natural do d20 do ataque
+ * precisa estar na margem (`natural >= critThreshold`) E `def.rolls.critical` precisa confirmar
+ * (ausente = nunca confirma sozinho — o card só marca "possível crítico"). Pura, sem RNG.
+ */
+export function confirmCritical(def: SystemDefinition | undefined, natural: number | null, critThreshold: number | undefined): boolean {
+  if (natural === null || critThreshold === undefined || natural < critThreshold) return false;
+  const rule = def?.rolls.critical;
+  if (!rule) return false;
+  return evaluateHitRule(rule, { natural })?.hit === true;
+}
+
 export interface RollMessageInput {
   /** Fórmula já sem placeholders. */
   formula: string;
@@ -61,6 +91,13 @@ export interface RollMessageInput {
   /** Rolagem vinda de uma ficha. */
   characterId?: string;
   critThreshold?: number;
+  /**
+   * Multiplicador de dano em crítico confirmado (`action.critMult`, SPEC §9.13 — "Rolar dano junto
+   * com o ataque"). Só tem efeito quando `isAttack` e `damage` vêm juntos: o natural do d20 desta
+   * rolagem precisa cair em `critThreshold`, e `def.rolls.critical` precisa confirmar (ausente = só
+   * marca `criticalConfirmed: false`, "possível crítico", sem multiplicar nada).
+   */
+  critMult?: number;
   /** Dano fixo ("2") é uma "rolagem" sem dado; no chat (/r) continua exigindo dado. */
   allowNoDice?: boolean;
   /** Parcelas de dano por tipo (ação de dano da ficha): cada uma é rolada em separado e `formula` é ignorada. */
@@ -72,9 +109,13 @@ export interface RollMessageInput {
    */
   tokenId?: string;
   /**
-   * Alvos marcados pelo autor (docs/plano-alvos.md) — só ações de ATAQUE (`isAttack`) constroem
-   * `roll.targets[]`; ação de dano ignora (o "Aplicar" usa os alvos AO VIVO do autor, não os
-   * congelados aqui). `def` é exigido junto: sem ele os alvos são ignorados (lista vazia).
+   * Alvos marcados pelo autor (docs/plano-alvos.md): ações de ATAQUE (`isAttack`, sozinhas ou com
+   * `damage` junto — §9.13) constroem `roll.targets[]` com acerto/erro calculado contra
+   * `attackHit`/`attackAutoHit`/`attackAutoMiss`; uma ação de DANO avulsa (sem `isAttack`) também
+   * congela a lista, mas sem avaliar acerto (`hit: null` em todas — não há total de ataque pra
+   * comparar), só para o "Aplicar" do card pré-selecionar quem foi mirado, mesmo que quem abrir o
+   * seletor depois não seja quem rolou (e não compartilhe os alvos AO VIVO dele). `def` é exigido
+   * para a variante com acerto: sem ele os alvos de ataque saem sem `hit` calculado.
    */
   targets?: RollTargetInput[];
   isAttack?: boolean;
@@ -94,40 +135,53 @@ export interface RollMessageResult {
  * e pelo combate (combat:roll).
  */
 export async function createRollMessage(io: TypedServer, roomId: string, me: DbParticipant, input: RollMessageInput): Promise<RollMessageResult> {
+  const hasDamage = !!input.damage && input.damage.length > 0;
   let outcome;
   let damage: DiceRoll["damage"];
+  let criticalConfirmed = false;
+  let attackNatural: number | null = null;
   try {
-    if (input.damage && input.damage.length > 0) {
-      // Uma parcela por tipo de dano: rolar em separado dá o total de cada tipo para o chat.
-      const multi = rollParsedMany(input.damage.map((d) => parseFormula(d.formula, { requireDice: !input.allowNoDice })));
-      outcome = multi;
-      damage = multi.parts.map((part, i) => ({ damageType: input.damage?.[i]?.damageType ?? null, ...part }));
-    } else {
+    // 1. Ataque/teste/fórmula solta: roda sempre que a rolagem NÃO for dano puro — isso cobre o
+    // ataque sozinho de sempre E o combinado ("Rolar dano junto com o ataque", SPEC §9.13), onde o
+    // d20 do ataque vira o total/groups do card e o dano fica à parte, em `damage[]`.
+    if (input.isAttack || !hasDamage) {
       outcome = rollParsed(parseFormula(input.formula, { requireDice: !input.allowNoDice }));
+      if (input.isAttack) attackNatural = naturalD20(outcome.groups);
+    }
+    if (hasDamage) {
+      // Crítico (§9.13): só existe pra avaliar quando o dano está sendo rolado JUNTO com um ataque
+      // — dano avulso não tem d20 nenhum pra checar margem. Confirmado → multiplica os DADOS de
+      // cada parcela por `critMult` antes de rolar.
+      criticalConfirmed = input.isAttack ? confirmCritical(input.def, attackNatural, input.critThreshold) : false;
+      const mult = criticalConfirmed && input.critMult && input.critMult > 1 ? input.critMult : 1;
+      // Uma parcela por tipo de dano: rolar em separado dá o total de cada tipo para o chat.
+      const multi = rollParsedMany(input.damage!.map((d) => parseFormula(mult > 1 ? multiplyFormulaDice(d.formula, mult) : d.formula, { requireDice: !input.allowNoDice })));
+      damage = multi.parts.map((part, i) => ({ damageType: input.damage?.[i]?.damageType ?? null, ...part }));
+      if (!outcome) outcome = multi; // dano avulso: o total do card É a soma das parcelas.
     }
   } catch (err) {
     if (err instanceof DiceParseError) throw new HandlerError(`Fórmula inválida: ${err.message}`);
     throw err;
   }
 
-  // Alvos (docs/plano-alvos.md): só ações de ATAQUE constroem roll.targets — o total já existe
-  // aqui (outcome.total), então dá pra avaliar attackHit/attackAutoHit/attackAutoMiss de uma vez.
-  const natural = input.isAttack && input.targets?.length ? naturalD20(outcome.groups) : null;
-  const targets: DiceRoll["targets"] =
-    input.isAttack && input.def && input.targets?.length ? input.targets.map((t) => computeRollTarget(input.def!, { total: outcome.total, natural }, t)) : [];
+  // Alvos (docs/plano-alvos.md, §9.13): ataque (sozinho ou combinado com dano) avalia acerto de
+  // verdade; dano avulso com alvo marcado só congela a lista, sem acerto (buildRollTargets).
+  const natural = input.isAttack && input.targets?.length ? attackNatural : null;
+  const targets = buildRollTargets(input.targets, { isAttack: !!input.isAttack, hasDamage, def: input.def, attackCtx: { total: outcome!.total, natural } });
 
   const diceRoll: DiceRoll = {
     id: randomUUID(),
     roomId,
     participantId: me.id,
     nickname: me.nickname,
-    formula: outcome.formula,
+    formula: outcome!.formula,
     label: input.label,
-    groups: outcome.groups,
-    modifier: outcome.modifier,
-    total: outcome.total,
+    groups: outcome!.groups,
+    modifier: outcome!.modifier,
+    total: outcome!.total,
     characterId: input.characterId,
     critThreshold: input.critThreshold,
+    criticalConfirmed,
     damage,
     applied: [],
     natural,
@@ -157,7 +211,7 @@ export async function createRollMessage(io: TypedServer, roomId: string, me: DbP
   if (targets.length > 0 && message.roll) {
     message = { ...message, roll: { ...message.roll, targets: await rollTargetsForRoomViewer(roomId, targets, authorViewer) } };
   }
-  return { message, total: outcome.total };
+  return { message, total: outcome!.total };
 }
 
 export interface InitiativeBatchEntryInput {

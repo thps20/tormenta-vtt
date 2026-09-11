@@ -203,6 +203,7 @@ describe("buildCharacterRoll", () => {
       formula: "1d20 + 7",
       label: "Espada longa: Ataque",
       critThreshold: 20,
+      critMult: 2,
       breakdown: null,
       isAttack: true,
     });
@@ -248,6 +249,18 @@ describe("buildCharacterRoll", () => {
     const built = buildCharacterRoll(def, d, { type: "action", itemId: "wand", actionId: "f" });
     expect(built.formula).toBe("1d6");
     expect(built.damage).toEqual([{ formula: "1d6", damageType: "fogo" }]);
+  });
+
+  // "Rolar dano junto com o ataque" (SPEC §9.13): combineDamageActionId numa ação de ataque.
+  it("combineDamageActionId: ataque ganha damage[] da ação de dano irmã, sem misturar as fórmulas", () => {
+    const built = buildCharacterRoll(def, data, { type: "action", itemId: "sword", actionId: "atk", combineDamageActionId: "dmg" });
+    expect(built).toMatchObject({ formula: "1d20 + 7", isAttack: true, critThreshold: 20, critMult: 2 });
+    expect(built.damage).toEqual([{ formula: "1d8 + 3 + 2", damageType: "corte" }]);
+  });
+
+  it("combineDamageActionId: erro se a ação não existe, ou não é de dano", () => {
+    expect(() => buildCharacterRoll(def, data, { type: "action", itemId: "sword", actionId: "atk", combineDamageActionId: "nope" })).toThrow(RollBuildError);
+    expect(() => buildCharacterRoll(def, data, { type: "action", itemId: "sword", actionId: "atk", combineDamageActionId: "atk" })).toThrow(RollBuildError);
   });
 
   it("resolve placeholders de uma fórmula livre", () => {

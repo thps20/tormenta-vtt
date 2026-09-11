@@ -321,7 +321,9 @@
     "$comment_alvos": "Sistema de alvos (docs/plano-alvos.md): 20 natural acerta sempre, 1 natural erra sempre, senão compara o total com a Defesa do alvo.",
     "attackAutoHit": "{natural} == 20",
     "attackAutoMiss": "{natural} == 1",
-    "attackHit": "{total} >= {target.derived.defense}"
+    "attackHit": "{total} >= {target.derived.defense}",
+    "$comment_critico": "SPEC §9.13 (Rolar dano junto com o ataque): T20 não pede confirmação — qualquer natural dentro da margem de crítico da arma já é crítico. Fórmula sempre verdadeira (natural é sempre >= 1) só pra 'ligar' a confirmação automática.",
+    "critical": "{natural} >= 1"
   },
 
   "combat": {

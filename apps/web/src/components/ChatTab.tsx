@@ -1,11 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Dices, Scroll, Eye } from 'lucide-react';
-import { hitRuleTargetLabel, type Character, type CharacterRollRequest, type ChatMessage, type DiceRoll, type Participant, type RollTarget, type Token } from '@tormenta-vtt/shared';
+import { Send, Dices, Scroll, Eye, Flame } from 'lucide-react';
+import {
+  hitRuleTargetLabel,
+  isCombinedAttackRoll,
+  type Character,
+  type CharacterRollRequest,
+  type ChatMessage,
+  type DiceRoll,
+  type Participant,
+  type RollTarget,
+  type Token,
+} from '@tormenta-vtt/shared';
 import { canEditCharacter } from '../store/characters';
 import { useChat } from '../store/chat';
 import { useTargets } from '../store/targets';
 import { useSystemDef } from '../lib/system';
 import { rollModeInfo } from '../lib/rollMode';
+import { loadRollDamageWithAttack, saveRollDamageWithAttack } from '../lib/rollPreferences';
 import { ApplyDamageButton } from './chat/ApplyDamageButton';
 import { HandoutCardMessage } from './chat/HandoutCardMessage';
 import { InitiativeBatchMessage } from './chat/InitiativeBatchMessage';
@@ -13,6 +24,12 @@ import { ItemCardMessage } from './chat/ItemCardMessage';
 import { RollModeButton } from './chat/RollModeButton';
 import { DamageFormula, DamageTypeBadge } from './DamageTypeBadge';
 import { useHandouts } from '../store/handouts';
+
+/** Soma dos totais das parcelas de dano — usado no bloco de dano de uma rolagem combinada (§9.13),
+ *  onde `roll.total` é o total do ATAQUE, não do dano (que fica só em `roll.damage[]`). */
+function sumDamage(damage: NonNullable<DiceRoll['damage']>): number {
+  return damage.reduce((sum, d) => sum + d.total, 0);
+}
 
 /**
  * Sistema de alvos (docs/plano-alvos.md): uma linha por alvo de um ataque — "Acertou/Errou" (com
@@ -61,6 +78,14 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   const setRollMode = useChat((s) => s.setRollMode);
   const revealMessage = useChat((s) => s.reveal);
   const applyDamage = useChat((s) => s.applyDamage);
+  // "Rolar dano junto com o ataque" (§9.13): preferência por usuário, localStorage — lida aqui só
+  // pro checkbox; quem decide de verdade se combina é a store (store/characters.ts#roll), que lê a
+  // mesma preferência na hora de montar o pedido (não depende deste componente estar montado).
+  const [rollDamageWithAttack, setRollDamageWithAttackState] = useState(loadRollDamageWithAttack);
+  const setRollDamageWithAttack = (value: boolean) => {
+    saveRollDamageWithAttack(value);
+    setRollDamageWithAttackState(value);
+  };
   // Sistema de alvos (docs/plano-alvos.md §3.5): "Aplicar" pré-seleciona os alvos do CARD quando
   // ele tiver (roll.targets, ataque com acerto/erro); sem alvo no card, cai nos meus alvos atuais.
   const myTargetIds = useTargets((s) => s.mine);
@@ -242,6 +267,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({
               roll.groups.some((g) => g.sides === 20 && g.rolls.some((r) => r >= critFrom));
             const isFumble =
               roll.groups.some((g) => g.sides === 20 && g.rolls.includes(1));
+            // "Rolar dano junto com o ataque" (§9.13): ataque em cima (roll.total/groups são DELE) e
+            // dano embaixo, num bloco à parte — não misturado no número do header como o dano avulso.
+            const combined = isCombinedAttackRoll(roll);
 
             return (
               <div
@@ -298,9 +326,10 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                       >
                         {roll.total}
                       </span>
-                      {/* Dano por tipo: uma parcela = só o selo; várias = "(7 [Fogo] + 14 [Frio])". */}
-                      {damage && damage.length === 1 && damage[0] && <DamageTypeBadge def={def} type={damage[0].damageType} />}
-                      {damage && damage.length > 1 && (
+                      {/* Dano por tipo: uma parcela = só o selo; várias = "(7 [Fogo] + 14 [Frio])".
+                          Combinado (§9.13) não mistura aqui: o dano tem bloco próprio, embaixo. */}
+                      {damage && !combined && damage.length === 1 && damage[0] && <DamageTypeBadge def={def} type={damage[0].damageType} />}
+                      {damage && !combined && damage.length > 1 && (
                         <span className="text-[11px] font-mono text-zinc-300 flex items-center gap-1 flex-wrap" data-damage-breakdown>
                           (
                           {damage.map((d, i) => (
@@ -324,7 +353,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                       </span>
                     </div>
                     {/* Fórmula do dano com o selo de cada parcela: "6d6 + 1 [Fogo] + 4d6 [Frio]". */}
-                    {damage && (
+                    {damage && !combined && (
                       <div className="mt-1 text-[10px] font-mono text-zinc-500" data-damage-formula>
                         <DamageFormula def={def} components={damage} />
                       </div>
@@ -353,6 +382,44 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                   </div>
                 )}
 
+                {/* Dano combinado com o ataque (§9.13): bloco próprio, com o total/parcelas/fórmula
+                    do dano (roll.total ali em cima é do ATAQUE, não deste dano) e o aviso de
+                    crítico — confirmado (dado já multiplicado) ou só "possível" (o Mestre decide). */}
+                {combined && damage && (
+                  <div className="mt-2 pt-1.5 border-t border-zinc-800/60" data-combined-damage>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[11px] text-zinc-400 italic">Dano</span>
+                      <span className="text-xl font-serif font-bold text-amber-200">{sumDamage(damage)}</span>
+                      {damage.length === 1 && damage[0] && <DamageTypeBadge def={def} type={damage[0].damageType} />}
+                      {damage.length > 1 && (
+                        <span className="text-[11px] font-mono text-zinc-300 flex items-center gap-1 flex-wrap">
+                          (
+                          {damage.map((d, i) => (
+                            <React.Fragment key={i}>
+                              {i > 0 && <span className="text-zinc-500">+</span>}
+                              <span className="font-bold text-amber-200">{d.total}</span>
+                              <DamageTypeBadge def={def} type={d.damageType} />
+                            </React.Fragment>
+                          ))}
+                          )
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 text-[10px] font-mono text-zinc-500" data-damage-formula>
+                      <DamageFormula def={def} components={damage} />
+                    </div>
+                    {isCritical && (
+                      <div
+                        className={`mt-1 flex items-center gap-1 text-[10px] font-mono ${roll.criticalConfirmed ? 'text-[#d4af37]' : 'text-amber-400'}`}
+                        data-critical={roll.criticalConfirmed ? 'confirmed' : 'possible'}
+                      >
+                        <Flame className="w-3 h-3" />
+                        {roll.criticalConfirmed ? 'Crítico confirmado! Dano já multiplicado.' : 'Possível crítico — confirme e ajuste o dano à mão.'}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {(damage || roll.applied.length > 0) && (
                   <div className="mt-2 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between gap-2 flex-wrap" data-apply-damage>
                     <ApplyDamageButton
@@ -364,7 +431,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                       def={def}
                       me={me}
                       onApply={applyDamage}
-                      preselectTokenIds={roll.targets.length > 0 ? roll.targets.map((t) => t.tokenId) : myTargetIds}
+                      preselectTokenIds={
+                        combined
+                          ? roll.targets.filter((t) => t.hit !== false).map((t) => t.tokenId) // sem alvo = [] de propósito (§9.13: "Aplicar" abre vazio)
+                          : roll.targets.length > 0
+                            ? roll.targets.map((t) => t.tokenId)
+                            : myTargetIds
+                      }
                     />
                     {roll.applied.length > 0 && (
                       <span className="text-[10px] font-mono text-zinc-500" data-applied-log>
@@ -467,6 +540,21 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             ROLAR:
           </span>
           <RollModeButton mode={rollMode} onChange={setRollMode} />
+          <button
+            type="button"
+            id="roll-damage-with-attack-btn"
+            onClick={() => setRollDamageWithAttack(!rollDamageWithAttack)}
+            aria-pressed={rollDamageWithAttack}
+            title="Rolar dano junto com o ataque: o botão de uma ação de ataque com dano no mesmo item rola as duas numa mensagem só."
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded border font-mono text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${
+              rollDamageWithAttack
+                ? 'text-[#d4af37] border-[#d4af37]/60 bg-[#2d2417]/60'
+                : 'text-zinc-500 border-[#3d3d3d] bg-[#1a1a1a] hover:text-zinc-300'
+            }`}
+          >
+            <Flame className="w-3 h-3" />
+            Dano junto
+          </button>
         </div>
         <div className="flex items-center gap-0.5">
           {[4, 6, 8, 10, 12, 20, 100].map((sides) => (

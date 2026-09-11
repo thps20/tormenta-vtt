@@ -16,6 +16,8 @@ export interface BuiltRoll {
   label: string;
   /** Resultado natural do dado a partir do qual é crítico (só ataques). */
   critThreshold?: number;
+  /** Multiplicador de dano em crítico confirmado (`action.critMult`, só ataques — SPEC §9.13). */
+  critMult?: number;
   /** Decomposição do dano ou do ataque quando aprimoramentos mudaram a fórmula ("6d6 base + 4d6 … ×2"); null = como está no item. */
   breakdown?: string | null;
   /**
@@ -130,25 +132,42 @@ export function buildCharacterRoll(def: SystemDefinition, character: Character |
         // Aprimoramentos escolhidos na conjuração (vazio = ação como está no item).
         const selected = resolveEnhancements(def, item, request.enhancements ?? []);
 
+        // Parcelas de dano de uma ação "damage" do MESMO item — extraído porque tanto o próprio
+        // case "damage" quanto o "attack" combinado ("Rolar dano junto", SPEC §9.13) precisam disto.
+        const buildDamage = (dmgAction: Extract<Action, { kind: "damage" }>): { damage: DamageComponent[]; breakdown: string | null } => {
+          const attrKey = dmgAction.attribute === "auto" ? autoDamageAttribute(def, item) : dmgAction.attribute;
+          const attrValue = attrKey ? (computed.attributes[attrKey] ?? 0) : 0;
+          const skill = attackSkillOf(item);
+          const bonus = sumModifiers(mods, (t) => t.kind === "damage" && (t.skill === null || t.skill === skill));
+          // Aprimoramentos: dados primeiro, atributo e bônus depois ("6d6 + 4d6 + 3"). Dados de outro
+          // tipo viram parcelas próprias, sem atributo/bônus (esses ficam só na base). Ação de cura
+          // (tipo com `healing` no sistema) só recebe healDiceAdd.
+          const enhanced = applyDamageEnhancements(substitutePlaceholders(dmgAction.formula, resolveGlobal), dmgAction.damageType, selected, isHealingType(def, dmgAction.damageType));
+          const damage: DamageComponent[] = [{ formula: joinParts(enhanced.formula, [attrValue, dmgAction.bonus, bonus]), damageType: dmgAction.damageType }, ...enhanced.extra];
+          return { damage, breakdown: enhanced.breakdown };
+        };
+
         switch (action.kind) {
           case "attack": {
             const total = skillTotalWithOverride(computed, action.skill, action.attributeOverride);
             const bonus = sumModifiers(mods, (t) => t.kind === "attack" && (t.skill === null || t.skill === action.skill));
             const base = substitutePlaceholders(def.rolls.attack ?? def.rolls.skillCheck, (p) => (p === "skill" ? total : resolveGlobal(p)));
             const enhanced = applyAttackEnhancements(joinParts(base, [action.bonus, bonus]), selected);
-            return { formula: enhanced.formula, label, critThreshold: action.critRange, breakdown: enhanced.breakdown, isAttack: true };
+            const built: BuiltRoll = { formula: enhanced.formula, label, critThreshold: action.critRange, critMult: action.critMult, breakdown: enhanced.breakdown, isAttack: true };
+            // "Rolar dano junto com o ataque" (preferência do jogador, aplicada pela store): uma
+            // ação de dano irmã no MESMO item rola junto, ataque em cima e dano embaixo, no mesmo
+            // card — o multiplicador de crítico (se confirmado) é aplicado depois, na hora de rolar
+            // de verdade (services/rolls.ts no servidor, que só aí sabe o natural do d20).
+            if (request.combineDamageActionId) {
+              const dmgAction = item.actions.find((a) => a.id === request.combineDamageActionId);
+              if (!dmgAction || dmgAction.kind !== "damage") throw new RollBuildError("Ação de dano inválida para rolar junto com o ataque");
+              built.damage = buildDamage(dmgAction).damage;
+            }
+            return built;
           }
           case "damage": {
-            const attrKey = action.attribute === "auto" ? autoDamageAttribute(def, item) : action.attribute;
-            const attrValue = attrKey ? (computed.attributes[attrKey] ?? 0) : 0;
-            const skill = attackSkillOf(item);
-            const bonus = sumModifiers(mods, (t) => t.kind === "damage" && (t.skill === null || t.skill === skill));
-            // Aprimoramentos: dados primeiro, atributo e bônus depois ("6d6 + 4d6 + 3"). Dados de outro
-            // tipo viram parcelas próprias, sem atributo/bônus (esses ficam só na base). Ação de cura
-            // (tipo com `healing` no sistema) só recebe healDiceAdd.
-            const enhanced = applyDamageEnhancements(substitutePlaceholders(action.formula, resolveGlobal), action.damageType, selected, isHealingType(def, action.damageType));
-            const damage: DamageComponent[] = [{ formula: joinParts(enhanced.formula, [attrValue, action.bonus, bonus]), damageType: action.damageType }, ...enhanced.extra];
-            return { formula: damage.map((d) => d.formula).join(" + "), label, breakdown: enhanced.breakdown, damage };
+            const { damage, breakdown } = buildDamage(action);
+            return { formula: damage.map((d) => d.formula).join(" + "), label, breakdown, damage };
           }
           case "check": {
             const skill = computed.skills[action.skill];

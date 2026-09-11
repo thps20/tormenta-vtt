@@ -25,6 +25,7 @@ const base: ChatMessage = {
     applied: [],
     natural: null,
     targets: [],
+    criticalConfirmed: false,
     createdAt: new Date().toISOString(),
   },
 };

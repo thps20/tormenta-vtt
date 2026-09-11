@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DiceParseError, parseFormula } from "./parser.js";
+import { DiceParseError, multiplyFormulaDice, parseFormula } from "./parser.js";
 import { evaluateConstant, roll, rollParsedMany } from "./roller.js";
 
 /** RNG que devolve valores fixos em sequência (repete o último). */
@@ -63,6 +63,27 @@ describe("parseFormula", () => {
     expect(() => parseFormula("1d1")).toThrow(DiceParseError);
     expect(() => parseFormula("1d6+".repeat(60) + "1")).toThrow(DiceParseError);
     expect(parseFormula("100d1000")).toBeTruthy();
+  });
+});
+
+// Crítico confirmado (SPEC §9.13, "Rolar dano junto com o ataque"): multiplica só os dados.
+describe("multiplyFormulaDice", () => {
+  it("dobra os dados, mantém o modificador fixo intacto", () => {
+    expect(multiplyFormulaDice("1d8 + 3", 2)).toBe("2d8 + 3");
+  });
+
+  it("multiplica cada grupo de dado numa fórmula com várias parcelas", () => {
+    expect(multiplyFormulaDice("1d6 + 1d4 + 2", 3)).toBe("3d6 + 3d4 + 2");
+  });
+
+  it("times <= 1 devolve a fórmula como está, sem reparsear", () => {
+    expect(multiplyFormulaDice("1d8 + 3", 1)).toBe("1d8 + 3");
+    expect(multiplyFormulaDice("1d8 + 3", 0)).toBe("1d8 + 3");
+  });
+
+  it("preserva kh/kl e respeita o limite de dados", () => {
+    expect(multiplyFormulaDice("2d20kh1", 2)).toBe("4d20kh1");
+    expect(multiplyFormulaDice("60d6", 2)).toBe("100d6"); // clampa em DICE_LIMITS.maxCount
   });
 });
 

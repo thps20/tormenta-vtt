@@ -213,6 +213,18 @@ describe("validateSystemDefinition (integridade)", () => {
     const rolls = base.rolls as Record<string, unknown>;
     expect(() => validateSystemDefinition(withPatch({ rolls: { ...rolls, attackHit: "{target.derived.defense} <= {total}" } }))).not.toThrow();
   });
+
+  // "Rolar dano junto com o ataque" (SPEC §9.13): rolls.critical, mesma gramática de attackAutoHit.
+  it("rejeita rolls.critical usando {total} ou {target.*} (só aceita {natural})", () => {
+    const rolls = base.rolls as Record<string, unknown>;
+    expect(() => validateSystemDefinition(withPatch({ rolls: { ...rolls, critical: "{total} == 20" } }))).toThrow(/rolls.critical/);
+    expect(() => validateSystemDefinition(withPatch({ rolls: { ...rolls, critical: "{target.derived.defense} == 1" } }))).toThrow(/rolls.critical/);
+  });
+
+  it("aceita rolls.critical com {natural}", () => {
+    const rolls = base.rolls as Record<string, unknown>;
+    expect(() => validateSystemDefinition(withPatch({ rolls: { ...rolls, critical: "{natural} >= 1" } }))).not.toThrow();
+  });
 });
 
 describe("conditions[] (todas as definições de sistema)", () => {

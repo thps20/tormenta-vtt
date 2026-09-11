@@ -350,8 +350,21 @@ export const CharacterRollRequestSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("skill"), key: SkillInstanceKeySchema }),
   z.object({ type: z.literal("initiative") }),
   z.object({ type: z.literal("extra"), key: KeySchema }),
-  /** `enhancements` = aprimoramentos aplicados à ação (o card do chat reenvia os da conjuração); ausente/vazio = ação como está no item. */
-  z.object({ type: z.literal("action"), itemId: IdSchema, actionId: IdSchema, enhancements: z.array(EnhancementUseSchema).optional() }),
+  /**
+   * `enhancements` = aprimoramentos aplicados à ação (o card do chat reenvia os da conjuração);
+   * ausente/vazio = ação como está no item. `combineDamageActionId` (§9.13, "Rolar dano junto com o
+   * ataque"): id de uma ação de DANO do MESMO item, só válido quando `actionId` é uma ação de
+   * ataque — o servidor rola as duas e publica uma mensagem só (ataque em cima, dano embaixo).
+   * Preenchido pela store (`store/characters.ts#roll`) a partir da preferência do usuário, nunca
+   * escolhido na UI diretamente.
+   */
+  z.object({
+    type: z.literal("action"),
+    itemId: IdSchema,
+    actionId: IdSchema,
+    enhancements: z.array(EnhancementUseSchema).optional(),
+    combineDamageActionId: IdSchema.optional(),
+  }),
 ]);
 export type CharacterRollRequest = z.infer<typeof CharacterRollRequestSchema>;
 

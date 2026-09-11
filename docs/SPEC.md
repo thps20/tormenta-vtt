@@ -157,12 +157,12 @@ Room 1───* ChatMessage *───? Token
 | **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON), order, arrival(JSON), deletedAt?` | Múltiplos mapas por sala (§9.7). `grid` e `fog` são JSON para evoluir sem migration; `fog` segue `FogConfigSchema` (§9.3). `order`: posição no painel "Mapas", renumerada 0..n-1 a cada `scene:reorder`. `arrival` = `{x,y} \| null` (pixels do mapa): onde tokens levados de outro mapa aparecem ao ativar. `deletedAt` (coluna só do banco, nunca serializada no `Scene` do shared, mesmo padrão de `Token.deletedAt`): soft delete de `scene:delete` — todo lugar que lista "mapas da sala agora" filtra `deletedAt: null`; limpeza definitiva depois de 30 dias (`services/cleanup.ts`) |
 | **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[]), deletedAt?` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto). `deletedAt` (coluna só do banco, nunca serializada no `Token` do shared): soft delete de `token:delete`/`token:delete-many` (§9.6) — todo lugar que lista "tokens da cena agora" filtra `deletedAt: null`; a limpeza definitiva apaga a linha de vez depois de 30 dias (`services/cleanup.ts`) |
 | **Character** | `id, roomId, ownerId?, name, kind, data(JSON)` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration |
-| **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), initiativeBatch?(JSON), handout?(JSON), visibility, tokenId?, whisperTo?` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3; `natural`/`targets[]` são o sistema de alvos, §9.12 — só em rolagens de ataque com alvo marcado, congelados na hora da rolagem); `item` segue `ItemCardSchema` (kind `item`); `initiativeBatch` segue `InitiativeBatchSchema` (kind `initiative-batch`: `{ round, entries: [{ combatantId, tokenId, name, formula?, result? }] }`, `combat:roll` rolando mais de um combatente, §3.5); `handout` segue `HandoutCardSchema` (kind `handout`, §9.10: cópia denormalizada do handout mostrado); `visibility` = `all \| gm \| self` (§3.4, sempre `all` num handout — quem recebe é decidido por `whisperTo`); `tokenId?` liga a rolagem a um token (combate/ficha), filtrado à parte de `visibility` (§3.4/§3.5) — um `initiative-batch` não usa este campo (várias linhas, vários tokens): o gate é por linha, dentro de `initiativeBatch.entries`; `whisperTo?` (§9.10) é um sussurro visual por PESSOA (`participantId`): setado, só o GM e ele recebem a mensagem, nem card nem placeholder pros demais — mesmo mecanismo de exclusão de `tokenId`, só que por pessoa |
+| **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), initiativeBatch?(JSON), handout?(JSON), visibility, tokenId?, whisperTo?` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3; `natural`/`targets[]` são o sistema de alvos, §9.12 — ataque OU dano com alvo marcado, congelados na hora da rolagem, ataque com acerto/erro calculado e dano só com o nome; `criticalConfirmed` é o crítico confirmado de "Rolar dano junto com o ataque", §9.13); `item` segue `ItemCardSchema` (kind `item`); `initiativeBatch` segue `InitiativeBatchSchema` (kind `initiative-batch`: `{ round, entries: [{ combatantId, tokenId, name, formula?, result? }] }`, `combat:roll` rolando mais de um combatente, §3.5); `handout` segue `HandoutCardSchema` (kind `handout`, §9.10: cópia denormalizada do handout mostrado); `visibility` = `all \| gm \| self` (§3.4, sempre `all` num handout — quem recebe é decidido por `whisperTo`); `tokenId?` liga a rolagem a um token (combate/ficha), filtrado à parte de `visibility` (§3.4/§3.5) — um `initiative-batch` não usa este campo (várias linhas, vários tokens): o gate é por linha, dentro de `initiativeBatch.entries`; `whisperTo?` (§9.10) é um sussurro visual por PESSOA (`participantId`): setado, só o GM e ele recebem a mensagem, nem card nem placeholder pros demais — mesmo mecanismo de exclusão de `tokenId`, só que por pessoa |
 | **Handout** | `id, roomId, name, kind, imageUrl?, width?, height?, text?, tags[], deletedAt?` | Biblioteca por sala (§9.10), só o GM vê (`handout:list` é `gmOnly`). `kind` = `image \| text`; imagem reaproveita `POST /api/upload` (mesmo limite de 20 MB do mapa), texto vai até 20 000 caracteres, sem parser de markdown (texto puro). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Token.deletedAt`): soft delete de `handout:delete`, que também soft-deleta os pinos deste handout em qualquer mapa (§9.10) |
 | **HandoutPin** | `id, sceneId, handoutId, x, y, visible, name, kind, imageUrl?, width?, height?, text?, deletedAt?` | Handout fixado no mapa como um ícone (§9.10). Geometria em pixels do mapa, como `Token`/`Template`. Campos de conteúdo são uma CÓPIA denormalizada do `Handout` no momento de `handout:pin` (mesmo padrão de `Combatant.name/color`): editar o handout original depois não atualiza pinos já fixados — reposicionar/atualizar é apagar e fixar de novo. `visible` = GM controla se o pino aparece pros jogadores (mesma regra de `Token.visible`, sem névoa). `deletedAt`: soft delete de `handout:unpin` (e da cascata de `handout:delete`), entra no desfazer do GM (§9.6) |
 | **Combat** | `id, roomId, sceneId (único: um combate por cena), round, status, activeCombatantId?` | `status` = `rolling \| active \| ended` (§3.5). Persistido (ao contrário da iniciativa manual anterior, que vivia em memória) |
 | **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound, movementBudget?, movementUsed, movementDiagonals, movementAnchorX?, movementAnchorY?, movementPath?(JSON)` | `initiative = null` = ainda não rolou. `combat:remove` apaga o combatente (e ajusta `activeCombatantId`/`round` se o removido era o ativo, `stateAfterRemoval`, §3.5). `token:delete`/`token:delete-many` **não** apagam mais a linha do combatente (o token agora é soft delete, §9.6): só param de listá-lo (o combate ignora combatente cujo token tem `deletedAt`) e fazem o mesmo ajuste de turno/`order`; a linha volta se o GM desfizer. Os seis últimos campos são o orçamento de deslocamento do turno (§9.11): `movementAnchorX/Y` (de onde o próximo movimento é medido) e `movementPath` (o caminho desenhado) são colunas só do banco, nunca serializadas no `Combatant` do shared — o cliente só recebe `movementBudget/Used/Diagonals` e `movementPath` via `Combat` (§5) |
-| **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), skillTotal, rolls{} (inclui `attackHit?`/`attackAutoHit?`/`attackAutoMiss?`, §9.12), combat{} (§3.5), damageAttribute, tokenBar, grid?, race? (§9.11), movement? (§9.11), trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código. `race?` aponta o `itemKinds[]` que alimenta o placeholder `{race.<campo>}` nas fórmulas (§9.11); `movement?` declara o orçamento de deslocamento por turno (ausente = sistema sem a regra); `rolls.attackHit?`/`attackAutoHit?`/`attackAutoMiss?` são a regra de acerto do sistema de alvos (§9.12, ausentes = sistema sem a regra) |
+| **SystemDefinition** | `id, name, attributes[], skills[], resources[], derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), skillTotal, rolls{} (inclui `attackHit?`/`attackAutoHit?`/`attackAutoMiss?`, §9.12, e `critical?`, §9.13), combat{} (§3.5), damageAttribute, tokenBar, grid?, race? (§9.11), movement? (§9.11), trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código. `race?` aponta o `itemKinds[]` que alimenta o placeholder `{race.<campo>}` nas fórmulas (§9.11); `movement?` declara o orçamento de deslocamento por turno (ausente = sistema sem a regra); `rolls.attackHit?`/`attackAutoHit?`/`attackAutoMiss?` são a regra de acerto do sistema de alvos (§9.12, ausentes = sistema sem a regra); `rolls.critical?` confirma um crítico ameaçado ao rolar dano junto com o ataque (§9.13, mesma gramática de `attackAutoHit`, só `{natural}`; ausente = sistema não confirma sozinho) |
 
 Decisão: coordenadas em pixels (não células) para o token poder ficar "fora do grid" e para suportar `grid.type = none`. A conversão célula↔pixel é uma função pura usando `cellSize` e `offset`.
 
@@ -201,7 +201,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `character:create` | `{ name, kind?, ownerId? }` | todos (jogador: `ownerId` = ele, `kind` = pc) | `character:created` (NPC só para o GM) |
 | `character:update` | `{ id, patch }` (patch raso de `CharacterDataSchema` + `name`, `ownerId`, `kind`) | GM ou owner (jogador não muda `ownerId`/`kind`) | `character:updated` |
 | `character:delete` | `{ characterId }` | GM ou owner | `character:deleted` + `token:updated` dos tokens desvinculados |
-| `character:roll` | `{ characterId, roll: {type: attribute\|skill\|initiative\|extra\|action, ...}, visibility?, targetTokenIds? }` (ação: `enhancements?: [{ id, times }]` aplica os efeitos dos aprimoramentos ao dano; `visibility` = modo de rolagem do autor; `targetTokenIds` = alvos marcados no momento, §9.12 — só ações de ataque constroem `roll.targets[]`) | GM ou owner | `chat:message` (rolagem com `characterId`; dano com `damage[]` por tipo; ataque com alvo ganha `roll.natural`/`roll.targets[]`); sem alvo, sala toda recebe e quem `visibility` não permite recebe sem `roll` (placeholder, §3.4); COM alvo, uma cópia por participante (§9.12) |
+| `character:roll` | `{ characterId, roll: {type: attribute\|skill\|initiative\|extra\|action, ...}, visibility?, targetTokenIds? }` (ação: `enhancements?: [{ id, times }]` aplica os efeitos dos aprimoramentos ao dano; `combineDamageActionId?` (§9.13) rola junto uma ação de DANO do mesmo item, só válido quando `actionId` é ataque; `visibility` = modo de rolagem do autor; `targetTokenIds` = alvos marcados no momento, §9.12 — ataque OU dano constroem `roll.targets[]`, ataque com acerto/erro e dano só com o nome) | GM ou owner | `chat:message` (rolagem com `characterId`; dano com `damage[]` por tipo; ataque com alvo ganha `roll.natural`/`roll.targets[]`; combinado ganha os dois, §9.13, mais `roll.criticalConfirmed`); sem alvo, sala toda recebe e quem `visibility` não permite recebe sem `roll` (placeholder, §3.4); COM alvo, uma cópia por participante (§9.12) |
 | `character:use-item` | `{ characterId, itemId, enhancements?: [{ id, times }] }` | GM ou owner | `character:updated` (se houve custo) + `chat:message` (`kind:"item"`); recurso insuficiente ou aprimoramento inválido = ack erro, sem broadcast |
 | `compendium:list` | `{}` | todos | ack `{ entries: CompendiumEntry[], roomIds: string[] }` do sistema da sala (sem broadcast; §9.4); jogador nunca recebe `type: "creature"` — filtro no servidor, `roomIds` só para o chip "Sala" (§9.5) |
 | `compendium:spawn-creature` | `{ sceneId, entryId, count (1..20), visible, x, y }` (`x, y` em pixels do mapa) | GM | `character:created` (uma por cópia) + `token:created`; ack com os `Token[]` criados (§9.5) |
@@ -947,8 +947,12 @@ manual), rolar o dano sozinho ao acertar, alvo em `/r` solto, alcance/linha de v
   "Acertou/Errou". `rules/targets.ts` (`parseHitRule`/`evaluateHitRule`) faz a conta; o servidor
   calcula `roll.natural` (resultado natural do d20) e `roll.targets[]` (`{ tokenId, name, hit,
   targetValue?, reason }`) na hora da rolagem — congelado no card, não recalcula se a Defesa do
-  alvo mudar depois. Só ações de **ataque** constroem `roll.targets[]`; dano ignora (usa os alvos AO
-  VIVO de quem clicou "Aplicar", não uma lista congelada).
+  alvo mudar depois. Ações de **ataque** constroem `roll.targets[]` com acerto/erro calculado; uma
+  ação de **dano** avulsa (sem ataque junto) também congela a lista, mas com `hit: null` em todas
+  (sem total de ataque pra comparar contra nada) — só pro "Aplicar" do card saber quem foi mirado,
+  mesmo que o Mestre (que abre o seletor) não compartilhe os alvos AO VIVO de quem rolou. "Rolar
+  dano junto com o ataque" (§9.13) é o único caso com as duas coisas ao mesmo tempo: aí o acerto é
+  avaliado de verdade, contra o total do ataque.
 - **Quem vê o quê** (mesmo mecanismo de `ChatMessage.tokenId`/card de iniciativa em lote, §3.4/§3.5):
   linha de alvo cujo token o jogador não vê (oculto, névoa, ou mapa que não é o ativo da sala) some
   da cópia dele — nem card, nem placeholder, só aquela linha; o GM sempre vê todas. `targetValue` (o
@@ -958,10 +962,13 @@ manual), rolar o dano sozinho ao acertar, alvo em `/r` solto, alcance/linha de v
   `attackAutoHit`/`Miss`, "→ **Goblin 2**" sem regra de acerto). Como o resultado muda por pessoa,
   uma rolagem COM alvos é enviada como uma cópia por participante (generaliza o mecanismo do card de
   iniciativa em lote); o snapshot reaplica a mesma regra no histórico.
-- **"Aplicar" pré-selecionado** (§3.3): o seletor de dano/cura já abre com os alvos do CARD (se o
-  ataque tinha) ou, sem eles, com os alvos AO VIVO de quem clicou — só na primeira abertura (reabrir
-  depois não sobrescreve ajustes já feitos), passando pelo mesmo `toggle` de sempre (a sugestão por
-  `damageResponses` vem de brinde). Confirmar continua manual.
+- **"Aplicar" pré-selecionado** (§3.3): o seletor de dano/cura já abre com os alvos do CARD (ataque
+  ou dano, se tinha) ou, sem eles, com os alvos AO VIVO de quem clicou — só na primeira abertura
+  (reabrir depois não sobrescreve ajustes já feitos), passando pelo mesmo `toggle` de sempre (a
+  sugestão por `damageResponses` vem de brinde). Rolagem combinada (§9.13) é a exceção: pré-seleciona
+  só quem foi ACERTADO (`hit !== false`, então também os sem regra de acerto) e, sem alvo nenhum no
+  card, abre vazio — nunca cai para os alvos AO VIVO de quem clicou (o card já é um retrato de um
+  ataque específico; alvos avulsos de agora não têm nada a ver com ele). Confirmar continua manual.
 - **Gabarito de área vira alvos** (§9.9): enquanto o gabarito que EU coloquei existir, os tokens
   dentro dele (`targetsFromTemplate`, mesma regra de `tokensInTemplate`: centro da célula decide,
   token grande conta se qualquer célula estiver dentro) substituem a seleção manual, recalculando ao
@@ -976,3 +983,41 @@ manual), rolar o dano sozinho ao acertar, alvo em `/r` solto, alcance/linha de v
 - **Limpar ao fim do turno** (opção por usuário, desligada por padrão): quando `combat:updated` troca
   quem está agindo e o combatente que ESTAVA agindo era meu (token com `ownerId` = eu; pro GM,
   combatente sem dono), limpa meus alvos — só no cliente (`RoomPage`), não é regra do servidor.
+
+### 9.13 Rolar dano junto com o ataque
+
+Preferência por usuário (`localStorage`, ligada por padrão, botão "Dano junto" na faixa "ROLAR:" do
+chat): o botão de uma ação de **ataque** cujo item também tem uma ação de **dano** rola as duas numa
+mensagem só — ataque em cima (acerto/erro por alvo, como sempre), dano embaixo (parcelas por tipo,
+igual a uma ação de dano avulsa), e "Aplicar" pré-selecionando só quem foi acertado. Ação de dano
+avulsa continua existindo (pra rolar só o dano, sem combinar nada).
+
+- **Onde decide** (`store/characters.ts#roll`, `withCombinedDamage`): só a STORE olha a preferência
+  e o item da ficha — nenhum componente que dispara rolagem (ficha, card do chat, NpcQuickCard,
+  ataque rápido do mapa) precisa saber disso. Pede pro servidor `roll: { type:"action", itemId,
+  actionId, combineDamageActionId }` (id da ação de dano IRMÃ, mesmo item) quando: a preferência está
+  ligada; a ação clicada é `attack`; e o item tem alguma ação `damage` (a primeira encontrada). Fora
+  disso, `combineDamageActionId` fica de fora e a rolagem sai como sempre (só ataque, ou só dano).
+- **No servidor** (`rules/rolls.ts#buildCharacterRoll` monta as duas fórmulas sem rolar nada, ainda
+  puro; `services/rolls.ts#createRollMessage` rola de verdade): o d20 do ataque vira `roll.total`/
+  `groups`/`natural`/`targets[]` de sempre; o dano rola em separado e vai só em `roll.damage[]` —
+  nunca soma no `roll.total` (esse continua sendo o ataque). Sem alvo marcado, ataque e dano saem do
+  mesmo jeito, só sem a lista de alvos (nem acerto/erro, nem pré-seleção nenhuma no "Aplicar").
+- **Crítico confirmado** (`rolls.critical?` do sistema, mesma gramática de `attackAutoHit`, só
+  `{natural}`): o natural do d20 caindo na margem de crítico da ação (`critRange`, ex.: 19-20) é só
+  uma AMEAÇA; role dano dobrado (`critMult`) só se `rolls.critical` existir e confirmar. Sem essa
+  regra no JSON, o card marca "Possível crítico — confirme e ajuste o dano à mão" e o dano sai
+  normal, sem multiplicar nada (Mestre decide). T20 não pede confirmação nenhuma (ameaçou, é
+  crítico), daí `"critical": "{natural} >= 1"` (sempre verdadeiro) no JSON dele — outro sistema pode
+  exigir uma comparação de verdade, ou não declarar a regra e deixar sempre "possível". Confirmado,
+  `multiplyFormulaDice` (`dice/parser.ts`) dobra só os DADOS de cada parcela de dano (`1d8 + 3` ×2 =
+  `2d8 + 3`, nunca `2d8 + 6` — atributo/bônus fixo não multiplica) antes de rolar; o card sinaliza
+  com `roll.criticalConfirmed: true` e o dano já vem com os dados extras.
+- **"Aplicar" no card combinado** (§3.3/§9.12): pré-seleciona só os alvos com `hit !== false` (os
+  acertados, e os sem regra de acerto — não há como saber); os errados aparecem na lista, mas
+  desmarcados. Sem alvo nenhum no card, abre vazio (não cai para os alvos AO VIVO de quem clicou,
+  ao contrário do card de dano avulso — ver §9.12).
+- **Fora do escopo**: confirmação de crítico com um segundo dado (o roteiro é sempre "ameaçou →
+  `rolls.critical` decide na hora, com o que já foi rolado"); multiplicar só parte do dano (por
+  tipo); desfazer/reverter um crítico confirmado por engano — o Mestre ajusta o valor à mão no
+  seletor de "Aplicar", como em qualquer outro ajuste manual de dano.

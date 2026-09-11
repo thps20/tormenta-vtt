@@ -484,6 +484,14 @@ export const SystemDefinitionSchema = z.object({
     attackAutoHit: FormulaSchema.optional(),
     /** "Erra sempre" (T20: 1 natural). Mesma gramática de `attackAutoHit`. */
     attackAutoMiss: FormulaSchema.optional(),
+    /**
+     * Confirma um crítico AMEAÇADO (natural ≥ `critRange` da ação de ataque) ao "Rolar dano junto
+     * com o ataque" (SPEC §9.13): mesma gramática de `attackAutoHit` (só {natural}). Ausente = o
+     * sistema não confirma sozinho — o card só marca "possível crítico", sem multiplicar o dano; o
+     * Mestre decide à mão. T20 não tem confirmação (qualquer natural na margem já é crítico), daí
+     * `"{natural} >= 1"` (sempre verdadeiro) no JSON dele.
+     */
+    critical: FormulaSchema.optional(),
   }),
   /** Regras do modo de combate (iniciativa, desempate, surpresa). Ver docs/plano-combate.md. */
   combat: z.object({
@@ -730,6 +738,7 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
   if (def.rolls.attackAutoHit) checkHitFormula(def.rolls.attackAutoHit, "rolls.attackAutoHit", ["natural"], false);
   if (def.rolls.attackAutoMiss) checkHitFormula(def.rolls.attackAutoMiss, "rolls.attackAutoMiss", ["natural"], false);
   if (def.rolls.attackHit) checkHitFormula(def.rolls.attackHit, "rolls.attackHit", ["total"], true);
+  if (def.rolls.critical) checkHitFormula(def.rolls.critical, "rolls.critical", ["natural"], false);
 
   check(def.combat.initiative, "combat.initiative", CONTEXTUAL.combatInitiative ?? []);
   check(def.combat.initiativeNoSheet, "combat.initiativeNoSheet", CONTEXTUAL.combatInitiativeNoSheet ?? []);

@@ -329,3 +329,47 @@ export function parseFormula(input: string, opts: { requireDice?: boolean } = {}
 
   return { normalized: tokens.map((t) => t.text).join(""), root, hasDice };
 }
+
+/** Reconstrói uma árvore em texto (usado só por `multiplyFormulaDice`, depois de mexer nos nós). */
+function serialize(node: FormulaNode): string {
+  switch (node.kind) {
+    case "number":
+      return String(node.value);
+    case "dice":
+      return `${node.count}d${node.sides}${node.keep ? `${node.keep.mode === "highest" ? "kh" : "kl"}${node.keep.n}` : ""}`;
+    case "neg":
+      return `-${serialize(node.arg)}`;
+    case "binary":
+      return `${serialize(node.left)} ${node.op} ${serialize(node.right)}`;
+    case "call":
+      return `${node.fn}(${node.args.map(serialize).join(", ")})`;
+  }
+}
+
+/** Multiplica só os grupos de dado por `times` (constantes ficam como estão). */
+function scaleDice(node: FormulaNode, times: number): FormulaNode {
+  switch (node.kind) {
+    case "dice":
+      return { ...node, count: Math.min(node.count * times, DICE_LIMITS.maxCount) };
+    case "number":
+      return node;
+    case "neg":
+      return { ...node, arg: scaleDice(node.arg, times) };
+    case "binary":
+      return { ...node, left: scaleDice(node.left, times), right: scaleDice(node.right, times) };
+    case "call":
+      return { ...node, args: node.args.map((a) => scaleDice(a, times)) };
+  }
+}
+
+/**
+ * Multiplica só os DADOS de uma fórmula já resolvida (sem placeholders) por `times`, deixando
+ * constantes intactas: crítico confirmado (SPEC §9.13) — "1d8 + 3" ×2 vira "2d8 + 3", nunca
+ * "2d8 + 6" (regra de mesa: o multiplicador dobra os dados, não o bônus fixo). `times <= 1` devolve
+ * a fórmula como está, sem reparsear à toa.
+ */
+export function multiplyFormulaDice(formula: string, times: number): string {
+  if (times <= 1) return formula;
+  const parsed = parseFormula(formula, { requireDice: false });
+  return serialize(scaleDice(parsed.root, times));
+}

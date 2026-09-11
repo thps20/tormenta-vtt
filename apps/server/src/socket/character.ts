@@ -34,13 +34,14 @@ import { broadcastToken } from "./token.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
 /**
- * Alvos marcados pelo autor (docs/plano-alvos.md) prontos pra `createRollMessage`: só ações de
- * ATAQUE constroem `roll.targets[]` (dano ignora — "Aplicar" usa os alvos AO VIVO do autor, não
- * os congelados aqui). Ids inválidos (token apagado, de outra sala) OU de um mapa que não é o que
- * o autor está VENDO agora (`sceneId` gravado da última vez que ele chamou `target:set` — não o
- * mapa do personagem nem o da ação) são descartados em silêncio (docs/revisao-alvos.md §5.2: sem
- * isso, um alvo esquecido marcado noutro mapa continuava entrando na conta de um ataque feito
- * depois de o GM já ter navegado pra outro lugar).
+ * Alvos marcados pelo autor (docs/plano-alvos.md) prontos pra `createRollMessage`: ações de ATAQUE
+ * e de DANO constroem `roll.targets[]` (§9.13 — congelados na hora da rolagem, pro "Aplicar"
+ * pré-selecionar certo mesmo que quem for aplicar depois não seja quem rolou); só teste/
+ * atributo/iniciativa/fórmula solta não chamam isto. Ids inválidos (token apagado, de outra sala)
+ * OU de um mapa que não é o que o autor está VENDO agora (`sceneId` gravado da última vez que ele
+ * chamou `target:set` — não o mapa do personagem nem o da ação) são descartados em silêncio
+ * (docs/revisao-alvos.md §5.2: sem isso, um alvo esquecido marcado noutro mapa continuava entrando
+ * na conta de um ataque feito depois de o GM já ter navegado pra outro lugar).
  */
 async function loadRollTargets(roomId: string, def: SystemDefinition, targetTokenIds: string[], authorParticipantId: string): Promise<RollTargetInput[]> {
   if (targetTokenIds.length === 0) return [];
@@ -146,14 +147,17 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
       }
 
       const tokenId = await findLinkedTokenId(character.id, ctx.roomId);
-      // Alvos (docs/plano-alvos.md): só ações de ataque constroem roll.targets.
-      const targets = built.isAttack ? await loadRollTargets(ctx.roomId, def, targetTokenIds, ctx.participantId) : [];
+      // Alvos (docs/plano-alvos.md, §9.13): ataque OU ação de dano (avulsa, ou junto do ataque)
+      // congelam roll.targets — só um teste/atributo/iniciativa/fórmula solta não tem "alvo" nenhum.
+      const hasTargets = built.isAttack || (built.damage && built.damage.length > 0);
+      const targets = hasTargets ? await loadRollTargets(ctx.roomId, def, targetTokenIds, ctx.participantId) : [];
       const { message } = await createRollMessage(io, ctx.roomId, me, {
         formula: built.formula,
         label: `${character.name}: ${built.label}`,
         visibility,
         characterId: character.id,
         critThreshold: built.critThreshold,
+        critMult: built.critMult,
         damage: built.damage,
         allowNoDice: true,
         tokenId,

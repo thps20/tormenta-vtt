@@ -99,6 +99,14 @@ export const DiceRollSchema = z.object({
   /** Resultado natural do dado a partir do qual é crítico (ataques com margem ampliada). Ausente = máximo do dado. */
   critThreshold: z.number().int().optional(),
   /**
+   * Crítico CONFIRMADO (SPEC §9.13, "Rolar dano junto com o ataque"): true = o natural do d20 caiu
+   * na margem de crítico (critThreshold) E `rolls.critical` do sistema confirmou — o dano em
+   * `damage[]` já veio com os dados multiplicados por `critMult` da ação. false (padrão) com o d20
+   * na margem mas sem `rolls.critical` (ou sem `damage` junto) = "possível crítico": o card só
+   * sinaliza, sem multiplicar nada — o Mestre decide à mão. Só faz sentido junto de `damage`.
+   */
+  criticalConfirmed: z.boolean().default(false),
+  /**
    * Rolagem de dano da ficha: uma parcela por tipo de dano, cada uma rolada em separado
    * (groups/modifier/total acima são a junção). A UI mostra "21 (7 fogo + 14 frio)".
    * Ausente = rolagem sem tipo (teste, ataque, /r).
@@ -117,6 +125,16 @@ export const DiceRollSchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type DiceRoll = z.infer<typeof DiceRollSchema>;
+
+/**
+ * Uma rolagem tem ataque E dano juntos (SPEC §9.13, "Rolar dano junto com o ataque") quando tem
+ * `damage[]` E `critThreshold` setado — só uma ação de ATAQUE seta `critThreshold`, então as duas
+ * coisas juntas só acontecem nesse modo (sem precisar de um campo à parte só para marcar isso). Uma
+ * ação de dano avulsa (ou `formula` com `damageType`) nunca tem `critThreshold`.
+ */
+export function isCombinedAttackRoll(roll: Pick<DiceRoll, "damage" | "critThreshold">): boolean {
+  return (roll.damage?.length ?? 0) > 0 && roll.critThreshold !== undefined;
+}
 
 /**
  * Uma linha de um card de iniciativa em lote (`ChatMessage{kind:"initiative-batch"}`,

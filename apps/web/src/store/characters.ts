@@ -2,11 +2,31 @@ import { create } from "zustand";
 import type { Character, CharacterCreatePayload, CharacterPatch, CharacterRollRequest, EnhancementUse, SystemDefinition } from "@tormenta-vtt/shared";
 import { buildInsertPatch, checkInsert } from "../lib/compendium";
 import { newId } from "../lib/ids";
+import { loadRollDamageWithAttack } from "../lib/rollPreferences";
 import { emitAck } from "./connection";
 import { notifyBlindRoll, useChat } from "./chat";
 import { useCompendium } from "./compendium";
 import { useTargets } from "./targets";
 import { toast } from "./ui";
+
+/**
+ * "Rolar dano junto com o ataque" (SPEC §9.13, preferência por usuário): quando a rolagem pedida é
+ * a ação de ATAQUE de um item que também tem uma ação de DANO, e a preferência está ligada, pede
+ * pro servidor rolar as duas juntas (`combineDamageActionId`) — o card sai com o ataque em cima e o
+ * dano embaixo, numa mensagem só. Não mexe em nada quando: não é ação; a ação já veio com
+ * `combineDamageActionId` explícito; a ação não é de ataque; o item não tem ação de dano; ou a
+ * preferência está desligada.
+ */
+function withCombinedDamage(character: Character | undefined, roll: CharacterRollRequest): CharacterRollRequest {
+  if (roll.type !== "action" || roll.combineDamageActionId || !character) return roll;
+  if (!loadRollDamageWithAttack()) return roll;
+  const item = character.items.find((i) => i.id === roll.itemId);
+  const action = item?.actions.find((a) => a.id === roll.actionId);
+  if (!item || !action || action.kind !== "attack") return roll;
+  const damageAction = item.actions.find((a) => a.kind === "damage");
+  if (!damageAction) return roll;
+  return { ...roll, combineDamageActionId: damageAction.id };
+}
 
 interface CharactersState {
   byId: Record<string, Character>;
@@ -102,7 +122,8 @@ export const useCharacters = create<CharactersState>((set, get) => ({
     // Alvos marcados (docs/plano-alvos.md): só ações de item levam alvo (ataque/dano da ficha);
     // teste de atributo/perícia/iniciativa não tem "alvo" — o servidor também ignora fora de ataque.
     const targetTokenIds = roll.type === "action" ? useTargets.getState().mine : [];
-    const res = await emitAck("character:roll", { characterId, roll, visibility: useChat.getState().rollMode, targetTokenIds });
+    const finalRoll = withCombinedDamage(get().byId[characterId], roll);
+    const res = await emitAck("character:roll", { characterId, roll: finalRoll, visibility: useChat.getState().rollMode, targetTokenIds });
     if (!res.ok) toast(res.error);
     else notifyBlindRoll(res.data);
     return res.ok;
