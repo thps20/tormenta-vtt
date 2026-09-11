@@ -54,8 +54,12 @@ describe("shapeContains", () => {
 });
 
 describe("tokenCenter", () => {
-  it("centro a partir do canto superior esquerdo", () => {
-    expect(tokenCenter({ x: 10, y: 20, width: 70, height: 70 })).toEqual({ x: 45, y: 55 });
+  it("centro a partir do canto superior esquerdo (1 célula)", () => {
+    expect(tokenCenter({ x: 10, y: 20, cells: 1 }, 70)).toEqual({ x: 45, y: 55 });
+  });
+
+  it("token 2x2: meio lado é cells × cellSize / 2", () => {
+    expect(tokenCenter({ x: 0, y: 0, cells: 2 }, 70)).toEqual({ x: 70, y: 70 });
   });
 });
 

@@ -12,7 +12,6 @@ import {
   applyResourceDelta,
   computeCharacter,
   type AppliedDamage,
-  type FogConfig,
   type SystemDefinition,
   type Token,
   type TokenHp,
@@ -31,6 +30,7 @@ import {
 import { checkApplyDamageTarget } from "../services/applyDamage.js";
 import { emitCombat, loadCombatRow, maybeReemitCombatForToken, prepareTokenRemovalFromCombat } from "../services/combat.js";
 import { emitChatMessage, messageVisibleTo } from "../services/chatVisibility.js";
+import { sceneGeometry, type SceneGeometry } from "../services/grid.js";
 import { checkMovement } from "../services/movement.js";
 import {
   describeDelete,
@@ -85,10 +85,10 @@ export function hpJson(hp: TokenHp | null): Prisma.InputJsonValue | typeof Prism
  * cache). Ver services/visibility.ts. A checagem de mapa ativo é assíncrona (mais uma consulta),
  * então roda fora do fluxo síncrono desta função — não muda a assinatura nos ~10 lugares que chamam.
  */
-export function broadcastToken(io: TypedServer, roomId: string, token: Token, event: "token:created" | "token:updated", fog: FogConfig) {
+export function broadcastToken(io: TypedServer, roomId: string, token: Token, event: "token:created" | "token:updated", geom: SceneGeometry) {
   io.to(rooms.gm(roomId)).emit(event, token);
   void isActiveScene(roomId, token.sceneId).then((active) => {
-    if (active) emitTokenToPlayers(io, roomId, token, event, fog);
+    if (active) emitTokenToPlayers(io, roomId, token, event, geom);
   });
 }
 
@@ -125,13 +125,13 @@ async function applyTokenUpdate(io: TypedServer, ctx: Ctx, patch: TokenPatch): P
   const movement = await checkMovement(io, def, ctx, row, patch);
   const updatedRow = await prisma.token.update({ where: { id }, data: { ...fields, ...(hp !== undefined ? { hp: hpJson(hp) } : {}) } });
   const token = toToken(updatedRow);
-  const fog = toScene(row.scene).fog;
+  const geom = sceneGeometry(toScene(row.scene));
   // A cena já veio junto com o token (requireToken): sem consulta extra a cada movimento.
-  broadcastToken(io, ctx.roomId, token, "token:updated", fog);
+  broadcastToken(io, ctx.roomId, token, "token:updated", geom);
   const before = toToken(row);
   // Nome/cor/visível mudaram, ou a posição cruzou a névoa: se este token é um combatente,
   // a lista de combate (e quem pode vê-la) pode ter mudado junto.
-  await maybeReemitCombatForToken(io, ctx.roomId, before, token, fog);
+  await maybeReemitCombatForToken(io, ctx.roomId, before, token, geom);
   if (!patch.live) await movement?.commit();
   const historyBefore = dragFrom ? { ...before, x: dragFrom.x, y: dragFrom.y } : before;
   return { before, after: token, historyBefore };
@@ -149,10 +149,10 @@ interface TrackableDiffItem {
 async function writeTrackablePatch(io: TypedServer, roomId: string, tokenId: string, patch: TrackableTokenPatch): Promise<void> {
   const row = await prisma.token.findUnique({ where: { id: tokenId }, include: { scene: true } });
   if (!row || row.deletedAt !== null) throw new Error(`token "${tokenId}" não existe mais`);
-  const fog = toScene(row.scene).fog;
+  const geom = sceneGeometry(toScene(row.scene));
   const updated = toToken(await prisma.token.update({ where: { id: tokenId }, data: patch }));
-  broadcastToken(io, roomId, updated, "token:updated", fog);
-  await maybeReemitCombatForToken(io, roomId, toToken(row), updated, fog);
+  broadcastToken(io, roomId, updated, "token:updated", geom);
+  await maybeReemitCombatForToken(io, roomId, toToken(row), updated, geom);
 }
 
 /** Uma entrada de histórico pra 1..N tokens que tiveram campo(s) rastreado(s) mudado(s) na MESMA
@@ -235,7 +235,7 @@ function buildDeleteHistoryEntry(io: TypedServer, roomId: string, def: SystemDef
       for (const item of items) {
         const row = await prisma.token.update({ where: { id: item.tokenId }, data: { deletedAt: null } });
         const scene = await prisma.scene.findUniqueOrThrow({ where: { id: item.sceneId } });
-        broadcastToken(io, roomId, toToken(row), "token:updated", toScene(scene).fog);
+        broadcastToken(io, roomId, toToken(row), "token:updated", sceneGeometry(toScene(scene)));
         if (item.combatSnapshot) {
           await restoreCombatSnapshot(item.combatSnapshot);
           affectedScenes.add(item.sceneId);
@@ -270,7 +270,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
         if (!owner || owner.roomId !== ctx.roomId) throw new HandlerError("Dono inválido");
       }
       const token = toToken(await prisma.token.create({ data: { ...data, hp: hpJson(data.hp) } }));
-      broadcastToken(io, ctx.roomId, token, "token:created", toScene(scene).fog);
+      broadcastToken(io, ctx.roomId, token, "token:created", sceneGeometry(toScene(scene)));
       return token;
     }, { gmOnly: true }),
   );
@@ -380,7 +380,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
         if (!canEditCharacter(ctx, character)) throw new HandlerError("Você não controla esta ficha");
       }
       const token = toToken(await prisma.token.update({ where: { id: tokenId }, data: { characterId } }));
-      broadcastToken(io, ctx.roomId, token, "token:updated", toScene(row.scene).fog);
+      broadcastToken(io, ctx.roomId, token, "token:updated", sceneGeometry(toScene(row.scene)));
       return token;
     }),
   );
@@ -434,7 +434,7 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
           const updatedToken = toToken(
             await prisma.token.update({ where: { id: tokenRow.id }, data: { hp: hpJson({ current: next.current, max: hp.max }) } }),
           );
-          broadcastToken(io, ctx.roomId, updatedToken, "token:updated", toScene(tokenRow.scene).fog);
+          broadcastToken(io, ctx.roomId, updatedToken, "token:updated", sceneGeometry(toScene(tokenRow.scene)));
         }
 
         applied.push({ tokenId: tokenRow.id, tokenName: tokenRow.name, amount: target.amount, multiplier: target.multiplier });

@@ -37,10 +37,11 @@
  * vira "uma cópia por participante" (mesmo mecanismo do card de iniciativa em lote), mas ainda
  * respeitando `visibility`/`tokenId`/`whisperTo` da mensagem como um todo primeiro.
  */
-import { FogConfigSchema, type ChatMessage, type FogConfig, type RollTarget, type Token } from "@tormenta-vtt/shared";
+import type { ChatMessage, RollTarget, Token } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { rooms, type TypedServer } from "../socket/types.js";
-import { toToken } from "./serialize.js";
+import { toScene, toToken } from "./serialize.js";
+import { sceneGeometry, type SceneGeometry } from "./grid.js";
 import { tokenVisibleTo } from "./visibility.js";
 
 export interface Viewer {
@@ -71,24 +72,25 @@ async function blockedPlayerIds(roomId: string, tokenId: string, authorParticipa
   ]);
   if (!row) return []; // token apagado: a FK já zerou tokenId na mensagem antes desta chamada acontecer de novo.
   const token = toToken(row);
-  const fog = FogConfigSchema.parse(row.scene.fog ?? {});
+  const geom = sceneGeometry(toScene(row.scene));
   const inactiveScene = token.sceneId !== room?.activeSceneId;
   const players = await prisma.participant.findMany({ where: { roomId, role: "player" } });
   return players
     .filter((p) => p.id !== authorParticipantId)
-    .filter((p) => inactiveScene || !tokenVisibleTo(token, { role: "player", participantId: p.id }, fog))
+    .filter((p) => inactiveScene || !tokenVisibleTo(token, { role: "player", participantId: p.id }, geom))
     .map((p) => p.id);
 }
 
 /**
- * Token + névoa da cena de cada um de `tokenIds`, pronto pra `tokenVisibleTo`. Usado pro gate por
- * linha de um card de iniciativa em lote (`initiativeBatchForViewer`) e reaproveitável pelo
- * snapshot (histórico), que já refaz essa consulta pra mensagens com `tokenId` único.
+ * Token + geometria da cena (névoa + cellSize, pra `tokenCenter`) de cada um de `tokenIds`, pronto
+ * pra `tokenVisibleTo`. Usado pro gate por linha de um card de iniciativa em lote
+ * (`initiativeBatchForViewer`) e reaproveitável pelo snapshot (histórico), que já refaz essa
+ * consulta pra mensagens com `tokenId` único.
  */
-export async function loadTokenInfo(tokenIds: string[]): Promise<Map<string, { token: Token; fog: FogConfig }>> {
+export async function loadTokenInfo(tokenIds: string[]): Promise<Map<string, { token: Token; geom: SceneGeometry }>> {
   if (tokenIds.length === 0) return new Map();
   const rows = await prisma.token.findMany({ where: { id: { in: tokenIds } }, include: { scene: true } });
-  return new Map(rows.map((t) => [t.id, { token: toToken(t), fog: FogConfigSchema.parse(t.scene.fog ?? {}) }]));
+  return new Map(rows.map((t) => [t.id, { token: toToken(t), geom: sceneGeometry(toScene(t.scene)) }]));
 }
 
 /**
@@ -103,7 +105,7 @@ export function tokenGateOk(
   tokenId: string | null | undefined,
   viewer: Viewer,
   authorParticipantId: string,
-  tokenInfo: { token: Token; fog: FogConfig } | undefined,
+  tokenInfo: { token: Token; geom: SceneGeometry } | undefined,
   activeSceneId: string | null,
 ): boolean {
   if (!tokenId) return true;
@@ -111,7 +113,7 @@ export function tokenGateOk(
   if (viewer.participantId === authorParticipantId) return true;
   if (!tokenInfo) return true; // referência órfã (não deveria acontecer, a FK zera); não trava o resto do chat por isso.
   if (tokenInfo.token.sceneId !== activeSceneId) return false;
-  return tokenVisibleTo(tokenInfo.token, { role: "player", participantId: viewer.participantId }, tokenInfo.fog);
+  return tokenVisibleTo(tokenInfo.token, { role: "player", participantId: viewer.participantId }, tokenInfo.geom);
 }
 
 /** Regra 3: sussurro visual (`whisperTo`, §9.10). GM sempre passa; jogador só se for o alvo. */
@@ -179,7 +181,7 @@ export async function emitChatMessage(io: TypedServer, roomId: string, msg: Chat
 export function initiativeBatchForViewer(
   msg: ChatMessage,
   viewer: Viewer,
-  tokenInfoById: Map<string, { token: Token; fog: FogConfig }>,
+  tokenInfoById: Map<string, { token: Token; geom: SceneGeometry }>,
   activeSceneId: string | null,
 ): ChatMessage | undefined {
   if (!msg.initiativeBatch) return undefined;
@@ -190,7 +192,7 @@ export function initiativeBatchForViewer(
       if (!info) return true; // referência órfã: não trava (mesma regra do resto)
       if (viewer.role === "gm") return true;
       if (info.token.sceneId !== activeSceneId) return false;
-      return tokenVisibleTo(info.token, viewer, info.fog);
+      return tokenVisibleTo(info.token, viewer, info.geom);
     })
     .map((e) => (showValues ? e : { combatantId: e.combatantId, tokenId: e.tokenId, name: e.name }));
   if (entries.length === 0) return undefined;
@@ -206,14 +208,14 @@ export function initiativeBatchForViewer(
 export function rollTargetsForViewer(
   targets: RollTarget[],
   viewer: Viewer,
-  tokenInfoById: Map<string, { token: Token; fog: FogConfig }>,
+  tokenInfoById: Map<string, { token: Token; geom: SceneGeometry }>,
   activeSceneId: string | null,
 ): RollTarget[] {
   return targets.flatMap((t) => {
     const info = tokenInfoById.get(t.tokenId);
     if (info && viewer.role !== "gm") {
       if (info.token.sceneId !== activeSceneId) return [];
-      if (!tokenVisibleTo(info.token, viewer, info.fog)) return [];
+      if (!tokenVisibleTo(info.token, viewer, info.geom)) return [];
     }
     if (viewer.role === "gm" || info?.token.ownerId === viewer.participantId || t.targetValue === undefined) return [t];
     const { targetValue: _drop, ...rest } = t;

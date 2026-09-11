@@ -1,4 +1,4 @@
-import type { CellRect, GridConfig } from "@tormenta-vtt/shared";
+import { tokenPixelSize, type CellRect, type GridConfig, type Token } from "@tormenta-vtt/shared";
 
 /**
  * Conversões célula <-> pixel. Funções puras (sem React, sem Konva) para
@@ -44,10 +44,21 @@ export function cellCenter(cell: { col: number; row: number }, grid: GridConfig)
   return { x: corner.x + size / 2, y: corner.y + size / 2 };
 }
 
-/** Retângulo em células ocupado por um token (o lado é arredondado pro grid; ver rules/placement.ts). */
-export function cellRect(token: { x: number; y: number; width: number }, grid: GridConfig): CellRect {
-  const size = effectiveCellSize(grid);
-  return { ...cellAt(token, grid), cells: Math.max(1, Math.round(token.width / size)) };
+/** Retângulo em células ocupado por um token (`token.cells`, docs/plano-grid.md — fonte da verdade). */
+export function cellRect(token: { x: number; y: number; cells: number }, grid: GridConfig): CellRect {
+  return { ...cellAt(token, grid), cells: token.cells };
+}
+
+/** Token + tamanho em pixels do mapa, derivado de `cells × cellSize do grid` (docs/plano-grid.md).
+ *  `width`/`height` não são persistidos nem trafegam no socket — só existem no cliente, pro Konva
+ *  desenhar e pro resto do arquivo continuar lendo `token.width`/`token.height` como sempre. */
+export type SizedToken = Token & { width: number; height: number };
+
+/** Deriva `SizedToken[]` uma vez (no topo do componente), a partir do grid do mapa ATUAL — nunca
+ *  gravado, sempre recalculado (mudou de mapa ou de `cellSize`? o tamanho já muda sozinho). */
+export function sizeTokens(tokens: Token[], grid: GridConfig): SizedToken[] {
+  const cellSizePx = effectiveCellSize(grid);
+  return tokens.map((t) => ({ ...t, ...tokenPixelSize(t.cells, cellSizePx) }));
 }
 
 /** Alinha o canto superior esquerdo de um token à célula mais próxima. */

@@ -1,10 +1,11 @@
-import { FogConfigSchema, getSystemDefinition, type Combat, type RoomSnapshot } from "@tormenta-vtt/shared";
+import { FogConfigSchema, GridConfigSchema, getSystemDefinition, type Combat, type RoomSnapshot } from "@tormenta-vtt/shared";
 import type { Participant as DbParticipant, Room as DbRoom } from "@prisma/client";
 import { prisma } from "../db.js";
 import { isConnected } from "./presence.js";
 import { loadCombatRow, toCombat } from "./combat.js";
 import { toChatMessage, toParticipant, toRoomPublic, toScene, toToken } from "./serialize.js";
 import { characterVisibleTo, toCharacter } from "./characters.js";
+import { effectiveCellSize } from "./grid.js";
 import { tokenVisibleTo } from "./visibility.js";
 import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, rollTargetsForViewer, tokenGateOk, whisperGateOk } from "./chatVisibility.js";
 import { listTemplates } from "./templates.js";
@@ -37,13 +38,15 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
       : Promise.resolve([]),
   ]);
 
-  // Névoa da cena ativa: decide quais tokens (e combatentes) alheios um jogador recebe.
+  // Névoa + cellSize da cena ativa: decide quais tokens (e combatentes) alheios um jogador recebe
+  // (o centro do token, pra régua da névoa, depende de `cells` — docs/plano-grid.md).
   const activeScene = scenes.find((sc) => sc.id === room.activeSceneId);
   const fog = FogConfigSchema.parse(activeScene?.fog ?? {});
+  const geom = { fog, cellSizePx: effectiveCellSize(GridConfigSchema.parse(activeScene?.grid ?? {})) };
   const viewer = { role: me.role, participantId: me.id };
   const def = getSystemDefinition(room.systemId);
 
-  const combat: Combat | null = combatRow ? toCombat(combatRow, def, viewer, fog) : null;
+  const combat: Combat | null = combatRow ? toCombat(combatRow, def, viewer, geom) : null;
 
   // Mensagens ligadas a um token (combate/ficha) ou cujas linhas citam tokens (card de
   // iniciativa em lote): quem não vê esses tokens não recebe a mensagem (nem histórico), mesmo
@@ -72,7 +75,7 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     if (roleByParticipant.get(t.participantId) === "gm") return []; // alvos do GM nunca vão a jogador
     const tokenIds = t.tokenIds.filter((id) => {
       const info = targetTokenInfo.get(id);
-      return info !== undefined && tokenVisibleTo(info.token, viewer, info.fog);
+      return info !== undefined && tokenVisibleTo(info.token, viewer, info.geom);
     });
     return tokenIds.length > 0 ? [{ ...t, tokenIds }] : [];
   });
@@ -83,7 +86,7 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     sessionToken: me.sessionToken,
     participants: participants.map((p) => toParticipant(p, isConnected(room.id, p.id))),
     scenes: scenes.map(toScene),
-    tokens: tokens.map(toToken).filter((t) => tokenVisibleTo(t, viewer, fog)),
+    tokens: tokens.map(toToken).filter((t) => tokenVisibleTo(t, viewer, geom)),
     combat,
     // Gabaritos são efêmeros (docs/plano-gabaritos.md): sem fog/visibilidade por token, todos que
     // veem o mapa ativo veem todos os gabaritos dele.

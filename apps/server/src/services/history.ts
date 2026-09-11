@@ -87,7 +87,7 @@ export function peekSummaries(roomId: string): { canUndo: boolean; canRedo: bool
 
 /** Únicos campos de Token que geram entrada de histórico. Nome/cor/imagem/dono/ficha ficam fora
  *  (editados pelo TokenInspector, fora do escopo deste plano). */
-export const TRACKABLE_TOKEN_FIELDS = ["x", "y", "width", "height", "conditions", "visible"] as const;
+export const TRACKABLE_TOKEN_FIELDS = ["x", "y", "cells", "conditions", "visible"] as const;
 export type TrackableTokenField = (typeof TRACKABLE_TOKEN_FIELDS)[number];
 
 export type TrackableTokenPatch = Partial<Pick<Token, TrackableTokenField>>;
@@ -112,7 +112,7 @@ export function pickTrackableTokenPatch(before: Token, after: Token): { before: 
 export function describeTokenChange(subject: string, fields: Iterable<TrackableTokenField>): string {
   const set = new Set(fields);
   if (set.has("x") || set.has("y")) return `mover ${subject}`;
-  if (set.has("width") || set.has("height")) return `redimensionar ${subject}`;
+  if (set.has("cells")) return `redimensionar ${subject}`;
   if (set.has("conditions")) return `alterar condição de ${subject}`;
   if (set.has("visible")) return `alterar visibilidade de ${subject}`;
   return `atualizar ${subject}`;

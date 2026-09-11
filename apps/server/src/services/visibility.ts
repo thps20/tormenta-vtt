@@ -1,5 +1,6 @@
-import { isPointRevealed, tokenCenter, type FogConfig, type Token } from "@tormenta-vtt/shared";
+import { isPointRevealed, tokenCenter, type Token } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
+import type { SceneGeometry } from "./grid.js";
 import { rooms, type TypedServer } from "../socket/types.js";
 
 export interface Viewer {
@@ -33,16 +34,16 @@ export function canAccessScene(role: "gm" | "player", isActive: boolean): boolea
  * (é dono dele, ou a névoa está desligada, ou o CENTRO do token está em área revelada).
  * A mesma função pura `isPointRevealed` roda no cliente (packages/shared).
  */
-export function tokenVisibleTo(token: Token, viewer: Viewer, fog: FogConfig): boolean {
+export function tokenVisibleTo(token: Token, viewer: Viewer, geom: SceneGeometry): boolean {
   if (viewer.role === "gm") return true;
   if (!token.visible) return false;
   if (token.ownerId === viewer.participantId) return true;
-  return isPointRevealed(fog, tokenCenter(token));
+  return isPointRevealed(geom.fog, tokenCenter(token, geom.cellSizePx));
 }
 
 /** Um token está escondido de jogadores (que não sejam o dono) pela névoa? */
-function hiddenByFog(token: Token, fog: FogConfig): boolean {
-  return !isPointRevealed(fog, tokenCenter(token));
+function hiddenByFog(token: Token, geom: SceneGeometry): boolean {
+  return !isPointRevealed(geom.fog, tokenCenter(token, geom.cellSizePx));
 }
 
 /**
@@ -51,7 +52,7 @@ function hiddenByFog(token: Token, fog: FogConfig): boolean {
  * assim nem nome nem existência vazam. Como "é dono" varia por pessoa, usamos
  * a sala do dono + `players` exceto o dono. O GM é tratado pelo chamador.
  */
-export function emitTokenToPlayers(io: TypedServer, roomId: string, token: Token, event: "token:created" | "token:updated", fog: FogConfig): void {
+export function emitTokenToPlayers(io: TypedServer, roomId: string, token: Token, event: "token:created" | "token:updated", geom: SceneGeometry): void {
   const players = rooms.players(roomId);
   const hide = (except?: string) => {
     // Em token:created ninguém tinha o token; não há o que apagar.
@@ -61,7 +62,7 @@ export function emitTokenToPlayers(io: TypedServer, roomId: string, token: Token
   };
 
   if (!token.visible) return hide();
-  if (!hiddenByFog(token, fog)) return void io.to(players).emit(event, token);
+  if (!hiddenByFog(token, geom)) return void io.to(players).emit(event, token);
 
   // Oculto pela névoa: só o dono (se houver) recebe o token; os outros jogadores apagam.
   if (token.ownerId) {

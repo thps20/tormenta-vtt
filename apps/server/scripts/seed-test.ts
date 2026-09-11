@@ -269,33 +269,30 @@ async function main(): Promise<void> {
   const goblinColor = creatureColor(def, goblinTemplate);
   const ogroColor = creatureColor(def, ogroTemplate);
   const ogroCells = Math.max(1, Math.round(def.sizes.find((s) => s.key === "grande")?.tokenCells ?? 1));
-  const ogroTokenSize = ogroCells * TAVERNA_CELL;
 
   // 5. Tokens na Taverna.
   await prisma.token.createMany({
     data: [
-      { sceneId: taverna.id, name: "Kael", x: 280, y: 280, width: TAVERNA_CELL, height: TAVERNA_CELL, ownerId: ana.id, color: "#2563eb", characterId: kael.id },
-      { sceneId: taverna.id, name: "Thorin", x: 420, y: 280, width: TAVERNA_CELL, height: TAVERNA_CELL, ownerId: null, color: "#16a34a", characterId: thorin.id },
+      { sceneId: taverna.id, name: "Kael", x: 280, y: 280, cells: 1, ownerId: ana.id, color: "#2563eb", characterId: kael.id },
+      { sceneId: taverna.id, name: "Thorin", x: 420, y: 280, cells: 1, ownerId: null, color: "#16a34a", characterId: thorin.id },
       {
         sceneId: taverna.id,
         name: "Goblin 1",
         x: 700,
         y: 490,
-        width: TAVERNA_CELL,
-        height: TAVERNA_CELL,
+        cells: 1,
         ownerId: null,
         color: goblinColor,
         characterId: goblin1.id,
         conditions: toJson([{ key: "sangrando" }]),
       },
-      { sceneId: taverna.id, name: "Goblin 2", x: 770, y: 490, width: TAVERNA_CELL, height: TAVERNA_CELL, ownerId: null, color: goblinColor, characterId: goblin2.id },
+      { sceneId: taverna.id, name: "Goblin 2", x: 770, y: 490, cells: 1, ownerId: null, color: goblinColor, characterId: goblin2.id },
       {
         sceneId: taverna.id,
         name: "Goblin 3",
         x: 840,
         y: 490,
-        width: TAVERNA_CELL,
-        height: TAVERNA_CELL,
+        cells: 1,
         ownerId: null,
         color: goblinColor,
         characterId: goblin3.id,
@@ -306,8 +303,7 @@ async function main(): Promise<void> {
         name: "Ogro",
         x: 980,
         y: 420,
-        width: ogroTokenSize,
-        height: ogroTokenSize,
+        cells: ogroCells,
         ownerId: null,
         color: ogroColor,
         characterId: ogro.id,
@@ -319,8 +315,9 @@ async function main(): Promise<void> {
         name: "Carroça",
         x: 180,
         y: 560,
-        width: TAVERNA_CELL * 2,
-        height: TAVERNA_CELL,
+        // Token não quadrado (2x1) não é mais suportado (Token.cells é um lado só,
+        // docs/plano-grid.md D1): arredonda pro maior lado.
+        cells: 2,
         ownerId: null,
         color: "#92400e",
         // Sem characterId: token de cenário puro, não entra em combate nem tem PV.

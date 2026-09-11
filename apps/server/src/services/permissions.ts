@@ -7,7 +7,7 @@ export function canEditToken(ctx: Pick<Ctx, "role" | "participantId">, token: Pi
 }
 
 /** Campos que um jogador (dono) pode alterar. O resto (dono, visibilidade, cena...) é só do GM. */
-const PLAYER_EDITABLE = new Set<keyof TokenPatch>(["id", "x", "y", "width", "height", "rotation", "conditions"]);
+const PLAYER_EDITABLE = new Set<keyof TokenPatch>(["id", "x", "y", "cells", "rotation", "conditions"]);
 
 export function restrictPatchForRole(ctx: Ctx, patch: TokenPatch): TokenPatch {
   if (ctx.role === "gm") return patch;

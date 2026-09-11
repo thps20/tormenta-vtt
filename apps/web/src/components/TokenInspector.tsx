@@ -1,14 +1,15 @@
 import React, { useRef, useState } from "react";
 import { BookOpen, Eye, EyeOff, Heart, ImagePlus, Sparkles, Trash2, User, X } from "lucide-react";
-import type { Character, ConditionDef, Participant, Token, TokenPatch } from "@tormenta-vtt/shared";
+import type { Character, ConditionDef, Participant, TokenPatch } from "@tormenta-vtt/shared";
 import { uploadImage } from "../lib/api";
+import type { SizedToken } from "../lib/grid";
 import { toast } from "../store/ui";
 
 /** Paleta de cores para tokens (só visual, não é regra de sistema). */
 export const TOKEN_COLORS = ["#e11d48", "#2563eb", "#16a34a", "#9333ea", "#d97706", "#0891b2", "#d4af37", "#71717a"];
 
 interface TokenInspectorProps {
-  token: Token;
+  token: SizedToken;
   participants: Participant[];
   me: Participant;
   onPatch: (patch: TokenPatch) => void;
@@ -122,7 +123,7 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({
       <div className="space-y-2.5 text-xs">
         <Row label="Posição">
           <span className="font-mono text-zinc-300 text-[11px]">
-            {Math.round(token.x)}, {Math.round(token.y)} • {Math.round(token.width)}×{Math.round(token.height)}
+            {Math.round(token.x)}, {Math.round(token.y)} • {token.cells}×{token.cells} células ({Math.round(token.width)}×{Math.round(token.height)} px)
           </span>
         </Row>
 

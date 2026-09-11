@@ -4,6 +4,11 @@
 > GM navegar e editar qualquer mapa sem ativar; levar tokens de um mapa para outro ao ativar; combate
 > por mapa. Escrito em 09/09/2026, **antes** da implementação. **Aguardando aprovação.**
 
+> **Nota (11/09/2026, `docs/plano-grid.md`):** as passagens abaixo sobre "converter tamanho do
+> token entre grids" (`convertSizeToCellSize`, `resnapToken` com width/height) descrevem o desenho
+> ANTES de `Token.cells` virar a fonte da verdade do tamanho — ficam como registro histórico, não
+> como o comportamento atual. Ver `docs/plano-grid.md` e o SPEC §9.7 atualizados.
+
 **Fora deste plano** (registrado no backlog quando fizer sentido): "Encerrar cena" (a unidade de tempo
 de jogo — ver §1), gabaritos de área (não existem ainda; quando existirem já nascem por mapa),
 mapas em camadas/níveis, importar mapa de outra sala, permissões de mapa por jogador, iluminação,

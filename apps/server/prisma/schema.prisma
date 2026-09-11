@@ -92,8 +92,10 @@ model Token {
   imageUrl    String?
   x           Float
   y           Float
-  width       Float
-  height      Float
+  /// Lado do token em células (docs/plano-grid.md): fonte da verdade do tamanho. Os pixels são
+  /// sempre `cells × cellSize do grid ATUAL` (tokenPixelSize, packages/shared) — nunca gravados,
+  /// pra não existir "converter tamanho ao trocar de grid" (bug histórico corrigido nesta migration).
+  cells       Int       @default(1)
   rotation    Float     @default(0)
   zIndex      Int       @default(0)
   visible     Boolean   @default(true)

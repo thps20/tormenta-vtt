@@ -3,12 +3,13 @@
  * services/targets.ts), sincronizado por socket. Lista COMPLETA por chamada (`target:set`), nunca
  * "adiciona/remove" — mesmo raciocínio de `fog:update`/`template:upsert`.
  */
-import { FogConfigSchema, TargetSetSchema } from "@tormenta-vtt/shared";
+import { TargetSetSchema } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { requirePlayerOnActiveScene } from "../services/combat.js";
+import { sceneGeometry } from "../services/grid.js";
 import { clearPlayerTargets, removeTokenFromTargets, setTargets } from "../services/targets.js";
 import { tokenVisibleTo } from "../services/visibility.js";
-import { toToken } from "../services/serialize.js";
+import { toScene, toToken } from "../services/serialize.js";
 import { guarded } from "./ack.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
@@ -30,12 +31,12 @@ export function registerTargetHandlers(io: TypedServer, socket: TypedSocket): vo
       if (ctx.role === "gm") {
         accepted = tokenIds.filter((id) => byId.has(id));
       } else {
-        const scene = await prisma.scene.findUniqueOrThrow({ where: { id: sceneId } });
-        const fog = FogConfigSchema.parse(scene.fog ?? {});
+        const scene = toScene(await prisma.scene.findUniqueOrThrow({ where: { id: sceneId } }));
+        const geom = sceneGeometry(scene);
         const viewer = { role: "player" as const, participantId: ctx.participantId };
         accepted = tokenIds.filter((id) => {
           const token = byId.get(id);
-          return token !== undefined && tokenVisibleTo(token, viewer, fog);
+          return token !== undefined && tokenVisibleTo(token, viewer, geom);
         });
       }
       // Preserva a ordem em que o cliente marcou (relevante pro Alt "vira o único alvo").
@@ -71,10 +72,10 @@ export async function broadcastTargets(
   const others = await prisma.participant.findMany({ where: { roomId, role: "player", id: { not: participantId } } });
   if (others.length === 0) return;
   const rows = tokenIds.length > 0 ? await prisma.token.findMany({ where: { id: { in: tokenIds } }, include: { scene: true } }) : [];
-  const infos = rows.map((r) => ({ token: toToken(r), fog: FogConfigSchema.parse(r.scene.fog ?? {}) }));
+  const infos = rows.map((r) => ({ token: toToken(r), geom: sceneGeometry(toScene(r.scene)) }));
   for (const other of others) {
     const viewer = { role: "player" as const, participantId: other.id };
-    const visibleIds = infos.filter(({ token, fog }) => tokenVisibleTo(token, viewer, fog)).map(({ token }) => token.id);
+    const visibleIds = infos.filter(({ token, geom }) => tokenVisibleTo(token, viewer, geom)).map(({ token }) => token.id);
     io.to(rooms.participant(other.id)).emit("target:updated", { participantId, sceneId, tokenIds: visibleIds });
   }
 }

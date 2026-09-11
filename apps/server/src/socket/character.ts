@@ -28,6 +28,7 @@ import {
   toJson,
 } from "../services/characters.js";
 import { emitChatMessage } from "../services/chatVisibility.js";
+import { sceneGeometry } from "../services/grid.js";
 import { partyOf, pruneFromParty, saveAndBroadcastParty } from "../services/party.js";
 import { createRollMessage, type RollTargetInput } from "../services/rolls.js";
 import { toChatMessage, toScene, toToken } from "../services/serialize.js";
@@ -137,7 +138,7 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
       const linked = await prisma.token.findMany({ where: { characterId, deletedAt: null }, include: { scene: true } });
       await prisma.character.delete({ where: { id: characterId } });
       io.to(rooms.all(ctx.roomId)).emit("character:deleted", { characterId });
-      for (const t of linked) broadcastToken(io, ctx.roomId, toToken({ ...t, characterId: null }), "token:updated", toScene(t.scene).fog);
+      for (const t of linked) broadcastToken(io, ctx.roomId, toToken({ ...t, characterId: null }), "token:updated", sceneGeometry(toScene(t.scene)));
       // Visão de grupo (SPEC §9.15): ficha apagada some do grupo também.
       await pruneFromParty(io, ctx.roomId, characterId);
     }),

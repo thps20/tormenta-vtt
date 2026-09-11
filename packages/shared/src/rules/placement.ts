@@ -99,23 +99,24 @@ function escapeRegExp(s: string): string {
 // --- Redimensionar entre grids -----------------------------------------------------------------
 
 /**
- * Tamanho (pixels) equivalente ao trocar de um grid com `fromCellSize` px por célula para outro
- * com `toCellSize`: primeiro descobre o lado em células na origem (arredondando — um token
- * quase-mas-não-exatamente 2 células continua sendo 2x2, mesma conta de `cellRect` em cada app),
- * depois multiplica pelo cellSize novo. Mínimo 1 célula por eixo (nunca deixa um token
- * "desaparecer"). Recebe só números (não `GridConfig`, que só o web/servidor conhecem — ver
- * comentário no topo do arquivo): quem chama já resolveu `effectiveCellSize` dos dois grids
- * (inclusive o virtual de 70px do grid "none"). Usada ao mover um token entre mapas com grid
- * diferente (`scene:activate`/`scene:delete`) e ao editar `cellSize`/offset de um mapa
- * (`scene:updateGrid`) — os dois lugares que, sem isso, deixariam um token menor/maior que a
- * célula ao trocar de grid.
+ * Tamanho em pixels de um token de `cells` células de lado, no grid com `cellSizePx` px por
+ * célula (`effectiveCellSize`, web/server — inclusive o virtual de 70px do grid "none"). Com
+ * `Token.cells` como fonte da verdade (docs/plano-grid.md), isto é a ÚNICA conta de célula→pixel
+ * de tamanho: como não se grava pixel nenhum, não existe mais "converter tamanho ao trocar de
+ * grid" — o tamanho já é sempre `cells × cellSize do grid ATUAL`, recalculado on-the-fly em quem
+ * precisa (canvas, espiral de posicionamento, névoa).
  */
-export function convertSizeToCellSize(
-  size: { width: number; height: number },
-  fromCellSize: number,
-  toCellSize: number,
-): { width: number; height: number } {
-  const cellsW = Math.max(1, Math.round(size.width / fromCellSize));
-  const cellsH = Math.max(1, Math.round(size.height / fromCellSize));
-  return { width: cellsW * toCellSize, height: cellsH * toCellSize };
+export function tokenPixelSize(cells: number, cellSizePx: number): { width: number; height: number } {
+  const side = cells * cellSizePx;
+  return { width: side, height: side };
+}
+
+/**
+ * Inverso de `tokenPixelSize`: quantas células um lado de `px` pixels ocupa nesse grid — arredonda
+ * (um token quase-mas-não-exatamente 2 células continua sendo 2), mínimo 1 (nunca deixa um token
+ * "desaparecer"). Usada no backfill da migration de `Token.cells` e ao redimensionar pelo
+ * Transformer (o arrasto solta um pixel, o servidor só aceita células inteiras).
+ */
+export function cellsFromPixels(px: number, cellSizePx: number): number {
+  return Math.max(1, Math.round(px / cellSizePx));
 }

@@ -21,7 +21,6 @@ import {
   type Combatant,
   type CombatStatus,
   type ConditionExpiry,
-  type FogConfig,
   type SystemDefinition,
   type Token,
   type TokenCondition,
@@ -31,6 +30,7 @@ import { HandlerError } from "../socket/ack.js";
 import { rooms, type TypedServer } from "../socket/types.js";
 import { toCharacter } from "./characters.js";
 import { emitChatMessage } from "./chatVisibility.js";
+import { sceneGeometry, type SceneGeometry } from "./grid.js";
 import { startTurnMovementIfChanged } from "./movement.js";
 import { toChatMessage, toScene, toToken } from "./serialize.js";
 import { canAccessScene, emitTokenToPlayers, isActiveScene, tokenVisibleTo } from "./visibility.js";
@@ -102,9 +102,9 @@ export function canControlCombatant(viewer: Viewer, token: Pick<DbToken, "ownerI
  * vê o próprio resultado). Dos demais combatentes, só a ORDEM (nome, `rolled`). GM vê tudo
  * sempre. Ver docs/plano-combate.md §4 e docs/revisao-combate.md §1.
  */
-export function toCombat(row: CombatRow, def: SystemDefinition, viewer: Viewer, fog: FogConfig): Combat {
+export function toCombat(row: CombatRow, def: SystemDefinition, viewer: Viewer, geom: SceneGeometry): Combat {
   const sorted = sortCombatants(def, row.combatants);
-  const visible = viewer.role === "gm" ? sorted : sorted.filter((cr) => tokenVisibleTo(toToken(cr.token), viewer, fog));
+  const visible = viewer.role === "gm" ? sorted : sorted.filter((cr) => tokenVisibleTo(toToken(cr.token), viewer, geom));
   const isGm = viewer.role === "gm";
   const combatants: Combatant[] = visible.map((cr) => {
     const mine = !isGm && cr.token.ownerId === viewer.participantId;
@@ -154,21 +154,21 @@ export async function emitCombat(io: TypedServer, roomId: string, sceneId: strin
 
   const def = getSystemDefinition(room.systemId);
   const [row, sceneRow] = await Promise.all([loadCombatRow(sceneId), prisma.scene.findUniqueOrThrow({ where: { id: sceneId } })]);
-  const fog = toScene(sceneRow).fog;
+  const geom = sceneGeometry(toScene(sceneRow));
 
-  const gmView: Combat | null = row ? toCombat(row, def, { role: "gm", participantId: "" }, fog) : null;
+  const gmView: Combat | null = row ? toCombat(row, def, { role: "gm", participantId: "" }, geom) : null;
   io.to(rooms.gm(roomId)).emit("combat:updated", { sceneId, combat: gmView });
 
   if (room.activeSceneId === sceneId) {
     const players = await prisma.participant.findMany({ where: { roomId, role: "player" } });
     for (const p of players) {
-      const view = row ? toCombat(row, def, { role: "player", participantId: p.id }, fog) : null;
+      const view = row ? toCombat(row, def, { role: "player", participantId: p.id }, geom) : null;
       io.to(rooms.participant(p.id)).emit("combat:updated", { sceneId, combat: view });
     }
   }
 
   if (caller.role === "gm") return gmView;
-  return row ? toCombat(row, def, caller, fog) : null;
+  return row ? toCombat(row, def, caller, geom) : null;
 }
 
 /** Fórmula + rótulo da iniciativa de um combatente: pela ficha vinculada (token atual), ou sem ficha (bônus manual). */
@@ -250,11 +250,15 @@ export async function removeTokenFromSceneCombat(def: SystemDefinition, sceneId:
  * `visible`, ou a posição cruzou a fronteira da névoa (não a cada tick de um arraste comum —
  * ver docs/plano-combate.md §4). Não faz nada se o token não é combatente de combate nenhum.
  */
-export async function maybeReemitCombatForToken(io: TypedServer, roomId: string, before: Token, after: Token, fog: FogConfig): Promise<void> {
+export async function maybeReemitCombatForToken(io: TypedServer, roomId: string, before: Token, after: Token, geom: SceneGeometry): Promise<void> {
   const nameOrColorChanged = before.name !== after.name || before.color !== after.color;
   const visibleChanged = before.visible !== after.visible;
   const moved = before.x !== after.x || before.y !== after.y;
-  const crossedFog = !nameOrColorChanged && !visibleChanged && moved && isPointRevealed(fog, tokenCenter(before)) !== isPointRevealed(fog, tokenCenter(after));
+  const crossedFog =
+    !nameOrColorChanged &&
+    !visibleChanged &&
+    moved &&
+    isPointRevealed(geom.fog, tokenCenter(before, geom.cellSizePx)) !== isPointRevealed(geom.fog, tokenCenter(after, geom.cellSizePx));
   if (!nameOrColorChanged && !visibleChanged && !crossedFog) return;
 
   const combatant = await prisma.combatant.findFirst({ where: { tokenId: after.id }, select: { id: true } });
@@ -285,7 +289,7 @@ async function applyConditionExpiry(
     prisma.scene.findUniqueOrThrow({ where: { id: sceneId } }),
     isActiveScene(roomId, sceneId),
   ]);
-  const fog = toScene(sceneRow).fog;
+  const geom = sceneGeometry(toScene(sceneRow));
   const labelByKey = new Map(def.conditions.map((c) => [c.key, c.label]));
 
   for (const row of tokens) {
@@ -296,7 +300,7 @@ async function applyConditionExpiry(
     const updated = toToken(await prisma.token.update({ where: { id: row.id }, data: { conditions: remaining } }));
     io.to(rooms.gm(roomId)).emit("token:updated", updated);
     // Combate deixou de exigir mapa ativo (docs/plano-mapas.md §7): jogador só recebe se for.
-    if (active) emitTokenToPlayers(io, roomId, updated, "token:updated", fog);
+    if (active) emitTokenToPlayers(io, roomId, updated, "token:updated", geom);
 
     for (const cond of expired) {
       const label = labelByKey.get(cond.key) ?? cond.key;

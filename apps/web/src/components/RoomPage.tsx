@@ -7,7 +7,7 @@ import { useTemplateHistory } from "../store/templateHistory";
 import { useTargets } from "../store/targets";
 import { scenePins, useHandouts } from "../store/handouts";
 import { describeTemplateAreaChange } from "../lib/templates";
-import { effectiveCellSize } from "../lib/grid";
+import { effectiveCellSize, sizeTokens } from "../lib/grid";
 import { useChat } from "../store/chat";
 import { activeCombatant, isMyTurn, sceneCombat, useCombat } from "../store/combat";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
@@ -239,8 +239,11 @@ function Table() {
   const tokens = useMemo(() => {
     const all = sceneTokens(byId, scene?.id);
     if (!scene || !me || me.role === "gm") return all;
-    return all.filter((t) => t.ownerId === me.id || isPointRevealed(scene.fog, tokenCenter(t)));
+    return all.filter((t) => t.ownerId === me.id || isPointRevealed(scene.fog, tokenCenter(t, effectiveCellSize(scene.grid))));
   }, [byId, scene, me]);
+  // Token.cells é a fonte da verdade do tamanho (docs/plano-grid.md): deriva width/height uma vez
+  // aqui, pras funções puras do shared (targetsFromTemplate) que ainda esperam width/height.
+  const sizedTokens = useMemo(() => (scene ? sizeTokens(tokens, scene.grid) : []), [tokens, scene]);
   const selectedTokenId = useTokens((s) => s.selectedId);
   const selectedIds = useTokens((s) => s.selectedIds);
   const focusRequest = useTokens((s) => s.focusRequest);
@@ -452,12 +455,12 @@ function Table() {
       void clearTargets();
       return;
     }
-    const ids = targetsFromTemplate(tokens, tmpl, effectiveCellSize(scene.grid));
+    const ids = targetsFromTemplate(sizedTokens, tmpl, effectiveCellSize(scene.grid));
     const current = useTargets.getState().mine;
     if (ids.length === current.length && ids.every((id, i) => id === current[i])) return;
     void setTargetsFromTemplate(myTemplateId, ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myTemplateId, templates, tokens, scene?.grid]);
+  }, [myTemplateId, templates, sizedTokens, scene?.grid]);
 
   const charById = useCharacters((s) => s.byId);
   const characters = useMemo(() => sortedCharacters(charById), [charById]);
@@ -534,7 +537,7 @@ function Table() {
     pushTemplateUndo("colocar", t, () => useTemplates.getState().remove(scene.id, t.id));
     // Sistema de alvos (docs/plano-alvos.md §3.6): meu gabarito já vira meus alvos, substituindo a
     // seleção manual; o efeito de cima mantém isso ao vivo enquanto ele existir.
-    void setTargetsFromTemplate(t.id, targetsFromTemplate(tokens, t, effectiveCellSize(scene.grid)));
+    void setTargetsFromTemplate(t.id, targetsFromTemplate(sizedTokens, t, effectiveCellSize(scene.grid)));
   };
   const handleTemplateCommit = (t: Template, dragFrom?: { x: number; y: number; rotation: number }) => {
     if (!scene) return;
@@ -719,7 +722,7 @@ function Table() {
                 onTokenMoveLive={moveLive}
                 onTokenPatch={(patch) => void patchToken(patch)}
                 onTokenPatchMany={(patches) => void patchTokenMany(patches)}
-                onTokenCreate={(pos, size) => {
+                onTokenCreate={(pos) => {
                   const n = tokens.length + 1;
                   void createToken({
                     sceneId: scene.id,
@@ -727,8 +730,7 @@ function Table() {
                     imageUrl: null,
                     x: pos.x,
                     y: pos.y,
-                    width: size,
-                    height: size,
+                    cells: 1,
                     rotation: 0,
                     zIndex: n,
                     visible: true,

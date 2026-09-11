@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { cellAt, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, normalizeOffset, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox } from "./grid";
-import type { GridConfig } from "@tormenta-vtt/shared";
+import { cellAt, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, normalizeOffset, sizeTokens, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox } from "./grid";
+import type { GridConfig, Token } from "@tormenta-vtt/shared";
 
 const grid: GridConfig = { type: "square", cellSize: 50, offsetX: 10, offsetY: 0, color: "#000", snap: true };
 
@@ -81,10 +81,19 @@ describe("grid", () => {
     expect(cellAt({ x: 72, y: 26 }, { ...grid, type: "none" })).toEqual({ col: 1, row: 0 });
   });
 
-  it("cellRect arredonda o lado do token pra células (mínimo 1)", () => {
-    expect(cellRect({ x: 60, y: 50, width: 100 }, grid)).toEqual({ col: 1, row: 1, cells: 2 });
-    // width bem menor que uma célula ainda ocupa 1 (nunca 0).
-    expect(cellRect({ x: 10, y: 0, width: 10 }, grid)).toEqual({ col: 0, row: 0, cells: 1 });
+  it("cellRect lê cells direto (fonte da verdade, docs/plano-grid.md)", () => {
+    expect(cellRect({ x: 60, y: 50, cells: 2 }, grid)).toEqual({ col: 1, row: 1, cells: 2 });
+    expect(cellRect({ x: 10, y: 0, cells: 1 }, grid)).toEqual({ col: 0, row: 0, cells: 1 });
+  });
+
+  it("sizeTokens deriva width/height de cells × cellSize do grid (nunca gravado)", () => {
+    const tokens = [{ cells: 1 }, { cells: 2 }] as Token[];
+    expect(sizeTokens(tokens, grid).map((t) => ({ width: t.width, height: t.height }))).toEqual([
+      { width: 50, height: 50 },
+      { width: 100, height: 100 },
+    ]);
+    // grid "none": célula virtual de 70px.
+    expect(sizeTokens([{ cells: 1 } as Token], { ...grid, type: "none" })[0]).toMatchObject({ width: 70, height: 70 });
   });
 
   it("seleção em caixa pega tokens pelo centro, em qualquer direção do arraste", () => {

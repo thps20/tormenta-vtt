@@ -21,8 +21,7 @@ const token = (patch: Partial<Token> = {}): Token => ({
   imageUrl: null,
   x: 0,
   y: 0,
-  width: 70,
-  height: 70,
+  cells: 1,
   rotation: 0,
   zIndex: 0,
   visible: true,
@@ -102,10 +101,10 @@ describe("pickTrackableTokenPatch", () => {
     expect(pickTrackableTokenPatch(before, after)).toEqual({ before: { x: 0, y: 0 }, after: { x: 10, y: 20 } });
   });
 
-  it("width/height entram; nome/cor/imagem/dono nunca entram", () => {
-    const before = token({ width: 70, height: 70, name: "Goblin", color: "#000" });
-    const after = token({ width: 140, height: 140, name: "Goblin Chefe", color: "#fff", ownerId: "p1" });
-    expect(pickTrackableTokenPatch(before, after)).toEqual({ before: { width: 70, height: 70 }, after: { width: 140, height: 140 } });
+  it("cells entra; nome/cor/imagem/dono nunca entram", () => {
+    const before = token({ cells: 1, name: "Goblin", color: "#000" });
+    const after = token({ cells: 2, name: "Goblin Chefe", color: "#fff", ownerId: "p1" });
+    expect(pickTrackableTokenPatch(before, after)).toEqual({ before: { cells: 1 }, after: { cells: 2 } });
   });
 
   it("patch que só muda campos fora da lista devolve null (nada pra empilhar)", () => {
@@ -139,7 +138,7 @@ describe("pickTrackableTokenPatch", () => {
 describe("resumos pro toast", () => {
   it("describeTokenChange escolhe pelo campo mais relevante", () => {
     expect(describeTokenChange("Goblin", ["x", "y"])).toBe("mover Goblin");
-    expect(describeTokenChange("Goblin", ["width"])).toBe("redimensionar Goblin");
+    expect(describeTokenChange("Goblin", ["cells"])).toBe("redimensionar Goblin");
     expect(describeTokenChange("Goblin", ["conditions"])).toBe("alterar condição de Goblin");
     expect(describeTokenChange("Goblin", ["visible"])).toBe("alterar visibilidade de Goblin");
     expect(describeTokenChange("5 tokens", ["x", "y"])).toBe("mover 5 tokens");

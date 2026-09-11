@@ -34,9 +34,14 @@ export const TokenSchema = z.object({
   /** Posição do canto superior esquerdo, em pixels do mapa. */
   x: z.number(),
   y: z.number(),
-  /** Tamanho em pixels do mapa (um token 1x1 no grid = cellSize x cellSize). */
-  width: z.number().positive(),
-  height: z.number().positive(),
+  /**
+   * Lado do token em células (token não quadrado não é suportado): fonte da verdade do tamanho.
+   * Os pixels (`tokenPixelSize`, `rules/placement.ts`) são sempre `cells × cellSize do grid ATUAL`
+   * — nunca gravados, pra não existir "converter tamanho ao trocar de grid" (bug histórico,
+   * docs/plano-mapas.md/docs/plano-grid.md). Mínimo 1 (mesmo token minúsculo ocupa 1 célula na
+   * espiral de posicionamento); 20 é só sanidade (colossal em T20 = 6).
+   */
+  cells: z.number().int().min(1).max(20).default(1),
   rotation: z.number().default(0),
   /** Ordem de desenho: maior = por cima. */
   zIndex: z.number().int().default(0),
@@ -68,7 +73,7 @@ export type Token = z.infer<typeof TokenSchema>;
 export const TokenCreateSchema = TokenSchema.omit({ id: true, characterId: true });
 export type TokenCreate = z.infer<typeof TokenCreateSchema>;
 
-/** Atualização parcial (arrastar manda só x/y; redimensionar manda width/height). */
+/** Atualização parcial (arrastar manda só x/y; redimensionar manda cells, sempre inteiro). */
 export const TokenPatchSchema = TokenSchema.omit({ characterId: true })
   .partial()
   .required({ id: true })

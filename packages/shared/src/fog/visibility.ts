@@ -20,9 +20,14 @@ export function isPointRevealed(fog: Pick<FogConfig, "enabled" | "base" | "shape
   return revealed;
 }
 
-/** Centro de um token (a regra de visibilidade olha só o centro, não a área). */
-export function tokenCenter(t: { x: number; y: number; width: number; height: number }): Point {
-  return { x: t.x + t.width / 2, y: t.y + t.height / 2 };
+/**
+ * Centro de um token (a regra de visibilidade olha só o centro, não a área). `cellSizePx` é o
+ * `effectiveCellSize` do grid do MAPA do token (docs/plano-grid.md: `cells` é a fonte do tamanho,
+ * o pixel é sempre derivado) — quem chama já resolveu isso.
+ */
+export function tokenCenter(t: { x: number; y: number; cells: number }, cellSizePx: number): Point {
+  const half = (t.cells * cellSizePx) / 2;
+  return { x: t.x + half, y: t.y + half };
 }
 
 export function shapeContains(shape: FogShape, p: Point): boolean {

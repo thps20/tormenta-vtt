@@ -26,7 +26,7 @@ import { prisma } from "../db.js";
 import { listCompendium } from "../services/compendium.js";
 import { broadcastCharacter, toCharacter, toJson } from "../services/characters.js";
 import { encounterEntriesOf, entriesJson, requireEncounter, toEncounter } from "../services/encounters.js";
-import { cellAt, cellRect, cellToPoint, effectiveCellSize } from "../services/grid.js";
+import { cellAt, cellRect, cellToPoint, effectiveCellSize, sceneGeometry } from "../services/grid.js";
 import { describeEncounterSpawn, pushEntry } from "../services/history.js";
 import { toScene, toToken } from "../services/serialize.js";
 import { guarded, HandlerError } from "./ack.js";
@@ -202,8 +202,7 @@ export function registerEncounterHandlers(io: TypedServer, socket: TypedSocket):
                 imageUrl: null,
                 x: point.x,
                 y: point.y,
-                width: placement.cellsPerSide * cellSize,
-                height: placement.cellsPerSide * cellSize,
+                cells: placement.cellsPerSide,
                 zIndex: existingTokens.length + i + 1,
                 visible: placement.visible,
                 ownerId: null,
@@ -219,7 +218,7 @@ export function registerEncounterHandlers(io: TypedServer, socket: TypedSocket):
         // Broadcast fora da transação, mesmo padrão de compendium:spawn-creature.
         for (const { character, token } of results) {
           broadcastCharacter(io, ctx.roomId, character, "character:created");
-          broadcastToken(io, ctx.roomId, token, "token:created", scene.fog);
+          broadcastToken(io, ctx.roomId, token, "token:created", sceneGeometry(scene));
         }
 
         // encounter:spawn já é gmOnly, então sempre empilha (uma entrada só pro encontro inteiro).

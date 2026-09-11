@@ -3,6 +3,7 @@ import { prisma } from "../db.js";
 import { broadcastCharacter, characterDataOf, toCharacter, toJson } from "../services/characters.js";
 import { emitCombat } from "../services/combat.js";
 import { toScene, toToken } from "../services/serialize.js";
+import { sceneGeometry } from "../services/grid.js";
 import type { HistoryEntry } from "../services/history.js";
 import { adjustCombatForTokenRemoval, broadcastToken, hpJson } from "./token.js";
 import { rooms, type TypedServer } from "./types.js";
@@ -47,7 +48,7 @@ export function buildMultiSpawnHistoryEntry(
     },
     async apply() {
       const scene = await prisma.scene.findUniqueOrThrow({ where: { id: sceneId } });
-      const fog = toScene(scene).fog;
+      const geom = sceneGeometry(toScene(scene));
       for (const { character, token } of results) {
         const characterRow = await prisma.character.create({
           data: {
@@ -67,8 +68,7 @@ export function buildMultiSpawnHistoryEntry(
             imageUrl: token.imageUrl,
             x: token.x,
             y: token.y,
-            width: token.width,
-            height: token.height,
+            cells: token.cells,
             rotation: token.rotation,
             zIndex: token.zIndex,
             visible: token.visible,
@@ -80,7 +80,7 @@ export function buildMultiSpawnHistoryEntry(
           },
         });
         broadcastCharacter(io, roomId, toCharacter(characterRow), "character:created");
-        broadcastToken(io, roomId, toToken(tokenRow), "token:created", fog);
+        broadcastToken(io, roomId, toToken(tokenRow), "token:created", geom);
       }
     },
   };

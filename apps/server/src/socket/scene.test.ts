@@ -24,8 +24,8 @@ describe("isLiveSceneInRoom (invariante do mapa ativo, docs/plano-mapas.md §15)
 describe("sceneDeleteMoveTarget (histórico de apagar mapa, docs/plano-mapas.md §15)", () => {
   const move: SceneDeleteMove = {
     tokenId: "t1",
-    before: { sceneId: "origem", x: 10, y: 20, width: 70, height: 70 },
-    after: { sceneId: "destino", x: 100, y: 200, width: 100, height: 100 },
+    before: { sceneId: "origem", x: 10, y: 20 },
+    after: { sceneId: "destino", x: 100, y: 200 },
   };
 
   it("revert (undo) devolve o token à posição/mapa de origem", () => {

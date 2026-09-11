@@ -55,14 +55,14 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Renomear, duplicar, apagar e reordenar mapas, e navegar entre vários da mesma sala: §9.7.
 
 ### 3.3 Tokens
-- Criar: GM clica "Novo token" → aparece no centro da viewport com `width = height = cellSize`. Opcional: imagem via `/api/upload`.
+- Criar: GM clica "Novo token" → aparece no centro da viewport com `cells: 1`. Opcional: imagem via `/api/upload`.
 - Arrastar: durante o drag o cliente emite `token:update {id, x, y}` com throttle (~30/s). Ao soltar, se `grid.snap`, alinha à célula mais próxima e emite a posição final.
 - **Setas/WASD** movem o(s) token(s) selecionados (Shift = 5 células), com o mesmo snap do arraste; com combate ativo, a trava de turno vale pro teclado igual ao arraste (§9.11).
-- Redimensionar: handles nos cantos (Konva Transformer). Emite `token:update {id, width, height}`.
+- Redimensionar: handles nos cantos (Konva Transformer), sempre em célula inteira — a alça "pula" de célula em célula durante o arrasto (`docs/plano-grid.md`). Emite `token:update {id, cells}`.
 - Permissão: servidor rejeita `token:update`/`token:delete` de jogador que não é `ownerId` do token (ack `{ ok: false }`).
 - Todo `token:*` aceito é persistido e reenviado a todos na sala (inclusive quem enviou, para manter uma única fonte de verdade).
 - Tokens com `visible = false` não são enviados a jogadores. Se o GM oculta um token visível, jogadores recebem `token:deleted`; se torna visível de novo, recebem `token:updated` (o cliente trata `token:updated` como upsert).
-- Jogador (dono) só pode alterar `x, y, width, height, rotation, conditions`; o servidor ignora os demais campos do patch. Nome, cor, dono, visibilidade e imagem são só do GM (painel do token).
+- Jogador (dono) só pode alterar `x, y, cells, rotation, conditions`; o servidor ignora os demais campos do patch. Nome, cor, dono, visibilidade e imagem são só do GM (painel do token).
 - **PV do token solto** (`Token.hp: { current, max } | null`, painel do token, só GM): só vale enquanto o token não tem `characterId`; vinculado a uma ficha, quem manda é o recurso `tokenBar` dela (§3.6). `null` = sem PV definido, o token não aparece como alvo de `token:apply-damage`.
 - **Condições** (`Token.conditions: TokenCondition[]`, `{ key, expiresRound? }` — chave de `SystemDefinition.conditions[]`, §3.6; `expiresRound` ausente = permanente): menu com toggle por condição, aberto pelo botão direito no token ou pelo botão "Condições" do painel — GM em qualquer token, jogador só nos que possui (`token:update` normal, sem evento novo; servidor rejeita chave que não existe no sistema da sala). Uma ficha salva antes de `expiresRound` existir grava só a chave (`string`); o schema aceita as duas formas (`z.preprocess`, sem migration de dado). Render: ícones pequenos na borda inferior do token (máx. 6 visíveis, o resto vira "+N"), tooltip no hover com nome e descrição; condição com duração ganha um selinho com as rodadas restantes no canto do ícone (mesmo número no painel de combate, ao lado do ícone da linha do combatente). Cada condição pode ter `modifiers[]` no JSON (mesmo formato `{ target, value }` do Modificador da ficha, §3.6), mas isso ainda é só estrutura — nenhuma automação de regra por enquanto.
   - **Duração em rodadas** (docs/plano-duracao-condicoes.md): com um combate ativo na cena (`status !== "ended"`) e a condição marcada, o menu mostra um campo opcional "duração (rodadas)" — vazio = permanente. Convertido para `expiresRound` via `deriveExpiresRound(round, N)` (`packages/shared/src/rules/conditions.ts`): com o combate em `"rolling"` (`round` 0, ainda rolando iniciativa) conta a partir da rodada 1, senão uma condição marcada antes do primeiro "Próximo" expiraria na própria virada pra rodada 1, sem nunca ter valido. `SystemDefinition.conditions[].defaultDuration?` pré-preenche o campo ao marcar (ex.: Surpreendido = 1). Condição já marcada pode ganhar, editar ou remover a duração pelo mesmo campo.
@@ -156,7 +156,7 @@ Room 1───* SavedEncounter
 | **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId, party(JSON)` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`). `activeSceneId` sempre aponta pra um mapa não apagado da sala (invariante mantida por `scene:activate`/`scene:delete`, §9.7). `party` = `PartyEntry[]` da Visão de grupo (§9.15, `{ characterId, hidden }[]`), não serializado em `RoomPublic`/`Room` do shared — vai à parte, já filtrado por papel, em `RoomSnapshot.party` (§5) |
 | **Participant** | `id, roomId, nickname, role, sessionToken` | `connected` é estado em memória, não persistido |
 | **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON), order, arrival(JSON), deletedAt?` | Múltiplos mapas por sala (§9.7). `grid` e `fog` são JSON para evoluir sem migration; `fog` segue `FogConfigSchema` (§9.3). `order`: posição no painel "Mapas", renumerada 0..n-1 a cada `scene:reorder`. `arrival` = `{x,y} \| null` (pixels do mapa): onde tokens levados de outro mapa aparecem ao ativar. `deletedAt` (coluna só do banco, nunca serializada no `Scene` do shared, mesmo padrão de `Token.deletedAt`): soft delete de `scene:delete` — todo lugar que lista "mapas da sala agora" filtra `deletedAt: null`; limpeza definitiva depois de 30 dias (`services/cleanup.ts`) |
-| **Token** | `id, sceneId, name, imageUrl, x, y, width, height, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[]), deletedAt?` | Coordenadas em **pixels do mapa**, não em células. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto). `deletedAt` (coluna só do banco, nunca serializada no `Token` do shared): soft delete de `token:delete`/`token:delete-many` (§9.6) — todo lugar que lista "tokens da cena agora" filtra `deletedAt: null`; a limpeza definitiva apaga a linha de vez depois de 30 dias (`services/cleanup.ts`) |
+| **Token** | `id, sceneId, name, imageUrl, x, y, cells, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[]), deletedAt?` | Posição (`x, y`) em **pixels do mapa**, não em células (docs/plano-grid.md). `cells` (inteiro ≥ 1) é a fonte da verdade do TAMANHO — lado do token em células, sempre quadrado; os pixels (`width`/`height` do `Token` do shared, nunca persistidos nem trafegados no socket) são derivados on-the-fly de `cells × cellSize do grid ATUAL da cena` (`tokenPixelSize`, `packages/shared/src/rules/placement.ts`) em quem precisa (canvas, espiral de posicionamento, névoa) — trocar de mapa ou editar o `cellSize` do mapa (`scene:updateGrid`) nunca precisa "converter" tamanho nenhum. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto). `deletedAt` (coluna só do banco, nunca serializada no `Token` do shared): soft delete de `token:delete`/`token:delete-many` (§9.6) — todo lugar que lista "tokens da cena agora" filtra `deletedAt: null`; a limpeza definitiva apaga a linha de vez depois de 30 dias (`services/cleanup.ts`) |
 | **Character** | `id, roomId, ownerId?, name, kind, data(JSON), compendiumEntryId?` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration. `compendiumEntryId` (coluna só do banco, nunca serializada no `Character` do shared): id da entrada do compêndio que gerou este NPC (`compendium:spawn-creature`/`encounter:spawn`, §9.5/§9.14) — metadado de app, não regra de sistema; `null` = ficha feita à mão (ou PC). Usado só por "salvar tokens selecionados como encontro" (§9.14) pra reconstruir de qual criatura cada token veio |
 | **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), initiativeBatch?(JSON), handout?(JSON), visibility, tokenId?, whisperTo?` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3; `natural`/`targets[]` são o sistema de alvos, §9.12 — ataque OU dano com alvo marcado, congelados na hora da rolagem, ataque com acerto/erro calculado e dano só com o nome; `criticalConfirmed` é o crítico confirmado de "Rolar dano junto com o ataque", §9.13); `item` segue `ItemCardSchema` (kind `item`); `initiativeBatch` segue `InitiativeBatchSchema` (kind `initiative-batch`: `{ round, entries: [{ combatantId, tokenId, name, formula?, result? }] }`, `combat:roll` rolando mais de um combatente, §3.5); `handout` segue `HandoutCardSchema` (kind `handout`, §9.10: cópia denormalizada do handout mostrado); `visibility` = `all \| gm \| self` (§3.4, sempre `all` num handout — quem recebe é decidido por `whisperTo`); `tokenId?` liga a rolagem a um token (combate/ficha), filtrado à parte de `visibility` (§3.4/§3.5) — um `initiative-batch` não usa este campo (várias linhas, vários tokens): o gate é por linha, dentro de `initiativeBatch.entries`; `whisperTo?` (§9.10) é um sussurro visual por PESSOA (`participantId`): setado, só o GM e ele recebem a mensagem, nem card nem placeholder pros demais — mesmo mecanismo de exclusão de `tokenId`, só que por pessoa |
 | **Handout** | `id, roomId, name, kind, imageUrl?, width?, height?, text?, tags[], deletedAt?` | Biblioteca por sala (§9.10), só o GM vê (`handout:list` é `gmOnly`). `kind` = `image \| text`; imagem reaproveita `POST /api/upload` (mesmo limite de 20 MB do mapa), texto vai até 20 000 caracteres, sem parser de markdown (texto puro). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Token.deletedAt`): soft delete de `handout:delete`, que também soft-deleta os pinos deste handout em qualquer mapa (§9.10) |
@@ -166,7 +166,7 @@ Room 1───* SavedEncounter
 | **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound, movementBudget?, movementUsed, movementDiagonals, movementAnchorX?, movementAnchorY?, movementPath?(JSON)` | `initiative = null` = ainda não rolou. `combat:remove` apaga o combatente (e ajusta `activeCombatantId`/`round` se o removido era o ativo, `stateAfterRemoval`, §3.5). `token:delete`/`token:delete-many` **não** apagam mais a linha do combatente (o token agora é soft delete, §9.6): só param de listá-lo (o combate ignora combatente cujo token tem `deletedAt`) e fazem o mesmo ajuste de turno/`order`; a linha volta se o GM desfizer. Os seis últimos campos são o orçamento de deslocamento do turno (§9.11): `movementAnchorX/Y` (de onde o próximo movimento é medido) e `movementPath` (o caminho desenhado) são colunas só do banco, nunca serializadas no `Combatant` do shared — o cliente só recebe `movementBudget/Used/Diagonals` e `movementPath` via `Combat` (§5) |
 | **SystemDefinition** | `id, name, attributes[], skills[], resources[] (com `color?`, §9.15), derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), skillTotal, rolls{} (inclui `attackHit?`/`attackAutoHit?`/`attackAutoMiss?`, §9.12, e `critical?`, §9.13), combat{} (§3.5), damageAttribute, tokenBar, grid?, race? (§9.11), movement? (§9.11), trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código. `race?` aponta o `itemKinds[]` que alimenta o placeholder `{race.<campo>}` nas fórmulas (§9.11); `movement?` declara o orçamento de deslocamento por turno (ausente = sistema sem a regra); `rolls.attackHit?`/`attackAutoHit?`/`attackAutoMiss?` são a regra de acerto do sistema de alvos (§9.12, ausentes = sistema sem a regra); `rolls.critical?` confirma um crítico ameaçado ao rolar dano junto com o ataque (§9.13, mesma gramática de `attackAutoHit`, só `{natural}`; ausente = sistema não confirma sozinho) |
 
-Decisão: coordenadas em pixels (não células) para o token poder ficar "fora do grid" e para suportar `grid.type = none`. A conversão célula↔pixel é uma função pura usando `cellSize` e `offset`.
+Decisão: posição em pixels (não células) para o token poder ficar "fora do grid" e para suportar `grid.type = none`. A conversão célula↔pixel é uma função pura usando `cellSize` e `offset`. Uma etapa futura pode mover a posição pra células também — só o TAMANHO (`cells`) já é célula hoje (docs/plano-grid.md).
 
 ## 5. Eventos Socket.io
 
@@ -581,31 +581,31 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   `Combatant` apagada de vez — diferente do soft delete de `token:delete`, aqui o token não some, só
   muda de mapa), calcula a posição no destino com `findFreeCells` (mesma espiral do spawn de
   criatura) a partir de `scene.arrival ?? dropPoint ?? centro do mapa`, e muda `sceneId`/`x`/`y` —
-  PV, condições, ficha, dono, rotação e imagem vão junto de graça; **tamanho é convertido pro
-  `cellSize` do mapa de destino** (`convertSizeToCellSize`, `packages/shared/src/rules/placement.ts`):
-  descobre quantas células o token ocupava na origem (`round(width|height / cellSize da origem)`,
-  mínimo 1) e multiplica pelo `cellSize` do destino — sem isso, um token nasceria menor/maior que a
-  célula sempre que os dois mapas tivessem `cellSize` diferente. Ponto de chegada definido pelo GM
-  no menu do card do mapa (pino visível só pro GM no canvas, não é token).
+  PV, condições, ficha, dono, rotação, imagem e **tamanho** (`cells`) vão junto de graça: como
+  `cells` é a fonte da verdade (docs/plano-grid.md), o token não precisa mudar de tamanho ao trocar
+  de mapa — os pixels já são sempre `cells × cellSize do mapa ATUAL`, então um token 2×2 continua
+  2×2 mesmo indo pra um mapa com `cellSize` diferente (fica maior/menor em pixels, nunca em
+  células). Ponto de chegada definido pelo GM no menu do card do mapa (pino visível só pro GM no
+  canvas, não é token).
 - **Apagar mapa**: bloqueado se for o ativo ou o último da sala. Com token de jogador, a primeira
   chamada só avisa (`{ status: "needs-confirm", playerTokenIds }`, nada apagado ainda); confirmando,
-  o servidor move esses tokens pro mapa ativo (mesma mecânica de ativar, tamanho incluso) antes do
-  soft delete. Tokens de NPC/monstro vão junto com o mapa (ficam soft-deletados por tabela, voltam
+  o servidor move esses tokens pro mapa ativo (mesma mecânica de ativar) antes do soft delete. Tokens de NPC/monstro vão junto com o mapa (ficam soft-deletados por tabela, voltam
   se o GM desfizer). É uma das duas ações de mapa que entram na pilha de desfazer (§9.6, a outra é
   `scene:updateGrid` quando reencaixa tokens, ver abaixo) — criar, renomear, duplicar, reordenar e
   ativar sem apagar nada não entram (efeito colateral de mover tokens seria assustador num Ctrl+Z;
   as outras quatro são triviais de desfazer à mão).
 - **Editar o grid** (`scene:updateGrid { sceneId, grid: Partial<GridConfig> }`): merge parcial no
   `grid` da cena. Se a troca muda a geometria efetiva (`cellSize`, `offsetX/Y` ou `type` — inclusive
-  a célula virtual de 70px do grid "none") de um jeito que desalinha ou redimensiona algum token já
-  no mapa, o servidor reencaixa TODOS os tokens da cena na mesma chamada: mesma célula (col/row,
-  recalculada no grid novo) e mesmo número de células de lado (`resnapToken`,
-  `apps/server/src/services/grid.ts`, que usa `convertSizeToCellSize` acima) — sem isso, mudar o
-  grid de um mapa com tokens deixaria cada um desalinhado ou fora do tamanho da célula nova. Um
-  patch que só muda cor/`snap` não reencaixa ninguém (`resnapToken` detecta que nada mudou). Cada
-  token reencaixado sai num `token:updated` (mesma visibilidade de sempre); se algum foi, a troca
-  inteira (grid + tokens) entra na pilha de desfazer como UMA entrada — reencaixar não é trivial de
-  desfazer à mão, diferente de só mudar cor/snap.
+  a célula virtual de 70px do grid "none") de um jeito que desalinha algum token já no mapa, o
+  servidor reencaixa a POSIÇÃO de TODOS os tokens da cena na mesma chamada: mesma célula (col/row,
+  recalculada no grid novo — `resnapTokenPosition`, `apps/server/src/services/grid.ts`) — sem isso,
+  mudar o grid de um mapa com tokens deixaria cada um desalinhado da célula. O TAMANHO (`cells`)
+  nunca precisa mudar aqui (docs/plano-grid.md: já é sempre `cells × cellSize do grid ATUAL`, então
+  recalibrar/trocar `cellSize` nunca redimensiona nada, só reencaixa posição). Um patch que só muda
+  cor/`snap` não reencaixa ninguém (`resnapTokenPosition` detecta que nada mudou). Cada token
+  reencaixado sai num `token:updated` (mesma visibilidade de sempre); se algum foi, a troca inteira
+  (grid + tokens) entra na pilha de desfazer como UMA entrada — reencaixar não é trivial de desfazer
+  à mão, diferente de só mudar cor/snap.
 - **Seletor de mapa** (`MapSelector`, na TopBar, só GM): botão "Mapa: <nome visitado> ▾" (ou "Vendo
   X · ativo: Y" em destaque âmbar quando diverge, ver acima). Clique ou a tecla **M** (fora de campo
   de texto) abrem um dropdown de ~420 px ancorado abaixo do botão; Esc ou clique fora fecham. Quando
@@ -625,12 +625,10 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
 - **Testes puros** (`packages/shared/src/rules/scenes.ts`, `scenes.test.ts`): ordenação
   (`orderScenes`, `nextSceneOrder`), `reorderScenes` (renumera, rejeita conjunto incompleto/
   repetido/estranho), `duplicateScene`/`duplicateSceneName`, `pickTokensToCarry` (pré-marcação),
-  `canDeleteScene` (bloqueado/precisa confirmar/ok). A conversão de tamanho entre grids
-  (`convertSizeToCellSize`, `packages/shared/src/rules/placement.ts`, `placement.test.ts`: 70→100,
-  100→70, token 2×2, largura/altura independentes, grid "none" com a célula virtual de 70px) e o
-  reencaixe posição+tamanho (`resnapToken`, `apps/server/src/services/grid.ts`, `grid.test.ts`:
-  troca de `cellSize`, só offset, grid "none" ↔ square, sem mudança nenhuma) são testados à parte,
-  sem banco.
+  `canDeleteScene` (bloqueado/precisa confirmar/ok). `tokenPixelSize`/`cellsFromPixels`
+  (`packages/shared/src/rules/placement.ts`, `placement.test.ts`) e o reencaixe de posição
+  (`resnapTokenPosition`, `apps/server/src/services/grid.ts`, `grid.test.ts`: troca de `cellSize`,
+  só offset, grid "none" ↔ square, sem mudança nenhuma) são testados à parte, sem banco.
 
 ### 9.8 Painel lateral recolhível
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { DEFAULT_MAP_SIZE, getSystemDefinition, type SystemDefinition, type Token } from "@tormenta-vtt/shared";
+import { DEFAULT_MAP_SIZE, getSystemDefinition, tokenPixelSize, type SystemDefinition, type Token } from "@tormenta-vtt/shared";
 import { canControl } from "../components/VttCanvas";
 import { canMoveNow, movementBudgetFallback, sceneCombat, useCombat } from "../store/combat";
 import { selectViewedScene, useRoom } from "../store/room";
@@ -160,7 +160,7 @@ export function useTokenMoveShortcuts(): void {
         const current = byId[t.id] ?? t;
         const raw = { x: current.x + delta.dx * step, y: current.y + delta.dy * step };
         const snapped = scene.grid.type === "none" ? raw : snapToGrid(raw.x, raw.y, scene.grid);
-        const settled = clampToMap(snapped.x, snapped.y, current, map);
+        const settled = clampToMap(snapped.x, snapped.y, tokenPixelSize(current.cells, cellSize), map);
         moveLive(t.id, settled.x, settled.y);
       }
       scheduleConfirm();

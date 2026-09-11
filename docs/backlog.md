@@ -79,21 +79,6 @@ comprometido — só um lugar para não perder a ideia até o dono do projeto pr
   depois da troca um `token:update` de um jogador que era dono do token quando o mapa ainda era o
   ativo. O §11 do plano não previa essa distinção. Anotado em 09/09/2026 (`docs/revisao-mapas.md`
   §4, "Ativar um mapa enquanto um jogador está no meio de um arraste").
-- **Tamanho de token em células (`Token.cells`) como fonte da verdade, pixels derivados do grid do
-  mapa — refatoração que elimina essa classe de bug.** Hoje `Token.width/height` são pixels fixos;
-  toda vez que o token muda de grid (`scene:activate`/`scene:delete` levando pra outro mapa,
-  `scene:updateGrid` trocando o `cellSize` do mapa atual) alguém precisa lembrar de converter
-  (`convertSizeToCellSize`, `packages/shared/src/rules/placement.ts`) e recalcular pixels de novo —
-  esqueceu uma vez (docs/plano-mapas.md, corrigido em 09/09/2026: os dois handlers de mapa moviam
-  token sem tocar no tamanho, então ele ficava do jeito que estava no mapa de origem, menor/maior
-  que a célula do destino). Se `Token` guardasse `cells` (nº de células de lado, análogo ao que já
-  existe pra criaturas do compêndio) em vez de `width/height`, os pixels seriam sempre `cells ×
-  cellSize do grid ATUAL` — calculado on-the-fly em qualquer lugar que precisa (canvas, findFreeCells,
-  serialização), nunca gravado errado. Não corrigido agora: é uma migration de schema (`Token.width/
-  height` → `Token.cells`, mais decidir o que fazer com token redimensionado livremente — hoje os
-  handles do canto permitem qualquer pixel, não só múltiplos de `cellSize`; ou perde essa liberdade,
-  ou `cells` vira fracionário) que toca client (Konva, handles de resize) e servidor a fundo — fora
-  do escopo de um fix pontual.
 - **Botão "Atualizar do compêndio" no item da ficha**, refazendo a cópia a partir da entrada de
   origem (`$source`). Hoje `character:insert-from-compendium` copia a entrada uma vez (denormalizada,
   `entryToItem`) e o item da ficha vive independente dali em diante — se o GM corrige o JSON do
@@ -130,3 +115,10 @@ comprometido — só um lugar para não perder a ideia até o dono do projeto pr
   tem isso hoje, então mudar só pra alvos criaria uma assimetria entre os dois cards). Achado na
   revisão de 10/09/2026 (`docs/revisao-alvos.md` §5.3); não corrigido — comportamento consistente
   com o que já existia, não uma regressão.
+- **Tokens de meia célula (Minúsculo 0,5 em T20).** `Token.cells` (docs/plano-grid.md) é inteiro
+  ≥ 1: um token cuja criatura tem `tokenCells: 0.5` no sistema (Minúsculo) arredonda pra 1 célula
+  cheia ao soltar do compêndio, igual ao comportamento de antes da migration — só que agora não tem
+  mais como um dia render "meia célula" sem o schema aprender fração. Suportar de verdade exigiria
+  `Token.cells` fracionário (ex.: `0.5`), o que muda a espiral de posicionamento (`findFreeCells`,
+  hoje em células inteiras) e o snap do Transformer (§ do plano) pra aceitar meio passo. Anotado em
+  11/09/2026, ao trocar `Token.width/height` por `Token.cells`.

@@ -4,6 +4,7 @@ import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
 import {
   applyResourceDelta,
+  cellsFromPixels,
   computeCharacter,
   conditionIconDataUrl,
   creatureColor,
@@ -35,7 +36,7 @@ import {
 } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
 import { isTyping } from "../lib/isTyping";
-import { cellAt, cellCenter, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox, type Box } from "../lib/grid";
+import { cellAt, cellCenter, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, sizeTokens, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox, type Box, type SizedToken } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
 import {
   cellCountFromPixels,
@@ -115,8 +116,8 @@ interface VttCanvasProps {
   /** Arraste em grupo ao soltar (2+ tokens selecionados movidos juntos): um patch por token, mas
    *  UMA chamada só (token:update-many), pra virar uma entrada de histórico só — ver handleTokenDragEnd. */
   onTokenPatchMany: (patches: TokenPatch[]) => void;
-  /** GM: criar token no ponto (pixels do mapa) com o tamanho de uma célula. */
-  onTokenCreate: (pos: { x: number; y: number }, size: number) => void;
+  /** GM: criar token no ponto (pixels do mapa), 1 célula de lado. */
+  onTokenCreate: (pos: { x: number; y: number }) => void;
   onTokenDelete: (tokenId: string) => void;
   /**
    * Apaga os tokens selecionados agora (mesma função do atalho Delete/Backspace — ver
@@ -289,7 +290,7 @@ function buildClickCellTemplate(
 export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   scene,
   mode,
-  tokens,
+  tokens: tokensProp,
   participants,
   me,
   activeTurnTokenId,
@@ -394,7 +395,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
      *  o "antes" que o servidor leria sozinho seria só o penúltimo tick, não o início do gesto
      *  (docs/plano-desfazer.md §3). */
     leaderOrigin: { x: number; y: number };
-    others: Array<{ token: Token; x: number; y: number }>;
+    others: Array<{ token: SizedToken; x: number; y: number }>;
   } | null>(null);
   /** Ponto inicial da régua em andamento (pixels do mapa). */
   const rulerStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -467,6 +468,11 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   const mapWidth = scene.mapWidth ?? DEFAULT_MAP.width;
   const mapHeight = scene.mapHeight ?? DEFAULT_MAP.height;
   const map = useMemo(() => ({ width: mapWidth, height: mapHeight }), [mapWidth, mapHeight]);
+
+  // Token.cells é a fonte da verdade do tamanho (docs/plano-grid.md): deriva width/height UMA VEZ
+  // aqui, a partir do grid do mapa atual — todo o resto do arquivo abaixo continua lendo
+  // token.width/token.height como sempre (Konva, condição, barra de PV, seleção em caixa...).
+  const tokens: SizedToken[] = useMemo(() => sizeTokens(tokensProp, scene.grid), [tokensProp, scene.grid]);
 
   useEffect(() => {
     setSnapEnabled(scene.grid.snap);
@@ -547,7 +553,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     let pos = { x: c.x - size / 2, y: c.y - size / 2 };
     if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
     pos = findFreeSpot(pos, scene.grid, tokens, map);
-    onTokenCreate(pos, size);
+    onTokenCreate(pos);
   };
 
   /** Ponto de TELA (clientX/Y — arrasto vem de fora do Konva, da paleta do compêndio) em pixels do mapa. */
@@ -652,7 +658,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
    * proteção contra fingerprinting embaralham; aí o Konva "não vê" shape nenhuma sob o mouse.
    * O último da lista é desenhado por cima, então tem prioridade.
    */
-  const tokenAtPointer = (): Token | null => {
+  const tokenAtPointer = (): SizedToken | null => {
     const p = pointerMapPos();
     if (!p) return null;
     for (let i = tokens.length - 1; i >= 0; i--) {
@@ -1294,7 +1300,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   };
 
   // --- Arraste em grupo: o token arrastado (líder) puxa os outros selecionados que eu controlo.
-  const handleTokenDragStart = (token: Token, node: Konva.Node, additive: boolean) => {
+  const handleTokenDragStart = (token: SizedToken, node: Konva.Node, additive: boolean) => {
     setConditionTooltip(null); // arrastando não há hover; senão o balão fica pendurado
     const leaderOrigin = { x: token.x, y: token.y };
     if (!selectedIds.includes(token.id)) {
@@ -1315,12 +1321,12 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     const others = selectedIds
       .filter((id) => id !== token.id)
       .map((id) => tokens.find((t) => t.id === id))
-      .filter((t): t is Token => t !== undefined && canControl(me, t))
+      .filter((t): t is SizedToken => t !== undefined && canControl(me, t))
       .map((t) => ({ token: t, x: t.x, y: t.y }));
     groupDragRef.current = { leader: { x: node.x(), y: node.y() }, leaderOrigin, others };
   };
 
-  const handleTokenDragMove = (token: Token, node: Konva.Node) => {
+  const handleTokenDragMove = (token: SizedToken, node: Konva.Node) => {
     onTokenMoveLive(token.id, node.x(), node.y());
     const g = groupDragRef.current;
     if (!g) return;
@@ -1336,7 +1342,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   /** Se o destino estoura o orçamento de deslocamento do combatente da vez, devolve a âncora em vez
    *  do destino (docs/plano-movimento.md §4.2) — o servidor aceita (custo zero) e o broadcast
    *  recoloca o token pra todo mundo. Toast só uma vez por gesto, mesmo em arraste de grupo. */
-  const clampToMovementBudget = (tok: Token, dest: { x: number; y: number }, warnRef: { warned: boolean }): { x: number; y: number } => {
+  const clampToMovementBudget = (tok: SizedToken, dest: { x: number; y: number }, warnRef: { warned: boolean }): { x: number; y: number } => {
     if (!systemDef) return dest;
     const cellSizePx = effectiveCellSize(scene.grid);
     const fallback = movementBudgetFallback(systemDef, combat, movementLimitEnabled, cellSizePx, tok.id, dest);
@@ -1348,7 +1354,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     return { x: fallback.x, y: fallback.y };
   };
 
-  const handleTokenDragEnd = (token: Token, node: Konva.Node) => {
+  const handleTokenDragEnd = (token: SizedToken, node: Konva.Node) => {
     const g = groupDragRef.current;
     groupDragRef.current = null;
     const dx = node.x() - (g?.leader.x ?? node.x());
@@ -1476,7 +1482,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   // do token qualquer token desenhado depois pintava por cima dele. Ver ConditionTooltipLayerContent.
   const [conditionTooltip, setConditionTooltip] = useState<ConditionTooltip | null>(null);
 
-  const renderToken = (token: Token) => (
+  const renderToken = (token: SizedToken) => (
     <TokenNode
       key={token.id}
       token={token}
@@ -1496,23 +1502,23 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       onDragMove={(node) => handleTokenDragMove(token, node)}
       onDragEnd={(node) => handleTokenDragEnd(token, node)}
       onTransformEnd={(node) => {
-        // O Transformer altera scaleX/scaleY do Group; convertemos em width/height reais
-        // e zeramos a escala, porque o token é desenhado a partir de width/height.
+        // O Transformer altera scaleX/scaleY do Group; convertemos em CÉLULAS (sempre inteiro — o
+        // tamanho do token nunca fica livre, docs/plano-grid.md D1) e zeramos a escala, porque o
+        // token é desenhado a partir de width/height (derivados de cells × cellSize do grid).
         const scaleX = node.scaleX();
         const scaleY = node.scaleY();
         node.scale({ x: 1, y: 1 });
-        const min = 8;
-        let width = Math.max(min, token.width * scaleX);
-        let height = Math.max(min, token.height * scaleY);
-        if (snapEnabled && scene.grid.type === "square") {
-          const cells = Math.max(1, Math.round(width / scene.grid.cellSize));
-          width = height = cells * scene.grid.cellSize;
-        }
+        const cellSizePx = effectiveCellSize(scene.grid);
+        const rawSide = Math.max(token.width * scaleX, token.height * scaleY);
+        const cells = cellsFromPixels(rawSide, cellSizePx);
+        const side = cells * cellSizePx;
+        // Snap continua sendo só da POSIÇÃO (preferência do mapa); o tamanho em células é sempre
+        // arredondado, com ou sem snap.
         let pos = { x: node.x(), y: node.y() };
         if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
-        pos = clampToMap(pos.x, pos.y, { width, height }, map);
+        pos = clampToMap(pos.x, pos.y, { width: side, height: side }, map);
         node.position(pos);
-        onTokenPatch({ id: token.id, x: pos.x, y: pos.y, width, height });
+        onTokenPatch({ id: token.id, x: pos.x, y: pos.y, cells });
       }}
       onContextMenu={() => openConditionMenuAt(token)}
     />
@@ -1599,6 +1605,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
             borderStroke="#d4af37"
             borderDash={[4, 4]}
             ignoreStroke
+            boundBoxFunc={(oldBox, newBox) => {
+              // Tamanho do token é sempre um nº inteiro de células (docs/plano-grid.md D1): arredonda
+              // JÁ durante o arrasto (não só ao soltar), pra alça "pular" de célula em célula e o GM
+              // ver exatamente o que vai ficar — em pixels de TELA (cellSize do mapa × zoom atual).
+              const screenCell = effectiveCellSize(scene.grid) * stageScale;
+              const side = Math.max(screenCell, Math.round(newBox.width / screenCell) * screenCell);
+              return { ...newBox, width: side, height: side };
+            }}
           />
         </Layer>
 
@@ -1803,7 +1817,7 @@ function findFreeSpot(
 // --- Token ------------------------------------------------------------------
 
 interface TokenNodeProps {
-  token: Token;
+  token: SizedToken;
   bar: TokenBar | null;
   /** conditions[] do sistema, indexadas por key, pra resolver ícone/cor/descrição das do token. */
   conditionByKey: Map<string, ConditionDef>;

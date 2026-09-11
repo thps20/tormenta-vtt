@@ -15,7 +15,7 @@ import {
 import { prisma } from "../db.js";
 import { listCompendium } from "../services/compendium.js";
 import { broadcastCharacter, toCharacter, toJson } from "../services/characters.js";
-import { cellAt, cellRect, cellToPoint, effectiveCellSize } from "../services/grid.js";
+import { cellAt, cellRect, cellToPoint, effectiveCellSize, sceneGeometry } from "../services/grid.js";
 import { describeSpawn, pushEntry } from "../services/history.js";
 import { toScene, toToken } from "../services/serialize.js";
 import { guarded, HandlerError } from "./ack.js";
@@ -60,9 +60,8 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
 
         const existingTokens = await prisma.token.findMany({ where: { sceneId: data.sceneId, deletedAt: null } });
         const occupied: CellRect[] = existingTokens.map((t) => cellRect(t, scene.grid));
-        // Lado em células: arredonda pro grid (tokenCells pode ser fracionário, ex.: Minúsculo =
-        // 0,5) — a espiral trabalha em células inteiras; o token continua com o tamanho exato em
-        // pixels (width/height abaixo), só a RESERVA na espiral vira 1 célula no mínimo.
+        // Lado em células: arredonda (tokenCells pode ser fracionário, ex.: Minúsculo = 0,5) —
+        // vira o `Token.cells` gravado (docs/plano-grid.md), mínimo 1 (docs/backlog.md).
         const sizeDef = def.sizes.find((s) => s.key === entry.sheet.size);
         const cellsPerSide = Math.max(1, Math.round(sizeDef?.tokenCells ?? 1));
 
@@ -93,8 +92,7 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
                 imageUrl: null,
                 x: point.x,
                 y: point.y,
-                width: cellsPerSide * cellSize,
-                height: cellsPerSide * cellSize,
+                cells: cellsPerSide,
                 zIndex: existingTokens.length + i + 1,
                 visible: data.visible,
                 ownerId: null,
@@ -111,7 +109,7 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
         // GM) e token:created (visibilidade normal — respeita `visible` e a névoa da cena).
         for (const { character, token } of results) {
           broadcastCharacter(io, ctx.roomId, character, "character:created");
-          broadcastToken(io, ctx.roomId, token, "token:created", scene.fog);
+          broadcastToken(io, ctx.roomId, token, "token:created", sceneGeometry(scene));
         }
 
         // compendium:spawn-creature já é gmOnly (guarded abaixo), então sempre empilha.
