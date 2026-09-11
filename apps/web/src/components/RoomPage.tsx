@@ -4,6 +4,7 @@ import { selectActiveScene, selectViewedScene, useRoom } from "../store/room";
 import { sceneTokens, useTokens } from "../store/tokens";
 import { sceneTemplates, useTemplates } from "../store/templates";
 import { useTemplateHistory } from "../store/templateHistory";
+import { useTargets } from "../store/targets";
 import { scenePins, useHandouts } from "../store/handouts";
 import { describeTemplateAreaChange } from "../lib/templates";
 import { effectiveCellSize } from "../lib/grid";
@@ -20,7 +21,18 @@ import { useTurnTitle } from "../lib/useTurnTitle";
 import { useHistory } from "../store/history";
 import { useSceneList } from "../store/sceneList";
 import { selectEffectiveMode, useTools } from "../store/tools";
-import { computeCharacter, isPointRevealed, pickTokensToCarry, tokenCenter, type Handout, type HandoutCard, type HandoutPin, type Template, type TemplateChangeAction } from "@tormenta-vtt/shared";
+import {
+  computeCharacter,
+  isPointRevealed,
+  pickTokensToCarry,
+  targetsFromTemplate,
+  tokenCenter,
+  type Handout,
+  type HandoutCard,
+  type HandoutPin,
+  type Template,
+  type TemplateChangeAction,
+} from "@tormenta-vtt/shared";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { CombatBanner } from "./CombatBanner";
 import { type CombatPanelCallbacks } from "./CombatPanel";
@@ -46,6 +58,9 @@ import { CREATURE_FILTER } from "../lib/compendium";
 
 const CENTER_ON_TURN_KEY = "tvtt:centerOnActiveTurn";
 const SIDE_PANEL_COLLAPSED_KEY = "tvtt:sidePanelCollapsed";
+// Sistema de alvos (docs/plano-alvos.md): preferências por usuário, mesmo padrão de CENTER_ON_TURN_KEY.
+const SHOW_OTHER_TARGETS_KEY = "tvtt:showOtherTargets";
+const CLEAR_TARGETS_ON_TURN_END_KEY = "tvtt:clearTargetsOnTurnEnd";
 
 /**
  * Página da mesa: entra na sala pela URL e liga as stores aos componentes.
@@ -335,6 +350,86 @@ function Table() {
   const myTurn = me !== null && isMyTurn(combat, me);
   useTurnTitle(myTurn);
 
+  // Sistema de alvos (docs/plano-alvos.md): meus alvos + os dos outros (já filtrados pelo
+  // servidor — nunca inclui o GM), e as duas preferências por usuário (mesmo padrão de
+  // centerOnActiveTurn acima).
+  const myTargetIds = useTargets((s) => s.mine);
+  const targetSource = useTargets((s) => s.source);
+  const othersTargets = useTargets((s) => s.others);
+  const toggleTarget = useTargets((s) => s.toggle);
+  const clearTargets = useTargets((s) => s.clear);
+  const setTargetsFromTemplate = useTargets((s) => s.setFromTemplate);
+  const [showOtherTargets, setShowOtherTargets] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SHOW_OTHER_TARGETS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(SHOW_OTHER_TARGETS_KEY, showOtherTargets ? "1" : "0");
+    } catch {
+      /* ignora (aba anônima etc.) */
+    }
+  }, [showOtherTargets]);
+  const [clearTargetsOnTurnEnd, setClearTargetsOnTurnEnd] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(CLEAR_TARGETS_ON_TURN_END_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(CLEAR_TARGETS_ON_TURN_END_KEY, clearTargetsOnTurnEnd ? "1" : "0");
+    } catch {
+      /* ignora (aba anônima etc.) */
+    }
+  }, [clearTargetsOnTurnEnd]);
+  // Fim do MEU turno (token que estava agindo era meu — para o GM, sem dono): limpa meus alvos,
+  // se a opção estiver ligada. `lastActiveCombatantRef` guarda quem estava agindo ANTES da
+  // mudança (o combate já trocou de mão quando este efeito roda).
+  const lastActiveCombatantRef = useRef<{ id: string; ownerId: string | null } | null>(null);
+  useEffect(() => {
+    const activeC = activeCombatant(combat);
+    const prev = lastActiveCombatantRef.current;
+    lastActiveCombatantRef.current = activeC ? { id: activeC.id, ownerId: activeC.ownerId } : null;
+    if (!clearTargetsOnTurnEnd || !prev || activeC?.id === prev.id) return;
+    const wasMine = me?.role === "gm" ? prev.ownerId === null : prev.ownerId === me?.id;
+    if (wasMine) void clearTargets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [combat?.activeCombatantId]);
+  // Gabarito de área que EU coloquei substitui a seleção manual enquanto existir (docs/plano-alvos.md
+  // §3.6): recalcula ao mover/girar (templates muda) ou tokens entrarem/saírem dele; some (Ctrl+Z,
+  // Delete, apagar) => limpa os alvos (decisão: não volta pra seleção manual de antes).
+  // Ids de token mirados por QUALQUER outro participante, no mapa visitado — pro CombatPanel (só
+  // liga alguma coisa, sem nome de quem; VttCanvas já resolve o nome pro selo no token).
+  const othersTargetTokenIds = useMemo(() => {
+    if (!showOtherTargets || !scene) return [];
+    const ids = new Set<string>();
+    for (const state of Object.values(othersTargets)) {
+      if (state.sceneId !== scene.id) continue;
+      for (const id of state.tokenIds) ids.add(id);
+    }
+    return [...ids];
+  }, [othersTargets, showOtherTargets, scene?.id]);
+
+  const myTemplateId = targetSource.kind === "template" ? targetSource.templateId : null;
+  useEffect(() => {
+    if (!myTemplateId || !scene) return;
+    const tmpl = templates.find((t) => t.id === myTemplateId);
+    if (!tmpl) {
+      void clearTargets();
+      return;
+    }
+    const ids = targetsFromTemplate(tokens, tmpl, effectiveCellSize(scene.grid));
+    const current = useTargets.getState().mine;
+    if (ids.length === current.length && ids.every((id, i) => id === current[i])) return;
+    void setTargetsFromTemplate(myTemplateId, ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myTemplateId, templates, tokens, scene?.grid]);
+
   const charById = useCharacters((s) => s.byId);
   const characters = useMemo(() => sortedCharacters(charById), [charById]);
   const openCharacterId = useCharacters((s) => s.openId);
@@ -401,6 +496,9 @@ function Table() {
     if (!scene) return;
     void createTemplate(scene.id, t);
     pushTemplateUndo("colocar", t, () => useTemplates.getState().remove(scene.id, t.id));
+    // Sistema de alvos (docs/plano-alvos.md §3.6): meu gabarito já vira meus alvos, substituindo a
+    // seleção manual; o efeito de cima mantém isso ao vivo enquanto ele existir.
+    void setTargetsFromTemplate(t.id, targetsFromTemplate(tokens, t, effectiveCellSize(scene.grid)));
   };
   const handleTemplateCommit = (t: Template, dragFrom?: { x: number; y: number; rotation: number }) => {
     if (!scene) return;
@@ -640,6 +738,11 @@ function Table() {
                 onOpenHandoutPin={handleOpenHandoutPin}
                 onDeleteHandoutPin={isGm ? handleDeleteHandoutPin : undefined}
                 onHandoutDrop={isGm ? handleHandoutDrop : undefined}
+                myTargetIds={myTargetIds}
+                othersTargets={othersTargets}
+                showOtherTargets={showOtherTargets}
+                onToggleTarget={(tokenId, additive) => void toggleTarget(tokenId, additive)}
+                onClearTargets={() => void clearTargets()}
               />
               <Toolbar
                 isGm={isGm}
@@ -712,6 +815,12 @@ function Table() {
           movementLimitEnabled={movementLimitEnabled}
           centerOnActiveTurn={centerOnActiveTurn}
           onToggleCenterOnActiveTurn={() => setCenterOnActiveTurn((v) => !v)}
+          myTargetTokenIds={myTargetIds}
+          othersTargetTokenIds={othersTargetTokenIds}
+          showOtherTargets={showOtherTargets}
+          onToggleShowOtherTargets={() => setShowOtherTargets((v) => !v)}
+          clearTargetsOnTurnEnd={clearTargetsOnTurnEnd}
+          onToggleClearTargetsOnTurnEnd={() => setClearTargetsOnTurnEnd((v) => !v)}
           tokens={tokens}
           conditions={systemDef?.conditions ?? []}
           onRollCharacter={(characterId, request) => void rollCharacter(characterId, request)}

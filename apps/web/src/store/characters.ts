@@ -5,6 +5,7 @@ import { newId } from "../lib/ids";
 import { emitAck } from "./connection";
 import { notifyBlindRoll, useChat } from "./chat";
 import { useCompendium } from "./compendium";
+import { useTargets } from "./targets";
 import { toast } from "./ui";
 
 interface CharactersState {
@@ -98,7 +99,10 @@ export const useCharacters = create<CharactersState>((set, get) => ({
   },
 
   roll: async (characterId, roll) => {
-    const res = await emitAck("character:roll", { characterId, roll, visibility: useChat.getState().rollMode });
+    // Alvos marcados (docs/plano-alvos.md): só ações de item levam alvo (ataque/dano da ficha);
+    // teste de atributo/perícia/iniciativa não tem "alvo" — o servidor também ignora fora de ataque.
+    const targetTokenIds = roll.type === "action" ? useTargets.getState().mine : [];
+    const res = await emitAck("character:roll", { characterId, roll, visibility: useChat.getState().rollMode, targetTokenIds });
     if (!res.ok) toast(res.error);
     else notifyBlindRoll(res.data);
     return res.ok;

@@ -30,6 +30,13 @@ interface ApplyDamageButtonProps {
   def: SystemDefinition | null;
   me: Participant;
   onApply: (messageId: string, targets: ApplyDamageTarget[]) => Promise<boolean>;
+  /**
+   * Sistema de alvos (docs/plano-alvos.md §3.5): ao abrir a primeira vez, marca estes tokens (só
+   * os que já apareceriam na lista desta pessoa — jogador continua vendo só os próprios) com o
+   * mesmo `toggle` de sempre, então a sugestão de `damageResponses` vem de brinde. Confirmar
+   * continua manual; reabrir depois não marca de novo (não sobrescreve ajustes já feitos).
+   */
+  preselectTokenIds: string[];
 }
 
 /** Linha da lista: token + de onde vem o PV dele (ficha vinculada ou hp próprio) e os limites. */
@@ -59,13 +66,15 @@ function withMultiplier(total: number, sign: 1 | -1, mult: '1' | '0.5' | '2' | '
  * por alvo. Confirma → token:apply-damage. O servidor valida permissão nos
  * mesmos moldes (tudo-ou-nada); aqui só filtramos pra não oferecer o que ele ia recusar.
  */
-export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId, roll, tokens, characters, participants, def, me, onApply }) => {
+export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId, roll, tokens, characters, participants, def, me, onApply, preselectTokenIds }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [amounts, setAmounts] = useState<Record<string, number>>({});
   const [multipliers, setMultipliers] = useState<Record<string, '1' | '0.5' | '2' | '0' | undefined>>({});
   const [submitting, setSubmitting] = useState(false);
+  // Só a primeira abertura marca os alvos sugeridos — reabrir depois não sobrescreve ajustes já feitos.
+  const didPreselectRef = useRef(false);
 
   const damage = roll.damage ?? [];
   const isHeal = def !== null && damage.length > 0 && isHealingType(def, damage[0]?.damageType ?? null);
@@ -170,7 +179,12 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
     <div className="relative inline-block">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => !v);
+          if (didPreselectRef.current) return;
+          didPreselectRef.current = true;
+          for (const id of preselectTokenIds) if (rows.some((r) => r.token.id === id)) toggle(id);
+        }}
         className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-emerald-800/60 text-emerald-400 hover:bg-emerald-950/40 text-[10px] font-serif font-bold cursor-pointer"
         title={isHeal ? 'Aplicar cura em tokens' : 'Aplicar dano em tokens'}
       >

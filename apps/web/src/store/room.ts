@@ -18,6 +18,7 @@ import { useTokens } from "./tokens";
 import { useChat } from "./chat";
 import { useCombat } from "./combat";
 import { useTemplates } from "./templates";
+import { useTargets } from "./targets";
 import { useCharacters } from "./characters";
 import { useCompendium } from "./compendium";
 import { useHandouts } from "./handouts";
@@ -148,6 +149,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useChat.getState().setAll([]);
     useCombat.getState().setSnapshot(null, null);
     useTemplates.getState().setSnapshot(null, []);
+    useTargets.getState().reset();
     useCharacters.getState().setAll([]);
     useCompendium.getState().reset();
     useHandouts.getState().reset();
@@ -165,6 +167,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useCombat.getState().setSnapshot(snap.room.activeSceneId, snap.combat);
     useTemplates.getState().setSnapshot(snap.room.activeSceneId, snap.templates);
     useHandouts.getState().setSnapshot(snap.room.activeSceneId, snap.handoutPins);
+    useTargets.getState().setSnapshot(snap.targets, snap.me.id);
     useCharacters.getState().setAll(snap.characters);
 
     // Jogador sempre vê o ativo (derivado, sem sessionStorage). GM: restaura o mapa que estava

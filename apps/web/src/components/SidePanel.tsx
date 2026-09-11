@@ -22,6 +22,13 @@ interface SidePanelProps {
   movementLimitEnabled: boolean;
   centerOnActiveTurn: boolean;
   onToggleCenterOnActiveTurn: () => void;
+  /** Sistema de alvos (docs/plano-alvos.md), pro CombatPanel: ícone de mira + as duas preferências. */
+  myTargetTokenIds: string[];
+  othersTargetTokenIds: string[];
+  showOtherTargets: boolean;
+  onToggleShowOtherTargets: () => void;
+  clearTargetsOnTurnEnd: boolean;
+  onToggleClearTargetsOnTurnEnd: () => void;
   tokens: Token[];
   /** conditions[] do sistema da sala, pro CombatPanel resolver ícone/cor/duração da linha do combatente. */
   conditions: ConditionDef[];
@@ -67,6 +74,12 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   movementLimitEnabled,
   centerOnActiveTurn,
   onToggleCenterOnActiveTurn,
+  myTargetTokenIds,
+  othersTargetTokenIds,
+  showOtherTargets,
+  onToggleShowOtherTargets,
+  clearTargetsOnTurnEnd,
+  onToggleClearTargetsOnTurnEnd,
   tokens,
   conditions,
   isGm,
@@ -177,6 +190,12 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             selectedTokenId={selectedTokenId}
             centerOnActiveTurn={centerOnActiveTurn}
             onToggleCenterOnActiveTurn={onToggleCenterOnActiveTurn}
+            myTargetTokenIds={myTargetTokenIds}
+            othersTargetTokenIds={othersTargetTokenIds}
+            showOtherTargets={showOtherTargets}
+            onToggleShowOtherTargets={onToggleShowOtherTargets}
+            clearTargetsOnTurnEnd={clearTargetsOnTurnEnd}
+            onToggleClearTargetsOnTurnEnd={onToggleClearTargetsOnTurnEnd}
             {...combatCallbacks}
           />
         )}

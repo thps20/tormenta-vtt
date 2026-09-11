@@ -5,6 +5,7 @@ import { useTokens } from "./tokens";
 import { useChat } from "./chat";
 import { useCombat } from "./combat";
 import { useTemplates } from "./templates";
+import { useTargets } from "./targets";
 import { useCharacters } from "./characters";
 import { useHistory } from "./history";
 import { useSceneList } from "./sceneList";
@@ -52,6 +53,8 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("token:created", (token) => useTokens.getState().upsert(token));
   socket.on("token:updated", (token) => useTokens.getState().upsert(token));
   socket.on("token:deleted", ({ tokenId }) => useTokens.getState().remove(tokenId));
+
+  socket.on("target:updated", (p) => useTargets.getState().applyRemote(p));
 
   socket.on("chat:message", (msg) => {
     useChat.getState().append(msg);

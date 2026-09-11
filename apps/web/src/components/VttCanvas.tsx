@@ -33,6 +33,7 @@ import {
   type TokenPatch,
 } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
+import { isTyping } from "../lib/isTyping";
 import { cellAt, cellCenter, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox, type Box } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
 import {
@@ -183,6 +184,18 @@ interface VttCanvasProps {
    * mapa não aceita o drop.
    */
   onHandoutDrop?: (handout: Handout, point: { x: number; y: number }) => void;
+
+  /** Sistema de alvos (docs/plano-alvos.md): meus alvos (anel sempre visível). */
+  myTargetIds: string[];
+  /** Alvos dos outros participantes (nunca inclui o GM), por participantId — `{sceneId,tokenIds}`
+   *  como chegou do servidor; o componente filtra pela cena visitada. */
+  othersTargets: Record<string, { sceneId: string; tokenIds: string[] }>;
+  /** Opção por usuário: mostra o selo de quem mais mira em cada token. */
+  showOtherTargets: boolean;
+  /** Alt+clique (ou tecla Y) num token: marca/desmarca; Shift entra na lista em vez de trocar. */
+  onToggleTarget: (tokenId: string, additive: boolean) => void;
+  /** Alt+clique em área vazia: limpa meus alvos. */
+  onClearTargets: () => void;
 }
 
 /** Forma + tamanho (metros) escolhidos na TemplateToolbar, e a sobrescrita de ângulo/largura de um preset. */
@@ -316,6 +329,11 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   onHandoutDrop,
   onTemplateLive,
   onTemplateCommit,
+  myTargetIds,
+  othersTargets,
+  showOtherTargets,
+  onToggleTarget,
+  onClearTargets,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -624,6 +642,22 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     }
     return null;
   };
+
+  // Sistema de alvos (docs/plano-alvos.md): tecla Y marca/desmarca o token SOB O PONTEIRO agora
+  // (Shift+Y entra na lista em vez de trocar) — alternativa ao Alt+clique (que em alguns sistemas
+  // abre menu do navegador ou move a janela ao soltar). Só na ferramenta Selecionar, fora de campo
+  // de texto; sem token sob o ponteiro, não faz nada (não limpa — Alt no vazio já cobre "limpar").
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (mode !== "select" || isTyping(e.target) || e.key.toLowerCase() !== "y") return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = tokenAtPointer();
+      if (t) onToggleTarget(t.id, e.shiftKey);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, tokens]);
 
   /**
    * Alça de redimensionar (`Konva.Transformer`) sob o ponteiro, por GEOMETRIA — mesmo motivo de
@@ -1051,6 +1085,17 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       return;
     }
     if (mode !== "select") return;
+    // Sistema de alvos (docs/plano-alvos.md): Alt+clique num token marca/desmarca (Shift+Alt entra
+    // na lista em vez de trocar); Alt no vazio limpa. Tratado inteiro AQUI, por geometria (mesmo
+    // motivo de sempre — hit canvas embaralhado), pra nunca também iniciar seleção/arraste: sem
+    // isso, um Alt+clique que tremesse 1-2px durante o mousedown moveria o token (ver
+    // handleStageClick/TokenNode.onClick, que só ignoram o Alt em vez de repetir o toggle).
+    if (e.evt.altKey) {
+      const t = tokenAtPointer();
+      if (t) onToggleTarget(t.id, e.evt.shiftKey);
+      else onClearTargets();
+      return;
+    }
     const rotateTarget = templateRotateHandleAtPointer();
     if (rotateTarget) {
       templateRotateRef.current = { id: rotateTarget.id, startTemplate: rotateTarget };
@@ -1158,6 +1203,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       return;
     }
     if (mode !== "select") return;
+    // Alt já foi tratado inteiro no mousedown (marcar/desmarcar alvo, ou limpar) — nada a fazer
+    // aqui, senão um hit sabotado chamaria selectByClick por cima (ver handleStageMouseDown).
+    if (e.evt.altKey) return;
     if (boxJustEndedRef.current) {
       boxJustEndedRef.current = false;
       return;
@@ -1363,6 +1411,21 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templates, tokens, scene.grid]);
 
+  /** Sistema de alvos (docs/plano-alvos.md): quem (nickname) mira cada token, por tokenId — só
+   *  calculado com a opção ligada, e só dos alvos marcados na cena visitada (o participante pode
+   *  ter marcado num mapa que este cliente não está vendo agora). */
+  const targetersByToken = useMemo(() => {
+    if (!showOtherTargets) return {};
+    const map: Record<string, string[]> = {};
+    for (const [participantId, state] of Object.entries(othersTargets)) {
+      if (state.sceneId !== scene.id) continue;
+      const nickname = participants.find((p) => p.id === participantId)?.nickname ?? "?";
+      for (const tokenId of state.tokenIds) (map[tokenId] ??= []).push(nickname);
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [othersTargets, showOtherTargets, scene.id, participants]);
+
   /** Preenchimento por célula (docs/plano-gabaritos.md §5): além do contorno geométrico, marca as
    *  células cujo centro cai dentro — todo mundo vê o mesmo resultado discreto. Só com grid ("none"
    *  não tem célula pra pintar), gabaritos reais e o rascunho durante o arrasto. */
@@ -1402,6 +1465,8 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       selectable={mode === "select"}
       isSelected={selectedIds.includes(token.id)}
       isActiveTurn={token.id === activeTurnTokenId}
+      isTargetedByMe={myTargetIds.includes(token.id)}
+      targetedByOthers={targetersByToken[token.id] ?? []}
       onSelect={(additive) => selectByClick(token.id, additive)}
       onCursor={setCursor}
       onDragStart={(node, additive) => handleTokenDragStart(token, node, additive)}
@@ -1739,9 +1804,13 @@ interface TokenNodeProps {
   onContextMenu: () => void;
   /** Zoom atual do Stage: os badges de condição precisam saber pra manter o tamanho em px de tela. */
   stageScale: number;
+  /** Sistema de alvos (docs/plano-alvos.md): meu anel, sempre; dos outros (nome de quem mira),
+   *  só com a opção "Mostrar alvos dos outros" ligada — já filtrado pelo chamador. */
+  isTargetedByMe: boolean;
+  targetedByOthers: string[];
 }
 
-const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, combatRound, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu, stageScale }) => {
+const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, combatRound, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu, stageScale, isTargetedByMe, targetedByOthers }) => {
   const image = useImage(assetUrl(token.imageUrl));
   const radius = tokenRadius(token);
   const cx = token.width / 2;
@@ -1763,6 +1832,10 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, comba
       opacity={token.visible ? 1 : 0.45}
       onClick={(e) => {
         if (!selectable) return;
+        // Alt já foi tratado no mousedown do Stage (docs/plano-alvos.md) — ambiente com hit canvas
+        // intacto chega aqui de qualquer jeito (o Group recebe o clique nativo direto do Konva,
+        // sem passar pelo fallback por geometria); só ignora, não repete o toggle.
+        if (e.evt.altKey) return;
         e.cancelBubble = true;
         onSelect(e.evt.shiftKey);
       }}
@@ -1777,12 +1850,29 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, comba
         onContextMenu();
       }}
       onDragStart={(e) => {
+        // Alt+clique nunca deveria iniciar arraste (docs/plano-alvos.md) — em ambiente com hit
+        // canvas intacto, o Konva já viu o mousedown chegar no Group e começa a rastrear um drag
+        // por conta própria; `stopDrag` cancela antes que ele visivelmente mova o token.
+        if (e.evt.altKey) {
+          e.target.stopDrag();
+          return;
+        }
         e.cancelBubble = true;
         onCursor("grabbing");
         onDragStart(e.target, e.evt.shiftKey);
       }}
-      onDragMove={(e) => onDragMove(e.target)}
+      onDragMove={(e) => {
+        if (e.evt.altKey) return; // stopDrag() do onDragStart já rejeitou; nada a fazer aqui
+        onDragMove(e.target);
+      }}
       onDragEnd={(e) => {
+        if (e.evt.altKey) {
+          // stopDrag() (onDragStart) já cancelou o gesto; o Group pode ter avançado alguns px
+          // durante a detecção do drag ANTES do nosso handler rodar — devolve pra posição de
+          // verdade (as props x/y do Group), sem nunca chamar onDragEnd (sem patch nenhum).
+          e.target.position({ x: token.x, y: token.y });
+          return;
+        }
         e.cancelBubble = true;
         onCursor("grab");
         onDragEnd(e.target);
@@ -1800,6 +1890,35 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, comba
         <Circle x={cx} y={cy} radius={radius + 8} stroke="#d4af37" strokeWidth={2.5} dash={[6, 4]} shadowColor="#d4af37" shadowBlur={14} shadowOpacity={0.9} listening={false} />
       )}
       {isSelected && !isActiveTurn && <Circle x={cx} y={cy} radius={radius + 6} stroke="#d4af37" strokeWidth={1.5} dash={[4, 4]} listening={false} />}
+
+      {/* Sistema de alvos (docs/plano-alvos.md): meu anel (sempre) + marcador de mira no canto;
+          selo com quem mais mira (só com "Mostrar alvos dos outros" ligado) no canto oposto. */}
+      {isTargetedByMe && (
+        <>
+          <Circle x={cx} y={cy} radius={radius + 11} stroke="#dc2626" strokeWidth={2} dash={[5, 5]} listening={false} />
+          <Group x={cx + radius * 0.62} y={cy - radius * 0.62} listening={false}>
+            <Circle radius={7} fill="#1a0505" stroke="#dc2626" strokeWidth={1.5} />
+            <Line points={[-3.5, 0, 3.5, 0]} stroke="#dc2626" strokeWidth={1.3} />
+            <Line points={[0, -3.5, 0, 3.5]} stroke="#dc2626" strokeWidth={1.3} />
+          </Group>
+        </>
+      )}
+      {targetedByOthers.length > 0 && (
+        <Group x={cx - radius * 0.62} y={cy - radius * 0.62} listening={false}>
+          <Circle radius={7} fill="#1a1206" stroke="#d4af37" strokeWidth={1.5} />
+          <Text
+            x={-7}
+            y={-4}
+            width={14}
+            align="center"
+            fontSize={8}
+            fontFamily="sans-serif"
+            fontStyle="bold"
+            fill="#d4af37"
+            text={targetedByOthers.length > 1 ? String(targetedByOthers.length) : (targetedByOthers[0]?.charAt(0).toUpperCase() ?? "?")}
+          />
+        </Group>
+      )}
 
       <Circle x={cx} y={cy + 3} radius={radius} fill="rgba(0, 0, 0, 0.6)" listening={false} />
       <Circle x={cx} y={cy} radius={radius} fill="#141414" stroke={highlight ? "#d4af37" : token.color} strokeWidth={BODY_STROKE} shadowColor="#000" shadowBlur={8} shadowOpacity={0.7} listening={false} />

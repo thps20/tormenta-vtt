@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Dices, Scroll, Eye } from 'lucide-react';
-import type { Character, CharacterRollRequest, ChatMessage, Participant, Token } from '@tormenta-vtt/shared';
+import { hitRuleTargetLabel, type Character, type CharacterRollRequest, type ChatMessage, type DiceRoll, type Participant, type RollTarget, type Token } from '@tormenta-vtt/shared';
 import { canEditCharacter } from '../store/characters';
 import { useChat } from '../store/chat';
+import { useTargets } from '../store/targets';
 import { useSystemDef } from '../lib/system';
 import { rollModeInfo } from '../lib/rollMode';
 import { ApplyDamageButton } from './chat/ApplyDamageButton';
@@ -12,6 +13,23 @@ import { ItemCardMessage } from './chat/ItemCardMessage';
 import { RollModeButton } from './chat/RollModeButton';
 import { DamageFormula, DamageTypeBadge } from './DamageTypeBadge';
 import { useHandouts } from '../store/handouts';
+
+/**
+ * Sistema de alvos (docs/plano-alvos.md): uma linha por alvo de um ataque — "Acertou/Errou" (com
+ * o número só quando o servidor mandou `targetValue`, ver services/chatVisibility.ts#rollTargetsForViewer
+ * no servidor); "(N natural)" quando `attackAutoHit`/`attackAutoMiss` decidiu; sem regra de acerto
+ * no sistema (ou alvo sem ficha), só o nome.
+ */
+function targetLineText(def: ReturnType<typeof useSystemDef>, roll: DiceRoll, target: RollTarget): { text: string; color: string } {
+  const name = target.name;
+  if (target.reason === 'auto-hit') return { text: `Acertou ${name} (${roll.natural} natural)`, color: 'text-emerald-400' };
+  if (target.reason === 'auto-miss') return { text: `Errou ${name} (${roll.natural} natural)`, color: 'text-red-400' };
+  if (target.hit === null) return { text: `→ ${name}`, color: 'text-zinc-400' };
+  const verb = target.hit ? 'Acertou' : 'Errou';
+  if (target.targetValue === undefined) return { text: `${verb} ${name}`, color: target.hit ? 'text-emerald-400' : 'text-red-400' };
+  const label = def?.rolls.attackHit ? hitRuleTargetLabel(def, def.rolls.attackHit) : 'alvo';
+  return { text: `${verb} ${name} (${roll.total} vs ${label} ${target.targetValue})`, color: target.hit ? 'text-emerald-400' : 'text-red-400' };
+}
 
 interface ChatTabProps {
   messages: ChatMessage[];
@@ -43,6 +61,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   const setRollMode = useChat((s) => s.setRollMode);
   const revealMessage = useChat((s) => s.reveal);
   const applyDamage = useChat((s) => s.applyDamage);
+  // Sistema de alvos (docs/plano-alvos.md §3.5): "Aplicar" pré-seleciona os alvos do CARD quando
+  // ele tiver (roll.targets, ataque com acerto/erro); sem alvo no card, cai nos meus alvos atuais.
+  const myTargetIds = useTargets((s) => s.mine);
   const openHandout = useHandouts((s) => s.openLocal);
   const [inputText, setInputText] = useState('');
   const isRollCommand = /^\/(r|roll|gmr|gr|pr)\b/i.test(inputText);
@@ -318,6 +339,20 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                   </div>
                 </div>
 
+                {/* Sistema de alvos (docs/plano-alvos.md): uma linha por alvo do ataque. */}
+                {roll.targets.length > 0 && (
+                  <div className="mt-2 pt-1.5 border-t border-zinc-800/60 space-y-0.5" data-roll-targets>
+                    {roll.targets.map((t) => {
+                      const { text, color } = targetLineText(def, roll, t);
+                      return (
+                        <div key={t.tokenId} className={`text-[11px] font-mono ${color}`}>
+                          {text}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {(damage || roll.applied.length > 0) && (
                   <div className="mt-2 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between gap-2 flex-wrap" data-apply-damage>
                     <ApplyDamageButton
@@ -329,6 +364,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                       def={def}
                       me={me}
                       onApply={applyDamage}
+                      preselectTokenIds={roll.targets.length > 0 ? roll.targets.map((t) => t.tokenId) : myTargetIds}
                     />
                     {roll.applied.length > 0 && (
                       <span className="text-[10px] font-mono text-zinc-500" data-applied-log>

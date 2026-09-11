@@ -19,6 +19,7 @@ import {
   FastForward,
   CheckCircle2,
   RotateCcw,
+  Crosshair,
 } from 'lucide-react';
 import type { Combat, Combatant, ConditionDef, RollVisibility, Token, TokenCondition } from '@tormenta-vtt/shared';
 
@@ -73,6 +74,15 @@ interface CombatPanelProps extends Partial<CombatPanelCallbacks> {
   conditions: ConditionDef[];
   /** Trava de deslocamento da SALA (docs/plano-movimento.md §4.3) — todos veem o estado; só o GM muda. */
   movementLimitEnabled: boolean;
+  /** Sistema de alvos (docs/plano-alvos.md): meus alvos (ícone de mira na linha do combatente),
+   *  os ids que ALGUM outro participante mira (já filtrado pela opção — vazio quando desligada;
+   *  sem nome de quem, só "alguém mira"), e as duas preferências por usuário. */
+  myTargetTokenIds: string[];
+  othersTargetTokenIds: string[];
+  showOtherTargets: boolean;
+  onToggleShowOtherTargets: () => void;
+  clearTargetsOnTurnEnd: boolean;
+  onToggleClearTargetsOnTurnEnd: () => void;
 }
 
 export const CombatPanel: React.FC<CombatPanelProps> = ({
@@ -88,6 +98,12 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
   tokens,
   conditions,
   movementLimitEnabled,
+  myTargetTokenIds,
+  othersTargetTokenIds,
+  showOtherTargets,
+  onToggleShowOtherTargets,
+  clearTargetsOnTurnEnd,
+  onToggleClearTargetsOnTurnEnd,
   onStart,
   onRoll,
   onSetInitiative,
@@ -369,6 +385,17 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
           Centralizar no token da vez
         </label>
 
+        {/* Sistema de alvos (docs/plano-alvos.md): duas preferências por usuário, mesmo padrão de
+         *  "Centralizar no token da vez" acima. */}
+        <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer select-none" title="Mostrar quem os outros participantes estão mirando">
+          <input type="checkbox" checked={showOtherTargets} onChange={onToggleShowOtherTargets} className="cursor-pointer accent-[#d4af37]" />
+          Mostrar alvos dos outros
+        </label>
+        <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer select-none" title="Limpar meus alvos quando meu turno terminar">
+          <input type="checkbox" checked={clearTargetsOnTurnEnd} onChange={onToggleClearTargetsOnTurnEnd} className="cursor-pointer accent-[#d4af37]" />
+          Limpar meus alvos ao fim do meu turno
+        </label>
+
         {/* Trava de deslocamento (docs/plano-movimento.md §4.3): GM liga/desliga na sala; jogador
          *  só vê o estado. "Ignorar" = interruptor LIGADO quando movementLimitEnabled é false. */}
         {viewer === 'gm' ? (
@@ -537,6 +564,14 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                         conditionByKey={conditionByKey}
                         combatRound={combatRound}
                       />
+
+                      {/* Sistema de alvos (docs/plano-alvos.md): mira vermelha = meu alvo; dourada =
+                          de outro participante (só com "Mostrar alvos dos outros" ligado). */}
+                      {(myTargetTokenIds.includes(combatant.tokenId) || othersTargetTokenIds.includes(combatant.tokenId)) && (
+                        <span title={myTargetTokenIds.includes(combatant.tokenId) ? 'Seu alvo' : 'Alvo de outro participante'} className="shrink-0">
+                          <Crosshair className={`w-3 h-3 ${myTargetTokenIds.includes(combatant.tokenId) ? 'text-red-400' : 'text-[#d4af37]'}`} />
+                        </span>
+                      )}
 
                       {/* Turn indicator */}
                       {isActive && (
@@ -946,6 +981,11 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                             conditionByKey={conditionByKey}
                             combatRound={combatRound}
                           />
+                          {(myTargetTokenIds.includes(combatant.tokenId) || othersTargetTokenIds.includes(combatant.tokenId)) && (
+                            <span title={myTargetTokenIds.includes(combatant.tokenId) ? 'Seu alvo' : 'Alvo de outro participante'} className="shrink-0">
+                              <Crosshair className={`w-3 h-3 ${myTargetTokenIds.includes(combatant.tokenId) ? 'text-red-400' : 'text-[#d4af37]'}`} />
+                            </span>
+                          )}
                         </div>
                       </div>
 
