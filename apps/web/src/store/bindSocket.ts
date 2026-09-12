@@ -12,6 +12,7 @@ import { useHistory } from "./history";
 import { useSceneList } from "./sceneList";
 import { useTools } from "./tools";
 import { useHandouts } from "./handouts";
+import { useCompendium } from "./compendium";
 import { usePins } from "./pins";
 import { useDrawings } from "./drawings";
 import { useEncounters } from "./encounters";
@@ -107,6 +108,11 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("encounter:created", (e) => useEncounters.getState().upsert(e));
   socket.on("encounter:updated", (e) => useEncounters.getState().upsert(e));
   socket.on("encounter:deleted", ({ id }) => useEncounters.getState().removeLocal(id));
+
+  // Homebrew da sala (§9.18): biblioteca só chega pro GM (rooms.gm), mesmo padrão de handout:*.
+  socket.on("compendium:room-created", (entry) => useCompendium.getState().upsertRoomEntry(entry));
+  socket.on("compendium:room-updated", (entry) => useCompendium.getState().upsertRoomEntry(entry));
+  socket.on("compendium:room-deleted", ({ entryId }) => useCompendium.getState().removeRoomEntry(entryId));
 
   socket.on("server:error", ({ message }) => toast(message));
 }

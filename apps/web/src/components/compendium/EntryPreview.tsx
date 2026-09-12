@@ -5,6 +5,8 @@ import { signed } from "../../lib/system";
 import { summarizeField } from "../character/StructuredFields";
 import { seeBook } from "../../lib/compendium";
 import type { ItemPaletteRow } from "./CompendiumPalette";
+import type { RoomEntryActions } from "./RoomEntryActionsRow";
+import { RoomEntryActionsRow } from "./RoomEntryActionsRow";
 import { DamageTypeBadge } from "../DamageTypeBadge";
 
 interface EntryPreviewProps {
@@ -12,12 +14,15 @@ interface EntryPreviewProps {
   row: ItemPaletteRow;
   /** Confirmação de troca (tipos com maxCount = 1): o clique é a confirmação. */
   onReplace: () => void;
+  /** GM, homebrew da sala (docs/plano-compendio-sala.md): "Duplicar para a sala" (entrada do
+   *  sistema) ou "Editar"/"Apagar" (entrada já da sala). Ausente = jogador, ou contexto sem GM. */
+  roomActions?: RoomEntryActions;
 }
 
 const STRUCTURED = ["attributeBonuses", "attributeChoice", "skillGrants", "size"];
 
 /** Resumo mecânico de uma entrada, com os rótulos do JSON do sistema. */
-export const EntryPreview: React.FC<EntryPreviewProps> = ({ def, row, onReplace }) => {
+export const EntryPreview: React.FC<EntryPreviewProps> = ({ def, row, onReplace, roomActions }) => {
   const { entry, check } = row;
   const kind = def.itemKinds.find((k) => k.key === entry.kind);
   const physical = kind?.physical ?? true;
@@ -92,6 +97,8 @@ export const EntryPreview: React.FC<EntryPreviewProps> = ({ def, row, onReplace 
           {entry.page !== null && ` · p. ${entry.page}`}
         </div>
       </div>
+
+      {roomActions && <RoomEntryActionsRow actions={roomActions} />}
 
       {!check.ok && (
         <div className="p-2 rounded bg-amber-950/40 border border-amber-800/60 text-amber-200 space-y-1.5">

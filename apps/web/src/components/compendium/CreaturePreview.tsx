@@ -11,6 +11,8 @@ import {
 } from "@tormenta-vtt/shared";
 import { signed } from "../../lib/system";
 import { DamageTypeBadge } from "../DamageTypeBadge";
+import type { RoomEntryActions } from "./RoomEntryActionsRow";
+import { RoomEntryActionsRow } from "./RoomEntryActionsRow";
 
 /** Quantidade e toggle "invisível ao soltar" (controlados pela paleta: Enter solta, ver CompendiumPalette). */
 export interface CreatureSpawnControls {
@@ -27,6 +29,8 @@ interface CreaturePreviewProps {
   spawn?: CreatureSpawnControls;
   /** "Ver bloco completo" (§9.5): abre a ficha inteira em modo leitura, sem soltar no mapa. */
   onOpenFullSheet?: () => void;
+  /** GM, homebrew da sala (docs/plano-compendio-sala.md): ver RoomEntryActionsRow. */
+  roomActions?: RoomEntryActions;
 }
 
 /** Só entra na comparação `preview` de useMemo; um id fixo basta (não muda nada da ficha). */
@@ -93,7 +97,7 @@ function quickStats(def: SystemDefinition, computed: ComputedCharacter): QuickSt
  * `spawn` (GM, contexto "map"): quantidade (1..20) e toggle "invisível ao soltar" no rodapé — soltar
  * em si é só Enter/Ctrl+Enter/arrastar (CompendiumPalette), sem botão aqui.
  */
-export const CreaturePreview: React.FC<CreaturePreviewProps> = ({ def, entry, spawn, onOpenFullSheet }) => {
+export const CreaturePreview: React.FC<CreaturePreviewProps> = ({ def, entry, spawn, onOpenFullSheet, roomActions }) => {
   const sheet = entry.sheet;
   const character = useMemo(() => entryToCharacter(def, entry, PREVIEW_ID).data, [def, entry]);
   const computed = useMemo(() => computeCharacter(def, character), [def, character]);
@@ -118,6 +122,8 @@ export const CreaturePreview: React.FC<CreaturePreviewProps> = ({ def, entry, sp
           {typeLabel && <span>· {typeLabel}</span>}
         </div>
       </div>
+
+      {roomActions && <RoomEntryActionsRow actions={roomActions} />}
 
       {/* Ordem pedida: PV, Defesa, Deslocamento (quando o sistema declara cada um) e Iniciativa por último. */}
       <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 text-[11px] font-serif">

@@ -41,7 +41,8 @@ Regra de conteúdo: só dados mecânicos. `description` fica vazia por enquanto.
 6. **Compêndio da sala (homebrew do GM): só a interface.** `CompendiumSource = { id, label, priority, entries }`
    e `mergeCompendium(sources)`: id repetido vence pela fonte de maior prioridade. O servidor já chama
    `mergeCompendium([sistema, sala])`, com a fonte da sala sendo um stub que devolve `[]`. Sem tela, sem tabela
-   no banco, sem evento de edição.
+   no banco, sem evento de edição. **Atualização (setembro/2026):** deixou de ser stub — tela, tabela e
+   eventos de edição em `docs/plano-compendio-sala.md` (§9.18 do SPEC).
 
 7. **Uma única função de inserção.** Enter, botão "+" e soltar chamam
    `useCharacters.insertFromCompendium(characterId, entryId, { replace? })`, que passa pelo `update` existente
@@ -126,6 +127,7 @@ das armas e da armadura ficaram com `TODO` no `$comment` do JSON, à espera do l
 
 ## Fora deste plano
 
-- Tela de edição do compêndio da sala (homebrew): só a interface/tipo fica pronta.
+- Tela de edição do compêndio da sala (homebrew): só a interface/tipo fica pronta. **Feito** em
+  `docs/plano-compendio-sala.md` (setembro/2026).
 - Soltar no mapa (monstro vira token): só o registro de alvos fica pronto.
 - Descrições em texto das entradas.

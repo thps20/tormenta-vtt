@@ -52,6 +52,9 @@ interface ItemsSectionProps {
   /** Aba (tipo de item) ativa; fica no drawer para o atalho da paleta abrir já filtrado. */
   activeTab: string;
   onActiveTabChange: (kind: string) => void;
+  /** RoomEntryEditor (docs/plano-compendio-sala.md): "Do compêndio" abriria a MESMA paleta que já
+   *  está por trás do editor (não insere em lugar nenhum ali) — só esconder o botão nesse contexto. */
+  hideCompendiumButton?: boolean;
 }
 
 /** Tipos de campo com efeito na ficha (têm editor próprio e podem pedir escolha). */
@@ -97,7 +100,7 @@ const optionLabel = (options: { key: string; label: string }[] | undefined, key:
  * Itens da ficha em abas por tipo (itemKinds[] do sistema). Os campos, stats de
  * equipamento e enumerações de ativação vêm todos do JSON, nunca do código.
  */
-export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, computed, canEdit, isEditMode, onPatch, onRoll, onUseItem, activeTab, onActiveTabChange: setActiveTab }) => {
+export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, computed, canEdit, isEditMode, onPatch, onRoll, onUseItem, activeTab, onActiveTabChange: setActiveTab, hideCompendiumButton }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggleExpand = (id: string) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   const openCompendium = useCompendium((s) => s.open);
@@ -152,10 +155,12 @@ export const ItemsSection: React.FC<ItemsSectionProps> = ({ def, character, comp
                 <span>Adicionar {currentKind.label}</span>
               </button>
             )}
-            <button onClick={() => openCompendium("sheet", currentKind.key)} className={smallBtn} id="btn-open-compendium" title={`Inserir do compêndio (${PALETTE_SHORTCUT_LABEL})`}>
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>Do compêndio</span>
-            </button>
+            {!hideCompendiumButton && (
+              <button onClick={() => openCompendium("sheet", currentKind.key)} className={smallBtn} id="btn-open-compendium" title={`Inserir do compêndio (${PALETTE_SHORTCUT_LABEL})`}>
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Do compêndio</span>
+              </button>
+            )}
           </div>
         )}
       </div>

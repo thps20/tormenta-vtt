@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { CompendiumEntry } from "@tormenta-vtt/shared";
+import type { CompendiumEntry, RoomCompendiumEntryInput, RoomCompendiumImportResult } from "@tormenta-vtt/shared";
 import { dropTargetAt, type DropPoint } from "../lib/dropTargets";
 import { emitAck } from "./connection";
 import { toast } from "./ui";
@@ -59,6 +59,21 @@ interface CompendiumState {
   setSpawnCount: (n: number) => void;
   /** Persiste em sessionStorage. */
   setSpawnInvisible: (v: boolean) => void;
+
+  // Homebrew da sala (docs/plano-compendio-sala.md, §9.18): GM cria/edita/apaga entradas próprias,
+  // que entram na mesma lista `entries` (o servidor já manda mesclado) e em `roomIds`.
+  /** `entryId` null = cria (o servidor gera o id do nome); preenchido = substitui o corpo inteiro. */
+  saveRoomEntry: (entryId: string | null, entry: RoomCompendiumEntryInput) => Promise<CompendiumEntry | null>;
+  deleteRoomEntry: (entryId: string) => Promise<boolean>;
+  /** Tudo que não está apagado, pronto pra virar um arquivo .json. */
+  exportRoom: () => Promise<CompendiumEntry[] | null>;
+  importRoom: (entries: CompendiumEntry[], overwriteConflicts: boolean) => Promise<RoomCompendiumImportResult | null>;
+  // Broadcasts (bindSocket) — idempotentes, mesmo padrão de useEncounters.upsert/removeLocal. Uma
+  // entrada da sala apagada some da lista; se por acaso ela sobrepunha uma do sistema (só possível
+  // via import — a criação normal nunca deixa colidir, ver nextEntryId), o sistema só volta a
+  // aparecer numa recarga da paleta (compendium:list de novo), não sozinho aqui.
+  upsertRoomEntry: (entry: CompendiumEntry) => void;
+  removeRoomEntry: (entryId: string) => void;
   /** Limpa o estado ao sair da sala (as entradas dependem do sistema da sala). */
   reset: () => void;
 }
@@ -120,5 +135,49 @@ export const useCompendium = create<CompendiumState>((set, get) => ({
       /* sessionStorage indisponível (aba privada etc.): só não lembra entre reaberturas. */
     }
   },
+
+  saveRoomEntry: async (entryId, entry) => {
+    const res = entryId ? await emitAck("compendium:room-update", { entryId, entry }) : await emitAck("compendium:room-create", { entry });
+    if (!res.ok) {
+      toast(res.error);
+      return null;
+    }
+    get().upsertRoomEntry(res.data);
+    return res.data;
+  },
+  deleteRoomEntry: async (entryId) => {
+    const res = await emitAck("compendium:room-delete", { entryId });
+    if (!res.ok) {
+      toast(res.error);
+      return false;
+    }
+    get().removeRoomEntry(entryId);
+    return true;
+  },
+  exportRoom: async () => {
+    const res = await emitAck("compendium:room-export", {});
+    if (!res.ok) {
+      toast(res.error);
+      return null;
+    }
+    return res.data.entries;
+  },
+  importRoom: async (entries, overwriteConflicts) => {
+    const res = await emitAck("compendium:room-import", { entries, overwriteConflicts });
+    if (!res.ok) {
+      toast(res.error);
+      return null;
+    }
+    // As entradas criadas/atualizadas também chegam por compendium:room-created/-updated (broadcast
+    // pra rooms.gm, e esta aba já está ligada nele) — nada a fazer aqui além de devolver o resumo.
+    return res.data;
+  },
+  upsertRoomEntry: (entry) =>
+    set((s) => ({
+      entries: s.entries.some((e) => e.id === entry.id) ? s.entries.map((e) => (e.id === entry.id ? entry : e)) : [...s.entries, entry],
+      roomIds: s.roomIds.includes(entry.id) ? s.roomIds : [...s.roomIds, entry.id],
+    })),
+  removeRoomEntry: (entryId) => set((s) => ({ entries: s.entries.filter((e) => e.id !== entryId), roomIds: s.roomIds.filter((id) => id !== entryId) })),
+
   reset: () => set({ entries: [], roomIds: [], status: "idle", isOpen: false, context: "sheet", initialKind: null, lastInserted: null, drag: null, spawnCount: 1 }),
 }));

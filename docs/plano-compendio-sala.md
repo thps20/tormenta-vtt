@@ -1,8 +1,8 @@
 # Plano: Homebrew da sala (compêndio da sala editável pelo GM)
 
-> Escrito em 12/09/2026, antes de qualquer código. **Aguardando aprovação do dono do projeto.**
-> Fecha o TODO de `docs/SPEC.md` §9.4 ("a sala ainda é um stub") e de `docs/plano-compendio.md`
-> ("Fora deste plano: tela de edição do compêndio da sala"). Vira **§9.18** do SPEC.
+> Escrito em 12/09/2026, antes de qualquer código. Status: **implementado** (mesmo dia). Resumo em
+> `docs/SPEC.md` §9.18. Fecha o TODO de §9.4 ("a sala ainda é um stub") e de `docs/plano-compendio.md`
+> ("Fora deste plano: tela de edição do compêndio da sala").
 
 Escopo: o GM cria e edita conteúdo próprio (armas, armaduras, magias, poderes, itens, criaturas) no
 compêndio **da sala**, que já tem prioridade sobre o do sistema quando o id bate (`mergeCompendium`,
@@ -171,7 +171,30 @@ tokens, handouts...).
 7. **Docs**: `docs/SPEC.md` §9.18 (resumo) + §9.4 (tira o "a sala ainda é um stub"), este arquivo
    passa a "implementado".
 
----
+## Decisões tomadas durante a implementação
 
-Decisões confirmadas com o dono do projeto (seção acima) já estão refletidas neste plano. Aguardando
-aprovação final para começar pelo passo 1.
+- **`nextEntryId` também não pode colidir com o compêndio do SISTEMA**, não só com o da própria
+  sala: o plano original só desempatava contra outros ids da sala, o que deixaria um nome como
+  "Espada Longa" sobrepor a "espada-longa" do sistema sem o GM ter pedido isso — exatamente o que a
+  decisão de id fixo (Q2) queria evitar. Corrigido antes de fechar o passo 3 (commit `Corrige
+  nextEntryId`).
+- **`ItemsSection` ganhou um prop `hideCompendiumButton`**: o botão "Do compêndio" dela abriria a
+  MESMA paleta que já está por trás do `RoomEntryEditor` (nada a inserir ali dentro do editor) — em
+  vez de reescrever a seção, só um booleano pra esconder esse botão específico no contexto do editor.
+  Continua sendo reaproveitar, não recriar.
+- **Teste do passo 3 foi `services/roomCompendium.test.ts`, não `socket/roomCompendium.test.ts`**
+  como o plano original sugeria: os handlers de socket são só `guarded` + emitir (mesmo padrão de
+  `handout:*`/`encounter:*`), a lógica que vale testar mora inteira em `services/roomCompendium.ts` —
+  não existe infraestrutura de socket/io real nos testes deste projeto (todos os `socket/*.test.ts`
+  atuais também só testam funções puras exportadas dos arquivos, nunca sobem um servidor de verdade).
+- **Editor de criatura não tem "Anotações" (bio) nem moedas**: `DetailsSection` (a seção que mostra
+  os dois) foi deixada de fora — `CreatureSheet` não carrega `bio` (o texto morreria em silêncio ao
+  salvar) e moeda fixa numa criatura não é um caso de uso pedido. `description`/`page`/`tags`, que
+  SÃO metadado real da entrada, ganharam três campos pequenos no cabeçalho do editor.
+- **Sem verificação em navegador ao vivo**: o Chrome/Edge headless deste ambiente (WSL) não estava de
+  pé e o executável não foi encontrado nos caminhos padrão pra subir um novo; a verificação ficou em
+  `make typecheck && make test` (250 testes, 27 novos) mais revisão manual de código, que já pegou o
+  problema do `hideCompendiumButton` acima antes de rodar. Recomendo um clique-e-veja rápido (chip
+  "Sala", "Novo", "Duplicar para a sala", editar/apagar, exportar/importar) na próxima sessão com o
+  navegador de teste de pé — sala semeada por `make seed-test`, GM em
+  `http://localhost:5173/room/TESTE1?gm=mesa-de-teste-gm-secret&session=mesa-de-teste-mestre-token`.

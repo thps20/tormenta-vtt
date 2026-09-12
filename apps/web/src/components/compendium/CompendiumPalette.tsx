@@ -1,14 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, Check, Eye, EyeOff, ListPlus, Plus, Save, Search, Trash2, Users, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Eye, EyeOff, FolderCog, ListPlus, Plus, Save, Search, Trash2, Users, X } from "lucide-react";
 import { sumChallengeRating, type Character, type CompendiumCreatureEntry, type CompendiumEntry, type CompendiumItemEntry, type SavedEncounter, type SystemDefinition } from "@tormenta-vtt/shared";
 import { checkInsert, matchesQuery, CREATURE_FILTER, ENCOUNTER_FILTER, ROOM_FILTER, type InsertCheck } from "../../lib/compendium";
 import { useCompendium } from "../../store/compendium";
 import { useEncounters, type EncounterCartItem } from "../../store/encounters";
+import { useRoom, selectIsGm } from "../../store/room";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { creatureIcon, kindIcon } from "../character/kindIcons";
 import { EntryPreview } from "./EntryPreview";
 import { CreaturePreview } from "./CreaturePreview";
 import { CreatureFullSheet } from "./CreatureFullSheet";
+import { RoomEntryEditor } from "./RoomEntryEditor";
+import { RoomCompendiumImportExport } from "./RoomCompendiumImportExport";
+import type { RoomEntryActions } from "./RoomEntryActionsRow";
 import { EncounterPreview, encounterIcon, formatChallenge } from "./EncounterPreview";
 import { useCompendiumDrag, useEncounterDrag } from "./DragGhost";
 
@@ -97,6 +101,14 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
   // Contexto "map": os tipos de item além de Criaturas/Encontros ficam atrás deste chip (item 2).
   const [showAllKinds, setShowAllKinds] = useState(false);
 
+  // Homebrew da sala (docs/plano-compendio-sala.md, §9.18): só GM. "Novo ▾" abre o editor em branco
+  // (kind escolhido no menu); "Duplicar para a sala"/"Editar" (RoomEntryActionsRow, no preview) abrem
+  // o mesmo editor pré-preenchido — a diferença entre os três é só o que se passa aqui.
+  const isGm = useRoom(selectIsGm);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const [roomEditor, setRoomEditor] = useState<{ kind: string; sourceEntry: CompendiumEntry | null; editingEntryId: string | null } | null>(null);
+  const [importExportOpen, setImportExportOpen] = useState(false);
+
   useEffect(() => inputRef.current?.focus(), []);
 
   const items = useMemo(() => entries.filter((e): e is CompendiumItemEntry => e.type === "item"), [entries]);
@@ -115,6 +127,22 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
   const encounterEntries = useMemo(() => (context === "map" && onSpawnEncounter ? allEncounters : []), [context, onSpawnEncounter, allEncounters]);
   const cart = useEncounters((s) => s.cart);
   const { onRowPointerDown: onEncounterRowPointerDown } = useEncounterDrag();
+
+  /** Ações de homebrew da sala pro preview de uma entrada (undefined = esconde a linha de botões). */
+  const roomActionsFor = (entryId: string): RoomEntryActions | undefined => {
+    if (!isGm) return undefined;
+    const openEditorFor = (editingEntryId: string | null) => {
+      const source = entries.find((e) => e.id === entryId);
+      if (!source) return;
+      setRoomEditor({ kind: source.type === "creature" ? "creature" : source.kind, sourceEntry: source, editingEntryId });
+    };
+    return {
+      isRoomEntry: roomIds.includes(entryId),
+      onDuplicate: () => openEditorFor(null),
+      onEdit: () => openEditorFor(entryId),
+      onDelete: () => void useCompendium.getState().deleteRoomEntry(entryId),
+    };
+  };
 
   // Linhas visíveis, agrupadas: Criaturas primeiro (quando há alguma), depois Encontros, depois
   // itemKinds[] na ordem do sistema. Os chips "Criaturas"/"Encontros"/"Sala" filtram por
@@ -257,13 +285,14 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
 
   const preview = current ? (
     current.kind === "item" ? (
-      <EntryPreview def={def} row={current} onReplace={() => void insert(current, false, true)} />
+      <EntryPreview def={def} row={current} onReplace={() => void insert(current, false, true)} roomActions={roomActionsFor(current.entry.id)} />
     ) : current.kind === "creature" ? (
       <CreaturePreview
         def={def}
         entry={current.entry}
         spawn={onSpawnCreature ? { count: spawnCount, onCountChange: setSpawnCount, invisible: spawnInvisible, onInvisibleChange: setSpawnInvisible } : undefined}
         onOpenFullSheet={() => setOpenFullSheetEntry(current.entry)}
+        roomActions={roomActionsFor(current.entry.id)}
       />
     ) : (
       <EncounterPreview
@@ -482,20 +511,85 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
               </button>
             )}
           </div>
-          {context === "map" && onSpawnEncounter && (
-            <button
-              id="encounter-mode-toggle"
-              onClick={() => setEncounterMode((v) => !v)}
-              title="Montar um encontro: adicionar criaturas da lista a um carrinho e salvar"
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-serif transition-colors cursor-pointer ${
-                encounterMode ? "bg-[#2d2417] border-[#d4af37] text-[#d4af37] font-bold" : "bg-[#141414] border-zinc-700 text-zinc-400 hover:border-zinc-500"
-              }`}
-            >
-              <ListPlus className="w-3 h-3" />
-              Montar encontro
-              {cart.length > 0 && <span className="font-mono text-[9px] opacity-70">{cart.length}</span>}
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {/* Homebrew da sala (docs/plano-compendio-sala.md, §9.18): "Novo ▾" cria uma entrada em
+                branco de qualquer tipo; "Sala…" exporta/importa o compêndio inteiro da sala. */}
+            {isGm && (
+              <div className="relative">
+                <button
+                  id="compendium-new-menu-toggle"
+                  onClick={() => setNewMenuOpen((v) => !v)}
+                  title="Criar uma entrada nova no compêndio da sala"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-serif transition-colors cursor-pointer bg-[#141414] border-zinc-700 text-zinc-400 hover:border-[#d4af37] hover:text-[#d4af37]"
+                >
+                  <Plus className="w-3 h-3" />
+                  Novo
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {newMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-48 max-h-64 overflow-y-auto rounded bg-[#181614] border border-[#2d2417] shadow-xl z-20 py-1">
+                    {context === "map" &&
+                      (() => {
+                        const CreatureIcon = creatureIcon;
+                        return (
+                          <button
+                            id="compendium-new-creature"
+                            onClick={() => {
+                              setRoomEditor({ kind: "creature", sourceEntry: null, editingEntryId: null });
+                              setNewMenuOpen(false);
+                            }}
+                            className="w-full text-left px-2 py-1 text-[11px] text-zinc-300 hover:bg-[#2d2417] hover:text-[#d4af37] flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <CreatureIcon className="w-3 h-3 shrink-0" /> Criatura
+                          </button>
+                        );
+                      })()}
+                    {def.itemKinds.map((k, index) => {
+                      const Icon = kindIcon(index);
+                      return (
+                        <button
+                          key={k.key}
+                          id={`compendium-new-${k.key}`}
+                          onClick={() => {
+                            setRoomEditor({ kind: k.key, sourceEntry: null, editingEntryId: null });
+                            setNewMenuOpen(false);
+                          }}
+                          className="w-full text-left px-2 py-1 text-[11px] text-zinc-300 hover:bg-[#2d2417] hover:text-[#d4af37] flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Icon className="w-3 h-3 shrink-0" /> {k.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+            {isGm && (
+              <button
+                id="compendium-room-tools"
+                onClick={() => setImportExportOpen(true)}
+                title="Exportar/importar o compêndio da sala"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-serif transition-colors cursor-pointer bg-[#141414] border-zinc-700 text-zinc-400 hover:border-[#d4af37] hover:text-[#d4af37]"
+              >
+                <FolderCog className="w-3 h-3" />
+                Sala…
+              </button>
+            )}
+            {context === "map" && onSpawnEncounter && (
+              <button
+                id="encounter-mode-toggle"
+                onClick={() => setEncounterMode((v) => !v)}
+                title="Montar um encontro: adicionar criaturas da lista a um carrinho e salvar"
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-serif transition-colors cursor-pointer ${
+                  encounterMode ? "bg-[#2d2417] border-[#d4af37] text-[#d4af37] font-bold" : "bg-[#141414] border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                }`}
+              >
+                <ListPlus className="w-3 h-3" />
+                Montar encontro
+                {cart.length > 0 && <span className="font-mono text-[9px] opacity-70">{cart.length}</span>}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -559,11 +653,20 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
     </div>
   );
 
+  // Homebrew da sala: os dois são `fixed` (cobrem a tela toda sozinhos), então um único par de
+  // renders serve pros três modos — sem repetir em cada `return` abaixo.
+  const roomEditorOverlay = roomEditor && (
+    <RoomEntryEditor def={def} kind={roomEditor.kind} sourceEntry={roomEditor.sourceEntry} editingEntryId={roomEditor.editingEntryId} onClose={() => setRoomEditor(null)} />
+  );
+  const importExportOverlay = importExportOpen && <RoomCompendiumImportExport onClose={() => setImportExportOpen(false)} />;
+
   if (mode === "docked") {
     // Irmã da ficha no drawer: ocupa a altura toda e nunca fica por cima dela.
     return (
       <div id="compendium-palette" data-mode="docked" className="relative z-10 h-full shrink-0 palette-dock-in" style={{ width: PALETTE_WIDTH_PX }}>
         {panel}
+        {roomEditorOverlay}
+        {importExportOverlay}
       </div>
     );
   }
@@ -585,6 +688,8 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
             }}
           />
         )}
+        {roomEditorOverlay}
+        {importExportOverlay}
       </div>
     );
   }
@@ -597,6 +702,8 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
       className={`absolute inset-0 z-30 flex items-stretch justify-start p-4 bg-black/60 backdrop-blur-[1px] transition-opacity ${dragging ? "opacity-25 pointer-events-none" : ""}`}
     >
       {panel}
+      {roomEditorOverlay}
+      {importExportOverlay}
     </div>
   );
 };
