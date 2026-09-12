@@ -165,6 +165,7 @@ Room 1───* SavedEncounter
 | **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), initiativeBatch?(JSON), handout?(JSON), visibility, tokenId?, whisperTo?` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3; `natural`/`targets[]` são o sistema de alvos, §9.12 — ataque OU dano com alvo marcado, congelados na hora da rolagem, ataque com acerto/erro calculado e dano só com o nome; `criticalConfirmed` é o crítico confirmado de "Rolar dano junto com o ataque", §9.13); `item` segue `ItemCardSchema` (kind `item`); `initiativeBatch` segue `InitiativeBatchSchema` (kind `initiative-batch`: `{ round, entries: [{ combatantId, tokenId, name, formula?, result? }] }`, `combat:roll` rolando mais de um combatente, §3.5); `handout` segue `HandoutCardSchema` (kind `handout`, §9.10: cópia denormalizada do handout mostrado); `visibility` = `all \| gm \| self` (§3.4, sempre `all` num handout — quem recebe é decidido por `whisperTo`); `tokenId?` liga a rolagem a um token (combate/ficha), filtrado à parte de `visibility` (§3.4/§3.5) — um `initiative-batch` não usa este campo (várias linhas, vários tokens): o gate é por linha, dentro de `initiativeBatch.entries`; `whisperTo?` (§9.10) é um sussurro visual por PESSOA (`participantId`): setado, só o GM e ele recebem a mensagem, nem card nem placeholder pros demais — mesmo mecanismo de exclusão de `tokenId`, só que por pessoa |
 | **Handout** | `id, roomId, name, kind, imageUrl?, width?, height?, text?, tags[], deletedAt?` | Biblioteca por sala (§9.10), só o GM vê (`handout:list` é `gmOnly`). `kind` = `image \| text`; imagem reaproveita `POST /api/upload` (mesmo limite de 20 MB do mapa), texto vai até 20 000 caracteres, sem parser de markdown (texto puro). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Token.deletedAt`): soft delete de `handout:delete`, que também soft-deleta os `Pin` deste handout em qualquer mapa (§9.10) |
 | **Pin** | `id, sceneId, kind, handoutId?, x, y, visible, name?, imageUrl?, width?, height?, text?, icon?, color?, deletedAt?` | Pino no mapa (§9.10/§9.16, docs/plano-narracao.md — unifica o antigo `HandoutPin` com pino de nota). Geometria em pixels do mapa, como `Token`/`Template`. `kind` = `image \| text` (handout — `handoutId` setado, campos de conteúdo são uma CÓPIA denormalizada do `Handout` no momento de `pin:create`, mesmo padrão de `Combatant.name/color`: editar o handout original depois não atualiza pinos já fixados) \| `note` (`handoutId` null; `name` faz o papel de título, `text` o corpo, `icon`/`color` a aparência — conteúdo é o próprio dado, editável no lugar por `pin:update`). `visible` = GM controla se o pino aparece pros jogadores (mesma regra de `Token.visible`, sem névoa). `deletedAt`: soft delete de `pin:remove` (e da cascata de `handout:delete`), entra no desfazer do GM (§9.6) |
+| **Drawing** | `id, sceneId, kind, ownerId, color, strokeWidth, filled, visible, points(Float[]), x1?, y1?, x2?, y2?, x?, y?, width?, height?, cx?, cy?, rx?, ry?, text?, deletedAt?` | Traço de desenho livre no mapa (§9.17): uma linha por traço — diferente da névoa (blob JSON cumulativo em `Scene.fog`) e dos gabaritos (efêmeros, nunca no banco) — sobrevive a F5 e a um restart. `kind` = `pen \| line \| rect \| ellipse \| arrow \| text`; só os campos do `kind` atual são preenchidos (mesmo padrão de `Pin`); `points` (só `pen`) é um array nativo do Postgres, polilinha achatada já decimada/suavizada pelo cliente. `ownerId` sempre travado no servidor (nunca confiado do payload, mesmo princípio de `Template.ownerId`): jogador move/apaga só os seus, GM todos. `visible` = GM decide "todos" (padrão) ou "só GM" (jogador sempre cria `true`, nunca muda depois). `deletedAt`: soft delete de `drawing:remove`/`clear-mine`/`clear-all`, entra no desfazer do GM (§9.6) |
 | **SavedEncounter** | `id, roomId, name, tags[], notes, entries(JSON), deletedAt?` | Encontro salvo (§9.14): grupo de criaturas do compêndio que o GM monta uma vez e solta de uma vez. `entries` = `{ entryId, count, visibleOnSpawn, nameOverride? }[]` (`SavedEncounterEntrySchema`) — só a "receita", nunca cópia de ficha; resolvida contra o compêndio ATUAL na hora de soltar (`encounter:spawn`). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Handout.deletedAt`): soft delete de `encounter:delete` |
 | **Combat** | `id, roomId, sceneId (único: um combate por cena), round, status, activeCombatantId?` | `status` = `rolling \| active \| ended` (§3.5). Persistido (ao contrário da iniciativa manual anterior, que vivia em memória) |
 | **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound, movementBudget?, movementUsed, movementDiagonals, movementAnchorX?, movementAnchorY?, movementPath?(JSON)` | `initiative = null` = ainda não rolou. `combat:remove` apaga o combatente (e ajusta `activeCombatantId`/`round` se o removido era o ativo, `stateAfterRemoval`, §3.5). `token:delete`/`token:delete-many` **não** apagam mais a linha do combatente (o token agora é soft delete, §9.6): só param de listá-lo (o combate ignora combatente cujo token tem `deletedAt`) e fazem o mesmo ajuste de turno/`order`; a linha volta se o GM desfizer. Os seis últimos campos são o orçamento de deslocamento do turno (§9.11): `movementAnchorX/Y` (de onde o próximo movimento é medido) e `movementPath` (o caminho desenhado) são colunas só do banco, nunca serializadas no `Combatant` do shared — o cliente só recebe `movementBudget/Used/Diagonals` e `movementPath` via `Combat` (§5) |
@@ -245,6 +246,12 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `pin:create` | `{ sceneId, x, y, visible, kind: "handout", handoutId } \| { sceneId, x, y, visible, kind: "note", title, text, icon?, color? }` (pixels do mapa) | GM | ack `Pin`; `pin:created`; entra no desfazer do GM (§9.6) |
 | `pin:update` | `{ sceneId, pinId, patch: { title?, text?, icon?, color?, visible? } }` (só pino `kind: "note"`) | GM | ack `Pin`; `pin:updated`; entra no desfazer do GM (§9.6) |
 | `pin:remove` | `{ sceneId, pinId }` | GM | `pin:removed`; entra no desfazer do GM (§9.6) |
+| `drawing:create` | `{ sceneId, drawing: Drawing }` (§9.17; `id`/`ownerId`/`visible` do payload não são confiados — servidor fixa dono e força `visible: true` de jogador) | GM (qualquer mapa vivo); jogador (só mapa ATIVO, se "jogadores podem desenhar" estiver ligado) | ack `Drawing`; `drawing:created`; GM entra no desfazer (§9.6) |
+| `drawing:update` | `{ sceneId, drawingId, patch, live? }` (mover/redimensionar/reeditar/trocar cor-espessura-preenchimento; `visible` só o GM muda) | GM, ou dono do traço | ack `Drawing`; `drawing:updated`; `live` nunca empilha; GM sem `live` entra no desfazer |
+| `drawing:remove` | `{ sceneId, drawingId }` | GM, ou dono do traço | `drawing:removed` (soft delete); GM entra no desfazer |
+| `drawing:clear-mine` | `{ sceneId }` | todos (só os próprios) | `drawing:cleared { sceneId, drawingIds }`; GM entra no desfazer (uma entrada pro lote) |
+| `drawing:clear-all` | `{ sceneId }` | GM | `drawing:cleared`; entra no desfazer |
+| `drawing:set-player-permission` | `{ enabled }` (por SALA, em memória; só trava CRIAR) | GM | ack `{ enabled }`; `drawing:playerPermissionChanged` a todos |
 | `scene:set-notes` | `{ sceneId, notes }` (docs/plano-narracao.md §9.16) | GM | ack `Scene`; `scene:updated` (só pra `rooms.gm` — o conteúdo é só do GM) |
 | `scene:get-notes` | `{ sceneId }` | GM | ack `{ notes: string }` |
 | `token:set-notes` | `{ tokenId, notes }` | GM | ack `Token`; `token:updated` (só pra `rooms.gm`) |
@@ -281,6 +288,9 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `handout:created` / `handout:updated` | `Handout` (§9.10; só pra `rooms.gm`, cliente faz upsert por id) |
 | `handout:deleted` | `{ id }` (só pra `rooms.gm`) |
 | `pin:created` / `pin:updated` / `pin:removed` | `{ sceneId, pin }` / `{ sceneId, pin }` / `{ sceneId, pinId }` (§9.10/§9.16; mesma regra de broadcast de mapa de sempre — GM sempre, jogador só se `pin.visible` e `sceneId` é o mapa ATIVO) |
+| `drawing:created` / `drawing:updated` / `drawing:removed` | `{ sceneId, drawing }` / `{ sceneId, drawing }` / `{ sceneId, drawingId }` (§9.17; mesma regra de broadcast de mapa de sempre — GM sempre, jogador só se `drawing.visible` e `sceneId` é o mapa ATIVO) |
+| `drawing:cleared` | `{ sceneId, drawingIds }` (§9.17; "Limpar meus"/"Limpar tudo" — lote de ids de uma vez, cliente remove todos) |
+| `drawing:playerPermissionChanged` | `{ enabled }` (§9.17; "jogadores podem desenhar" da sala mudou — também entra no `RoomSnapshot.playerDrawingEnabled` de quem entra depois) |
 | `handout:closed` | `{ messageId }` (efêmero: instrui quem via a mensagem a fechar o overlay, sem mudar a mensagem no chat) |
 | `encounter:created` / `encounter:updated` | `SavedEncounter` (§9.14; só pra `rooms.gm`, cliente faz upsert por id) |
 | `encounter:deleted` | `{ id }` (só pra `rooms.gm`) |
@@ -324,7 +334,9 @@ apps/web/src/
                 zoom/arrastar imagem), HandoutDragGhost (arrastar card pro mapa), PinLayer (desenho
                 dos pinos no canvas, só geometria — §9.10/§9.16), NotePinCard (cartão de um pino de
                 nota), PinCreatePopover (formulário da ferramenta "Pino"), NotesPanel (notas do
-                Mestre + busca, §9.16)
+                Mestre + busca, §9.16), DrawToolbar (painel da ferramenta Desenho, §9.17),
+                DrawingLayer (desenho dos traços no canvas, só geometria — §9.17), DrawingTextPopover
+                (formulário da forma "Texto" da ferramenta Desenho)
   components/chat/  ItemCardMessage, InitiativeBatchMessage, HandoutCardMessage (miniatura
                 clicável do handout mostrado, §9.10), ApplyDamageButton, RollModeButton,
                 WhisperTargetButton (seletor "para" do sussurro, §3.4)
@@ -339,12 +351,14 @@ apps/web/src/
                 tools.ts (ferramenta ativa, régua, forma/tamanho da ferramenta Área — §9.9),
                 templates.ts (gabaritos por mapa, §9.9), compendium.ts (entradas, paleta, arrasto),
                 handouts.ts (biblioteca, overlay aberto, arrasto — §9.10),
-                pins.ts (pinos por mapa, handout ou nota — §9.10/§9.16)
+                pins.ts (pinos por mapa, handout ou nota — §9.10/§9.16),
+                drawings.ts (traços por mapa, create/live/commit/clear — §9.17),
+                drawingHistory.ts (Ctrl+Z local do jogador pros próprios traços, §9.17)
   lib/          router.ts (2 rotas, sem lib), api.ts (HTTP), grid.ts (célula↔pixel, puro),
                 session.ts (localStorage/sessionStorage), throttle.ts, useImage.ts,
                 thumbnails.ts (miniatura de mapa gerada no cliente, cacheada — §9.7),
                 system.ts (useSystemDef), ids.ts, pinIcons.ts (paleta padrão de pino, §9.16),
-                useToolShortcuts.ts (V/H/R/T/P/Esc/espaço), useTurnTitle.ts (título da aba pisca no seu turno),
+                useToolShortcuts.ts (V/H/R/T/P/D/Esc/espaço), useTurnTitle.ts (título da aba pisca no seu turno),
                 compendium.ts (regras de inserção, puro), dropTargets.ts (alvos de soltura por
                 data-drop-target, genérico — mesmo id "map" aceita criatura do compêndio E handout
                 ao mesmo tempo, §9.10), templates.ts (ponte pixel↔metro dos gabaritos, §9.9),
@@ -356,7 +370,8 @@ apps/server/src/
   socket/       index.ts, types.ts, ack.ts (validação Zod + ack), room.ts, scene.ts,
                 token.ts, chat.ts, combat.ts (modo de combate), character.ts, ruler.ts (efêmero),
                 compendium.ts, templates.ts (efêmero, §9.9), handout.ts (biblioteca, §9.10),
-                pins.ts (pino de handout ou nota, §9.10/§9.16), notes.ts (notas do Mestre, §9.16)
+                pins.ts (pino de handout ou nota, §9.10/§9.16), drawings.ts (traço de desenho
+                livre, §9.17), notes.ts (notas do Mestre, §9.16)
   services/     serialize.ts (Prisma → shared), snapshot.ts, presence.ts,
                 combat.ts (carregar/ordenar/filtrar/emitir combate; regras de ordem em si em shared/rules/combat.ts),
                 permissions.ts, chatCommands.ts, ids.ts,
@@ -367,15 +382,20 @@ apps/server/src/
                 compendium.ts (sistema + sala via mergeCompendium; a sala ainda é um stub vazio),
                 templates.ts (gabaritos em memória por mapa, nunca no banco — §9.9),
                 handouts.ts (Prisma ↔ Handout, HandoutCard denormalizado — §9.10),
-                pins.ts (Prisma ↔ Pin — handout ou nota —, visibilidade de pino — §9.10/§9.16)
+                pins.ts (Prisma ↔ Pin — handout ou nota —, visibilidade de pino — §9.10/§9.16),
+                drawings.ts (Prisma ↔ Drawing, visibilidade de traço — §9.17),
+                drawingPermission.ts ("jogadores podem desenhar" por sala, em memória — §9.17)
 packages/shared/src/
-  schemas/      (Zod, inclui payloads.ts, character.ts, combat.ts e template.ts)  events.ts
+  schemas/      (Zod, inclui payloads.ts, character.ts, combat.ts, template.ts e drawing.ts)  events.ts
   dice/         parser + roller, puro, sem I/O
   rules/        placeholders.ts, modifierTarget.ts (regex do target),
                 compute.ts (computeCharacter), rolls.ts (buildCharacterRoll), combat.ts (ordenação,
                 turno, surpresa — puro, testado), scenes.ts (ordem, nomeação de cópia, pré-marcação
                 de "levar para o mapa", quem pode apagar um mapa — puro, testado, §9.7), defaults.ts,
-                templates.ts (geometria dos gabaritos e parseAreaText, puro, testado — §9.9)
+                templates.ts (geometria dos gabaritos e parseAreaText, puro, testado — §9.9),
+                drawing.ts (hit-test/bounding box/suavização dos traços, puro, testado — §9.17)
+  geometry.ts   distância a segmento/polilinha, ponto-em-polígono — compartilhado por fog/ e
+                rules/drawing.ts, puro, testado
   systems.ts    registro dos JSONs (getSystemDefinition)
   compendium/   registro dos compêndios (subpath @tormenta-vtt/shared/compendium, só o servidor importa)
 packages/shared/systems/
@@ -397,6 +417,7 @@ Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a fi
 - Handouts (§9.10): um pino no mapa é uma cópia do handout no momento de fixar — editar nome/imagem/texto do handout original depois NÃO atualiza pinos já fixados, e não dá pra arrastar um pino pra reposicionar (apagar e fixar de novo faz as duas coisas). Handout de texto é sempre texto puro (`white-space: pre-wrap`), sem parser de markdown — "leve" no nome, não na renderização. Uploads de imagem de handout caem na mesma pasta sem limpeza de órfãos do mapa (§8, acima).
 - Movimento e orçamento de deslocamento (§9.11): condições que alterariam o deslocamento (Lento, Imóvel...) não são automatizadas ainda (só a função pura já aceita modificadores); terreno difícil e caminho com desvio não existem (medição sempre em linha reta, como a régua); Ctrl+Z de um movimento não estorna `movementUsed` (D7 do plano — o GM tem o botão de zerar); um `token:update-many` (arraste em grupo) não é atômico no banco — se um patch do meio do lote for recusado por orçamento, os anteriores já foram persistidos (mesma característica pré-existente do handler, não uma regressão desta feature); ver `docs/revisao-movimento.md` para as bordas testadas.
 - Sistema de alvos (§9.12): alvos são efêmeros (memória, como a régua/gabaritos) — se perdem num restart do servidor, não num F5. Sem checagem de alcance ou linha de visão (marcar um alvo do outro lado do mapa funciona igual); sem acerto automático em crítico (20/1 natural) a menos que o sistema declare `attackAutoHit`/`attackAutoMiss` (T20 declara). O selo de "quem mais mira" (`showOtherTargets`) mostra só iniciais/contagem, sem tooltip com os nomes. Ver `docs/revisao-alvos.md` para as bordas testadas.
+- Desenho livre no mapa (§9.17): `pen`/`text` não redimensionam por arrasto (só move/apaga); `rect`/`ellipse` não giram; sem seleção múltipla de traços; sem cascata de soft delete ao apagar o mapa (a linha fica órfã até a limpeza de 30 dias do mapa, mesma situação de `Pin` hoje — sem job de limpeza dedicado pra traço/pino individual). Fica abaixo da névoa (ela continua cobrindo o que está por baixo, ao contrário de régua/gabarito, que ficam numa camada acima, sempre visíveis).
 
 ## 9. Fase 2 (pós-MVP)
 
@@ -519,8 +540,12 @@ revisão pós-implementação em `docs/revisao-desfazer.md`.
   apagar um gabarito de área de efeito do GM (`template:upsert`/`template:remove`, §9.9 — do
   jogador não entra aqui, tem a própria pilha local), fixar/mover/editar/apagar um pino de handout
   ou nota no mapa (`pin:create`/`pin:update`/`pin:remove`, §9.10/§9.16 — mover vale pra qualquer
-  `kind`, editar conteúdo só pra nota), e apagar um handout da biblioteca (`handout:delete`, §9.10 —
-  apaga junto, na mesma entrada, os pinos dele em qualquer mapa; desfazer restaura os dois). Fora:
+  `kind`, editar conteúdo só pra nota), apagar um handout da biblioteca (`handout:delete`, §9.10 —
+  apaga junto, na mesma entrada, os pinos dele em qualquer mapa; desfazer restaura os dois), e
+  criar/mover/redimensionar/apagar um traço de desenho livre ou "Limpar meus"/"Limpar tudo"
+  (`drawing:create`/`drawing:update`/`drawing:remove`/`drawing:clear-mine`/`drawing:clear-all`,
+  §9.17 — do GM; do jogador não entra aqui, tem a própria pilha local, mesma exceção do gabarito).
+  Fora:
   notas do Mestre (`scene:set-notes`/`token:set-notes`, §9.16 — trivial de desfazer à mão: escreve
   de novo), chat/rolagens (inclusive
   `handout:show`/`handout:close`, que não mexem em nada persistido além da mensagem em si),
@@ -1287,3 +1312,77 @@ Plano e decisões em `docs/plano-narracao.md`; revisão pós-implementação em 
   diferente do que o GM está vendo, navega pra ele (`scene:enter`) — sem fechar/reabrir o painel.
   Indicador no canvas: um ponto discreto no canto do token quando `hasNotes` (nunca aparece pro
   jogador, pela redação do servidor acima — o cliente nem checa `role`, o dado já chega `false`).
+
+### 9.17 Desenho livre no mapa
+
+Ferramenta "Desenho" (atalho **D**): caneta, linha, retângulo, elipse, seta e texto, persistidos por
+mapa — diferente da névoa (blob JSON cumulativo em `Scene.fog`, §9.3) e dos gabaritos (efêmeros, só
+em memória, §9.9), um traço é uma linha própria do banco (`Drawing`, §4), com `id` endereçável pra
+mover/redimensionar/apagar individualmente (setembro/2026).
+
+- **Modelo**: `Drawing` (§4) — `kind = pen | line | rect | ellipse | arrow | text`, geometria em
+  pixels do mapa (como token/gabarito/pino), colunas tipadas nullable por `kind` (só as do `kind` da
+  linha são preenchidas, mesmo padrão de `Pin`); `points` (só `pen`) é um `Float[]` nativo do
+  Postgres, polilinha achatada `[x1,y1,x2,y2,...]`. `color` (hex) e `strokeWidth` (1–20 px — em
+  `text`, é o tamanho da fonte, mesmo controle reaproveitado) valem pra qualquer `kind`; `filled`
+  (preenchimento) só em `rect`/`ellipse`. Sem rotação em `rect`/`ellipse` (fora do pedido — só
+  redimensionar). `ownerId` é sempre travado no servidor (nunca confiado do payload, mesmo princípio
+  de `Template.ownerId`).
+- **Quem desenha**: GM sempre, em qualquer mapa vivo da sala; jogador só no mapa ATIVO e só se
+  "jogadores podem desenhar" estiver ligado (toggle por SALA, em memória, padrão **ligado** —
+  `drawing:set-player-permission`, mesmo padrão de `combat:set-movement-limit`, §9.11). O toggle só
+  trava **criar** um traço novo: mover/apagar os que o jogador já tinha antes de o GM desligar
+  continua permitido (evita travar no meio de um gesto). Cada traço tem dono: jogador move/apaga só
+  os seus (`canControlDrawing`, mesma regra de gabarito); GM, todos.
+- **Visibilidade por traço** (`Drawing.visible`, só o GM decide): "todos" (padrão) ou "só GM" — pra
+  marcar coisas na preparação, mesma semântica de `Token.visible`/`Pin.visible`. Jogador sempre cria
+  `true` e nunca muda depois (o servidor recusa um patch de jogador que tente setar `visible`).
+- **Limite por mapa** (mesmo espírito de `FOG_SHAPES_WARN`/`MAX`, mais conservador porque aqui cada
+  traço é uma LINHA de banco, não um item de array JSON): aviso em 300 traços vivos
+  (`DRAWING_WARN_PER_SCENE`, cliente), bloqueio em 400 (`DRAWING_MAX_PER_SCENE`, servidor recusa
+  `drawing:create` acima disso). Cada traço de caneta aceita no máximo 2000 pontos
+  (`DRAWING_MAX_POINTS_PER_STROKE`, igual à névoa).
+- **Persistência e soft delete**: sobrevive a F5 e a um restart (diferente do gabarito). `drawing:
+  remove`, `drawing:clear-mine` (qualquer role, só os próprios) e `drawing:clear-all` (GM) só marcam
+  `deletedAt` — a linha continua no banco pro desfazer restaurar sem snapshot manual, mesmo padrão de
+  `Token.deletedAt`. "Limpar meus"/"Limpar tudo" apagam em lote numa transação e mandam **um**
+  broadcast (`drawing:cleared { sceneId, drawingIds }`), não um `drawing:removed` por item.
+- **Desfazer** (§9.6): só ações do GM (criar/mover/redimensionar/apagar QUALQUER traço, "Limpar
+  tudo", e "Limpar meus" quando é o próprio GM limpando os dele) entram na pilha geral do servidor —
+  mesma regra de token/gabarito/pino (`docs/plano-desfazer.md` §6). Ação do PRÓPRIO jogador (criar/
+  mover/redimensionar/apagar, "Limpar meus") empilha numa pilha **local**, só no cliente
+  (`store/drawingHistory.ts`, clone de `store/templateHistory.ts`: só undo, sem redo, sem servidor) —
+  mesma decisão de gabaritos. O atalho Ctrl+Z do jogador (fora do modo Névoa) desfaz o último traço
+  quando a ferramenta ativa é "Desenho", senão o último gabarito (`useToolShortcuts.ts`).
+- **Interação** (modo Selecionar, geometria pura — não hit canvas do Konva, mesmo motivo de sempre
+  neste projeto, `docs/debug-condicoes.md`): clique seleciona (só o que o usuário controla — dono ou
+  GM — nunca seleciona um traço alheio, mesma regra de gabarito); arrastar o corpo move (translada
+  toda a geometria); Delete apaga o selecionado. Alças de redimensionar (calculadas por geometria,
+  nunca `Transformer` nativo do Konva) em `line`/`arrow` (as duas pontas), `rect` (os 4 cantos,
+  mantendo o canto oposto fixo) e `ellipse` (4 pontos cardeais, um raio por vez) — **`pen` e `text`
+  não têm alça** (só move/apaga; texto usa o slider de tamanho da barra, não redimensiona por
+  arrasto). Mover/redimensionar usa o mesmo padrão `live`/commit de gabarito (throttle 33ms durante o
+  gesto, patch final com ack ao soltar).
+- **Criar cada forma** (ferramenta "Desenho" ativa): caneta acumula pontos com decimação ao vivo
+  local (mesma ideia do pincel da névoa, sem emitir nada durante o arrasto) e, ao soltar, suaviza com
+  Douglas-Peucker (`smoothPenPoints`, `packages/shared/src/rules/drawing.ts`) antes de criar — a
+  "suavização/redução de pontos" pedida. Linha/seta/retângulo/elipse: clique-e-arraste define a
+  geometria (elipse inscrita na caixa arrastada, como um retângulo); um clique parado (sem arrastar)
+  não cria nada — não há um "tamanho padrão da barra" como o gabarito tem. Texto: clique abre um
+  campo (`DrawingTextPopover`) pra digitar o conteúdo; cor/tamanho/visibilidade já vêm da sub-barra.
+- **Camada**: um traço fica ABAIXO de qualquer token (controlado ou não) e abaixo da névoa — uma
+  camada própria (`drawings-layer`) entre o mapa e os tokens no `<Stage>`, pra um traço grosso nunca
+  atrapalhar o clique num token por cima dele.
+- **Sub-barra** (`DrawToolbar`, ao lado da barra de ferramentas): forma do traço, paleta fixa de 8
+  cores (sem color-picker livre — "paleta pequena" do pedido), slider de espessura, "Preencher"
+  (só rect/ellipse), contador de traços do mapa (âmbar acima do aviso), "Limpar meus"/"Limpar tudo",
+  e (só GM) o toggle "todos veem"/"só GM" do PRÓXIMO traço e o toggle "jogadores podem desenhar" da
+  sala; jogador vê um aviso somente-leitura quando este último está desligado.
+- **Testes**: schema por `kind` (`packages/shared/src/schemas/drawing.test.ts`), hit-test/bounding
+  box/suavização (`packages/shared/src/rules/drawing.test.ts`), dono/visibilidade
+  (`drawingOwnedBy`/`drawingVisibleTo`), conversão Prisma↔shared e robustez a linha inconsistente
+  (`apps/server/src/services/drawings.test.ts`, mesmo padrão de `pins.test.ts`).
+- **Limitações conhecidas**: `pen` e `text` não redimensionam por arrasto (só move/apaga); `rect`/
+  `ellipse` não giram; sem seleção múltipla de traços (um por vez, mesma limitação de pino/gabarito
+  hoje); sem cascata de soft delete se o próprio mapa for apagado (a linha só fica órfã até o mapa
+  ser purgado de vez em 30 dias — mesma situação de `Pin` hoje, sem job de limpeza dedicado).

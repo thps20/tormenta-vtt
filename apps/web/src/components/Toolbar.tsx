@@ -44,13 +44,15 @@ const TOOLS: ToolDef[] = [
 /** Só quando o sistema declara `templates` (docs/plano-gabaritos.md) — não é GM-only. */
 const TEMPLATE_TOOL: ToolDef = { mode: "template", label: "Área", shortcut: "T", Icon: Shapes };
 
+/** Desenho livre (SPEC §9.17) — GM sempre; jogador conforme o toggle da sala (ver DrawToolbar,
+ *  que mostra o aviso quando está desligado). Não é GM-only na barra. */
+const DRAW_TOOL: ToolDef = { mode: "draw", label: "Desenho", shortcut: "D", Icon: Pencil };
+
 /** Só o GM: pintar a névoa (ver FogToolbar para os sub-modos) e fixar pinos (docs/plano-narracao.md). */
 const GM_TOOLS: ToolDef[] = [
   { mode: "fog", label: "Névoa", shortcut: "F", Icon: CloudFog },
   { mode: "pin", label: "Pino", shortcut: "P", Icon: MapPin },
 ];
-
-const FUTURE_TOOLS: ToolDef[] = [{ mode: "draw", label: "Desenho", shortcut: null, Icon: Pencil, soon: true }];
 
 /** Barra vertical de ferramentas do canvas (canto superior esquerdo da mesa). */
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -84,14 +86,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       {showTemplateTool && (
         <ToolButton tool={TEMPLATE_TOOL} active={effectiveMode === TEMPLATE_TOOL.mode} chosen={mode === TEMPLATE_TOOL.mode} onClick={() => onChange(TEMPLATE_TOOL.mode)} />
       )}
+      <ToolButton tool={DRAW_TOOL} active={effectiveMode === DRAW_TOOL.mode} chosen={mode === DRAW_TOOL.mode} onClick={() => onChange(DRAW_TOOL.mode)} />
       <div className="h-[1px] w-full bg-[#2d2417] my-0.5" />
       {isGm &&
         GM_TOOLS.map((t) => (
           <ToolButton key={t.mode} tool={t} active={effectiveMode === t.mode} chosen={mode === t.mode} onClick={() => onChange(t.mode)} />
         ))}
-      {FUTURE_TOOLS.map((t) => (
-        <ToolButton key={t.mode} tool={t} active={false} chosen={false} onClick={() => undefined} />
-      ))}
       {isGm && (
         <>
           <div className="h-[1px] w-full bg-[#2d2417] my-0.5" />

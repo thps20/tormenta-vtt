@@ -19,6 +19,7 @@ import {
   SceneSetMapSchema,
   SceneUpdateGridSchema,
   canDeleteScene,
+  drawingVisibleTo,
   duplicateScene,
   duplicateSceneName,
   findFreeCells,
@@ -28,6 +29,7 @@ import {
   type CellRect,
   type CharacterKind,
   type CombatStatus,
+  type Drawing,
   type GridConfig,
   type Pin,
   type Scene,
@@ -44,6 +46,7 @@ import { toScene, toToken } from "../services/serialize.js";
 import { clearTemplates, listTemplates } from "../services/templates.js";
 import { redactTokenForViewer, tokenVisibleTo } from "../services/visibility.js";
 import { pinVisibleTo, toPinSafe } from "../services/pins.js";
+import { toDrawingSafe } from "../services/drawings.js";
 import { clearSceneTargets } from "../services/targets.js";
 import { guarded, HandlerError } from "./ack.js";
 import { emitHistoryUpdated } from "./history.js";
@@ -319,11 +322,12 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
       const scene = toScene(sceneRow);
       const geom = sceneGeometry(scene);
       const viewer = { role: ctx.role, participantId: ctx.participantId };
-      const [tokenRows, combatRow, def, pinRows] = await Promise.all([
+      const [tokenRows, combatRow, def, pinRows, drawingRows] = await Promise.all([
         prisma.token.findMany({ where: { sceneId, deletedAt: null }, orderBy: { zIndex: "asc" } }),
         loadCombatRow(sceneId),
         requireSystem(ctx.roomId),
         prisma.pin.findMany({ where: { sceneId, deletedAt: null } }),
+        prisma.drawing.findMany({ where: { sceneId, deletedAt: null } }),
       ]);
       const tokens = tokenRows
         .map(toToken)
@@ -334,7 +338,11 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
         .map(toPinSafe)
         .filter((p): p is Pin => p !== null)
         .filter((p) => pinVisibleTo(p, viewer, sceneId));
-      return { tokens, combat, templates: listTemplates(sceneId), pins };
+      const drawings = drawingRows
+        .map(toDrawingSafe)
+        .filter((d): d is Drawing => d !== null)
+        .filter((d) => drawingVisibleTo(d, viewer, sceneId));
+      return { tokens, combat, templates: listTemplates(sceneId), pins, drawings };
     }),
   );
 

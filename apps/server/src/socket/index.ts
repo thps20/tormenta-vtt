@@ -12,6 +12,7 @@ import { registerCompendiumHandlers } from "./compendium.js";
 import { registerHistoryHandlers } from "./history.js";
 import { registerHandoutHandlers } from "./handout.js";
 import { registerPinHandlers } from "./pins.js";
+import { registerDrawingHandlers } from "./drawings.js";
 import { registerNotesHandlers } from "./notes.js";
 import { registerTargetHandlers } from "./targets.js";
 import { registerEncounterHandlers } from "./encounter.js";
@@ -41,6 +42,7 @@ export function registerSocketHandlers(io: TypedServer, log: FastifyBaseLogger):
     registerHistoryHandlers(io, socket);
     registerHandoutHandlers(io, socket);
     registerPinHandlers(io, socket);
+    registerDrawingHandlers(io, socket);
     registerNotesHandlers(io, socket);
     registerTargetHandlers(io, socket);
     registerEncounterHandlers(io, socket);

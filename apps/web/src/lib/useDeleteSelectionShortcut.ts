@@ -5,8 +5,11 @@ import { useTokens } from "../store/tokens";
 import { useTemplates } from "../store/templates";
 import { useTemplateHistory } from "../store/templateHistory";
 import { usePins } from "../store/pins";
+import { useDrawings } from "../store/drawings";
+import { useDrawingHistory } from "../store/drawingHistory";
 import { useCharacters } from "../store/characters";
 import { isTyping } from "./isTyping";
+import { newId } from "./ids";
 import { describeTemplateAreaChange } from "./templates";
 import { effectiveCellSize } from "./grid";
 
@@ -90,11 +93,38 @@ function deleteSelectedPin(): void {
 }
 
 /**
+ * Apaga o traço de desenho selecionado, se houver (SPEC §9.17). GM ou dono — VttCanvas só deixa
+ * selecionar o que o usuário controla (`canControlDrawing`), então não precisa reconferir aqui,
+ * mesmo raciocínio de `deleteSelectedTemplate`. Jogador (não-GM): empilha no Ctrl+Z LOCAL antes de
+ * apagar (o GM já tem a pilha geral — `socket/drawings.ts` empilha sozinho ao receber
+ * `drawing:remove`), mesma decisão de gabaritos.
+ */
+function deleteSelectedDrawing(): void {
+  const { selectedId, byScene, remove } = useDrawings.getState();
+  if (!selectedId) return;
+  const sceneId = Object.keys(byScene).find((id) => byScene[id]?.[selectedId]);
+  const removed = sceneId ? byScene[sceneId]?.[selectedId] : undefined;
+  if (!sceneId || !removed) return;
+
+  if (!selectIsGm(useRoom.getState())) {
+    // `remove` é soft delete (a linha continua no banco, docs/plano-desfazer.md) — recriar com o
+    // MESMO id colidiria com a chave primária ainda existente; o "desfazer" local do jogador (sem
+    // acesso ao undo do servidor) é uma cópia NOVA, com um id novo, não uma restauração de verdade.
+    useDrawingHistory.getState().push({
+      summary: "apagar desenho",
+      revert: () => useDrawings.getState().create(sceneId, { ...removed, id: newId() }).then((d) => d !== null),
+    });
+  }
+  void remove(sceneId, selectedId);
+}
+
+/**
  * Atalho global: Delete/Backspace apaga os tokens (só GM), o gabarito de área selecionado (GM ou
- * dono) ou o pino selecionado (só GM), quando o foco não está num campo de texto (isTyping).
- * Multi-seleção de token apaga todos de uma vez. Token/gabarito/pino nunca ficam selecionados
- * juntos (VttCanvas garante isso a cada seleção), então só uma das três chamadas abaixo faz algo.
- * Um único listener na janela (montado pela página da mesa, ao lado de useToolShortcuts).
+ * dono), o pino selecionado (só GM) ou o traço de desenho selecionado (GM ou dono), quando o foco
+ * não está num campo de texto (isTyping). Multi-seleção de token apaga todos de uma vez. Token/
+ * gabarito/pino/traço nunca ficam selecionados juntos (VttCanvas garante isso a cada seleção),
+ * então só uma das quatro chamadas abaixo faz algo. Um único listener na janela (montado pela
+ * página da mesa, ao lado de useToolShortcuts).
  */
 export function useDeleteSelectionShortcut(): void {
   useEffect(() => {
@@ -106,6 +136,7 @@ export function useDeleteSelectionShortcut(): void {
       deleteSelectedTokens();
       deleteSelectedTemplate();
       deleteSelectedPin();
+      deleteSelectedDrawing();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);

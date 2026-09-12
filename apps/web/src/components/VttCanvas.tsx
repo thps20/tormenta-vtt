@@ -10,8 +10,10 @@ import {
   creatureColor,
   DEFAULT_MAP_SIZE,
   findFreeCells,
+  hitTestDrawing,
   measureDistance,
   pointInTemplate,
+  smoothPenPoints,
   tokensInTemplate,
   type Character,
   type CharacterPatch,
@@ -19,6 +21,8 @@ import {
   type Combat,
   type CompendiumEntry,
   type ConditionDef,
+  type Drawing,
+  type DrawingPatchPayload,
   type FogShape,
   type GridConfig,
   type Handout,
@@ -68,6 +72,7 @@ import { ConditionMenu } from "./ConditionMenu";
 import { FogLayer } from "./FogLayer";
 import { TemplateLayer } from "./TemplateLayer";
 import { PinLayer, PIN_RADIUS } from "./PinLayer";
+import { DrawingLayer } from "./DrawingLayer";
 import { MovementLayer } from "./MovementLayer";
 
 /** Tamanho padrão quando a cena ainda não tem mapa (shared: o servidor usa o mesmo, ver compendium:spawn-creature). */
@@ -217,6 +222,28 @@ interface VttCanvasProps {
    *  no ponto clicado (RoomPage guarda x/y e chama `pin:create` ao confirmar). GM only. */
   onPinToolClick?: (point: { x: number; y: number }) => void;
 
+  /**
+   * Desenho livre no mapa (SPEC §9.17), persistido por mapa (diferente do gabarito): traços da cena
+   * visitada, já filtrados por quem pode ver. Se comportam como pino (clique seleciona, arrastar
+   * move) mas ganham alças de redimensionar (menos a caneta, que só move/apaga) — tudo por
+   * GEOMETRIA, como token/gabarito/pino (`DrawingLayer` é `listening={false}`, mesmo motivo de
+   * sempre — canvas de hit do Konva embaralhado, docs/debug-condicoes.md).
+   */
+  drawings: Drawing[];
+  /** Ferramenta "Desenho" (atalho D): forma/cor/espessura/preenchimento/visibilidade em vigor.
+   *  null = jogador com "jogadores podem desenhar" desligado (RoomPage não monta a ferramenta). */
+  drawTool: DrawTool | null;
+  selectedDrawingId: string | null;
+  onSelectDrawing: (drawingId: string | null) => void;
+  /** Cria um traço novo (geometria já resolvida em pixels do mapa, id gerado no cliente). */
+  onDrawingCreate: (drawing: Drawing) => void;
+  /** Durante mover/redimensionar um traço selecionado: aplica local e emite com throttle (eco `live`). */
+  onDrawingLive: (drawingId: string, patch: DrawingPatch) => void;
+  /** Ao soltar: patch final do gesto, com ack (entra no desfazer do GM, ou na pilha local do jogador). */
+  onDrawingCommit: (drawingId: string, patch: DrawingPatch) => void;
+  /** Forma "Texto": clique no mapa abre o formulário de conteúdo (RoomPage guarda x/y e cria ao confirmar). */
+  onDrawingTextToolClick?: (point: { x: number; y: number }) => void;
+
   /** Sistema de alvos (docs/plano-alvos.md): meus alvos (anel sempre visível). */
   myTargetIds: string[];
   /** Alvos dos outros participantes (nunca inclui o GM), por participantId — `{sceneId,tokenIds}`
@@ -250,6 +277,19 @@ export interface FogTool {
   brushSize: number;
 }
 
+/** Forma/cor/espessura/preenchimento/visibilidade escolhidos na DrawToolbar (SPEC §9.17). */
+export interface DrawTool {
+  kind: Drawing["kind"];
+  color: string;
+  strokeWidth: number;
+  filled: boolean;
+  /** Visibilidade do PRÓXIMO traço (GM only na UI — jogador nunca muda, o servidor força `true`). */
+  visible: boolean;
+}
+
+/** Patch de um traço já existente (mover/redimensionar/reeditar — mesmo shape do payload do servidor). */
+type DrawingPatch = DrawingPatchPayload["patch"];
+
 /** Atual/máximo do recurso que o sistema aponta como barra do token. */
 export interface TokenBar {
   current: number;
@@ -265,7 +305,7 @@ const MODE_HINTS: Record<ToolMode, string> = {
   fog: "Névoa: escolha Revelar/Ocultar e uma forma no painel • Scroll = zoom",
   template: "Clique e arraste para definir tamanho/direção (Alt/Shift soltam o snap) • Clique parado usa o tamanho da barra • Scroll = zoom",
   pin: "Clique no mapa para fixar um pino de nota • Scroll = zoom",
-  draw: "Desenho: em breve",
+  draw: "Escolha a forma no painel • Clique e arraste para desenhar (Texto: clique abre um campo) • Scroll = zoom",
 };
 
 /** Ajuda específica de cada forma da névoa. */
@@ -297,6 +337,11 @@ export function canControl(me: Participant, token: Token): boolean {
 /** GM move/gira/apaga qualquer gabarito; jogador só os seus (mesma regra do servidor). */
 export function canControlTemplate(me: Participant, template: Template): boolean {
   return me.role === "gm" || template.ownerId === me.id;
+}
+
+/** GM move/redimensiona/apaga qualquer traço; jogador só os seus (SPEC §9.17, mesma regra do servidor). */
+export function canControlDrawing(me: Participant, drawing: Drawing): boolean {
+  return me.role === "gm" || drawing.ownerId === me.id;
 }
 
 /** Clique sem arrasto em quadrado/linha com grid ativo (docs/plano-gabaritos.md §8): segue a mesma
@@ -372,6 +417,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   onMovePin,
   onHandoutDrop,
   onPinToolClick,
+  drawings,
+  drawTool,
+  selectedDrawingId,
+  onSelectDrawing,
+  onDrawingCreate,
+  onDrawingLive,
+  onDrawingCommit,
+  onDrawingTextToolClick,
   onTemplateLive,
   onTemplateCommit,
   myTargetIds,
@@ -498,6 +551,19 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     [pins, pinDragLive],
   );
 
+  // --- Desenho livre (SPEC §9.17): criar (modo Desenho) e mover/redimensionar/apagar (modo
+  // Selecionar) — mesmos padrões de névoa (pincel/retângulo) e pino/gabarito (arrastar corpo/alça).
+  /** Caneta: pontos [x1,y1,x2,y2,...] acumulados no arrasto (já decimados). null = não desenhando. */
+  const drawPenPointsRef = useRef<number[] | null>(null);
+  /** Linha/seta/retângulo/elipse: canto/ponta onde o mousedown caiu. */
+  const drawStartRef = useRef<{ x: number; y: number } | null>(null);
+  /** Rascunho ao vivo do traço em criação (preview antes de confirmar no mouseup). */
+  const [drawDraft, setDrawDraft] = useState<Drawing | null>(null);
+  /** Arrastando o CORPO do traço selecionado (modo Selecionar): delta do ponteiro desde o início. */
+  const drawDragRef = useRef<{ id: string; startPointer: { x: number; y: number }; startDrawing: Drawing } | null>(null);
+  /** Arrastando uma ALÇA de redimensionar do traço selecionado (não existe pra `pen`). */
+  const drawResizeRef = useRef<{ id: string; handleId: string; startDrawing: Drawing } | null>(null);
+
   const cancelGestures = () => {
     boxStartRef.current = null;
     setSelectionBox(null);
@@ -515,6 +581,11 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     templateRotateRef.current = null;
     pinDragRef.current = null;
     setPinDragLive(null);
+    drawPenPointsRef.current = null;
+    drawStartRef.current = null;
+    setDrawDraft(null);
+    drawDragRef.current = null;
+    drawResizeRef.current = null;
   };
 
   // Esc cancela a caixa/régua em andamento.
@@ -1087,6 +1158,124 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     return null;
   };
 
+  // --- Desenho livre (SPEC §9.17) ------------------------------------------------------------
+  const drawActive = mode === "draw" && drawTool !== null;
+
+  /** Campos comuns de um traço novo — `id` gerado no cliente (create otimista, mesmo padrão de
+   *  gabarito), `ownerId` só informativo aqui (o servidor sempre trava o de verdade). */
+  const buildDrawingBase = () => ({
+    id: newId(),
+    sceneId: scene.id,
+    ownerId: me.id,
+    color: drawTool!.color,
+    strokeWidth: drawTool!.strokeWidth,
+    visible: drawTool!.visible,
+  });
+
+  const rectFromCorners = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    width: Math.max(1, Math.abs(b.x - a.x)),
+    height: Math.max(1, Math.abs(b.y - a.y)),
+  });
+
+  /** Traço sob o ponteiro, por GEOMETRIA (mesmo motivo de sempre: `DrawingLayer` é `listening={false}`).
+   *  Tolerância generosa (6px de tela) pra facilitar acertar um traço fino. O de cima primeiro. */
+  const drawingAtPointer = (): Drawing | null => {
+    const p = pointerMapPos();
+    if (!p) return null;
+    const tolerance = 6 / stageScale;
+    for (let i = drawings.length - 1; i >= 0; i--) {
+      const d = drawings[i];
+      if (d && hitTestDrawing(d, p, tolerance)) return d;
+    }
+    return null;
+  };
+
+  /** Pontos das alças de redimensionar de um traço, por `kind` — vazio pra `pen` (só move/apaga,
+   *  SPEC §9.17) e `text` (tamanho vem do slider da barra, não de arraste). */
+  const drawingHandlePoints = (d: Drawing): Array<{ id: string; x: number; y: number }> => {
+    switch (d.kind) {
+      case "line":
+      case "arrow":
+        return [
+          { id: "p1", x: d.x1, y: d.y1 },
+          { id: "p2", x: d.x2, y: d.y2 },
+        ];
+      case "rect":
+        return [
+          { id: "tl", x: d.x, y: d.y },
+          { id: "tr", x: d.x + d.width, y: d.y },
+          { id: "bl", x: d.x, y: d.y + d.height },
+          { id: "br", x: d.x + d.width, y: d.y + d.height },
+        ];
+      case "ellipse":
+        return [
+          { id: "top", x: d.cx, y: d.cy - d.ry },
+          { id: "bottom", x: d.cx, y: d.cy + d.ry },
+          { id: "left", x: d.cx - d.rx, y: d.cy },
+          { id: "right", x: d.cx + d.rx, y: d.cy },
+        ];
+      default:
+        return [];
+    }
+  };
+
+  /** Alça de redimensionar do traço SELECIONADO sob o ponteiro (só ele tem alças desenhadas). */
+  const drawingHandleAtPointer = (): { drawing: Drawing; handleId: string } | null => {
+    const selected = drawings.find((d) => d.id === selectedDrawingId);
+    const p = pointerMapPos();
+    if (!selected || !p) return null;
+    const hitR = 8 / stageScale;
+    for (const h of drawingHandlePoints(selected)) {
+      const dx = p.x - h.x;
+      const dy = p.y - h.y;
+      if (dx * dx + dy * dy <= hitR * hitR) return { drawing: selected, handleId: h.id };
+    }
+    return null;
+  };
+
+  /** Pontos das alças do traço selecionado, prontos pra `DrawingLayer` desenhar (vazio sem seleção
+   *  ou pra `pen`/`text`, que não têm alça). */
+  const selectedDrawing = drawings.find((d) => d.id === selectedDrawingId);
+  const drawingHandlePointsForRender = selectedDrawing ? drawingHandlePoints(selectedDrawing) : [];
+
+  /** Arrastar uma alça vira um patch geométrico — cantos opostos do retângulo ficam fixos (redimensionar
+   *  padrão), extremidade oposta da linha/seta idem, raio da elipse só no eixo da alça arrastada. */
+  const resizedDrawingPatch = (d: Drawing, handleId: string, p: { x: number; y: number }): DrawingPatch => {
+    switch (d.kind) {
+      case "line":
+      case "arrow":
+        return handleId === "p1" ? { x1: p.x, y1: p.y } : { x2: p.x, y2: p.y };
+      case "rect": {
+        const opposite = { tl: { x: d.x + d.width, y: d.y + d.height }, tr: { x: d.x, y: d.y + d.height }, bl: { x: d.x + d.width, y: d.y }, br: { x: d.x, y: d.y } }[
+          handleId as "tl" | "tr" | "bl" | "br"
+        ];
+        return rectFromCorners(opposite, p);
+      }
+      case "ellipse":
+        return handleId === "left" || handleId === "right" ? { rx: Math.max(1, Math.abs(p.x - d.cx)) } : { ry: Math.max(1, Math.abs(p.y - d.cy)) };
+      default:
+        return {};
+    }
+  };
+
+  /** Mover o CORPO de um traço: translada toda a geometria pelo delta do arrasto. */
+  const translatedDrawingPatch = (d: Drawing, dx: number, dy: number): DrawingPatch => {
+    switch (d.kind) {
+      case "pen":
+        return { points: d.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) };
+      case "line":
+      case "arrow":
+        return { x1: d.x1 + dx, y1: d.y1 + dy, x2: d.x2 + dx, y2: d.y2 + dy };
+      case "rect":
+      case "text":
+        return { x: d.x + dx, y: d.y + dy };
+      case "ellipse":
+        return { cx: d.cx + dx, cy: d.cy + dy };
+    }
+  };
+
   /** Ponto da alça de rotação de um gabarito: na ponta do cone/linha, ou um pouco além da borda do
    *  quadrado. Círculo não gira (giro não muda nada visualmente) — sem alça. */
   const templateRotateHandlePoint = (t: Template): { x: number; y: number } | null => {
@@ -1178,6 +1367,32 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       }
       return;
     }
+    if (drawActive) {
+      setCursor(drawTool!.kind === "text" ? "text" : "crosshair");
+      const p = pointerMapPos();
+      if (!p) return;
+      const pts = drawPenPointsRef.current;
+      if (drawTool!.kind === "pen" && pts) {
+        // Decimação ao vivo (mesma ideia do pincel da névoa, sem dividir pela espessura — o traço
+        // de caneta é fino): a suavização de verdade (`smoothPenPoints`) roda só no mouseup.
+        const lx = pts[pts.length - 2] ?? p.x;
+        const ly = pts[pts.length - 1] ?? p.y;
+        if (Math.hypot(p.x - lx, p.y - ly) < Math.max(2 / stageScale, 1.5)) return;
+        pts.push(p.x, p.y);
+        setDrawDraft({ ...buildDrawingBase(), kind: "pen", points: [...pts] });
+        return;
+      }
+      const start = drawStartRef.current;
+      if (!start) return;
+      if (drawTool!.kind === "line") setDrawDraft({ ...buildDrawingBase(), kind: "line", x1: start.x, y1: start.y, x2: p.x, y2: p.y });
+      else if (drawTool!.kind === "arrow") setDrawDraft({ ...buildDrawingBase(), kind: "arrow", x1: start.x, y1: start.y, x2: p.x, y2: p.y });
+      else if (drawTool!.kind === "rect") setDrawDraft({ ...buildDrawingBase(), kind: "rect", ...rectFromCorners(start, p), filled: drawTool!.filled });
+      else if (drawTool!.kind === "ellipse") {
+        const box = rectFromCorners(start, p);
+        setDrawDraft({ ...buildDrawingBase(), kind: "ellipse", cx: box.x + box.width / 2, cy: box.y + box.height / 2, rx: box.width / 2, ry: box.height / 2, filled: drawTool!.filled });
+      }
+      return;
+    }
     if (mode !== "select") return setCursor("crosshair");
     if (templateRotateRef.current) {
       const { id } = templateRotateRef.current;
@@ -1198,6 +1413,18 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (p) setPinDragLive({ id, x: startX + (p.x - startPointer.x), y: startY + (p.y - startPointer.y) });
       return;
     }
+    if (drawResizeRef.current) {
+      const { id, handleId, startDrawing } = drawResizeRef.current;
+      const p = pointerMapPos();
+      if (p) onDrawingLive(id, resizedDrawingPatch(startDrawing, handleId, p));
+      return;
+    }
+    if (drawDragRef.current) {
+      const { id, startPointer, startDrawing } = drawDragRef.current;
+      const p = pointerMapPos();
+      if (p) onDrawingLive(id, translatedDrawingPatch(startDrawing, p.x - startPointer.x, p.y - startPointer.y));
+      return;
+    }
     const start = boxStartRef.current;
     if (start) {
       const p = pointerMapPos();
@@ -1209,7 +1436,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     }
     const over = tokenAtPointer();
     if (over) setCursor(canControl(me, over) ? "grab" : "default");
-    else setCursor(pinAtPointer() ? (onMovePin ? "grab" : "pointer") : "default");
+    else if (pinAtPointer()) setCursor(onMovePin ? "grab" : "pointer");
+    else if (drawingHandleAtPointer()) setCursor("crosshair");
+    else setCursor(drawingAtPointer() ? "grab" : "default");
     // Tooltip da condição: por geometria, aqui, e não por mouseenter do badge (ver
     // conditionTooltipAtPointer). Só troca o estado quando muda de badge, pra não repintar a cada
     // pixel de movimento.
@@ -1302,6 +1531,18 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       );
       return;
     }
+    if (drawActive) {
+      const p = pointerMapPos();
+      if (!p) return;
+      if (drawTool!.kind === "text") return onDrawingTextToolClick?.(p); // popover cuida do resto
+      if (drawTool!.kind === "pen") {
+        drawPenPointsRef.current = [p.x, p.y];
+        setDrawDraft({ ...buildDrawingBase(), kind: "pen", points: [p.x, p.y] });
+        return;
+      }
+      drawStartRef.current = p;
+      return;
+    }
     if (mode !== "select") return;
     // Sistema de alvos (docs/plano-alvos.md): Alt+clique num token marca/desmarca (Shift+Alt entra
     // na lista em vez de trocar); Alt no vazio limpa. Tratado inteiro AQUI, por geometria (mesmo
@@ -1317,6 +1558,13 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     const rotateTarget = templateRotateHandleAtPointer();
     if (rotateTarget) {
       templateRotateRef.current = { id: rotateTarget.id, startTemplate: rotateTarget };
+      return;
+    }
+    // Alça de redimensionar de um traço selecionado (SPEC §9.17): alvo pequeno e preciso, checado
+    // ANTES do resto (mesma prioridade da alça de rotação do gabarito acima).
+    const drawHandle = drawingHandleAtPointer();
+    if (drawHandle) {
+      drawResizeRef.current = { id: drawHandle.drawing.id, handleId: drawHandle.handleId, startDrawing: drawHandle.drawing };
       return;
     }
     // Alça de redimensionar tem prioridade sobre o token: geometricamente ela fica na borda dele,
@@ -1340,10 +1588,23 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       onSelectPin(pin.id);
       onSelectToken(null);
       onSelectTemplate(null);
+      onSelectDrawing(null);
       if (onMovePin) {
         const p = pointerMapPos();
         if (p) pinDragRef.current = { id: pin.id, startPointer: p, startX: pin.x, startY: pin.y };
       }
+      return;
+    }
+    // Traço de desenho (SPEC §9.17): se comporta como gabarito — só seleciona/arrasta o que o
+    // usuário controla (dono ou GM); alheio nem seleciona (mesmo padrão de `canControlTemplate`).
+    const drawing = drawingAtPointer();
+    if (drawing && canControlDrawing(me, drawing)) {
+      onSelectDrawing(drawing.id);
+      onSelectToken(null);
+      onSelectPin(null);
+      onSelectTemplate(null);
+      const p = pointerMapPos();
+      if (p) drawDragRef.current = { id: drawing.id, startPointer: p, startDrawing: drawing };
       return;
     }
     const tmpl = templateAtPointer();
@@ -1351,6 +1612,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       onSelectTemplate(tmpl.id);
       onSelectToken(null);
       onSelectPin(null);
+      onSelectDrawing(null);
       const p = pointerMapPos();
       if (p) templateDragRef.current = { id: tmpl.id, startPointer: p, startTemplate: tmpl };
       return;
@@ -1416,6 +1678,43 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (moved && current && onMovePin) onMovePin(current, live!.x, live!.y);
       return;
     }
+    if (drawResizeRef.current) {
+      const { id, handleId, startDrawing } = drawResizeRef.current;
+      drawResizeRef.current = null;
+      const p = pointerMapPos();
+      if (p) onDrawingCommit(id, resizedDrawingPatch(startDrawing, handleId, p));
+      return;
+    }
+    if (drawDragRef.current) {
+      const { id, startPointer, startDrawing } = drawDragRef.current;
+      drawDragRef.current = null;
+      const p = pointerMapPos();
+      // Só um clique parado (sem andar de verdade): nada pra commitar, evita um drawing:update à toa.
+      if (p && Math.hypot(p.x - startPointer.x, p.y - startPointer.y) * stageScale > 1) {
+        onDrawingCommit(id, translatedDrawingPatch(startDrawing, p.x - startPointer.x, p.y - startPointer.y));
+      }
+      return;
+    }
+    if (drawActive) {
+      const pts = drawPenPointsRef.current;
+      if (pts) {
+        drawPenPointsRef.current = null;
+        setDrawDraft(null);
+        // Suaviza (Douglas-Peucker) os pontos já decimados ao vivo — a "redução de pontos" pedida.
+        const smoothed = pts.length >= 6 ? smoothPenPoints(pts, 1.5 / stageScale) : pts;
+        if (smoothed.length >= 4) onDrawingCreate({ ...buildDrawingBase(), kind: "pen", points: smoothed });
+        return;
+      }
+      const start = drawStartRef.current;
+      const draft = drawDraft;
+      drawStartRef.current = null;
+      setDrawDraft(null);
+      const p = pointerMapPos();
+      // Sem arrasto de verdade (clique parado): não cria nada — não há um tamanho "padrão" pra
+      // essas formas como o gabarito tem na barra (SPEC §9.17 não pede isso).
+      if (start && draft && p && Math.hypot(p.x - start.x, p.y - start.y) * stageScale > 4) onDrawingCreate(draft);
+      return;
+    }
     if (fogActive) return fogMouseUp();
     if (rulerStartRef.current) {
       rulerStartRef.current = null;
@@ -1470,6 +1769,8 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     // caia no ramo de baixo e desselecione tudo (o alvo de um clique num `PinLayer`,
     // `listening={false}`, é sempre o Stage por trás, nunca o pino).
     if (pinAtPointer()) return;
+    // Mesmo raciocínio do pino acima: a seleção de um traço já foi tratada no mousedown.
+    if (drawingAtPointer()) return;
     if (e.target === stageRef.current || e.target.name() === "map-background") {
       onSelectToken(null);
       // Só limpa a seleção de gabarito/pino se o clique NÃO foi em cima de um (mousedown já
@@ -1477,6 +1778,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       // desfazer).
       if (!templateAtPointer()) onSelectTemplate(null);
       onSelectPin(null);
+      onSelectDrawing(null);
     }
   };
 
@@ -1504,6 +1806,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   const selectByClick = (tokenId: string, additive: boolean) => {
     onSelectTemplate(null);
     onSelectPin(null);
+    onSelectDrawing(null);
     if (additive) onToggleSelect(tokenId);
     else onSelectToken(tokenId);
   };
@@ -1797,6 +2100,21 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           {lines.map((points, i) => (
             <Line key={i} points={points} stroke={scene.grid.color} strokeWidth={1} listening={false} />
           ))}
+        </Layer>
+
+        {/*
+          Camada de desenho livre (SPEC §9.17): acima do mapa, mas abaixo de QUALQUER token
+          (controlado ou não) — um traço grosso nunca disputa o clique com um token por cima dele.
+          Abaixo da névoa também (ela continua escondendo o que está por baixo, sem interação especial).
+        */}
+        <Layer id="drawings-layer" listening={false}>
+          <DrawingLayer
+            drawings={drawings}
+            draft={drawActive ? drawDraft : null}
+            selectedId={selectedDrawingId}
+            resizeHandlePoints={mode === "select" ? drawingHandlePointsForRender : []}
+            stageScale={stageScale}
+          />
         </Layer>
 
         {/*

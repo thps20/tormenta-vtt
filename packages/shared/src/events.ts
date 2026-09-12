@@ -36,6 +36,13 @@ import type {
   CombatStartPayload,
   CompendiumEntry,
   CompendiumSpawnCreaturePayload,
+  Drawing,
+  DrawingClearAllPayload,
+  DrawingClearMinePayload,
+  DrawingCreatePayload,
+  DrawingPatchPayload,
+  DrawingRemovePayload,
+  DrawingSetPlayerPermissionPayload,
   EncounterCreateFromTokensPayload,
   EncounterCreatePayload,
   EncounterDeletePayload,
@@ -116,6 +123,9 @@ export interface RoomSnapshot {
   /** Pinos (handout ou nota) fixados na cena ativa (§9.10/§9.16), já filtrados pela visibilidade de
    *  quem recebe. */
   pins: Pin[];
+  /** Traços de desenho livre da cena ativa (§9.17), já filtrados pela visibilidade de quem recebe
+   *  (jogador não recebe traço "só GM"). Persistidos por mapa, diferente dos gabaritos. */
+  drawings: Drawing[];
   chat: ChatMessage[];
   /** Fichas da sala (jogadores não recebem as de kind = "npc"). */
   characters: Character[];
@@ -132,6 +142,9 @@ export interface RoomSnapshot {
    *  de `movementLimitEnabled` acima. `true` (padrão) = combat:start/combat:add rolam sozinhos os
    *  combatentes sem dono que entram sem iniciativa. */
   autoRollNpcInitiativeEnabled: boolean;
+  /** "Jogadores podem desenhar" (§9.17), por SALA — em memória, mesmo padrão de
+   *  `movementLimitEnabled` acima. `true` (padrão) = jogador pode criar traço novo no mapa ativo. */
+  playerDrawingEnabled: boolean;
   /**
    * Alvos marcados (docs/plano-alvos.md), por participante — efêmeros, em memória, já filtrados
    * pra quem recebe (alvos do GM nunca vão a jogadores; jogador só vê os alvos dos outros
@@ -179,7 +192,7 @@ export interface ClientToServerEvents {
    */
   "scene:enter": (
     payload: SceneEnterPayload,
-    ack: Ack<{ tokens: Token[]; combat: Combat | null; templates: Template[]; pins: Pin[] }>,
+    ack: Ack<{ tokens: Token[]; combat: Combat | null; templates: Template[]; pins: Pin[]; drawings: Drawing[] }>,
   ) => void;
   "scene:rename": (payload: SceneRenamePayload, ack: Ack<Scene>) => void;
   /** Copia mapUrl/mapWidth/mapHeight/grid/fog/arrival; NÃO copia tokens nem combate. */
@@ -326,6 +339,24 @@ export interface ClientToServerEvents {
   "pin:update": (payload: PinUpdatePayload, ack: Ack<Pin>) => void;
   "pin:remove": (payload: PinRemovePayload, ack: Ack) => void;
 
+  // Desenho livre no mapa (§9.17): persistido por mapa (diferente dos gabaritos), um traço por
+  // linha do banco. GM sempre pode; jogador só os PRÓPRIOS, condicionado ao toggle abaixo e ao mapa
+  // ATIVO da sala. Só ações do GM entram no desfazer geral (jogador tem pilha local, sem servidor).
+  /** `drawing.id`/`ownerId` do payload nunca são confiados — o servidor sempre fixa `ownerId` a
+   *  quem chamou e força `visible: true` quando quem cria é jogador. */
+  "drawing:create": (payload: DrawingCreatePayload, ack: Ack<Drawing>) => void;
+  /** Mover/redimensionar/reeditar texto/trocar cor-espessura-preenchimento; `visible` só o GM muda.
+   *  `live: true` marca eco de arraste/redimensionamento em andamento (nunca empilha no desfazer). */
+  "drawing:update": (payload: DrawingPatchPayload, ack: Ack<Drawing>) => void;
+  "drawing:remove": (payload: DrawingRemovePayload, ack: Ack) => void;
+  /** "Limpar meus desenhos" (qualquer role, só os próprios do mapa). */
+  "drawing:clear-mine": (payload: DrawingClearMinePayload, ack: Ack) => void;
+  /** "Limpar tudo" (GM). */
+  "drawing:clear-all": (payload: DrawingClearAllPayload, ack: Ack) => void;
+  /** GM: liga/desliga "jogadores podem desenhar" NA SALA (memória, broadcast
+   *  `drawing:playerPermissionChanged`). Só trava CRIAR — mover/apagar os já existentes continua. */
+  "drawing:set-player-permission": (payload: DrawingSetPlayerPermissionPayload, ack: Ack<{ enabled: boolean }>) => void;
+
   // Chat + dados
   /**
    * "/r <fórmula> [# rótulo]" rola no modo `visibility` do autor; "/gmr" força
@@ -462,6 +493,17 @@ export interface ServerToClientEvents {
   "pin:created": (p: { sceneId: string; pin: Pin }) => void;
   "pin:updated": (p: { sceneId: string; pin: Pin }) => void;
   "pin:removed": (p: { sceneId: string; pinId: string }) => void;
+
+  // Desenho livre no mapa (§9.17): mesma regra de broadcast de mapa de sempre — GM sempre recebe;
+  // jogador só se `visible` e `sceneId` é o mapa ATIVO.
+  "drawing:created": (p: { sceneId: string; drawing: Drawing }) => void;
+  "drawing:updated": (p: { sceneId: string; drawing: Drawing }) => void;
+  "drawing:removed": (p: { sceneId: string; drawingId: string }) => void;
+  /** "Limpar meus"/"Limpar tudo": lote de ids de uma vez (o cliente remove todos, ids que ele nunca
+   *  teve — traço "só GM" pra um jogador — são um no-op). */
+  "drawing:cleared": (p: { sceneId: string; drawingIds: string[] }) => void;
+  /** `drawing:set-player-permission`: novo estado de "jogadores podem desenhar" da SALA, para todos. */
+  "drawing:playerPermissionChanged": (p: { enabled: boolean }) => void;
 
   // Encontros salvos (§9.14): biblioteca por sala, só pro GM (rooms.gm) — mesmo desenho de handout:*.
   "encounter:created": (encounter: SavedEncounter) => void;

@@ -1,12 +1,13 @@
 import { useEffect } from "react";
 import { useHistory } from "../store/history";
 import { useTemplateHistory } from "../store/templateHistory";
+import { useDrawingHistory } from "../store/drawingHistory";
 import { selectIsGm, useRoom } from "../store/room";
 import { useTools, type ToolMode } from "../store/tools";
 import { isTyping } from "./isTyping";
 
 /** Tecla → modo. Letras em minúsculo; comparamos com e.key.toLowerCase(). */
-const KEY_TO_MODE: Record<string, ToolMode> = { v: "select", h: "pan", r: "ruler", f: "fog", t: "template", p: "pin" };
+const KEY_TO_MODE: Record<string, ToolMode> = { v: "select", h: "pan", r: "ruler", f: "fog", t: "template", p: "pin", d: "draw" };
 
 /** Modos que só o GM pode ativar. */
 const GM_ONLY_MODES = new Set<ToolMode>(["fog", "pin"]);
@@ -17,8 +18,10 @@ const GM_ONLY_MODES = new Set<ToolMode>(["fog", "pin"]);
  * Selecionar, espaço segurado ativa
  * "mover mapa". Ctrl+Z (Cmd+Z): no modo Névoa desfaz a última forma pintada (sem refazer, SPEC
  * §9.3); fora dela é o desfazer geral do GM (docs/plano-desfazer.md) — Ctrl+Shift+Z e Ctrl+Y
- * refazem. Jogador não tem essa pilha geral, mas tem a própria dos gabaritos de área que ele
- * colocou (`store/templateHistory.ts`, docs/plano-gabaritos.md §4) — só Ctrl+Z, sem refazer, mesmo
+ * refazem. Jogador não tem essa pilha geral, mas tem pilhas locais próprias — gabaritos de área
+ * (`store/templateHistory.ts`, docs/plano-gabaritos.md §4) e desenho livre
+ * (`store/drawingHistory.ts`, SPEC §9.17), uma por ferramenta (Ctrl+Z no modo Desenho desfaz o
+ * último traço; qualquer outro modo desfaz o último gabarito) — só Ctrl+Z, sem refazer, mesmo
  * motivo da Névoa não ter. Um único listener na janela (montado pela página da mesa).
  */
 export function useToolShortcuts(): void {
@@ -33,7 +36,8 @@ export function useToolShortcuts(): void {
         if (!isGm) {
           if (key === "z" && !e.shiftKey) {
             e.preventDefault();
-            void useTemplateHistory.getState().undo();
+            if (useTools.getState().mode === "draw") void useDrawingHistory.getState().undo();
+            else void useTemplateHistory.getState().undo();
           }
           return;
         }

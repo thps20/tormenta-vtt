@@ -7,6 +7,8 @@ import { useTemplateHistory } from "../store/templateHistory";
 import { useTargets } from "../store/targets";
 import { useHandouts } from "../store/handouts";
 import { scenePins, usePins } from "../store/pins";
+import { sceneDrawings, useDrawings } from "../store/drawings";
+import { useDrawingHistory } from "../store/drawingHistory";
 import { resolvePinIcons } from "../lib/pinIcons";
 import { describeTemplateAreaChange } from "../lib/templates";
 import { effectiveCellSize, sizeTokens } from "../lib/grid";
@@ -30,12 +32,15 @@ import {
   pickTokensToCarry,
   targetsFromTemplate,
   tokenCenter,
+  type Drawing,
+  type DrawingPatchPayload,
   type Handout,
   type HandoutCard,
   type Pin,
   type Template,
   type TemplateChangeAction,
 } from "@tormenta-vtt/shared";
+import { newId } from "../lib/ids";
 import { CharacterSheetDrawer } from "./CharacterSheetDrawer";
 import { CombatBanner } from "./CombatBanner";
 import { type CombatPanelCallbacks } from "./CombatPanel";
@@ -46,6 +51,8 @@ import { HandoutOverlay } from "./HandoutOverlay";
 import { HandoutDragGhost } from "./HandoutDragGhost";
 import { NotePinCard } from "./NotePinCard";
 import { PinCreatePopover } from "./PinCreatePopover";
+import { DrawToolbar } from "./DrawToolbar";
+import { DrawingTextPopover } from "./DrawingTextPopover";
 import { NotesPanel, type NotesPanelTarget } from "./NotesPanel";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
@@ -73,6 +80,9 @@ const CLEAR_TARGETS_ON_TURN_END_KEY = "tvtt:clearTargetsOnTurnEnd";
 // Barras flutuantes translúcidas sobre o mapa: preferência por usuário, padrão ligada — mesmo
 // padrão de PARTY_VIEW_EXPANDED_KEY (botão no HUD inferior do VttCanvas, ver useBarTranslucency).
 const TRANSLUCENT_BARS_OVER_MAP_KEY = "tvtt:translucentBarsOverMap";
+
+/** Patch de um traço já existente (SPEC §9.17) — mesmo shape do payload do servidor. */
+type DrawingPatch = DrawingPatchPayload["patch"];
 
 /**
  * Página da mesa: entra na sala pela URL e liga as stores aos componentes.
@@ -212,6 +222,30 @@ function Table() {
   const createTemplate = useTemplates((s) => s.create);
   const templateLive = useTemplates((s) => s.updateLive);
   const commitTemplate = useTemplates((s) => s.commit);
+  // Desenho livre no mapa (SPEC §9.17): forma/cor/espessura/preenchimento/visibilidade ficam na
+  // store de ferramentas (igual à névoa/gabarito); os traços em si são da cena, em useDrawings.
+  const drawKind = useTools((s) => s.drawKind);
+  const drawColor = useTools((s) => s.drawColor);
+  const drawStrokeWidth = useTools((s) => s.drawStrokeWidth);
+  const drawFilled = useTools((s) => s.drawFilled);
+  const drawVisible = useTools((s) => s.drawVisible);
+  const setDrawKind = useTools((s) => s.setDrawKind);
+  const setDrawColor = useTools((s) => s.setDrawColor);
+  const setDrawStrokeWidth = useTools((s) => s.setDrawStrokeWidth);
+  const setDrawFilled = useTools((s) => s.setDrawFilled);
+  const setDrawVisible = useTools((s) => s.setDrawVisible);
+  const drawingsByScene = useDrawings((s) => s.byScene);
+  const drawings = useMemo(() => sceneDrawings(drawingsByScene, scene?.id), [drawingsByScene, scene?.id]);
+  const selectedDrawingId = useDrawings((s) => s.selectedId);
+  const selectDrawing = useDrawings((s) => s.select);
+  const createDrawing = useDrawings((s) => s.create);
+  const drawingLive = useDrawings((s) => s.updateLive);
+  const commitDrawing = useDrawings((s) => s.commit);
+  const clearMyDrawings = useDrawings((s) => s.clearMine);
+  const clearAllDrawings = useDrawings((s) => s.clearAll);
+  const setPlayerDrawingPermission = useDrawings((s) => s.setPlayerPermission);
+  const playerDrawingEnabled = useRoom((s) => s.playerDrawingEnabled);
+  const [pendingDrawingTextPoint, setPendingDrawingTextPoint] = useState<{ x: number; y: number } | null>(null);
   useToolShortcuts();
   useDeleteSelectionShortcut();
   useTokenMoveShortcuts();
@@ -593,6 +627,50 @@ function Table() {
     if (action) pushTemplateUndo(action, t, () => useTemplates.getState().commit(scene.id, { ...t, ...dragFrom }));
   };
 
+  // --- Desenho livre no mapa (SPEC §9.17) ---------------------------------------------------------
+  // Mesmo raciocínio do gabarito acima: o GM já tem tudo pela pilha geral do servidor (empilha
+  // sozinho ao receber drawing:create/update/remove); aqui só cobre o jogador, que não tem acesso a
+  // `history:undo` (gmOnly) — ver store/drawingHistory.ts.
+  const handleDrawingCreate = (d: Drawing) => {
+    void createDrawing(d.sceneId, d);
+    if (!isGm) useDrawingHistory.getState().push({ summary: "desenhar", revert: () => useDrawings.getState().remove(d.sceneId, d.id) });
+  };
+  const handleDrawingLive = (drawingId: string, patch: DrawingPatch) => {
+    if (!scene) return;
+    drawingLive(scene.id, drawingId, patch);
+  };
+  const handleDrawingCommit = (drawingId: string, patch: DrawingPatch) => {
+    if (!scene) return;
+    // Jogador: empilha o "antes" (valor de cada campo do patch ANTES de aplicá-lo) pro Ctrl+Z local
+    // desfazer de volta — o GM já tem isso pela pilha geral do servidor (empilha sozinho).
+    const before = !isGm ? drawings.find((d) => d.id === drawingId) : undefined;
+    void commitDrawing(scene.id, drawingId, patch);
+    if (before) {
+      const beforePatch = Object.fromEntries(Object.keys(patch).map((k) => [k, (before as unknown as Record<string, unknown>)[k]])) as DrawingPatch;
+      useDrawingHistory.getState().push({
+        summary: "mover/redimensionar desenho",
+        revert: () => useDrawings.getState().commit(scene.id, drawingId, beforePatch).then((d) => d !== null),
+      });
+    }
+  };
+  const handleDrawingTextToolClick = (point: { x: number; y: number }) => setPendingDrawingTextPoint(point);
+  const handleCreateDrawingText = (text: string) => {
+    if (!scene || !pendingDrawingTextPoint) return;
+    handleDrawingCreate({
+      id: newId(),
+      sceneId: scene.id,
+      ownerId: me.id,
+      kind: "text",
+      x: pendingDrawingTextPoint.x,
+      y: pendingDrawingTextPoint.y,
+      text,
+      color: drawColor,
+      strokeWidth: drawStrokeWidth,
+      visible: drawVisible,
+    });
+    setPendingDrawingTextPoint(null);
+  };
+
   // Salvar do modal: só emite o que mudou (mapa e/ou grid).
   const handleSaveMapConfig = async ({ map, grid }: MapConfigResult) => {
     if (!scene) return;
@@ -845,6 +923,14 @@ function Table() {
                 onMovePin={isGm ? handleMovePin : undefined}
                 onHandoutDrop={isGm ? handleHandoutDrop : undefined}
                 onPinToolClick={isGm ? handlePinToolClick : undefined}
+                drawings={drawings}
+                drawTool={isGm || playerDrawingEnabled ? { kind: drawKind, color: drawColor, strokeWidth: drawStrokeWidth, filled: drawFilled, visible: drawVisible } : null}
+                selectedDrawingId={selectedDrawingId}
+                onSelectDrawing={selectDrawing}
+                onDrawingCreate={handleDrawingCreate}
+                onDrawingLive={handleDrawingLive}
+                onDrawingCommit={handleDrawingCommit}
+                onDrawingTextToolClick={handleDrawingTextToolClick}
                 myTargetIds={myTargetIds}
                 othersTargets={othersTargets}
                 showOtherTargets={showOtherTargets}
@@ -889,6 +975,26 @@ function Table() {
                   onShape={setTemplateShape}
                   onSize={setTemplateSize}
                   onPreset={pickTemplatePreset}
+                />
+              )}
+              {toolMode === "draw" && (
+                <DrawToolbar
+                  isGm={isGm}
+                  drawKind={drawKind}
+                  drawColor={drawColor}
+                  strokeWidth={drawStrokeWidth}
+                  filled={drawFilled}
+                  visible={drawVisible}
+                  drawingCount={drawings.length}
+                  playerDrawingEnabled={playerDrawingEnabled}
+                  onDrawKind={setDrawKind}
+                  onDrawColor={setDrawColor}
+                  onStrokeWidth={setDrawStrokeWidth}
+                  onFilled={setDrawFilled}
+                  onVisible={setDrawVisible}
+                  onTogglePlayerDrawing={() => void setPlayerDrawingPermission(!playerDrawingEnabled)}
+                  onClearMine={() => scene && void clearMyDrawings(scene.id)}
+                  onClearAll={() => scene && void clearAllDrawings(scene.id)}
                 />
               )}
             </>
@@ -1020,6 +1126,7 @@ function Table() {
         />
       )}
       {pendingPinPoint && isGm && <PinCreatePopover icons={pinIcons} onCreate={handleCreateNotePin} onCancel={() => setPendingPinPoint(null)} />}
+      {pendingDrawingTextPoint && <DrawingTextPopover onCreate={handleCreateDrawingText} onCancel={() => setPendingDrawingTextPoint(null)} />}
 
       {notesTarget && isGm && (
         <NotesPanel

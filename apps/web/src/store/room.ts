@@ -24,6 +24,7 @@ import { useParty } from "./party";
 import { useCompendium } from "./compendium";
 import { useHandouts } from "./handouts";
 import { usePins } from "./pins";
+import { useDrawings } from "./drawings";
 import { useEncounters } from "./encounters";
 import { useSceneList } from "./sceneList";
 import { toast } from "./ui";
@@ -61,6 +62,9 @@ interface RoomState {
   /** "Rolar iniciativa dos NPCs ao iniciar o combate" da SALA (SPEC §3.5), padrão ligada — GM
    *  desliga em `combat:set-auto-roll-npc-initiative`. */
   autoRollNpcInitiativeEnabled: boolean;
+  /** "Jogadores podem desenhar" da SALA (SPEC §9.17), padrão ligada — GM desliga em
+   *  `drawing:set-player-permission`. Só trava CRIAR um traço novo. */
+  playerDrawingEnabled: boolean;
 
   join: (params: JoinParams) => Promise<void>;
   leave: () => void;
@@ -101,6 +105,8 @@ interface RoomState {
   setMovementLimitEnabled: (enabled: boolean) => void;
   /** `combat:autoRollNpcInitiativeChanged` (broadcast) e o retorno de `combat:set-auto-roll-npc-initiative`. */
   setAutoRollNpcInitiativeEnabled: (enabled: boolean) => void;
+  /** `drawing:playerPermissionChanged` (broadcast) e o retorno do próprio `drawing:set-player-permission`. */
+  setPlayerDrawingEnabled: (enabled: boolean) => void;
 }
 
 export const useRoom = create<RoomState>((set, get) => ({
@@ -113,6 +119,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   lastJoin: null,
   movementLimitEnabled: true,
   autoRollNpcInitiativeEnabled: true,
+  playerDrawingEnabled: true,
 
   join: async (params) => {
     const socket = getSocket();
@@ -163,6 +170,7 @@ export const useRoom = create<RoomState>((set, get) => ({
       lastJoin: null,
       movementLimitEnabled: true,
       autoRollNpcInitiativeEnabled: true,
+      playerDrawingEnabled: true,
     });
     useTokens.getState().setAll([]);
     useChat.getState().setAll([]);
@@ -174,6 +182,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useCompendium.getState().reset();
     useHandouts.getState().reset();
     usePins.getState().reset();
+    useDrawings.getState().reset();
     useEncounters.getState().reset();
     useSceneList.getState().reset();
     // Desconectar e reconectar é o jeito simples de sair das salas do Socket.io.
@@ -190,12 +199,14 @@ export const useRoom = create<RoomState>((set, get) => ({
       scenes: snap.scenes,
       movementLimitEnabled: snap.movementLimitEnabled,
       autoRollNpcInitiativeEnabled: snap.autoRollNpcInitiativeEnabled,
+      playerDrawingEnabled: snap.playerDrawingEnabled,
     });
     useTokens.getState().setAll(snap.tokens);
     useChat.getState().setAll(snap.chat);
     useCombat.getState().setSnapshot(snap.room.activeSceneId, snap.combat);
     useTemplates.getState().setSnapshot(snap.room.activeSceneId, snap.templates);
     usePins.getState().setSnapshot(snap.room.activeSceneId, snap.pins);
+    useDrawings.getState().setSnapshot(snap.room.activeSceneId, snap.drawings);
     useTargets.getState().setSnapshot(snap.targets, snap.me.id);
     useCharacters.getState().setAll(snap.characters);
     useParty.getState().setAll(snap.party);
@@ -263,6 +274,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useCombat.getState().setSceneState(sceneId, res.data.combat);
     useTemplates.getState().replaceScene(sceneId, res.data.templates);
     usePins.getState().replaceScene(sceneId, res.data.pins);
+    useDrawings.getState().replaceScene(sceneId, res.data.drawings);
     set({ viewingSceneId: sceneId });
     const roomId = get().room?.id;
     if (roomId) setViewingScene(roomId, sceneId);
@@ -385,6 +397,7 @@ export const useRoom = create<RoomState>((set, get) => ({
 
   setMovementLimitEnabled: (enabled) => set({ movementLimitEnabled: enabled }),
   setAutoRollNpcInitiativeEnabled: (enabled) => set({ autoRollNpcInitiativeEnabled: enabled }),
+  setPlayerDrawingEnabled: (enabled) => set({ playerDrawingEnabled: enabled }),
 }));
 
 /** Mapa ATIVO da sala (derivado). Use para a faixa de aviso e o painel "Mapas". */

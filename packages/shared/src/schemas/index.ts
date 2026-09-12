@@ -12,5 +12,6 @@ export * from "./character.js";
 export * from "./compendium.js";
 export * from "./handout.js";
 export * from "./pin.js";
+export * from "./drawing.js";
 export * from "./encounter.js";
 export * from "./party.js";

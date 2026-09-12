@@ -21,3 +21,4 @@ export * from "./templates.js";
 export * from "./targets.js";
 export * from "./encounter.js";
 export * from "./party.js";
+export * from "./drawing.js";

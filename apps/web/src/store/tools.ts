@@ -1,14 +1,17 @@
 import { create } from "zustand";
-import type { Ruler, TemplatePreset, TemplateShape } from "@tormenta-vtt/shared";
+import { DRAWING_MAX_STROKE_WIDTH, DRAWING_MIN_STROKE_WIDTH, type DrawingKind, type Ruler, type TemplatePreset, type TemplateShape } from "@tormenta-vtt/shared";
 import { throttle } from "../lib/throttle";
 import { emitAck } from "./connection";
 
 /**
- * Ferramenta ativa no canvas (barra vertical à esquerda). Um modo por vez;
- * "draw" já existe no tipo para a barra reservar o lugar, mas ainda não faz nada.
- * "fog" é só do GM (ver useToolShortcuts e Toolbar). "template" (Área) não é GM-only.
+ * Ferramenta ativa no canvas (barra vertical à esquerda). Um modo por vez.
+ * "fog" é só do GM (ver useToolShortcuts e Toolbar). "template"/"draw" não são GM-only (jogador usa
+ * "draw" condicionado ao toggle `RoomState.playerDrawingEnabled`, SPEC §9.17).
  */
 export type ToolMode = "select" | "pan" | "ruler" | "fog" | "template" | "draw" | "pin";
+
+/** Paleta fixa da sub-barra de Desenho (SPEC §9.17: "paleta pequena", sem color-picker livre). */
+export const DRAWING_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#8b5cf6", "#ec4899", "#f8fafc"] as const;
 
 /** Sub-modo da névoa: o que a forma desenhada faz. */
 export type FogToolMode = "reveal" | "hide";
@@ -49,12 +52,26 @@ interface ToolsState {
   templateSize: number;
   templateAngle: number | undefined;
   templateWidth: number | undefined;
+  /** Modo Desenho (SPEC §9.17): forma do traço, cor (paleta fixa acima), espessura (1-20px, ou
+   *  fontSize quando `drawKind === "text"`), preenchimento (só rect/ellipse) e visibilidade do
+   *  PRÓXIMO traço que o GM criar ("todos" padrão, ou "só GM" pra marcar coisas na preparação —
+   *  jogador não tem este controle, o servidor sempre força `true` no traço dele). */
+  drawKind: DrawingKind;
+  drawColor: string;
+  drawStrokeWidth: number;
+  drawFilled: boolean;
+  drawVisible: boolean;
   setMode: (mode: ToolMode) => void;
   setFogMode: (fogMode: FogToolMode) => void;
   setFogShape: (fogShape: FogToolShape) => void;
   setFogBrushSize: (size: number) => void;
   setTemplateShape: (shape: TemplateShape) => void;
   setTemplateSize: (size: number) => void;
+  setDrawKind: (kind: DrawingKind) => void;
+  setDrawColor: (color: string) => void;
+  setDrawStrokeWidth: (width: number) => void;
+  setDrawFilled: (filled: boolean) => void;
+  setDrawVisible: (visible: boolean) => void;
   /** Preset do JSON do sistema, ou do botão "Colocar área" do card de item: preenche forma+tamanho
    *  (e ângulo/largura, se o preset sobrescrever) sem posicionar sozinho — o clique no mapa continua
    *  definindo a origem. */
@@ -87,12 +104,22 @@ export const useTools = create<ToolsState>((set, get) => ({
   templateSize: 6,
   templateAngle: undefined,
   templateWidth: undefined,
+  drawKind: "pen",
+  drawColor: DRAWING_COLORS[0],
+  drawStrokeWidth: 4,
+  drawFilled: false,
+  drawVisible: true,
   setMode: (mode) => set({ mode }),
   setFogMode: (fogMode) => set({ fogMode }),
   setFogShape: (fogShape) => set({ fogShape }),
   setFogBrushSize: (size) => set({ fogBrushSize: Math.max(FOG_BRUSH_MIN, Math.min(FOG_BRUSH_MAX, Math.round(size))) }),
   setTemplateShape: (templateShape) => set({ templateShape }),
   setTemplateSize: (size) => set({ templateSize: Math.max(0.1, size) }),
+  setDrawKind: (drawKind) => set({ drawKind }),
+  setDrawColor: (drawColor) => set({ drawColor }),
+  setDrawStrokeWidth: (width) => set({ drawStrokeWidth: Math.max(DRAWING_MIN_STROKE_WIDTH, Math.min(DRAWING_MAX_STROKE_WIDTH, Math.round(width))) }),
+  setDrawFilled: (drawFilled) => set({ drawFilled }),
+  setDrawVisible: (drawVisible) => set({ drawVisible }),
   pickTemplatePreset: (preset) =>
     set({ templateShape: preset.shape, templateSize: preset.size, templateAngle: preset.angle, templateWidth: preset.width }),
   setSpaceHeld: (spaceHeld) => set({ spaceHeld }),

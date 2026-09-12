@@ -1,4 +1,4 @@
-import { FogConfigSchema, GridConfigSchema, getSystemDefinition, type Combat, type Pin, type RoomSnapshot } from "@tormenta-vtt/shared";
+import { FogConfigSchema, GridConfigSchema, drawingVisibleTo, getSystemDefinition, type Combat, type Drawing, type Pin, type RoomSnapshot } from "@tormenta-vtt/shared";
 import type { Participant as DbParticipant, Room as DbRoom } from "@prisma/client";
 import { prisma } from "../db.js";
 import { isConnected } from "./presence.js";
@@ -10,8 +10,10 @@ import { redactTokenForViewer, tokenVisibleTo } from "./visibility.js";
 import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, rollTargetsForViewer, tokenGateOk, whisperGateOk } from "./chatVisibility.js";
 import { listTemplates } from "./templates.js";
 import { pinVisibleTo, toPinSafe } from "./pins.js";
+import { toDrawingSafe } from "./drawings.js";
 import { isMovementLimitEnabled } from "./movementLimit.js";
 import { isAutoRollNpcInitiativeEnabled } from "./autoRollNpcInitiative.js";
+import { isPlayerDrawingEnabled } from "./drawingPermission.js";
 import { partyFor, partyOf } from "./party.js";
 import { listTargets } from "./targets.js";
 
@@ -19,7 +21,7 @@ const CHAT_HISTORY_LIMIT = 100;
 
 /** Estado completo da sala do ponto de vista de `me`. */
 export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<RoomSnapshot> {
-  const [participants, scenes, tokens, messages, combatRow, characters, pinRows] = await Promise.all([
+  const [participants, scenes, tokens, messages, combatRow, characters, pinRows, drawingRows] = await Promise.all([
     prisma.participant.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
     // Mapas apagados (soft delete, docs/plano-mapas.md §10) nunca vão pro cliente. Ordenados como
     // o painel "Mapas" mostra (order asc, createdAt desempata — mesma regra de rules/scenes.ts).
@@ -35,6 +37,7 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     room.activeSceneId ? loadCombatRow(room.activeSceneId) : Promise.resolve(null),
     prisma.character.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
     room.activeSceneId ? prisma.pin.findMany({ where: { sceneId: room.activeSceneId, deletedAt: null } }) : Promise.resolve([]),
+    room.activeSceneId ? prisma.drawing.findMany({ where: { sceneId: room.activeSceneId, deletedAt: null } }) : Promise.resolve([]),
   ]);
 
   // Névoa + cellSize da cena ativa: decide quais tokens (e combatentes) alheios um jogador recebe
@@ -100,6 +103,10 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
       .map(toPinSafe)
       .filter((p): p is Pin => p !== null)
       .filter((p) => pinVisibleTo(p, viewer, room.activeSceneId)),
+    drawings: drawingRows
+      .map(toDrawingSafe)
+      .filter((d): d is Drawing => d !== null)
+      .filter((d) => drawingVisibleTo(d, viewer, room.activeSceneId)),
     chat: chatMessages.flatMap((m) => {
       if (m.kind === "initiative-batch") {
         const view = initiativeBatchForViewer(m, viewer, tokenInfoById, room.activeSceneId);
@@ -123,6 +130,7 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     party: partyFor(partyOf(room), new Set(characters.filter((c) => c.kind === "pc").map((c) => c.id)), viewer.role),
     movementLimitEnabled: isMovementLimitEnabled(room.id),
     autoRollNpcInitiativeEnabled: isAutoRollNpcInitiativeEnabled(room.id),
+    playerDrawingEnabled: isPlayerDrawingEnabled(room.id),
     targets,
   };
 }

@@ -81,10 +81,11 @@ model Scene {
   gmNotes   String?
   createdAt DateTime  @default(now())
 
-  room   Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  tokens Token[]
-  combat Combat?
-  pins   Pin[]
+  room     Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tokens   Token[]
+  combat   Combat?
+  pins     Pin[]
+  drawings Drawing[]
 
   @@index([roomId])
 }
@@ -322,6 +323,60 @@ model Pin {
 
   @@index([sceneId])
   @@index([handoutId])
+}
+
+/// Traço de desenho livre no mapa (docs/SPEC.md §9.17): uma linha por traço — diferente da névoa
+/// (um blob JSON cumulativo em Scene.fog) e dos gabaritos (efêmeros em memória, nunca no banco) —
+/// sobrevive a F5 e a um restart, e cada um precisa de `id` endereçável pra mover/redimensionar/
+/// apagar individualmente. Geometria em colunas tipadas nullable por `kind` (mesmo padrão de Pin;
+/// só a caneta usa um array nativo pra polilinha, como Handout.tags).
+model Drawing {
+  id          String    @id @default(cuid())
+  sceneId     String
+  kind        String // "pen" | "line" | "rect" | "ellipse" | "arrow" | "text"
+  /// Sempre o participantId de quem criou (GM ou jogador) — nunca confiado do payload (mesmo
+  /// princípio de Template.ownerId). Jogador só move/apaga o próprio; GM, todos.
+  ownerId     String
+  color       String // hex "#rrggbb"
+  /// Espessura do traço (pen/line/rect/ellipse/arrow) OU tamanho da fonte (text) — mesmo slider.
+  strokeWidth Float
+  /// Só kind "rect"/"ellipse" (forma fechada). Ignorado nos demais.
+  filled      Boolean   @default(false)
+  /// GM decide: "todos" (true, padrão) ou "só GM" (false) — pra marcar coisas na preparação.
+  /// Traço de jogador é sempre true: o servidor ignora o que vier no payload dele.
+  visible     Boolean   @default(true)
+
+  // Geometria por kind — só os campos do kind atual são não-nulos (mesmo padrão de Pin).
+  /// kind "pen": polilinha achatada [x1,y1,x2,y2,...], já decimada/suavizada pelo cliente.
+  points Float[]
+  /// kind "line"/"arrow": ponta inicial/final.
+  x1     Float?
+  y1     Float?
+  x2     Float?
+  y2     Float?
+  /// kind "rect"/"text": canto superior-esquerdo (rect) ou origem (text).
+  x      Float?
+  y      Float?
+  /// kind "rect": tamanho (sem rotação — fora do escopo pedido).
+  width  Float?
+  height Float?
+  /// kind "ellipse": centro + raios.
+  cx Float?
+  cy Float?
+  rx Float?
+  ry Float?
+  /// kind "text": conteúdo.
+  text String?
+
+  /// Soft delete (docs/plano-desfazer.md): drawing:remove e as cascatas de "limpar" só marcam esta
+  /// data — o desfazer do GM restaura sem precisar de snapshot manual, mesmo padrão de Pin.deletedAt.
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  scene Scene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@index([sceneId])
+  @@index([ownerId])
 }
 
 /// Encontro salvo (docs/SPEC.md §9.14): grupo de criaturas do compêndio que o GM monta uma vez e

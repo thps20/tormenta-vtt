@@ -13,6 +13,7 @@ import { useSceneList } from "./sceneList";
 import { useTools } from "./tools";
 import { useHandouts } from "./handouts";
 import { usePins } from "./pins";
+import { useDrawings } from "./drawings";
 import { useEncounters } from "./encounters";
 import { toast } from "./ui";
 
@@ -70,6 +71,7 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("combat:updated", ({ sceneId, combat }) => useCombat.getState().setSceneState(sceneId, combat));
   socket.on("combat:movementLimitChanged", ({ enabled }) => useRoom.getState().setMovementLimitEnabled(enabled));
   socket.on("combat:autoRollNpcInitiativeChanged", ({ enabled }) => useRoom.getState().setAutoRollNpcInitiativeEnabled(enabled));
+  socket.on("drawing:playerPermissionChanged", ({ enabled }) => useRoom.getState().setPlayerDrawingEnabled(enabled));
 
   socket.on("ruler:updated", (p) => useTools.getState().setRemoteRuler(p));
 
@@ -95,6 +97,12 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("pin:created", ({ sceneId, pin }) => usePins.getState().upsertPin(sceneId, pin));
   socket.on("pin:updated", ({ sceneId, pin }) => usePins.getState().upsertPin(sceneId, pin));
   socket.on("pin:removed", ({ sceneId, pinId }) => usePins.getState().removePin(sceneId, pinId));
+
+  // Desenho livre no mapa (§9.17): mesma regra de broadcast de mapa de sempre.
+  socket.on("drawing:created", ({ sceneId, drawing }) => useDrawings.getState().upsertLocal(sceneId, drawing));
+  socket.on("drawing:updated", ({ sceneId, drawing }) => useDrawings.getState().upsertLocal(sceneId, drawing));
+  socket.on("drawing:removed", ({ sceneId, drawingId }) => useDrawings.getState().removeLocal(sceneId, drawingId));
+  socket.on("drawing:cleared", ({ sceneId, drawingIds }) => useDrawings.getState().removeManyLocal(sceneId, drawingIds));
 
   socket.on("encounter:created", (e) => useEncounters.getState().upsert(e));
   socket.on("encounter:updated", (e) => useEncounters.getState().upsert(e));
