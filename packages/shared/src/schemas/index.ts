@@ -15,3 +15,4 @@ export * from "./pin.js";
 export * from "./drawing.js";
 export * from "./encounter.js";
 export * from "./party.js";
+export * from "./macro.js";

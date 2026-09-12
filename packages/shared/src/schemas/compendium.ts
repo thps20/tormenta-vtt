@@ -141,3 +141,13 @@ export interface RoomCompendiumImportResult {
   overwritten: number;
   skipped: { id: string; name: string; reason: string }[];
 }
+
+/**
+ * Favoritos (§9.19): estrela por entrada, por PARTICIPANTE (nunca por sala/GM) — GM favorita
+ * criaturas e itens, jogador magias/poderes que usa sempre. `entryId` é o mesmo id de
+ * `CompendiumEntry` (sistema ou sala); o servidor não confere se a entrada ainda existe (favoritar
+ * é só uma marca — se a entrada some depois, o id fica órfão até o participante desfavoritar,
+ * sem quebrar nada). `compendium:favorite-add`/`-remove` devolvem a lista completa atualizada.
+ */
+export const CompendiumFavoriteToggleSchema = z.object({ entryId: CompendiumIdSchema });
+export type CompendiumFavoriteTogglePayload = z.infer<typeof CompendiumFavoriteToggleSchema>;

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, Eye, EyeOff, FolderCog, ListPlus, Plus, Save, Search, Trash2, Users, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, Eye, EyeOff, FolderCog, ListPlus, Plus, Save, Search, Star, Trash2, Users, X } from "lucide-react";
 import { sumChallengeRating, type Character, type CompendiumCreatureEntry, type CompendiumEntry, type CompendiumItemEntry, type SavedEncounter, type SystemDefinition } from "@tormenta-vtt/shared";
-import { checkInsert, matchesQuery, CREATURE_FILTER, ENCOUNTER_FILTER, ROOM_FILTER, type InsertCheck } from "../../lib/compendium";
+import { checkInsert, matchesQuery, sortFavoritesFirst, CREATURE_FILTER, ENCOUNTER_FILTER, FAVORITE_FILTER, ROOM_FILTER, type InsertCheck } from "../../lib/compendium";
 import { useCompendium } from "../../store/compendium";
 import { useEncounters, type EncounterCartItem } from "../../store/encounters";
 import { useRoom, selectIsGm } from "../../store/room";
@@ -68,6 +68,21 @@ function rowId(row: PaletteRow): string {
 
 const NO_SHEET_CHECK: InsertCheck = { ok: false, reason: null, replaces: null };
 
+/** Estrela de favorito (§9.19): sempre visível (não só no hover, diferente do "+"), preenchida
+ *  quando favoritado. Mesma estrela em item e criatura — magia/poder já são "item" pro compêndio. */
+const FavoriteStarButton: React.FC<{ isFavorite: boolean; onToggle: () => void }> = ({ isFavorite, onToggle }) => (
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      onToggle();
+    }}
+    title={isFavorite ? "Remover dos favoritos" : "Favoritar"}
+    className={`p-0.5 rounded cursor-pointer transition-colors shrink-0 ${isFavorite ? "text-[#d4af37]" : "text-zinc-600 hover:text-zinc-400"}`}
+  >
+    <Star className={`w-3.5 h-3.5 ${isFavorite ? "fill-[#d4af37]" : ""}`} />
+  </button>
+);
+
 /**
  * Paleta de comandos do compêndio, sempre em coluna: busca com foco automático,
  * chips por tipo (no contexto "map" só Criaturas/Encontros ficam à mostra; os demais tipos entram
@@ -83,6 +98,8 @@ const NO_SHEET_CHECK: InsertCheck = { ok: false, reason: null, replaces: null };
 export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, character, mode, onInsert, onSpawnCreature, onSpawnEncounter, selectedTokenIds = [], onClose }) => {
   const entries = useCompendium((s) => s.entries);
   const roomIds = useCompendium((s) => s.roomIds);
+  const favoriteIds = useCompendium((s) => s.favoriteIds);
+  const toggleFavorite = useCompendium((s) => s.toggleFavorite);
   const status = useCompendium((s) => s.status);
   const context = useCompendium((s) => s.context);
   const initialKind = useCompendium((s) => s.initialKind);
@@ -148,14 +165,20 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
   // itemKinds[] na ordem do sistema. Os chips "Criaturas"/"Encontros"/"Sala" filtram por
   // tipo/origem, não por itemKinds[].key.
   const groups = useMemo(() => {
-    const matchesChips = (id: string, roomOnly: boolean) => kinds.size === 0 || (kinds.has(ROOM_FILTER) && roomIds.includes(id)) || roomOnly;
+    const matchesChips = (id: string, roomOnly: boolean) =>
+      kinds.size === 0 || (kinds.has(ROOM_FILTER) && roomIds.includes(id)) || (kinds.has(FAVORITE_FILTER) && favoriteIds.has(id)) || roomOnly;
+    // Busca ativa: favoritos primeiro dentro de cada grupo (§9.19). Sem busca, a estrela e o chip
+    // "Favoritos" já bastam — a ordem normal (por nome) não muda.
+    const withFavoritesFirst = <T,>(rows: T[], getId: (row: T) => string): T[] => (query.trim() ? sortFavoritesFirst(rows, favoriteIds, getId) : rows);
     const out: { key: string; label: string; Icon: typeof creatureIcon; rows: PaletteRow[] }[] = [];
 
     if (creatureEntries.length > 0) {
-      const rows: PaletteRow[] = creatureEntries
-        .filter((e) => matchesChips(e.id, kinds.has(CREATURE_FILTER)) && matchesQuery(e, query))
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((entry) => ({ kind: "creature", entry }));
+      const rows: PaletteRow[] = withFavoritesFirst(
+        creatureEntries
+          .filter((e) => matchesChips(e.id, kinds.has(CREATURE_FILTER)) && matchesQuery(e, query))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        (e) => e.id,
+      ).map((entry) => ({ kind: "creature", entry }));
       if (rows.length > 0) out.push({ key: CREATURE_FILTER, label: "Criaturas", Icon: creatureIcon, rows });
     }
     if (encounterEntries.length > 0) {
@@ -166,14 +189,16 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
       if (rows.length > 0) out.push({ key: ENCOUNTER_FILTER, label: "Encontros", Icon: encounterIcon, rows });
     }
     def.itemKinds.forEach((kind, index) => {
-      const rows: PaletteRow[] = items
-        .filter((e) => e.kind === kind.key && matchesChips(e.id, kinds.has(kind.key)) && matchesQuery(e, query))
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((entry) => ({ kind: "item", entry, check: character ? checkInsert(def, character, entry) : NO_SHEET_CHECK }));
+      const rows: PaletteRow[] = withFavoritesFirst(
+        items
+          .filter((e) => e.kind === kind.key && matchesChips(e.id, kinds.has(kind.key)) && matchesQuery(e, query))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        (e) => e.id,
+      ).map((entry) => ({ kind: "item", entry, check: character ? checkInsert(def, character, entry) : NO_SHEET_CHECK }));
       if (rows.length > 0) out.push({ key: kind.key, label: kind.label, Icon: kindIcon(index), rows });
     });
     return out;
-  }, [def, character, items, creatureEntries, encounterEntries, kinds, roomIds, query]);
+  }, [def, character, items, creatureEntries, encounterEntries, kinds, roomIds, favoriteIds, query]);
   const flat = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
   const current = flat[Math.min(focused, Math.max(0, flat.length - 1))] ?? null;
 
@@ -394,8 +419,10 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
                 row={row}
                 focused={current !== null && rowId(current) === rowId(row)}
                 inserted={justInserted === row.entry.id}
+                isFavorite={favoriteIds.has(row.entry.id)}
                 onFocus={() => setFocused(flat.indexOf(row))}
                 onInsert={() => void insert(row, true)}
+                onToggleFavorite={() => void toggleFavorite(row.entry.id)}
                 onPointerDown={(e) => row.check.ok && onRowPointerDown(e, row.entry.id)}
               />
             ) : row.kind === "creature" ? (
@@ -403,9 +430,11 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
                 key={row.entry.id}
                 entry={row.entry}
                 focused={current !== null && rowId(current) === rowId(row)}
+                isFavorite={favoriteIds.has(row.entry.id)}
                 onFocus={() => setFocused(flat.indexOf(row))}
                 onPointerDown={(e) => !!onSpawnCreature && onRowPointerDown(e, row.entry.id)}
                 onDoubleClick={() => setOpenFullSheetEntry(row.entry)}
+                onToggleFavorite={() => void toggleFavorite(row.entry.id)}
                 onAddToCart={encounterMode ? () => useEncounters.getState().addToCart(row.entry.id, spawnCount, !spawnInvisible) : undefined}
               />
             ) : (
@@ -482,6 +511,9 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
         {/* Chips + "Montar encontro" (item 2/3): uma linha só, chips à esquerda, modo à direita. */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1 flex-wrap">
+            {favoriteIds.size > 0 && (
+              <ChipButton id={`compendium-chip-${FAVORITE_FILTER}`} Icon={Star} label="Favoritos" count={favoriteIds.size} active={kinds.has(FAVORITE_FILTER)} onClick={() => toggleKind(FAVORITE_FILTER)} />
+            )}
             {context === "map" ? (
               <>
                 {creatureEntries.length > 0 && (
@@ -750,13 +782,15 @@ interface PaletteRowViewProps {
   row: ItemPaletteRow;
   focused: boolean;
   inserted: boolean;
+  isFavorite: boolean;
   onFocus: () => void;
   onInsert: () => void;
+  onToggleFavorite: () => void;
   /** Início de um possível arrasto (só entradas inseríveis). */
   onPointerDown: (e: React.PointerEvent) => void;
 }
 
-const PaletteRowView: React.FC<PaletteRowViewProps> = ({ row, focused, inserted, onFocus, onInsert, onPointerDown }) => {
+const PaletteRowView: React.FC<PaletteRowViewProps> = ({ row, focused, inserted, isFavorite, onFocus, onInsert, onToggleFavorite, onPointerDown }) => {
   const { entry, check } = row;
   return (
     <div
@@ -774,6 +808,7 @@ const PaletteRowView: React.FC<PaletteRowViewProps> = ({ row, focused, inserted,
         <div className={`text-xs font-serif truncate ${check.ok ? "text-zinc-100" : "text-zinc-400"}`}>{entry.name}</div>
         {entry.tags.length > 0 && <div className="text-[10px] text-zinc-500 truncate">{entry.tags.join(" · ")}</div>}
       </div>
+      <FavoriteStarButton isFavorite={isFavorite} onToggle={onToggleFavorite} />
       {inserted ? (
         <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-serif">
           <Check className="w-3.5 h-3.5" /> inserido
@@ -804,16 +839,18 @@ const PaletteRowView: React.FC<PaletteRowViewProps> = ({ row, focused, inserted,
 interface CreatureRowViewProps {
   entry: CompendiumCreatureEntry;
   focused: boolean;
+  isFavorite: boolean;
   onFocus: () => void;
   /** Início de um possível arrasto pro mapa (docs/plano-criaturas.md §2.4). */
   onPointerDown: (e: React.PointerEvent) => void;
   /** Duplo clique na linha: abre o bloco completo em modo leitura (§9.5), não solta no mapa. */
   onDoubleClick: () => void;
+  onToggleFavorite: () => void;
   /** "+" (modo "Montar encontro", §9.14): soma ao carrinho. Ausente = modo desligado. */
   onAddToCart?: () => void;
 }
 
-const CreatureRowView: React.FC<CreatureRowViewProps> = ({ entry, focused, onFocus, onPointerDown, onDoubleClick, onAddToCart }) => (
+const CreatureRowView: React.FC<CreatureRowViewProps> = ({ entry, focused, isFavorite, onFocus, onPointerDown, onDoubleClick, onToggleFavorite, onAddToCart }) => (
   <div
     data-entry-id={entry.id}
     onPointerEnter={onFocus}
@@ -827,6 +864,7 @@ const CreatureRowView: React.FC<CreatureRowViewProps> = ({ entry, focused, onFoc
       <div className="text-xs font-serif truncate text-zinc-100">{entry.name}</div>
       {entry.tags.length > 0 && <div className="text-[10px] text-zinc-500 truncate">{entry.tags.join(" · ")}</div>}
     </div>
+    <FavoriteStarButton isFavorite={isFavorite} onToggle={onToggleFavorite} />
     {onAddToCart && (
       <button
         onClick={(e) => {

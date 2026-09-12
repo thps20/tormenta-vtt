@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CharacterDataSchema, CompendiumItemEntrySchema, createDefaultCharacterData, getSystemDefinition, type Character, type CompendiumItemEntry } from "@tormenta-vtt/shared";
-import { buildInsertPatch, checkInsert, isOpenPaletteShortcut, matchesQuery, type ShortcutKey } from "./compendium";
+import { buildInsertPatch, checkInsert, isOpenPaletteShortcut, matchesQuery, sortFavoritesFirst, type ShortcutKey } from "./compendium";
 
 const def = getSystemDefinition("tormenta20");
 
@@ -95,5 +95,18 @@ describe("isOpenPaletteShortcut", () => {
     expect(isOpenPaletteShortcut(key({ key: "/", code: "Digit7", shiftKey: true }), false)).toBe(true);
     expect(isOpenPaletteShortcut(key({ key: "/", code: "Slash" }), true)).toBe(false);
     expect(isOpenPaletteShortcut(key({ key: "/", code: "Slash", ctrlKey: true }), false)).toBe(false);
+  });
+});
+
+describe("sortFavoritesFirst", () => {
+  const rows = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
+
+  it("sem favoritos, mantém a ordem original", () => {
+    expect(sortFavoritesFirst(rows, new Set(), (r) => r.id)).toEqual(rows);
+  });
+
+  it("favoritos vão pro início, preservando a ordem relativa dentro de cada bloco", () => {
+    const result = sortFavoritesFirst(rows, new Set(["c", "a"]), (r) => r.id);
+    expect(result.map((r) => r.id)).toEqual(["a", "c", "b", "d"]);
   });
 });

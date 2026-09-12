@@ -16,12 +16,14 @@ import { isAutoRollNpcInitiativeEnabled } from "./autoRollNpcInitiative.js";
 import { isPlayerDrawingEnabled } from "./drawingPermission.js";
 import { partyFor, partyOf } from "./party.js";
 import { listTargets } from "./targets.js";
+import { listFavoriteEntryIds } from "./compendiumFavorites.js";
+import { listMacros } from "./macros.js";
 
 const CHAT_HISTORY_LIMIT = 100;
 
 /** Estado completo da sala do ponto de vista de `me`. */
 export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<RoomSnapshot> {
-  const [participants, scenes, tokens, messages, combatRow, characters, pinRows, drawingRows] = await Promise.all([
+  const [participants, scenes, tokens, messages, combatRow, characters, pinRows, drawingRows, favoriteEntryIds, macros] = await Promise.all([
     prisma.participant.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
     // Mapas apagados (soft delete, docs/plano-mapas.md §10) nunca vão pro cliente. Ordenados como
     // o painel "Mapas" mostra (order asc, createdAt desempata — mesma regra de rules/scenes.ts).
@@ -38,6 +40,8 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     prisma.character.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
     room.activeSceneId ? prisma.pin.findMany({ where: { sceneId: room.activeSceneId, deletedAt: null } }) : Promise.resolve([]),
     room.activeSceneId ? prisma.drawing.findMany({ where: { sceneId: room.activeSceneId, deletedAt: null } }) : Promise.resolve([]),
+    listFavoriteEntryIds(room.id, me.id),
+    listMacros(room.id, me.id),
   ]);
 
   // Névoa + cellSize da cena ativa: decide quais tokens (e combatentes) alheios um jogador recebe
@@ -132,5 +136,7 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     autoRollNpcInitiativeEnabled: isAutoRollNpcInitiativeEnabled(room.id),
     playerDrawingEnabled: isPlayerDrawingEnabled(room.id),
     targets,
+    favoriteEntryIds,
+    macros,
   };
 }

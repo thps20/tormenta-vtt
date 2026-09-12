@@ -26,6 +26,9 @@ interface CompendiumState {
   entries: CompendiumEntry[];
   /** Ids que vieram do compêndio da SALA (homebrew do GM): o chip "Sala" da paleta só aparece com algum. */
   roomIds: string[];
+  /** Favoritos (§9.19) do PRÓPRIO participante — vem no RoomSnapshot, independente de a paleta já
+   *  ter carregado `entries` ou não (é só uma lista de ids, não precisa esperar compendium:list). */
+  favoriteIds: Set<string>;
   status: "idle" | "loading" | "ready" | "error";
   /** Paleta aberta (por cima da ficha, ou flutuando sobre o mapa). */
   isOpen: boolean;
@@ -74,6 +77,13 @@ interface CompendiumState {
   // aparecer numa recarga da paleta (compendium:list de novo), não sozinho aqui.
   upsertRoomEntry: (entry: CompendiumEntry) => void;
   removeRoomEntry: (entryId: string) => void;
+
+  // Favoritos (§9.19): 100% pessoal, sem broadcast — o ack já devolve a lista atualizada.
+  isFavorite: (entryId: string) => boolean;
+  toggleFavorite: (entryId: string) => Promise<void>;
+  /** RoomSnapshot (room:join): substitui a lista inteira. */
+  setFavorites: (entryIds: string[]) => void;
+
   /** Limpa o estado ao sair da sala (as entradas dependem do sistema da sala). */
   reset: () => void;
 }
@@ -81,6 +91,7 @@ interface CompendiumState {
 export const useCompendium = create<CompendiumState>((set, get) => ({
   entries: [],
   roomIds: [],
+  favoriteIds: new Set(),
   status: "idle",
   isOpen: false,
   context: "sheet",
@@ -179,5 +190,26 @@ export const useCompendium = create<CompendiumState>((set, get) => ({
     })),
   removeRoomEntry: (entryId) => set((s) => ({ entries: s.entries.filter((e) => e.id !== entryId), roomIds: s.roomIds.filter((id) => id !== entryId) })),
 
-  reset: () => set({ entries: [], roomIds: [], status: "idle", isOpen: false, context: "sheet", initialKind: null, lastInserted: null, drag: null, spawnCount: 1 }),
+  isFavorite: (entryId) => get().favoriteIds.has(entryId),
+  toggleFavorite: async (entryId) => {
+    const wasFavorite = get().favoriteIds.has(entryId);
+    const setLocal = (favorite: boolean) =>
+      set((s) => {
+        const next = new Set(s.favoriteIds);
+        if (favorite) next.add(entryId);
+        else next.delete(entryId);
+        return { favoriteIds: next };
+      });
+    setLocal(!wasFavorite); // 1. otimista (a estrela muda na hora)
+    const res = wasFavorite ? await emitAck("compendium:favorite-remove", { entryId }) : await emitAck("compendium:favorite-add", { entryId });
+    if (!res.ok) {
+      setLocal(wasFavorite); // 2. reverte
+      toast(res.error);
+      return;
+    }
+    get().setFavorites(res.data);
+  },
+  setFavorites: (entryIds) => set({ favoriteIds: new Set(entryIds) }),
+
+  reset: () => set({ entries: [], roomIds: [], favoriteIds: new Set(), status: "idle", isOpen: false, context: "sheet", initialKind: null, lastInserted: null, drag: null, spawnCount: 1 }),
 }));

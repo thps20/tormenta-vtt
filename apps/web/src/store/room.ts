@@ -26,6 +26,7 @@ import { useHandouts } from "./handouts";
 import { usePins } from "./pins";
 import { useDrawings } from "./drawings";
 import { useEncounters } from "./encounters";
+import { useMacros } from "./macros";
 import { useSceneList } from "./sceneList";
 import { toast } from "./ui";
 
@@ -184,6 +185,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     usePins.getState().reset();
     useDrawings.getState().reset();
     useEncounters.getState().reset();
+    useMacros.getState().reset();
     useSceneList.getState().reset();
     // Desconectar e reconectar é o jeito simples de sair das salas do Socket.io.
     const socket = getSocket();
@@ -210,6 +212,8 @@ export const useRoom = create<RoomState>((set, get) => ({
     useTargets.getState().setSnapshot(snap.targets, snap.me.id);
     useCharacters.getState().setAll(snap.characters);
     useParty.getState().setAll(snap.party);
+    useCompendium.getState().setFavorites(snap.favoriteEntryIds);
+    useMacros.getState().setAll(snap.macros);
 
     // Jogador sempre vê o ativo (derivado, sem sessionStorage). GM: restaura o mapa que estava
     // visitando (F5 no meio da preparação); se o id salvo não existe mais (mapa apagado) ou é o

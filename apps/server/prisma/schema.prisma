@@ -37,6 +37,8 @@ model Room {
   handouts              Handout[]
   savedEncounters       SavedEncounter[]
   roomCompendiumEntries RoomCompendiumEntry[]
+  compendiumFavorites   CompendiumFavorite[]
+  macros                Macro[]
 }
 
 model Participant {
@@ -48,9 +50,11 @@ model Participant {
   sessionToken String   @unique @default(cuid())
   createdAt    DateTime @default(now())
 
-  room       Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  tokens     Token[]
-  characters Character[]
+  room                Room                 @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tokens              Token[]
+  characters          Character[]
+  compendiumFavorites CompendiumFavorite[]
+  macros              Macro[]
 
   @@index([roomId])
 }
@@ -436,4 +440,48 @@ model RoomCompendiumEntry {
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@id([roomId, entryId])
+}
+
+/// Favorito de compêndio (docs/SPEC.md §9.19): estrela por entrada, por PARTICIPANTE — nunca
+/// visível/editável por outro participante da mesma sala, nem pelo GM (é preferência de uso, não
+/// conteúdo de sala, mesmo espírito de Macro abaixo). `entryId` não tem FK: é o id de um
+/// CompendiumEntry, que pode vir do sistema (nem está no banco) ou da sala (RoomCompendiumEntry,
+/// que pode ser apagado depois) — favoritar não valida se a entrada ainda existe.
+model CompendiumFavorite {
+  id            String   @id @default(cuid())
+  roomId        String
+  participantId String
+  entryId       String
+  createdAt     DateTime @default(now())
+
+  room        Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, entryId])
+  @@index([roomId, participantId])
+}
+
+/// Macro (docs/SPEC.md §9.20): botão de atalho por PARTICIPANTE, persistido por sala. `action` é o
+/// MacroAction serializado (ver MacroActionSchema) — Json porque evolui sem migration, mesma
+/// convenção de Scene.grid/Token.hp. Nunca editável por outro participante nem pelo GM: é
+/// preferência pessoal de uso, não recurso de sala (diferente de Pin/Handout, que são do GM).
+model Macro {
+  id            String   @id @default(cuid())
+  roomId        String
+  participantId String
+  /// Posição na barra (arrastar reordena, macro:reorder); também decide qual tecla 1..9 dispara
+  /// qual macro (índice 0..8 da lista ordenada). Renumerado 0..n-1 a cada reorder.
+  order         Int
+  label         String
+  /// Chave de lib/pinIcons.ts (mesma paleta do pino de nota) — não é regra de sistema.
+  icon          String
+  color         String
+  action        Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  room        Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, participantId])
 }

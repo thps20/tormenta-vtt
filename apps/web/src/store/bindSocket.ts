@@ -16,6 +16,7 @@ import { useCompendium } from "./compendium";
 import { usePins } from "./pins";
 import { useDrawings } from "./drawings";
 import { useEncounters } from "./encounters";
+import { useMacros } from "./macros";
 import { toast } from "./ui";
 
 /**
@@ -113,6 +114,12 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("compendium:room-created", (entry) => useCompendium.getState().upsertRoomEntry(entry));
   socket.on("compendium:room-updated", (entry) => useCompendium.getState().upsertRoomEntry(entry));
   socket.on("compendium:room-deleted", ({ entryId }) => useCompendium.getState().removeRoomEntry(entryId));
+
+  // Macros (§9.20): só chega nas próprias abas do participante dono (rooms.participant).
+  socket.on("macro:created", (macro) => useMacros.getState().upsertMacro(macro));
+  socket.on("macro:updated", (macro) => useMacros.getState().upsertMacro(macro));
+  socket.on("macro:removed", ({ id }) => useMacros.getState().removeMacro(id));
+  socket.on("macro:reordered", ({ order }) => useMacros.getState().applyReorder(order));
 
   socket.on("server:error", ({ message }) => toast(message));
 }

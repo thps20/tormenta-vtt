@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  CompendiumFavoriteToggleSchema,
   CompendiumSpawnCreatureSchema,
   DEFAULT_MAP_SIZE,
   EmptySchema,
@@ -18,6 +19,7 @@ import {
 } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { listCompendium } from "../services/compendium.js";
+import { listFavoriteEntryIds } from "../services/compendiumFavorites.js";
 import { broadcastCharacter, toCharacter, toJson } from "../services/characters.js";
 import { cellAt, cellRect, cellToPoint, effectiveCellSize, sceneGeometry } from "../services/grid.js";
 import { describeSpawn, pushEntry, type HistoryEntry } from "../services/history.js";
@@ -168,6 +170,28 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
       },
       { gmOnly: true },
     ),
+  );
+
+  // Favoritos (docs/SPEC.md §9.19): 100% pessoal, sem gmOnly — cada participante mexe só nos
+  // próprios. Sem broadcast (o ack já devolve a lista atualizada pra quem chamou).
+  socket.on(
+    "compendium:favorite-add",
+    guarded(socket, CompendiumFavoriteToggleSchema, async ({ entryId }, ctx) => {
+      await prisma.compendiumFavorite.upsert({
+        where: { participantId_entryId: { participantId: ctx.participantId, entryId } },
+        update: {},
+        create: { roomId: ctx.roomId, participantId: ctx.participantId, entryId },
+      });
+      return listFavoriteEntryIds(ctx.roomId, ctx.participantId);
+    }),
+  );
+
+  socket.on(
+    "compendium:favorite-remove",
+    guarded(socket, CompendiumFavoriteToggleSchema, async ({ entryId }, ctx) => {
+      await prisma.compendiumFavorite.deleteMany({ where: { participantId: ctx.participantId, entryId } });
+      return listFavoriteEntryIds(ctx.roomId, ctx.participantId);
+    }),
   );
 
   // Homebrew da sala (docs/plano-compendio-sala.md, §9.18): mesmo desenho de handout:* — GM only,

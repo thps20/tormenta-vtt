@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Crown, Copy, Check, Users, MapPin, LogOut, NotebookText, Settings } from "lucide-react";
+import { Crown, Copy, Check, Users, MapPin, LogOut, NotebookText, Settings, Zap } from "lucide-react";
 import type { Participant, RoomPublic, Scene } from "@tormenta-vtt/shared";
 import { roomPath } from "../lib/router";
 
@@ -19,6 +19,8 @@ interface TopBarProps {
   mapSelector?: React.ReactNode;
   /** Seletor de handouts (`HandoutSelector`, docs/SPEC.md §9.10), ao lado do de mapa — só GM. */
   handoutSelector?: React.ReactNode;
+  /** Abre o criador de macro (docs/SPEC.md §9.20) — GM e jogador, é preferência pessoal. */
+  onOpenMacros?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -32,6 +34,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   characterMenu,
   mapSelector,
   handoutSelector,
+  onOpenMacros,
 }) => {
   const [copied, setCopied] = useState(false);
   const isGM = me.role === "gm";
@@ -163,6 +166,17 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <div className="flex items-center gap-2 ml-2">
           {characterMenu}
+          {onOpenMacros && (
+            <button
+              id="btn-topbar-macros"
+              onClick={onOpenMacros}
+              title="Nova macro (barra na parte de baixo da tela, teclas 1-9 disparam as suas)"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#252525] hover:bg-[#2d2417] border border-[#3d3d3d] hover:border-[#d4af37] text-zinc-200 hover:text-[#d4af37] text-xs font-serif font-bold transition-colors cursor-pointer shadow-sm"
+            >
+              <Zap className="w-3.5 h-3.5 text-[#d4af37]" />
+              <span className="hidden md:inline">Macros</span>
+            </button>
+          )}
           {isGM && onOpenMapNotes && scene && (
             <button
               id="btn-topbar-map-notes"

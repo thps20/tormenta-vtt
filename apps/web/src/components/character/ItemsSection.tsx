@@ -32,6 +32,7 @@ import {
 import { PALETTE_SHORTCUT_LABEL, seeBook } from "../../lib/compendium";
 import { describeEffect, effectForKind, effectKindOptions } from "../../lib/enhancements";
 import { newId } from "../../lib/ids";
+import { encodeMacroDrag, MACRO_DRAG_MIME } from "../../lib/macros";
 import { useCompendium } from "../../store/compendium";
 import { kindIcon } from "./kindIcons";
 import { EnhancementPicker } from "./EnhancementPicker";
@@ -345,6 +346,13 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
               <button
                 onClick={() => (hasEnhancements ? setPickerOpen((v) => !v) : use([]))}
                 disabled={!canRoll}
+                draggable={canRoll}
+                onDragStart={(e) =>
+                  e.dataTransfer.setData(
+                    MACRO_DRAG_MIME,
+                    encodeMacroDrag({ label: `${item.name} (${kind?.useLabel ?? "Usar"})`, action: { type: "useItem", characterId: character.id, itemId: item.id, enhancements: [] } }),
+                  )
+                }
                 id={`btn-use-item-${item.id}`}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-serif font-bold transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                   insufficient
@@ -376,8 +384,15 @@ const ItemCard: React.FC<ItemCardProps> = ({ def, character, computed, kind, ite
                 key={act.id}
                 onClick={() => onRoll(act.id)}
                 disabled={!canRoll}
+                draggable={canRoll}
+                onDragStart={(e) =>
+                  e.dataTransfer.setData(
+                    MACRO_DRAG_MIME,
+                    encodeMacroDrag({ label: `${item.name}: ${act.label}`, action: { type: "characterAction", characterId: character.id, itemId: item.id, actionId: act.id, enhancements: [] } }),
+                  )
+                }
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#221c14] hover:bg-[#33281b] border border-[#d4af37]/50 hover:border-[#d4af37] text-amber-100 text-xs font-serif font-semibold transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                title={built ? `Rolar ${act.label}: ${built.formula}` : `Rolar ${act.label}`}
+                title={built ? `Rolar ${act.label}: ${built.formula} (arraste para a barra de macros para salvar)` : `Rolar ${act.label}`}
               >
                 <Dices className="w-3.5 h-3.5 text-[#d4af37]" />
                 <span>{act.label}</span>

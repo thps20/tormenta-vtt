@@ -16,6 +16,8 @@ export const CREATURE_FILTER = "__creature__";
 export const ROOM_FILTER = "__room__";
 /** Grupo dos encontros salvos (§9.14), não uma entrada do compêndio — mesmo truque de id fora do alfabeto de chave. */
 export const ENCOUNTER_FILTER = "__encounter__";
+/** Filtra por favoritados (§9.19, por participante) — mesmo truque de id fora do alfabeto de chave. */
+export const FAVORITE_FILTER = "__favorite__";
 
 export interface InsertCheck {
   /** Pode inserir direto (Enter, "+", soltar). */
@@ -81,6 +83,19 @@ export function matchesQuery(entry: { name: string; id: string; tags: string[] }
   if (words.length === 0) return true;
   const haystack = normalize([entry.name, entry.id, ...entry.tags].join(" "));
   return words.every((w) => haystack.includes(w));
+}
+
+/**
+ * "Favoritos aparecem primeiro" (§9.19): ordenação estável — dentro de cada grupo (favoritos e
+ * não-favoritos) a ordem de entrada é preservada, só reparticiona em dois blocos. Usada na busca;
+ * sem busca o chip "Favoritos" já filtra, então a ordem normal (por nome) basta. `getId` porque a
+ * paleta mistura formas diferentes de linha (item/criatura usam `.entry.id`, encontro `.encounter.id`).
+ */
+export function sortFavoritesFirst<T>(entries: T[], favoriteIds: ReadonlySet<string>, getId: (entry: T) => string): T[] {
+  const favorites: T[] = [];
+  const rest: T[] = [];
+  for (const entry of entries) (favoriteIds.has(getId(entry)) ? favorites : rest).push(entry);
+  return [...favorites, ...rest];
 }
 
 function normalize(text: string): string {

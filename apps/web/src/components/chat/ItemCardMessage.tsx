@@ -1,5 +1,5 @@
 import React from "react";
-import { Dices, Shapes, Sparkles } from "lucide-react";
+import { BookmarkPlus, Dices, Shapes, Sparkles } from "lucide-react";
 import { formatArea, type ChatMessage, type ItemCard, type SystemDefinition } from "@tormenta-vtt/shared";
 import { useTools } from "../../store/tools";
 import { DamageFormula } from "../DamageTypeBadge";
@@ -15,6 +15,8 @@ interface ItemCardMessageProps {
   /** GM ou dono da ficha (e a ficha ainda existe): botões de ação ativos. */
   canAct: boolean;
   onRoll: (actionId: string) => void;
+  /** "Salvar como macro" (docs/SPEC.md §9.20): mesma ação de `onRoll`, mas vira uma macro em vez de rolar agora. */
+  onSaveAsMacro?: (actionId: string) => void;
 }
 
 /** Marca de campo alterado por aprimoramento nesta conjuração. */
@@ -25,7 +27,7 @@ const Enhanced: React.FC = () => <span className="ml-1 text-[9px] text-emerald-4
  * servidor com os rótulos do sistema (ItemCard é denormalizado); os botões só
  * disparam character:roll { type: "action" } pela ficha de origem.
  */
-export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card, isGm, isMe, time, canAct, onRoll }) => {
+export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card, isGm, isMe, time, canAct, onRoll, onSaveAsMacro }) => {
   // `enhanced` diz quais campos um aprimoramento mudou nesta conjuração (cards antigos não têm).
   const enhanced = new Set(card.enhanced ?? []);
   const meta: { label: string; value: string; enhanced: boolean }[] = [];
@@ -154,19 +156,29 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
       {card.actions.length > 0 && (
         <div className="mt-2.5 pt-2 border-t border-sky-900/40 flex items-center gap-2 flex-wrap">
           {card.actions.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => onRoll(a.id)}
-              disabled={!canAct}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#221c14] hover:bg-[#33281b] border border-[#d4af37]/50 hover:border-[#d4af37] text-amber-100 text-xs font-serif font-semibold transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              title={canAct ? `Rolar ${a.label}${a.formula ? `: ${a.formula}` : ""}${a.breakdown ? ` (${a.breakdown})` : ""}` : "Só o GM ou o dono da ficha pode rolar"}
-            >
-              <Dices className="w-3.5 h-3.5 text-[#d4af37]" />
-              <span>{a.label}</span>
-              {a.kind === "attack" && enhanced.has("attack") && <Enhanced />}
-              {/* Dano: parcelas com o selo do tipo; cards antigos não têm `damage` e mostram só a fórmula. */}
-              {a.formula && <span className="font-mono font-bold text-amber-300 ml-0.5">({(a.damage ?? []).length > 0 ? <DamageFormula def={def} components={a.damage} /> : a.formula})</span>}
-            </button>
+            <div key={a.id} className="relative group/action flex items-center">
+              <button
+                onClick={() => onRoll(a.id)}
+                disabled={!canAct}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#221c14] hover:bg-[#33281b] border border-[#d4af37]/50 hover:border-[#d4af37] text-amber-100 text-xs font-serif font-semibold transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                title={canAct ? `Rolar ${a.label}${a.formula ? `: ${a.formula}` : ""}${a.breakdown ? ` (${a.breakdown})` : ""}` : "Só o GM ou o dono da ficha pode rolar"}
+              >
+                <Dices className="w-3.5 h-3.5 text-[#d4af37]" />
+                <span>{a.label}</span>
+                {a.kind === "attack" && enhanced.has("attack") && <Enhanced />}
+                {/* Dano: parcelas com o selo do tipo; cards antigos não têm `damage` e mostram só a fórmula. */}
+                {a.formula && <span className="font-mono font-bold text-amber-300 ml-0.5">({(a.damage ?? []).length > 0 ? <DamageFormula def={def} components={a.damage} /> : a.formula})</span>}
+              </button>
+              {canAct && onSaveAsMacro && (
+                <button
+                  onClick={() => onSaveAsMacro(a.id)}
+                  title="Salvar como macro"
+                  className="ml-1 opacity-0 group-hover/action:opacity-100 text-zinc-500 hover:text-[#d4af37] transition-all cursor-pointer"
+                >
+                  <BookmarkPlus className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           ))}
           {/* Decomposição do dano com os aprimoramentos (só quando algum efeito mudou a fórmula). */}
           {card.actions.some((a) => a.breakdown) && (

@@ -18,6 +18,7 @@ import { canEditCharacter, sortedCharacters, useCharacters } from "../store/char
 import { useParty } from "../store/party";
 import { useSystemDef } from "../lib/system";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
+import { useMacroShortcuts } from "../lib/useMacroShortcuts";
 import { deleteSelectedTokens, useDeleteSelectionShortcut } from "../lib/useDeleteSelectionShortcut";
 import { useTokenMoveShortcuts } from "../lib/useTokenMoveShortcuts";
 import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
@@ -65,6 +66,7 @@ import { SidePanel, type SidePanelTab } from "./SidePanel";
 import { CharacterMenu } from "./CharacterMenu";
 import { NicknamePrompt } from "./NicknamePrompt";
 import { CompendiumPalette } from "./compendium/CompendiumPalette";
+import { MacroBar, useMacroBarController } from "./MacroBar";
 import { DragGhost, EncounterDragGhost } from "./compendium/DragGhost";
 import { useCompendium } from "../store/compendium";
 import { useEncounters } from "../store/encounters";
@@ -247,6 +249,8 @@ function Table() {
   const playerDrawingEnabled = useRoom((s) => s.playerDrawingEnabled);
   const [pendingDrawingTextPoint, setPendingDrawingTextPoint] = useState<{ x: number; y: number } | null>(null);
   useToolShortcuts();
+  useMacroShortcuts();
+  const macroBarController = useMacroBarController();
   useDeleteSelectionShortcut();
   useTokenMoveShortcuts();
 
@@ -823,6 +827,7 @@ function Table() {
         handoutSelector={
           isGm ? <HandoutSelector handouts={handoutsProps} onOpen={() => void loadHandoutLibrary()} /> : undefined
         }
+        onOpenMacros={() => macroBarController.setCreating(true)}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -835,6 +840,7 @@ function Table() {
             onDelay={(combatantId) => viewedSceneId && void combatDelay(viewedSceneId, combatantId)}
             onResume={(combatantId) => viewedSceneId && void combatResume(viewedSceneId, combatantId)}
           />
+          <MacroBar controller={macroBarController} />
           {scene ? (
             <>
               <VttCanvas
@@ -1053,6 +1059,7 @@ function Table() {
           onSetPartyHidden={(characterId, hidden) => void setPartyHidden(characterId, hidden)}
           onReorderParty={(characterIds) => void reorderParty(characterIds)}
           onRollCharacter={(characterId, request) => void rollCharacter(characterId, request)}
+          onSaveMacro={(action, defaultLabel) => macroBarController.openQuickCreate(action, defaultLabel)}
           isGm={isGm}
           onSendMessage={(text) => void sendMessage(text)}
           onSelectToken={focusToken}

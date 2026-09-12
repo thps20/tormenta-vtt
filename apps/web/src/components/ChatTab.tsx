@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Dices, Scroll, Eye, Flame, MessageCircle } from 'lucide-react';
+import { Send, Dices, Scroll, Eye, Flame, MessageCircle, BookmarkPlus } from 'lucide-react';
 import {
   hitRuleTargetLabel,
   isCombinedAttackRoll,
@@ -7,6 +7,7 @@ import {
   type CharacterRollRequest,
   type ChatMessage,
   type DiceRoll,
+  type MacroAction,
   type Participant,
   type RollTarget,
   type Token,
@@ -73,6 +74,8 @@ interface ChatTabProps {
   tokens: Token[];
   onSendMessage: (text: string) => void;
   onRollCharacter: (characterId: string, request: CharacterRollRequest) => void;
+  /** "Salvar como macro" (docs/SPEC.md §9.20): abre o criador de macro já com a ação travada. */
+  onSaveMacro: (action: MacroAction, defaultLabel: string) => void;
 }
 
 export const ChatTab: React.FC<ChatTabProps> = ({
@@ -83,6 +86,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   tokens,
   onSendMessage,
   onRollCharacter,
+  onSaveMacro,
 }) => {
   const currentUserId = me.id;
   // Sistema da sala: só para pintar os selos de tipo de dano (null fora de sala = selos neutros).
@@ -221,6 +225,11 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                   // Reenvia os aprimoramentos da conjuração: o servidor monta a fórmula com os efeitos escolhidos.
                   onRollCharacter(card.characterId, { type: 'action', itemId: card.itemId, actionId, enhancements: (card.enhancements ?? []).map((e) => ({ id: e.id, times: e.times })) })
                 }
+                onSaveAsMacro={(actionId) => {
+                  const action = card.actions.find((a) => a.id === actionId);
+                  const enhancements = (card.enhancements ?? []).map((e) => ({ id: e.id, times: e.times }));
+                  onSaveMacro({ type: 'characterAction', characterId: card.characterId, itemId: card.itemId, actionId, enhancements }, action?.label ?? card.itemName);
+                }}
               />
             );
           }
@@ -353,9 +362,23 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                       </span>
                     )}
                   </div>
-                  <span className="text-[9px] font-mono text-zinc-600">
-                    {formatTime(msg.createdAt)}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {/* Só rolagem SOLTA (sem ficha) vira macro "roll" — a de ficha (atributo/perícia)
+                        já é ao vivo pela própria ficha, sem tipo de macro equivalente (§9.20). */}
+                    {!roll.characterId && (
+                      <button
+                        type="button"
+                        onClick={() => onSaveMacro({ type: 'roll', formula: roll.formula, label: roll.label }, roll.label || 'Rolagem')}
+                        title="Salvar como macro"
+                        className="text-zinc-600 hover:text-[#d4af37] transition-colors cursor-pointer"
+                      >
+                        <BookmarkPlus className="w-3 h-3" />
+                      </button>
+                    )}
+                    <span className="text-[9px] font-mono text-zinc-600">
+                      {formatTime(msg.createdAt)}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Roll Content Layout */}

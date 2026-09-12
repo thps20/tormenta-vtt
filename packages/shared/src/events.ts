@@ -35,6 +35,7 @@ import type {
   CombatSetSurprisedPayload,
   CombatStartPayload,
   CompendiumEntry,
+  CompendiumFavoriteTogglePayload,
   CompendiumSpawnCreaturePayload,
   Drawing,
   DrawingClearAllPayload,
@@ -56,6 +57,11 @@ import type {
   HandoutDeletePayload,
   HandoutShowPayload,
   HandoutUpdatePayload,
+  Macro,
+  MacroCreatePayload,
+  MacroRemovePayload,
+  MacroReorderPayload,
+  MacroUpdatePayload,
   NotesSearchPayload,
   NotesSearchResultItem,
   Participant,
@@ -157,6 +163,18 @@ export interface RoomSnapshot {
    * marcados — pode não ser mais o mapa que o viewer está vendo agora.
    */
   targets: { participantId: string; sceneId: string; tokenIds: string[] }[];
+  /**
+   * Favoritos do compêndio (§9.19) — só os do PRÓPRIO `me`, nunca de outro participante: ids de
+   * `CompendiumEntry` marcados com a estrela na paleta. Sem broadcast dedicado (100% privado);
+   * outras abas do mesmo participante só sincronizam num `room:join` novo.
+   */
+  favoriteEntryIds: string[];
+  /**
+   * Macros (§9.20) — só as do PRÓPRIO `me`, já ordenadas (`order` asc). Broadcast de
+   * criar/editar/apagar/reordenar vai só pras abas do mesmo participante (`rooms.participant`),
+   * nunca pra sala toda: é preferência pessoal, não conteúdo de jogo.
+   */
+  macros: Macro[];
 }
 
 /**
@@ -281,6 +299,13 @@ export interface ClientToServerEvents {
    * NPC) e token:created (visibilidade normal) para cada um, feito separadamente deste ack.
    */
   "compendium:spawn-creature": (payload: CompendiumSpawnCreaturePayload, ack: Ack<Token[]>) => void;
+
+  // Favoritos do compêndio (§9.19): 100% pessoal, por participante — sem gmOnly, cada um mexe só
+  // nos próprios. Sem broadcast: o ack já devolve a lista atualizada pra quem chamou.
+  /** Idempotente (já favoritado não é erro nem duplica). Ack devolve a lista completa de `entryId`. */
+  "compendium:favorite-add": (payload: CompendiumFavoriteTogglePayload, ack: Ack<string[]>) => void;
+  /** Idempotente (não estar favoritado não é erro). */
+  "compendium:favorite-remove": (payload: CompendiumFavoriteTogglePayload, ack: Ack<string[]>) => void;
 
   // Homebrew da sala (docs/plano-compendio-sala.md, §9.18), só GM — mesmo desenho de handout:*
   // (broadcast pra rooms.gm, pode haver mais de uma aba/GM). O editor sempre manda a entrada
@@ -438,6 +463,21 @@ export interface ClientToServerEvents {
   /** Nova ordem completa (arrastar na faixa), tudo ou nada — ver reorderParty. */
   "party:reorder": (payload: PartyReorderPayload, ack: Ack<PartyEntry[]>) => void;
 
+  // Macros (§9.20): barra de botões por PARTICIPANTE, persistida por sala — 100% pessoal, sem
+  // gmOnly (cada um mexe só nas próprias). Broadcast só pras próprias abas (rooms.participant),
+  // nunca pra sala toda. Executar uma macro NÃO passa por aqui: o cliente reemite
+  // chat:send/character:roll/character:use-item direto, com os parâmetros guardados na macro.
+  /** `characterAction`/`useItem`: o servidor recusa (HandlerError) se o autor não controla a ficha
+   *  apontada (mesma `canEditCharacter` de character:roll/use-item) — não deixa existir uma macro
+   *  "impossível" sem avisar na hora de criar. */
+  "macro:create": (payload: MacroCreatePayload, ack: Ack<Macro>) => void;
+  /** Mesma checagem de `characterId` acima quando `patch.action` muda. GM não edita macro de outro
+   *  participante — é preferência pessoal, não recurso de sala. */
+  "macro:update": (payload: MacroUpdatePayload, ack: Ack<Macro>) => void;
+  "macro:remove": (payload: MacroRemovePayload, ack: Ack) => void;
+  /** Nova ordem completa das PRÓPRIAS macros (arrastar na barra); renumera 0..n-1. */
+  "macro:reorder": (payload: MacroReorderPayload, ack: Ack<{ order: { id: string; order: number }[] }>) => void;
+
   // Desfazer/refazer (docs/plano-desfazer.md): pilha por sala, só do GM, em memória no servidor.
   /** Desfaz o topo da pilha da sala. `null` no ack = pilha vazia (nada pra desfazer). */
   "history:undo": (payload: Record<string, never>, ack: Ack<HistoryActionResult | null>) => void;
@@ -540,6 +580,13 @@ export interface ServerToClientEvents {
   "encounter:deleted": (p: { id: string }) => void;
   /** Efêmero: instrui quem via a mensagem a fechar o overlay (a mensagem em si não muda no chat). */
   "handout:closed": (p: { messageId: string }) => void;
+
+  // Macros (§9.20): só chega nas próprias abas do participante dono (rooms.participant), nunca na
+  // sala toda.
+  "macro:created": (macro: Macro) => void;
+  "macro:updated": (macro: Macro) => void;
+  "macro:removed": (p: { id: string }) => void;
+  "macro:reordered": (p: { order: { id: string; order: number }[] }) => void;
 
   /** Erros não relacionados a um ack específico. */
   "server:error": (p: { message: string }) => void;

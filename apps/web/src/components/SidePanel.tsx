@@ -4,7 +4,7 @@ import { ChatTab } from './ChatTab';
 import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
 import { CharactersTab } from './CharactersTab';
 import { PartyView } from './PartyView';
-import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, Participant, PartyEntry, SystemDefinition, Token } from '@tormenta-vtt/shared';
+import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, MacroAction, Participant, PartyEntry, SystemDefinition, Token } from '@tormenta-vtt/shared';
 
 export type SidePanelTab = 'chat' | 'initiative' | 'characters';
 
@@ -60,6 +60,8 @@ interface SidePanelProps {
   onDeleteCharacter: (characterId: string) => void;
   /** Botões de ação nos cards de item do chat (dano, cura) rolam pela ficha. */
   onRollCharacter: (characterId: string, request: CharacterRollRequest) => void;
+  /** "Salvar como macro" (docs/SPEC.md §9.20): abre o criador de macro já com a ação travada. */
+  onSaveMacro: (action: MacroAction, defaultLabel: string) => void;
   /** Recolher/expandir (\ ou Ctrl+B, preferência lembrada por usuário — ver Table em RoomPage.tsx). */
   collapsed: boolean;
   onToggleCollapsed: () => void;
@@ -110,6 +112,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   onReorderParty,
   isGm,
   onSendMessage,
+  onSaveMacro,
   onSelectToken,
   selectedTokenId,
   me,
@@ -214,6 +217,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             tokens={tokens}
             onSendMessage={onSendMessage}
             onRollCharacter={onRollCharacter}
+            onSaveMacro={onSaveMacro}
           />
         ) : activeTab === 'characters' ? (
           <CharactersTab

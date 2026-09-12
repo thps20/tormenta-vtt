@@ -153,6 +153,8 @@ Room 1───* Character *───? Participant (owner)
 Token *───? Character
 Room 1───* ChatMessage *───? Token
 Room 1───* SavedEncounter
+Room 1───* CompendiumFavorite *───1 Participant
+Room 1───* Macro *───1 Participant
 ```
 
 | Entidade | Campos principais | Notas |
@@ -168,6 +170,8 @@ Room 1───* SavedEncounter
 | **Drawing** | `id, sceneId, kind, ownerId, color, strokeWidth, filled, visible, points(Float[]), x1?, y1?, x2?, y2?, x?, y?, width?, height?, cx?, cy?, rx?, ry?, text?, deletedAt?` | Traço de desenho livre no mapa (§9.17): uma linha por traço — diferente da névoa (blob JSON cumulativo em `Scene.fog`) e dos gabaritos (efêmeros, nunca no banco) — sobrevive a F5 e a um restart. `kind` = `pen \| line \| rect \| ellipse \| arrow \| text`; só os campos do `kind` atual são preenchidos (mesmo padrão de `Pin`); `points` (só `pen`) é um array nativo do Postgres, polilinha achatada já decimada/suavizada pelo cliente. `ownerId` sempre travado no servidor (nunca confiado do payload, mesmo princípio de `Template.ownerId`): jogador move/apaga só os seus, GM todos. `visible` = GM decide "todos" (padrão) ou "só GM" (jogador sempre cria `true`, nunca muda depois). `deletedAt`: soft delete de `drawing:remove`/`clear-mine`/`clear-all`, entra no desfazer do GM (§9.6) |
 | **SavedEncounter** | `id, roomId, name, tags[], notes, entries(JSON), deletedAt?` | Encontro salvo (§9.14): grupo de criaturas do compêndio que o GM monta uma vez e solta de uma vez. `entries` = `{ entryId, count, visibleOnSpawn, nameOverride? }[]` (`SavedEncounterEntrySchema`) — só a "receita", nunca cópia de ficha; resolvida contra o compêndio ATUAL na hora de soltar (`encounter:spawn`). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Handout.deletedAt`): soft delete de `encounter:delete` |
 | **RoomCompendiumEntry** | `roomId, entryId, type, kind?, name, tags[], description, page?, data(JSON), deletedAt?` | Homebrew da sala (§9.18): entrada de compêndio própria, prioridade sobre a do sistema quando `entryId` bate. Chave primária **composta** `(roomId, entryId)` — `entryId` é o slug que vira `CompendiumEntry.id`, fixo desde a criação (gerado do nome, `slugify`). `type`/`kind`/`name`/`tags`/`description`/`page` são colunas de índice/exibição; `data` guarda o resto do corpo mecânico (`CompendiumItemBody` ou `{ sheet: CreatureSheet }`), confirmado por `validateCompendiumEntry` antes de gravar. `deletedAt`: soft delete de `compendium:room-delete`, entra no desfazer do GM (§9.6) |
+| **CompendiumFavorite** | `id, roomId, participantId, entryId` | Favorito por participante (§9.19), `@@unique([participantId, entryId])`. `entryId` sem FK (é o id de um `CompendiumEntry`, sistema ou sala; favoritar não valida se ainda existe). 100% pessoal: nunca serializado num tipo compartilhado — só sai em `RoomSnapshot.favoriteEntryIds`, já filtrado pro próprio `me` |
+| **Macro** | `id, roomId, participantId, order, label, icon, color, action(JSON)` | Botão da barra de macros por participante (§9.20). `action` segue `MacroActionSchema` (`roll \| characterAction \| useItem \| chatText`). Estritamente pessoal (nem o GM edita a de outro participante) — só sai em `RoomSnapshot.macros`, já filtrado pro próprio `me` e ordenado por `order` |
 | **Combat** | `id, roomId, sceneId (único: um combate por cena), round, status, activeCombatantId?` | `status` = `rolling \| active \| ended` (§3.5). Persistido (ao contrário da iniciativa manual anterior, que vivia em memória) |
 | **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound, movementBudget?, movementUsed, movementDiagonals, movementAnchorX?, movementAnchorY?, movementPath?(JSON)` | `initiative = null` = ainda não rolou. `combat:remove` apaga o combatente (e ajusta `activeCombatantId`/`round` se o removido era o ativo, `stateAfterRemoval`, §3.5). `token:delete`/`token:delete-many` **não** apagam mais a linha do combatente (o token agora é soft delete, §9.6): só param de listá-lo (o combate ignora combatente cujo token tem `deletedAt`) e fazem o mesmo ajuste de turno/`order`; a linha volta se o GM desfizer. Os seis últimos campos são o orçamento de deslocamento do turno (§9.11): `movementAnchorX/Y` (de onde o próximo movimento é medido) e `movementPath` (o caminho desenhado) são colunas só do banco, nunca serializadas no `Combatant` do shared — o cliente só recebe `movementBudget/Used/Diagonals` e `movementPath` via `Combat` (§5) |
 | **SystemDefinition** | `id, name, attributes[], skills[], resources[] (com `color?`, §9.15), derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), pinIcons[] (§9.16), skillTotal, rolls{} (inclui `attackHit?`/`attackAutoHit?`/`attackAutoMiss?`, §9.12, e `critical?`, §9.13), combat{} (§3.5), damageAttribute, tokenBar, grid?, race? (§9.11), movement? (§9.11), trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código. `pinIcons[]` (`key, label, icon, color`, docs/plano-narracao.md): ícones extras pra pino de nota — mesmo formato de `conditions[]`, mas NÃO é regra de sistema (é mobília de UI); vazio (padrão) = o cliente usa uma paleta embutida no código. `race?` aponta o `itemKinds[]` que alimenta o placeholder `{race.<campo>}` nas fórmulas (§9.11); `movement?` declara o orçamento de deslocamento por turno (ausente = sistema sem a regra); `rolls.attackHit?`/`attackAutoHit?`/`attackAutoMiss?` são a regra de acerto do sistema de alvos (§9.12, ausentes = sistema sem a regra); `rolls.critical?` confirma um crítico ameaçado ao rolar dano junto com o ataque (§9.13, mesma gramática de `attackAutoHit`, só `{natural}`; ausente = sistema não confirma sozinho) |
@@ -1469,3 +1473,79 @@ compêndio da SALA, que já tinha prioridade sobre o do sistema quando o id coin
 - **Visibilidade**: criatura homebrew da sala segue a MESMA regra das do sistema — o servidor já
   filtra `type: "creature"` pra jogador em `listCompendium`, não importa a origem (nada de código
   novo precisou disso).
+
+### 9.19 Favoritos no compêndio
+
+Estrela por entrada, por PARTICIPANTE (setembro/2026) — GM favorita criaturas e itens, jogador
+magias/poderes que usa sempre. Server-side (não `localStorage`): sobrevive a reconectar de outro
+navegador/aparelho como o mesmo participante, mesma garantia que já vale pra fichas e tokens
+(servidor é a fonte da verdade, CLAUDE.md regra #1) — diferente de preferências puramente de UI
+como `rollDamageWithAttack` ou o toggle "invisível ao soltar", que continuam em `localStorage`/
+`sessionStorage` por não precisarem sobreviver a troca de aparelho.
+
+- **Modelo**: `CompendiumFavorite` (`apps/server/prisma/schema.prisma`) — `{ id, roomId,
+  participantId, entryId, createdAt }`, `@@unique([participantId, entryId])`. `entryId` é o mesmo id
+  de `CompendiumEntry` (sistema ou sala) e NÃO tem FK: favoritar não valida se a entrada ainda existe
+  — um favorito "órfão" (entrada apagada depois) só some da lista quando a paleta filtra contra as
+  entradas carregadas, sem quebrar nada.
+- **Eventos** (sem `gmOnly`, cada participante mexe só nos próprios): `compendium:favorite-add` e
+  `compendium:favorite-remove` (`{ entryId }`), idempotentes, ack devolve a lista completa de
+  `entryId` favoritados. Sem broadcast: o valor é 100% privado, a resposta do próprio ack já basta
+  (outras abas do MESMO participante só sincronizam no próximo `room:join`). `RoomSnapshot.favoriteEntryIds`
+  entrega a lista já no snapshot inicial (`services/snapshot.ts#buildSnapshot`), do mesmo jeito que
+  `party` já vem filtrado por `viewer`.
+- **UI** (`CompendiumPalette.tsx`): estrela em cada linha de item/criatura (`FavoriteStarButton`),
+  sempre visível — diferente do "+"/inserir, que só aparece no hover — preenchida quando favoritado.
+  Chip **"Favoritos"** (`FAVORITE_FILTER`, `lib/compendium.ts` — mesmo truque de id fora do alfabeto
+  de `itemKinds[].key` que `CREATURE_FILTER`/`ROOM_FILTER`/`ENCOUNTER_FILTER` já usam) aparece quando
+  há pelo menos um favorito, junto dos demais chips. Com busca ativa, favoritos aparecem primeiro
+  dentro de cada grupo (`sortFavoritesFirst`, ordenação estável — só reparticiona em dois blocos,
+  preserva a ordem por nome dentro de cada um); sem busca, a estrela e o chip já bastam.
+
+### 9.20 Macros
+
+Barra de botões personalizados por PARTICIPANTE, persistida por sala (setembro/2026) — atalho de uso
+diário pra rolagens e ações repetidas (ataque de sempre, magia favorita, fala pronta). Uma macro
+NUNCA reimplementa rolagem/uso de item: ela só guarda os parâmetros de um evento que já existe e o
+cliente reemite igualzinho a um clique manual — `chat:send` (rolagem livre ou texto) ou
+`character:roll`/`character:use-item` (ação de ficha ou uso de item). Consequência prática: a
+permissão de EXECUTAR uma macro de ficha (`canEditCharacter`) já vem de graça desses handlers, sem
+nenhuma rota nova pra validar de novo — mesmo que o cliente tentasse forjar uma macro apontando pra
+ficha de outro participante, o handler de sempre rejeitaria do mesmo jeito que rejeitaria um clique
+direto.
+
+- **Tipos de ação** (`MacroActionSchema`, união discriminada por `type`): `roll` (`{ formula, label?
+  }`, equivalente a `/r <formula> [# label]`), `characterAction` (`{ characterId, itemId, actionId,
+  enhancements[] }`, mesmo trio que `character:roll{type:"action"}`), `useItem` (`{ characterId,
+  itemId, enhancements[] }`, mesmo shape de `character:use-item`) e `chatText` (`{ text }`, igual a
+  digitar — sempre público, herda o sussurro pontual "para X" se houver um selecionado no chat, SPEC
+  §3.4; modo de rolagem não se aplica a texto).
+- **Modelo**: `Macro` (`apps/server/prisma/schema.prisma`) — `{ id, roomId, participantId, order,
+  label, icon, color, action(Json) }`. Estritamente pessoal: nem o GM edita/reordena/apaga a macro de
+  outro participante (`canEditMacro`, `apps/server/src/services/macros.ts`) — diferente de
+  Pin/Handout, que são recursos do GM. `order` decide a posição na barra E qual tecla 1..9 dispara
+  qual macro (índice 0..8 da lista ordenada); renumerado 0..n-1 a cada `macro:reorder`
+  (`reorderMacros`, mesmo padrão de `reorderScenes`/`reorderParty`).
+- **Eventos** (sem `gmOnly`; broadcast só pras PRÓPRIAS abas do participante, `rooms.participant`,
+  nunca a sala toda): `macro:create` (valida `characterAction`/`useItem` contra `canEditCharacter`
+  antes de gravar — não deixa existir uma macro "impossível" sem avisar na criação), `macro:update`
+  (revalida se `patch.action` mudou), `macro:remove`, `macro:reorder`. `RoomSnapshot.macros` entrega
+  só as do próprio `me`, já ordenadas.
+- **Referência pendurada** (item/ação apagado da ficha depois de a macro existir): não há nenhuma
+  validação no servidor além da criação/edição — se o cliente ainda assim disparar uma macro assim
+  (corrida rara), o `character:roll`/`character:use-item` de sempre rejeita com o erro de sempre.
+  O cliente evita chegar nesse erro: `resolveMacroTarget` (`apps/web/src/lib/macros.ts`) confere se
+  ficha/item/ação ainda existem e a `MacroBar` desenha o botão esmaecido (ícone de aviso, desabilitado)
+  em vez de deixar clicar.
+- **UI** (`apps/web/src/components/MacroBar.tsx`): barra fixa na parte de baixo da tela, um botão por
+  macro na ordem salva — clique executa, arrastar reordena (mesmo padrão de `MapsPanel.tsx`), hover
+  revela editar/apagar. Botão **"Macros"** na barra superior abre o criador (`MacroFormPopover`), que
+  cobre os dois tipos que não dependem de nenhuma ficha (`roll`/`chatText` — nome, ícone da paleta de
+  `lib/pinIcons.ts`, cor, e os campos do tipo escolhido). **Arrastar uma ação da ficha** (botão "Usar"
+  ou de ataque/dano/teste/fórmula em `ItemsSection.tsx`, `draggable` com um mimetype próprio
+  `application/x-tvtt-macro-action`) solta na barra e abre o mesmo criador com a ação já travada, só
+  faltando nome/ícone/cor. **"Salvar como macro"** num card do chat (rolagem livre sem ficha, ou uma
+  ação de um card de item já usado, `ItemCardMessage.tsx`) reconstrói a ação exatamente como o botão
+  "Rolar" do próprio card já fazia, e abre o mesmo criador. Teclas **1..9** (fora de campo de texto,
+  `useMacroShortcuts.ts`, mesmo padrão de `isTyping`/`useToolShortcuts.ts`) disparam a macro na
+  posição correspondente da barra.
