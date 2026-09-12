@@ -29,6 +29,7 @@ import {
   type CharacterKind,
   type CombatStatus,
   type GridConfig,
+  type Pin,
   type Scene,
   type SceneDeleteResult,
   type SceneListItem,
@@ -42,7 +43,7 @@ import { pushEntry, type HistoryEntry } from "../services/history.js";
 import { toScene, toToken } from "../services/serialize.js";
 import { clearTemplates, listTemplates } from "../services/templates.js";
 import { redactTokenForViewer, tokenVisibleTo } from "../services/visibility.js";
-import { pinVisibleTo, toPin } from "../services/pins.js";
+import { pinVisibleTo, toPinSafe } from "../services/pins.js";
 import { clearSceneTargets } from "../services/targets.js";
 import { guarded, HandlerError } from "./ack.js";
 import { emitHistoryUpdated } from "./history.js";
@@ -329,7 +330,10 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
         .filter((t) => tokenVisibleTo(t, viewer, geom))
         .map((t) => redactTokenForViewer(t, viewer));
       const combat = combatRow ? toCombat(combatRow, def, viewer, geom) : null;
-      const pins = pinRows.map(toPin).filter((p) => pinVisibleTo(p, viewer, sceneId));
+      const pins = pinRows
+        .map(toPinSafe)
+        .filter((p): p is Pin => p !== null)
+        .filter((p) => pinVisibleTo(p, viewer, sceneId));
       return { tokens, combat, templates: listTemplates(sceneId), pins };
     }),
   );

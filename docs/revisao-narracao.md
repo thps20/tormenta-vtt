@@ -154,6 +154,47 @@ prisma.token.findMany({ where: { deletedAt: null, notes: { contains: q, ... }, s
 - Nenhum teste web novo — o projeto não tem teste de componente/store hoje (só `lib/*.test.ts`
   puros); a camada web foi validada só por `tsc --noEmit`.
 
+## 3.1 Correção pós-revisão: `toPin` derrubava a sala inteira (ZodError "title Required")
+
+Bug real, reportado pelo dono do projeto ao abrir a sala depois do commit inicial: `toPin`
+(`apps/server/src/services/pins.ts`) passava `name: row.name` pra QUALQUER `kind`, mas
+`PinSchema` (packages/shared/src/schemas/pin.ts) chama o campo de `title` — não `name` — no ramo
+`"note"`. Todo pino de nota (kind `note`) tinha `Zod.parse` explodindo com "title Required" — e
+como `buildSnapshot`/`scene:enter` mapeavam a lista inteira de pinos com `.map(toPin)` sem proteção
+nenhuma, um `throw` de UM pino derrubava o `room:join` inteiro (a sala não abria pra ninguém).
+
+**Não era o backfill da migration** (a hipótese inicial do relato) — `SELECT kind, count(*) FROM
+"Pin" GROUP BY 1` mostrou as linhas com `kind` correto (`image`/`note`), `handoutId`/`name`/
+`imageUrl` batendo com o que cada `kind` precisa. O `kind='note'` já tinha `name` preenchido (é ele
+quem guarda o título) — só a função de serialização não sabia que precisava renomear o campo na
+saída.
+
+**Correção**:
+- `toPin` agora ramifica por `row.kind`: `kind === "note"` manda `title: row.name` (nunca `name`);
+  qualquer outro `kind` manda `name: row.name` (nunca `title`) — os dois nunca mais se confundem.
+- `toPinSafe(row): Pin | null` (nova função): mesma conversão, mas captura qualquer erro do Zod,
+  registra um aviso (`console.warn`, com o id/kind do pino) e devolve `null` em vez de propagar a
+  exceção — usada em `buildSnapshot` e `scene:enter` (as duas listagens de "pinos JÁ EXISTENTES" de
+  um mapa), com `.filter((p): p is Pin => p !== null)` logo depois. Um pino com dado inconsistente
+  (o motivo em si não importa: bug de mapeamento, edição manual no banco, uma migration futura
+  incompleta) some da lista com um log, nunca derruba a sala inteira de novo.
+- `pin:create`/`pin:update` continuam usando `toPin` (a versão que lança): ali a linha acabou de
+  ser escrita por este mesmo processo — um erro de validação ali É um bug de verdade e deve
+  aparecer no ack como tal, não ser engolido em silêncio.
+- Verificado contra o banco de dev real (`SELECT` acima + um script descartável rodando `toPin`
+  em cada linha existente): as 4 linhas atuais (1 handout, 3 nota) agora serializam sem erro.
+- `PinSchema` em si nunca teve o bug — os dois ramos (`image`/`text` vs `note`) já exigiam só o
+  que cada um tem de verdade (conferido de novo nesta revisão); o problema inteiro estava no
+  MAPEAMENTO linha→schema em `toPin`, não no schema.
+- Testes novos (`services/pins.test.ts`): `toPin` com pino de handout sem `title` nenhum (serializa
+  normal), pino de nota (confirma que vira `title`, não `name`), pino de nota com `name` nulo
+  (lança — é o caso que `toPinSafe` deveria engolir); `toPinSafe` com pino válido (mesmo resultado
+  de `toPin`), pino de nota inconsistente (`null`, sem lançar) e `kind` desconhecido (`null`, sem
+  lançar). `PinCreateSchema` continua rejeitando nota sem título NA CRIAÇÃO (já coberto em
+  `packages/shared/src/schemas/pin.test.ts`, mantido) — a distinção pedida ("rejeitado na criação,
+  não no snapshot") é exatamente a diferença entre `toPin` (criação, estrito) e `toPinSafe`
+  (snapshot, tolerante). `make typecheck`/`make test` verdes (569 testes: 370 + 136 + 63).
+
 ## 4. O que ficou por fazer (fora do pedido original, ou nice-to-have)
 
 - Arrastar um pino pra reposicionar (hoje: apagar e fixar de novo, igual handout já era).

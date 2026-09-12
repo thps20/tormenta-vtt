@@ -1,4 +1,4 @@
-import { FogConfigSchema, GridConfigSchema, getSystemDefinition, type Combat, type RoomSnapshot } from "@tormenta-vtt/shared";
+import { FogConfigSchema, GridConfigSchema, getSystemDefinition, type Combat, type Pin, type RoomSnapshot } from "@tormenta-vtt/shared";
 import type { Participant as DbParticipant, Room as DbRoom } from "@prisma/client";
 import { prisma } from "../db.js";
 import { isConnected } from "./presence.js";
@@ -9,7 +9,7 @@ import { effectiveCellSize } from "./grid.js";
 import { redactTokenForViewer, tokenVisibleTo } from "./visibility.js";
 import { initiativeBatchForViewer, loadTokenInfo, messageVisibleTo, rollTargetsForViewer, tokenGateOk, whisperGateOk } from "./chatVisibility.js";
 import { listTemplates } from "./templates.js";
-import { pinVisibleTo, toPin } from "./pins.js";
+import { pinVisibleTo, toPinSafe } from "./pins.js";
 import { isMovementLimitEnabled } from "./movementLimit.js";
 import { isAutoRollNpcInitiativeEnabled } from "./autoRollNpcInitiative.js";
 import { partyFor, partyOf } from "./party.js";
@@ -93,7 +93,13 @@ export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<Ro
     // Gabaritos são efêmeros (docs/plano-gabaritos.md): sem fog/visibilidade por token, todos que
     // veem o mapa ativo veem todos os gabaritos dele.
     templates: room.activeSceneId ? listTemplates(room.activeSceneId) : [],
-    pins: pinRows.map(toPin).filter((p) => pinVisibleTo(p, viewer, room.activeSceneId)),
+    // toPinSafe nunca derruba o snapshot inteiro por causa de UM pino com dado inconsistente
+    // (linha antiga de antes de um bug de mapeamento, edição manual no banco...) — ignora com
+    // aviso no log em vez de estourar (ver services/pins.ts).
+    pins: pinRows
+      .map(toPinSafe)
+      .filter((p): p is Pin => p !== null)
+      .filter((p) => pinVisibleTo(p, viewer, room.activeSceneId)),
     chat: chatMessages.flatMap((m) => {
       if (m.kind === "initiative-batch") {
         const view = initiativeBatchForViewer(m, viewer, tokenInfoById, room.activeSceneId);
