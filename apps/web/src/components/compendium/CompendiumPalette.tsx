@@ -236,6 +236,12 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
 
   // "Ver bloco completo" (§9.5): ficha inteira em modo leitura, botão ou duplo clique na lista.
   const [openFullSheetEntry, setOpenFullSheetEntry] = useState<CompendiumCreatureEntry | null>(null);
+  // Qualquer diálogo (Dialog, portal em document.body) aberto por cima da paleta: ela fica inerte
+  // (pointer-events-none) e para de reagir a teclado enquanto ele estiver aberto — sem isso, setas/
+  // Enter digitados DENTRO do diálogo (ex.: um campo de texto do editor) ainda borbulham pelo REACT
+  // até este onKeyDown (portal não escapa do bubbling do React, só do DOM) e mexeriam na seleção da
+  // lista por trás ao mesmo tempo.
+  const anyDialogOpen = openFullSheetEntry !== null || roomEditor !== null || importExportOpen;
 
   // Modo "Montar encontro" (§9.14, item 3): botão no cabeçalho; ligado, cada linha de criatura
   // ganha um "+" (soma ao carrinho) e o rodapé vira o carrinho no lugar do preview. Desligar não
@@ -266,6 +272,9 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
     });
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    // Diálogo aberto (Dialog, portal): ele já cuida do próprio Esc/Tab; setas/Enter digitados nele
+    // ainda chegam aqui via bubbling do React (ver comentário de `anyDialogOpen`) — ignora tudo.
+    if (anyDialogOpen) return;
     if (e.key === "Escape") {
       e.preventDefault();
       onClose();
@@ -439,13 +448,18 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
 
   const panel = (
     <div
+      id="compendium-panel"
       role="dialog"
       aria-label="Compêndio"
       onPointerDown={(e) => e.stopPropagation()}
       onKeyDown={onKeyDown}
       className={`h-full bg-[#0f0e0c] flex flex-col overflow-hidden transition-colors ${
         mode === "docked" ? "w-full border-l shadow-[-10px_0_30px_rgba(0,0,0,0.6)]" : "w-96 max-w-full border rounded-lg shadow-[0_0_40px_rgba(0,0,0,0.8)]"
-      } ${encounterMode ? "border-[#d4af37] shadow-[0_0_24px_rgba(212,175,55,0.25)]" : "border-[#3a3022]"}`}
+      } ${encounterMode ? "border-[#d4af37] shadow-[0_0_24px_rgba(212,175,55,0.25)]" : "border-[#3a3022]"} ${
+        // Diálogo (Dialog, portal em document.body) aberto por cima: a paleta fica inerte de verdade
+        // (não só visualmente por baixo do backdrop do diálogo) — defesa a mais além do portal em si.
+        anyDialogOpen ? "pointer-events-none opacity-60" : ""
+      }`}
     >
       {/* Busca */}
       <div className="p-2 border-b border-[#2d2417] space-y-1.5">
@@ -527,7 +541,10 @@ export const CompendiumPalette: React.FC<CompendiumPaletteProps> = ({ def, chara
                   <ChevronDown className="w-3 h-3" />
                 </button>
                 {newMenuOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-48 max-h-64 overflow-y-auto rounded bg-[#181614] border border-[#2d2417] shadow-xl z-20 py-1">
+                  // left-0 (não right-0): o botão "Novo" fica perto da borda ESQUERDA do cabeçalho —
+                  // ancorar pela direita jogava o menu (192px) pra fora da tela à esquerda, cortado
+                  // pelo overflow-hidden da paleta (bug achado no teste CDP deste diálogo).
+                  <div className="absolute left-0 top-full mt-1 w-48 max-h-64 overflow-y-auto rounded bg-[#181614] border border-[#2d2417] shadow-xl z-20 py-1">
                     {context === "map" &&
                       (() => {
                         const CreatureIcon = creatureIcon;

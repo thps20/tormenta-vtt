@@ -18,6 +18,7 @@ import {
 import { newId } from "../../lib/ids";
 import { useCompendium } from "../../store/compendium";
 import { toast } from "../../store/ui";
+import { Dialog } from "../Dialog";
 import { AttributesGrid } from "../character/AttributesGrid";
 import { ResourcesBlock } from "../character/ResourcesBlock";
 import { DerivedStatsBar } from "../character/DerivedStatsBar";
@@ -129,26 +130,11 @@ export const RoomEntryEditor: React.FC<RoomEntryEditorProps> = ({ def, kind, sou
   const title = editingEntryId ? `Editar "${draft.name || "sem nome"}"` : sourceEntry ? `Duplicar "${sourceEntry.name}" para a sala` : isCreature ? "Nova criatura da sala" : `Novo ${kindLabel.toLowerCase()} da sala`;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onPointerDown={(e) => e.stopPropagation()}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.stopPropagation();
-          onClose();
-        }
-      }}
-      // fixed (não absolute): este editor abre em cima da paleta em QUALQUER modo, inclusive
-      // "docked" (coluna estreita ao lado da ficha) — absolute ficaria confinado a essa coluna. z-[60]
-      // fica acima da gaveta da ficha (z-50, CharacterSheetDrawer), que pode estar aberta atrás.
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-[1px]"
-    >
-      <div className="w-full max-w-xl max-h-[90vh] flex flex-col rounded-lg border border-[#3a3022] bg-[#0f0e0c] shadow-[0_0_40px_rgba(0,0,0,0.8)] text-xs">
+    <Dialog onClose={onClose} ariaLabel={title} maxWidthClassName="max-w-xl">
+      <div className="contents">
         <div className="shrink-0 flex items-start justify-between gap-2 p-3 border-b border-[#2d2417]">
           <div className="text-sm font-serif font-bold text-amber-200">{title}</div>
-          <button onClick={onClose} className="p-1 rounded text-zinc-500 hover:text-zinc-200 cursor-pointer shrink-0" title="Cancelar (Esc)">
+          <button id="room-entry-close" onClick={onClose} className="p-1 rounded text-zinc-500 hover:text-zinc-200 cursor-pointer shrink-0" title="Cancelar (Esc)">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -159,6 +145,7 @@ export const RoomEntryEditor: React.FC<RoomEntryEditorProps> = ({ def, kind, sou
           <div className="p-3 space-y-1.5 border-b border-[#2d2417]">
             {isCreature && (
               <input
+                id="room-entry-name"
                 autoFocus
                 value={draft.name}
                 onChange={(e) => onPatch({ name: e.target.value })}
@@ -167,6 +154,7 @@ export const RoomEntryEditor: React.FC<RoomEntryEditorProps> = ({ def, kind, sou
               />
             )}
             <input
+              id="room-entry-tags"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="Tags (separadas por vírgula)"
@@ -175,6 +163,7 @@ export const RoomEntryEditor: React.FC<RoomEntryEditorProps> = ({ def, kind, sou
             {isCreature && (
               <>
                 <textarea
+                  id="room-entry-description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Descrição (opcional)"
@@ -182,6 +171,7 @@ export const RoomEntryEditor: React.FC<RoomEntryEditorProps> = ({ def, kind, sou
                   className="w-full bg-[#141210] border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 placeholder:text-zinc-600 resize-none focus:outline-none focus:border-[#d4af37]"
                 />
                 <input
+                  id="room-entry-page"
                   value={page}
                   onChange={(e) => setPage(e.target.value.replace(/[^0-9]/g, ""))}
                   placeholder="Página do livro (opcional)"
@@ -216,10 +206,11 @@ export const RoomEntryEditor: React.FC<RoomEntryEditorProps> = ({ def, kind, sou
         </div>
 
         <div className="shrink-0 flex items-center justify-end gap-2 p-3 border-t border-[#2d2417] bg-[#0b0a09]">
-          <button onClick={onClose} className="px-3 py-1.5 rounded text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer">
+          <button id="room-entry-cancel" onClick={onClose} className="px-3 py-1.5 rounded text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer">
             Cancelar
           </button>
           <button
+            id="room-entry-save"
             onClick={() => void save()}
             disabled={busy}
             className="px-3 py-1.5 rounded bg-[#d4af37] text-zinc-950 font-serif font-bold text-xs hover:bg-amber-300 transition-colors cursor-pointer disabled:opacity-50"
@@ -228,6 +219,6 @@ export const RoomEntryEditor: React.FC<RoomEntryEditorProps> = ({ def, kind, sou
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 };

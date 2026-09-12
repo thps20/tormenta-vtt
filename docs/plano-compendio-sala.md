@@ -191,10 +191,21 @@ tokens, handouts...).
   os dois) foi deixada de fora — `CreatureSheet` não carrega `bio` (o texto morreria em silêncio ao
   salvar) e moeda fixa numa criatura não é um caso de uso pedido. `description`/`page`/`tags`, que
   SÃO metadado real da entrada, ganharam três campos pequenos no cabeçalho do editor.
-- **Sem verificação em navegador ao vivo**: o Chrome/Edge headless deste ambiente (WSL) não estava de
-  pé e o executável não foi encontrado nos caminhos padrão pra subir um novo; a verificação ficou em
-  `make typecheck && make test` (250 testes, 27 novos) mais revisão manual de código, que já pegou o
-  problema do `hideCompendiumButton` acima antes de rodar. Recomendo um clique-e-veja rápido (chip
-  "Sala", "Novo", "Duplicar para a sala", editar/apagar, exportar/importar) na próxima sessão com o
-  navegador de teste de pé — sala semeada por `make seed-test`, GM em
-  `http://localhost:5173/room/TESTE1?gm=mesa-de-teste-gm-secret&session=mesa-de-teste-mestre-token`.
+- **Bug real achado só depois, em produção**: os três diálogos que a paleta abre por cima de si
+  (`CreatureFullSheet`, `RoomEntryEditor`, `RoomCompendiumImportExport`) viviam como filhos DOM
+  normais da paleta. No modo "map" (paleta flutuando sobre o mapa), o wrapper que a envolve é
+  `pointer-events-none` por padrão (deixa clique passar pro mapa fora da paleta); `CreatureFullSheet`
+  já sabia disso e ligava `pointer-events-auto` em si mesmo, mas os dois diálogos novos não —
+  ficavam visíveis, porém totalmente inertes (nenhum campo/botão respondia). Corrigido generalizando
+  num componente único, `Dialog` (`apps/web/src/components/Dialog.tsx`), que renderiza via PORTAL em
+  `document.body` — nunca descendente da paleta — e ainda ganhou foco preso e devolução de foco de
+  brinde. `CreatureFullSheet` também passou a usar o `Dialog` (era código quase idêntico duplicado; a
+  paleta ficou mais simples de manter com um único jeito de abrir diálogo). Ver §9.18 do SPEC.
+- **Verificado ao vivo, CDP** (Edge headless, `C:\Temp\cdp-lib.ps1`, sala de `make seed-test`): os
+  três diálogos abrem, aceitam digitação e clique em botão, e fecham pelos três jeitos (X, Esc,
+  clique fora) — inclusive confirmando por `getComputedStyle`/`elementFromPoint` que a paleta fica
+  `pointer-events: none` de verdade enquanto um diálogo está aberto, e que o diálogo é filho direto
+  do `<body>` (portal). O teste também achou (e este commit corrigiu) um segundo bug: o menu "Novo ▾"
+  se ancorava por `right-0`, jogando as opções pra fora da tela à esquerda (o botão fica perto da
+  borda esquerda do cabeçalho) — `elementFromPoint` no centro da opção "Criatura" voltava vazio.
+  Virou `left-0`.

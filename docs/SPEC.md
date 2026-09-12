@@ -1442,6 +1442,18 @@ compêndio da SALA, que já tinha prioridade sobre o do sistema quando o id coin
   socket. "Duplicar para a sala" (entrada do sistema) e "Editar" (entrada já da sala) abrem o mesmo
   editor pré-preenchido; só muda se `compendium:room-create` (id novo) ou `compendium:room-update`
   (mesmo id) é chamado ao salvar.
+- **Diálogo único (`Dialog`, `apps/web/src/components/Dialog.tsx`)**: bloco completo da criatura
+  (`CreatureFullSheet`), `RoomEntryEditor` e `RoomCompendiumImportExport` — tudo que a paleta abre por
+  cima de si — usam o MESMO componente, via PORTAL direto em `document.body` (nunca descendente DOM
+  da paleta). Motivo: a paleta, no modo "map", vive dentro de um wrapper `pointer-events-none` por
+  padrão (deixa clique passar pro mapa); um diálogo renderizado como filho normal herdava esse
+  `pointer-events: none` (ou ficava preso na stacking context de um irmão com o mesmo z-index) e
+  nenhum controle respondia — bug real, corrigido generalizando o `pointer-events-auto` que já
+  existia isolado no `CreatureFullSheet`. Fecha por X, Esc ou clique fora; prende o foco (Tab não
+  escapa) e devolve ao elemento que tinha foco antes. A paleta por trás fica `pointer-events-none`
+  enquanto qualquer diálogo estiver aberto (defesa a mais, além do portal) e para de reagir a
+  teclado — um portal não escapa do *bubbling* de eventos do React (só do DOM), então tecla digitada
+  dentro do diálogo ainda "vê" o `onKeyDown` de quem o renderizou.
 - **UI, tudo dentro da paleta que já existe** (nada de tela separada): botão **"Novo ▾"** no
   cabeçalho da paleta (só GM) — criatura (só no contexto "map", onde criaturas aparecem) ou qualquer
   `itemKinds[]` — abre o editor em branco. Cada entrada do compêndio do SISTEMA ganha **"Duplicar
