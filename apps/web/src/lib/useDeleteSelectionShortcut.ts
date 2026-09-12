@@ -4,6 +4,7 @@ import { selectIsGm, useRoom } from "../store/room";
 import { useTokens } from "../store/tokens";
 import { useTemplates } from "../store/templates";
 import { useTemplateHistory } from "../store/templateHistory";
+import { usePins } from "../store/pins";
 import { useCharacters } from "../store/characters";
 import { isTyping } from "./isTyping";
 import { describeTemplateAreaChange } from "./templates";
@@ -73,9 +74,27 @@ function deleteSelectedTemplate(): void {
 }
 
 /**
- * Atalho global: Delete/Backspace apaga os tokens (só GM) ou o gabarito de área selecionado (GM ou
- * dono), quando o foco não está num campo de texto (isTyping). Multi-seleção de token apaga todos
- * de uma vez. Um único listener na janela (montado pela página da mesa, ao lado de useToolShortcuts).
+ * Apaga o pino selecionado, se houver (docs/plano-narracao.md — pino se comporta como token: só
+ * GM apaga, entra no desfazer do GM — `pin:remove` já empilha sozinho no servidor, socket/pins.ts,
+ * mesmo padrão de `handout:delete`). Sem confirmação: Ctrl+Z corrige um clique errado tão bem
+ * quanto um `confirm()` custaria uma interrupção (mesmo raciocínio do botão direito que o pino
+ * tinha antes desta mudança).
+ */
+function deleteSelectedPin(): void {
+  if (!selectIsGm(useRoom.getState())) return;
+  const { selectedId, pinsByScene, remove } = usePins.getState();
+  if (!selectedId) return;
+  const sceneId = Object.keys(pinsByScene).find((id) => pinsByScene[id]?.[selectedId]);
+  if (!sceneId) return;
+  void remove(sceneId, selectedId);
+}
+
+/**
+ * Atalho global: Delete/Backspace apaga os tokens (só GM), o gabarito de área selecionado (GM ou
+ * dono) ou o pino selecionado (só GM), quando o foco não está num campo de texto (isTyping).
+ * Multi-seleção de token apaga todos de uma vez. Token/gabarito/pino nunca ficam selecionados
+ * juntos (VttCanvas garante isso a cada seleção), então só uma das três chamadas abaixo faz algo.
+ * Um único listener na janela (montado pela página da mesa, ao lado de useToolShortcuts).
  */
 export function useDeleteSelectionShortcut(): void {
   useEffect(() => {
@@ -86,6 +105,7 @@ export function useDeleteSelectionShortcut(): void {
       e.preventDefault();
       deleteSelectedTokens();
       deleteSelectedTemplate();
+      deleteSelectedPin();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);

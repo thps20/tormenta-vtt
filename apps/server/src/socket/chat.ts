@@ -1,6 +1,6 @@
 import { ChatRevealSchema, ChatSendSchema, FormulaError, resolveCharacterFormula, getSystemDefinition } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
-import { parseChatCommand, resolveWhisperTarget } from "../services/chatCommands.js";
+import { parseChatCommand } from "../services/chatCommands.js";
 import { toCharacter } from "../services/characters.js";
 import { emitChatMessage } from "../services/chatVisibility.js";
 import { createRollMessage } from "../services/rolls.js";
@@ -33,15 +33,20 @@ export function registerChatHandlers(io: TypedServer, socket: TypedSocket): void
       const me = await prisma.participant.findUnique({ where: { id: ctx.participantId } });
       if (!me) throw new HandlerError("Participante não encontrado");
 
-      const cmd = parseChatCommand(text);
+      // parseChatCommand só precisa da lista de participantes pra resolver "/w <nickname> ...": é
+      // ela quem sabe onde o nickname termina e a mensagem começa (inclusive nickname de mais de
+      // uma palavra, com ou sem aspas). Só busca quando o texto pode ser um /w — os demais
+      // comandos (/r, /gmr, /pr, texto normal) não usam a lista, sem consulta à toa.
+      const participants = /^\/w\b/i.test(text.trim()) ? await prisma.participant.findMany({ where: { roomId: ctx.roomId } }) : [];
+      const cmd = parseChatCommand(text, participants);
 
-      // "/w <nickname> <mensagem>" (docs/plano-narracao.md): resolve o nickname pra participantId
-      // AQUI (nunca confiado do cliente) — vira uma mensagem de texto normal com whisperTo setado,
-      // mesmo mecanismo do seletor "para" abaixo.
+      // Nickname não resolveu (inexistente ou ambíguo): o autor claramente tentou sussurrar, então
+      // recusa com erro — nunca manda como mensagem normal (ele pensaria que sussurrou quando na
+      // verdade todo mundo leu).
+      if (cmd.kind === "whisper-error") throw new HandlerError(cmd.error);
+
+      // "/w <nickname> <mensagem>" já vem com o participantId resolvido (docs/plano-narracao.md).
       if (cmd.kind === "whisper") {
-        const participants = await prisma.participant.findMany({ where: { roomId: ctx.roomId } });
-        const resolved = resolveWhisperTarget(cmd.targetNickname, participants);
-        if (!resolved.ok) throw new HandlerError(resolved.error);
         const msg = toChatMessage(
           await prisma.chatMessage.create({
             data: {
@@ -51,7 +56,7 @@ export function registerChatHandlers(io: TypedServer, socket: TypedSocket): void
               kind: "text",
               text: cmd.text,
               visibility: "all",
-              whisperTo: resolved.participantId,
+              whisperTo: cmd.participantId,
             },
           }),
         );

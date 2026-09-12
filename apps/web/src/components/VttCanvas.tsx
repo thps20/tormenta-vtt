@@ -188,15 +188,24 @@ interface VttCanvasProps {
    *  gesto de mover/girar terminou — pro histórico do GM saber o "antes" de verdade (docs/plano-gabaritos.md §4). */
   onTemplateCommit: (template: Template, dragFrom?: { x: number; y: number; rotation: number }) => void;
 
-  /** Pinos (handout ou nota) fixados na cena visitada (docs/plano-narracao.md), já filtrados por
-   *  quem pode ver. */
+  /**
+   * Pinos (handout ou nota) fixados na cena visitada (docs/plano-narracao.md), já filtrados por
+   * quem pode ver — se comportam como token (mesmo ajuste pedido pelo dono do projeto): clique
+   * simples seleciona (halo), duplo clique abre o cartão/overlay, arrastar move (GM), Delete apaga
+   * o selecionado (GM — ver `lib/useDeleteSelectionShortcut.ts`). Tudo por GEOMETRIA, como token e
+   * gabarito (`PinLayer` é `listening={false}`, mesmo motivo de sempre — canvas de hit do Konva
+   * embaralhado, docs/debug-condicoes.md).
+   */
   pins: Pin[];
   /** Ícones/cores disponíveis pra pino de nota (do sistema, senão o padrão embutido, `lib/pinIcons.ts`). */
   pinIcons: PinIconDef[];
-  /** Clique num pino, modo Selecionar (qualquer um): abre o cartão/overlay local. */
+  selectedPinId: string | null;
+  onSelectPin: (pinId: string | null) => void;
+  /** Duplo clique num pino (qualquer um): abre o cartão/overlay local. */
   onOpenPin: (pin: Pin) => void;
-  /** Botão direito num pino, modo Selecionar: apaga (entra no desfazer do GM). GM only; ausente = jogador. */
-  onDeletePin?: (pin: Pin) => void;
+  /** Ao soltar um arrasto: patch final da posição, com ack (entra no desfazer do GM). GM only;
+   *  ausente = jogador (pino selecionável, mas não arrastável). */
+  onMovePin?: (pin: Pin, x: number, y: number) => void;
   /**
    * Arrastar um card da biblioteca de handouts até o mapa fixa um pino no ponto (pixels do mapa) —
    * mesmo mecanismo de soltar criatura do compêndio (§9.5), registrado no mesmo alvo "mapa" (o
@@ -357,8 +366,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   onTemplateCreate,
   pins,
   pinIcons,
+  selectedPinId,
+  onSelectPin,
   onOpenPin,
-  onDeletePin,
+  onMovePin,
   onHandoutDrop,
   onPinToolClick,
   onTemplateLive,
@@ -471,6 +482,22 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   /** Arrastando a ALÇA de rotação do gabarito selecionado. */
   const templateRotateRef = useRef<{ id: string; startTemplate: Template } | null>(null);
 
+  // --- Pinos (docs/plano-narracao.md): se comportam como token — clique seleciona, arrastar move.
+  /** Último mousedown num pino (id + instante), pro duplo clique por geometria (mesmo mecanismo de
+   *  `lastTokenMouseDownRef`/`registerTokenClick` acima). */
+  const lastPinMouseDownRef = useRef<{ pinId: string; time: number } | null>(null);
+  /** Arrastando o pino selecionado (modo Selecionar, GM): delta do ponteiro desde o início. */
+  const pinDragRef = useRef<{ id: string; startPointer: { x: number; y: number }; startX: number; startY: number } | null>(null);
+  /** Posição ao vivo durante o arrasto — só visual (sem broadcast, ao contrário de token/gabarito):
+   *  um pino não precisa de eco pros outros verem em tempo real, só o commit final importa. */
+  const [pinDragLive, setPinDragLive] = useState<{ id: string; x: number; y: number } | null>(null);
+  /** `pins`, mas com o pino em arrasto na posição AO VIVO (só neste cliente) em vez da última
+   *  posição confirmada pelo servidor. */
+  const pinsForRender = useMemo(
+    () => (pinDragLive ? pins.map((p) => (p.id === pinDragLive.id ? { ...p, x: pinDragLive.x, y: pinDragLive.y } : p)) : pins),
+    [pins, pinDragLive],
+  );
+
   const cancelGestures = () => {
     boxStartRef.current = null;
     setSelectionBox(null);
@@ -486,6 +513,8 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     setTemplateDraftLive(null);
     templateDragRef.current = null;
     templateRotateRef.current = null;
+    pinDragRef.current = null;
+    setPinDragLive(null);
   };
 
   // Esc cancela a caixa/régua em andamento.
@@ -1163,6 +1192,12 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (p) onTemplateLive({ ...startTemplate, x: startTemplate.x + (p.x - startPointer.x), y: startTemplate.y + (p.y - startPointer.y) });
       return;
     }
+    if (pinDragRef.current) {
+      const { id, startPointer, startX, startY } = pinDragRef.current;
+      const p = pointerMapPos();
+      if (p) setPinDragLive({ id, x: startX + (p.x - startPointer.x), y: startY + (p.y - startPointer.y) });
+      return;
+    }
     const start = boxStartRef.current;
     if (start) {
       const p = pointerMapPos();
@@ -1173,7 +1208,8 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       return;
     }
     const over = tokenAtPointer();
-    setCursor(over && canControl(me, over) ? "grab" : "default");
+    if (over) setCursor(canControl(me, over) ? "grab" : "default");
+    else setCursor(pinAtPointer() ? (onMovePin ? "grab" : "pointer") : "default");
     // Tooltip da condição: por geometria, aqui, e não por mouseenter do badge (ver
     // conditionTooltipAtPointer). Só troca o estado quando muda de badge, pra não repintar a cada
     // pixel de movimento.
@@ -1197,6 +1233,16 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     // Um terceiro clique rápido não vira "outro duplo clique": exige um mousedown novo primeiro.
     lastTokenMouseDownRef.current = isDoubleClick ? null : { tokenId: token.id, time: now };
     if (isDoubleClick && token.characterId) onTokenOpenSheet(token.id);
+  };
+
+  /** Duplo clique num pino (mesmo mecanismo geométrico de `registerTokenClick` acima, docs/plano-narracao.md):
+   *  abre o cartão/overlay. Clique simples só seleciona (feito por quem chama, no mousedown). */
+  const registerPinClick = (pin: Pin) => {
+    const now = performance.now();
+    const last = lastPinMouseDownRef.current;
+    const isDoubleClick = last !== null && last.pinId === pin.id && now - last.time <= DOUBLE_CLICK_MS;
+    lastPinMouseDownRef.current = isDoubleClick ? null : { pinId: pin.id, time: now };
+    if (isDoubleClick) onOpenPin(pin);
   };
 
   /**
@@ -1286,10 +1332,25 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (!hitLandedOnToken(e.target, t.id)) tokenGroup(t.id)?.fire("mousedown", { evt: e.evt, pointerId: e.pointerId }, false);
       return;
     }
+    // Pino (docs/plano-narracao.md): se comporta como token — seleciona no mousedown (qualquer um),
+    // duplo clique abre (registerPinClick), arrastar move (só GM — jogador seleciona/abre, não move).
+    const pin = pinAtPointer();
+    if (pin) {
+      registerPinClick(pin);
+      onSelectPin(pin.id);
+      onSelectToken(null);
+      onSelectTemplate(null);
+      if (onMovePin) {
+        const p = pointerMapPos();
+        if (p) pinDragRef.current = { id: pin.id, startPointer: p, startX: pin.x, startY: pin.y };
+      }
+      return;
+    }
     const tmpl = templateAtPointer();
     if (tmpl && canControlTemplate(me, tmpl)) {
       onSelectTemplate(tmpl.id);
       onSelectToken(null);
+      onSelectPin(null);
       const p = pointerMapPos();
       if (p) templateDragRef.current = { id: tmpl.id, startPointer: p, startTemplate: tmpl };
       return;
@@ -1344,6 +1405,17 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (current) onTemplateCommit(current, { x: startTemplate.x, y: startTemplate.y, rotation: startTemplate.rotation });
       return;
     }
+    if (pinDragRef.current) {
+      const { id, startX, startY } = pinDragRef.current;
+      pinDragRef.current = null;
+      const live = pinDragLive;
+      setPinDragLive(null);
+      // Só um clique parado (sem andar de verdade): nada pra commitar, evita um pin:update à toa.
+      const moved = live && live.id === id && Math.hypot(live.x - startX, live.y - startY) > 0.5;
+      const current = pins.find((p) => p.id === id);
+      if (moved && current && onMovePin) onMovePin(current, live!.x, live!.y);
+      return;
+    }
     if (fogActive) return fogMouseUp();
     if (rulerStartRef.current) {
       rulerStartRef.current = null;
@@ -1393,20 +1465,18 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (!hitLandedOnToken(e.target, t.id)) selectByClick(t.id, e.evt.shiftKey);
       return;
     }
-    // Pino (handout ou nota, docs/plano-narracao.md): qualquer um (GM ou jogador) clica pra abrir
-    // — sem seleção, sem Transformer, só abre o cartão/overlay local. `PinLayer` é
-    // listening={false}, então o hit do Konva nunca "aterrissa" nele; sempre passa por aqui, por
-    // geometria.
-    const pin = pinAtPointer();
-    if (pin) {
-      onOpenPin(pin);
-      return;
-    }
+    // Pino (docs/plano-narracao.md): a seleção/duplo-clique já foi tratada no mousedown
+    // (`registerPinClick`/`onSelectPin`, mesmo padrão de gabarito) — aqui só evita que o `click`
+    // caia no ramo de baixo e desselecione tudo (o alvo de um clique num `PinLayer`,
+    // `listening={false}`, é sempre o Stage por trás, nunca o pino).
+    if (pinAtPointer()) return;
     if (e.target === stageRef.current || e.target.name() === "map-background") {
       onSelectToken(null);
-      // Só limpa a seleção de gabarito se o clique NÃO foi em cima de um (mousedown já selecionou
-      // e talvez começado a arrastar; o `click` que o Konva dispara em seguida não deve desfazer).
+      // Só limpa a seleção de gabarito/pino se o clique NÃO foi em cima de um (mousedown já
+      // selecionou e talvez começado a arrastar; o `click` que o Konva dispara em seguida não deve
+      // desfazer).
       if (!templateAtPointer()) onSelectTemplate(null);
+      onSelectPin(null);
     }
   };
 
@@ -1424,19 +1494,16 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       // Se o hit tivesse acertado, o onContextMenu do Group já teria aberto o menu (que confere
       // canControl por dentro, igual ao clique).
       if (!hitLandedOnToken(e.target, t.id)) openConditionMenuAt(t);
-      return;
     }
-    // Botão direito num pino apaga direto (GM only — entra no desfazer, sem confirmação: Ctrl+Z
-    // corrige um clique errado tão fácil quanto um confirm() teria custado, §9.10).
-    if (!onDeletePin) return;
-    const pin = pinAtPointer();
-    if (pin) onDeletePin(pin);
+    // Pino não tem menu de botão direito (docs/plano-narracao.md: se comporta como token —
+    // Delete/Backspace apaga o selecionado, não botão direito, ver lib/useDeleteSelectionShortcut.ts).
   };
 
   /** Clique num token: seleciona só ele; com Shift, entra/sai da seleção atual. Token e gabarito
    *  nunca ficam selecionados juntos (evita ambiguidade no Delete e nas alças). */
   const selectByClick = (tokenId: string, additive: boolean) => {
     onSelectTemplate(null);
+    onSelectPin(null);
     if (additive) onToggleSelect(tokenId);
     else onSelectToken(tokenId);
   };
@@ -1795,7 +1862,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
             cellSize={effectiveCellSize(scene.grid)}
             stageScale={stageScale}
           />
-          <PinLayer pins={pins} icons={pinIcons} stageScale={stageScale} />
+          <PinLayer pins={pinsForRender} icons={pinIcons} selectedId={selectedPinId} stageScale={stageScale} />
           {movementDisplay && <MovementLayer {...movementDisplay} stageScale={stageScale} />}
           {selectionBox && (
             <Rect

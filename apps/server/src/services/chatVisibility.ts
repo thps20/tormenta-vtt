@@ -23,11 +23,14 @@
  * mapa é que não era o que a mesa está vendo). Quando o mapa vira ativo, a mensagem volta a ser
  * entregue no próximo snapshot (`room:join`), igual à regra 2 — sem reenvio ao vivo.
  *
- * Regra 3 (`whisperTo`, §9.10 — handout:show "para X"): mesmo mecanismo de exclusão total da
- * regra 2, mas por PESSOA em vez de por token — quem não é o GM nem o participante alvo fica de
- * fora por completo (nem card, nem placeholder), independente de `visibility` (que fica "all"
- * nessas mensagens). Como só o GM publica handout, "autor sempre recebe" já vale de graça (GM
- * nunca é bloqueado por regra nenhuma aqui).
+ * Regra 3 (`whisperTo`, §9.10 — handout:show "para X"; também o sussurro comum do chat,
+ * docs/plano-narracao.md, `/w` ou o seletor "para"): mesmo mecanismo de exclusão total da regra 2,
+ * mas por PESSOA em vez de por token — quem não é o GM, nem o participante alvo, NEM O AUTOR fica
+ * de fora por completo (nem card, nem placeholder), independente de `visibility` (que fica "all"
+ * nessas mensagens). "Autor sempre recebe" era de graça enquanto só o GM publicava handout (GM
+ * nunca é bloqueado por regra nenhuma aqui) — deixou de ser de graça quando o sussurro comum
+ * (qualquer participante pode ser autor) passou a usar o mesmo campo: um jogador sussurrando pra
+ * OUTRO jogador não pode sumir da própria mensagem (bug corrigido, ver `docs/revisao-narracao.md`).
  *
  * Regra 4 (`roll.targets[]`, docs/plano-alvos.md — ataque com alvo marcado): mesma ideia da regra
  * 2/2b, mas por LINHA de alvo em vez de pela mensagem inteira (a linha some da cópia de quem não
@@ -116,18 +119,24 @@ export function tokenGateOk(
   return tokenVisibleTo(tokenInfo.token, { role: "player", participantId: viewer.participantId }, tokenInfo.geom);
 }
 
-/** Regra 3: sussurro visual (`whisperTo`, §9.10). GM sempre passa; jogador só se for o alvo. */
-export function whisperGateOk(msg: Pick<ChatMessage, "whisperTo">, viewer: Viewer): boolean {
+/**
+ * Regra 3: sussurro visual (`whisperTo`, §9.10/docs/plano-narracao.md). GM sempre passa; o AUTOR
+ * da mensagem sempre passa (mesmo se ele é um jogador sussurrando pra outro — nunca deveria sumir
+ * da própria mensagem); senão, só o alvo.
+ */
+export function whisperGateOk(msg: Pick<ChatMessage, "whisperTo" | "participantId">, viewer: Viewer): boolean {
   if (!msg.whisperTo) return true;
-  return viewer.role === "gm" || viewer.participantId === msg.whisperTo;
+  return viewer.role === "gm" || viewer.participantId === msg.whisperTo || viewer.participantId === msg.participantId;
 }
 
-/** Ids dos jogadores (nunca o GM) que não são o alvo do sussurro e por isso ficam de fora por
- *  completo — mesmo papel de `blockedPlayerIds`, mas pra regra 3. `[]` quando não é sussurro. */
-async function blockedPlayerIdsForWhisper(roomId: string, whisperTo: string | null): Promise<string[]> {
+/** Ids dos jogadores (nunca o GM, nunca o autor) que não são o alvo do sussurro e por isso ficam
+ *  de fora por completo — mesmo papel de `blockedPlayerIds`, mas pra regra 3. `[]` quando não é
+ *  sussurro. Mesma regra de `whisperGateOk` acima (autor e alvo sempre passam), só que devolvendo
+ *  quem FICA de fora em vez de perguntar "este viewer entra?". */
+async function blockedPlayerIdsForWhisper(roomId: string, whisperTo: string | null, authorParticipantId: string): Promise<string[]> {
   if (!whisperTo) return [];
   const players = await prisma.participant.findMany({ where: { roomId, role: "player" } });
-  return players.filter((p) => p.id !== whisperTo).map((p) => p.id);
+  return players.filter((p) => p.id !== whisperTo && p.id !== authorParticipantId).map((p) => p.id);
 }
 
 /**
@@ -151,7 +160,7 @@ export async function emitChatMessage(io: TypedServer, roomId: string, msg: Chat
 
   const [tokenBlocked, whisperBlocked] = await Promise.all([
     msg.tokenId ? blockedPlayerIds(roomId, msg.tokenId, msg.participantId) : Promise.resolve([]),
-    blockedPlayerIdsForWhisper(roomId, msg.whisperTo),
+    blockedPlayerIdsForWhisper(roomId, msg.whisperTo, msg.participantId),
   ]);
   const blocked = [...new Set([...tokenBlocked, ...whisperBlocked])];
   const exceptRooms = blocked.map(rooms.participant);
@@ -244,7 +253,7 @@ async function emitRollWithTargetsMessage(io: TypedServer, roomId: string, msg: 
   const targets = msg.roll?.targets ?? [];
   const [tokenBlocked, whisperBlocked, room, participants, tokenInfoById] = await Promise.all([
     msg.tokenId ? blockedPlayerIds(roomId, msg.tokenId, msg.participantId) : Promise.resolve([]),
-    blockedPlayerIdsForWhisper(roomId, msg.whisperTo),
+    blockedPlayerIdsForWhisper(roomId, msg.whisperTo, msg.participantId),
     prisma.room.findUnique({ where: { id: roomId }, select: { activeSceneId: true } }),
     prisma.participant.findMany({ where: { roomId } }),
     loadTokenInfo(targets.map((t) => t.tokenId)),

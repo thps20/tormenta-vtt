@@ -11,9 +11,14 @@ import { toast } from "./ui";
  */
 interface PinsState {
   pinsByScene: Record<string, Record<string, Pin>>;
+  /** Seleção é só local (não sincronizada, como token/gabarito): halo, Delete apaga o selecionado
+   *  (docs/plano-narracao.md — pino se comporta como token). */
+  selectedId: string | null;
+  select: (pinId: string | null) => void;
 
   create: (payload: PinCreatePayload) => Promise<Pin | null>;
-  /** Só pinos `kind: "note"` — handout continua "apagar e fixar de novo". */
+  /** `patch` com `x`/`y` funciona pra QUALQUER kind (arrastar move, GM); título/texto/ícone/cor só
+   *  em `kind: "note"` — handout continua "apagar e fixar de novo" pra editar conteúdo. */
   update: (sceneId: string, pinId: string, patch: PinUpdatePayload["patch"]) => Promise<Pin | null>;
   remove: (sceneId: string, pinId: string) => Promise<boolean>;
 
@@ -30,6 +35,8 @@ interface PinsState {
 
 export const usePins = create<PinsState>((set, get) => ({
   pinsByScene: {},
+  selectedId: null,
+  select: (pinId) => set({ selectedId: pinId }),
 
   create: async (payload) => {
     const res = await emitAck("pin:create", payload);
@@ -66,14 +73,15 @@ export const usePins = create<PinsState>((set, get) => ({
   removePin: (sceneId, pinId) =>
     set((s) => {
       const { [pinId]: _removed, ...rest } = s.pinsByScene[sceneId] ?? {};
-      return { pinsByScene: { ...s.pinsByScene, [sceneId]: rest } };
+      return { pinsByScene: { ...s.pinsByScene, [sceneId]: rest }, selectedId: s.selectedId === pinId ? null : s.selectedId };
     }),
 
-  setSnapshot: (activeSceneId, pins) => set({ pinsByScene: activeSceneId ? { [activeSceneId]: Object.fromEntries(pins.map((p) => [p.id, p])) } : {} }),
+  setSnapshot: (activeSceneId, pins) =>
+    set({ pinsByScene: activeSceneId ? { [activeSceneId]: Object.fromEntries(pins.map((p) => [p.id, p])) } : {}, selectedId: null }),
 
   replaceScene: (sceneId, pins) => set((s) => ({ pinsByScene: { ...s.pinsByScene, [sceneId]: Object.fromEntries(pins.map((p) => [p.id, p])) } })),
 
-  reset: () => set({ pinsByScene: {} }),
+  reset: () => set({ pinsByScene: {}, selectedId: null }),
 }));
 
 /** Lista dos pinos de UM mapa. Função pura para useMemo (não use como seletor do hook). */

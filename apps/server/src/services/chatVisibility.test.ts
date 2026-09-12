@@ -34,6 +34,8 @@ const base: ChatMessage = {
 const gm = { role: "gm" as const, participantId: "p-gm" };
 const author = { role: "player" as const, participantId: "p-author" };
 const other = { role: "player" as const, participantId: "p-other" };
+/** Terceiro jogador: nem autor, nem alvo do sussurro, nem GM — usado nos testes de whisperGateOk. */
+const thirdParty = { role: "player" as const, participantId: "p-third" };
 
 describe("messageVisibleTo", () => {
   it("pública: todos veem", () => {
@@ -152,21 +154,26 @@ describe("tokenGateOk", () => {
 });
 
 // base.whisperTo é null nos fixtures: maioria dos testes trata "sem sussurro" como o caso normal.
-describe("whisperGateOk", () => {
+// base.participantId = "p-author" (o autor); whisperTo "p-other" nestes casos = o destinatário.
+describe("whisperGateOk (docs/plano-narracao.md — bug corrigido: autor sumia da própria mensagem)", () => {
   it("sem whisperTo: sempre ok (regra normal de visibility)", () => {
     expect(whisperGateOk(base, other)).toBe(true);
   });
 
-  it("GM sempre recebe, mesmo não sendo o alvo do sussurro", () => {
-    expect(whisperGateOk({ ...base, whisperTo: "p-other" }, gm)).toBe(true);
+  it("o AUTOR sempre recebe a própria mensagem, mesmo sussurrando pra outro alguém", () => {
+    expect(whisperGateOk({ ...base, whisperTo: "p-other" }, author)).toBe(true);
   });
 
-  it("o alvo do sussurro recebe", () => {
+  it("o destinatário do sussurro recebe", () => {
     expect(whisperGateOk({ ...base, whisperTo: "p-other" }, other)).toBe(true);
   });
 
-  it("quem não é o alvo nem o GM fica de fora", () => {
-    expect(whisperGateOk({ ...base, whisperTo: "p-other" }, author)).toBe(false);
+  it("GM sempre recebe, mesmo não sendo autor nem destinatário", () => {
+    expect(whisperGateOk({ ...base, whisperTo: "p-other" }, gm)).toBe(true);
+  });
+
+  it("um terceiro jogador (nem autor, nem destinatário, nem GM) fica de fora", () => {
+    expect(whisperGateOk({ ...base, whisperTo: "p-other" }, thirdParty)).toBe(false);
   });
 });
 

@@ -41,12 +41,20 @@ const NotePinIcon: React.FC<{ pin: Pin & { kind: "note" }; icons: PinIconDef[] }
  * VttCanvas, mesmo motivo de sempre neste projeto (canvas de hit do Konva embaralhado por proteção
  * anti-fingerprinting, docs/debug-condicoes.md) — mesmo padrão de `TemplateLayer`.
  */
-export const PinLayer: React.FC<{ pins: Pin[]; icons: PinIconDef[]; stageScale: number }> = ({ pins, icons, stageScale }) => (
+export const PinLayer: React.FC<{ pins: Pin[]; icons: PinIconDef[]; selectedId?: string | null; stageScale: number }> = ({
+  pins,
+  icons,
+  selectedId,
+  stageScale,
+}) => (
   <>
     {pins.map((pin) => {
       const stroke = pin.kind === "note" ? (pin.color ?? STROKE) : STROKE;
       return (
         <Group key={pin.id} x={pin.x} y={pin.y} scaleX={1 / stageScale} scaleY={1 / stageScale} listening={false}>
+          {/* Halo de seleção (docs/plano-narracao.md — pino se comporta como token): mesmo anel
+           *  tracejado dourado do token/gabarito selecionado. */}
+          {pin.id === selectedId && <Circle radius={PIN_RADIUS + 5} stroke="#d4af37" strokeWidth={1.5} dash={[4, 4]} />}
           <Circle radius={PIN_RADIUS} fill={FILL} stroke={stroke} strokeWidth={1.5} shadowColor="#000" shadowBlur={4} shadowOpacity={0.6} />
           {pin.kind === "image" && <Path data={IMAGE_ICON} fill={STROKE} />}
           {pin.kind === "text" && (

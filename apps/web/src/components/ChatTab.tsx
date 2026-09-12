@@ -140,13 +140,20 @@ export const ChatTab: React.FC<ChatTabProps> = ({
    */
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Tab') return;
-    const m = /^\/w\s+(\S*)$/i.exec(inputText);
-    if (!m) return;
-    const partial = (m[1] ?? '').toLowerCase();
+    // Duas formas em andamento: já dentro de aspas abertas ("/w "Ana...) ou ainda sem aspas
+    // ("/w Ana..."). Nos dois casos só faz sentido completar se não houver espaço nenhum digitado
+    // ainda fora de aspas (senão o usuário já está na mensagem, não no nickname).
+    const quoted = /^\/w\s+"([^"]*)$/i.exec(inputText);
+    const bare = /^\/w\s+(\S*)$/i.exec(inputText);
+    const partial = (quoted ? quoted[1] : bare ? bare[1] : null)?.toLowerCase();
+    if (partial === undefined || partial === null) return;
     const match = participants.find((p) => p.id !== me.id && p.nickname.toLowerCase().startsWith(partial));
     if (!match) return;
     e.preventDefault();
-    setInputText(`/w ${match.nickname} `);
+    // Nickname com espaço precisa de aspas pro parser gracioso do servidor não confundir onde ele
+    // termina (docs/plano-narracao.md) — completa sempre com aspas nesse caso, mesmo se o usuário
+    // não tinha aberto uma ainda.
+    setInputText(match.nickname.includes(' ') ? `/w "${match.nickname}" ` : `/w ${match.nickname} `);
   };
 
   const formatTime = (isoString: string) => {
@@ -642,7 +649,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleInputKeyDown}
-            placeholder="Mensagem, /r 2d6+3 # rótulo, /gmr (secreta), /pr (pública) ou /w <nickname> (sussurro)..."
+            placeholder='Mensagem, /r 2d6+3 # rótulo, /gmr (secreta), /pr (pública) ou /w <nickname> (sussurro, aspas se tiver espaço)...'
             data-roll-mode={rollMode}
             className={`w-full bg-[#1a1a1a] border rounded-md px-3 py-2 text-xs focus:outline-none text-zinc-200 placeholder:text-zinc-600 ${
               whispering ? 'border-purple-500/70 focus:border-purple-400' : nonPublic ? 'border-amber-500/70 focus:border-amber-400' : 'border-[#3d3d3d] focus:border-[#d4af37]'

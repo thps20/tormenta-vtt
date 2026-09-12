@@ -76,7 +76,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Comandos:
   - `/r <fórmula> [# rótulo]` — rola no **modo de rolagem** atual do autor (abaixo), ex.: `/r 2d6+3`, `/r 1d20+5 # Ataque`.
   - `/gmr <fórmula>` — força rolagem secreta (só o GM vê); `/gr` é sinônimo. `/pr <fórmula>` — força rolagem pública.
-  - `/w <nickname> <mensagem>` — sussurro (docs/plano-narracao.md): manda uma mensagem de texto visível só pro GM e pra quem tem esse nickname (case-insensitive). `<nickname>` é uma palavra só (sem espaço) — nickname com espaço, ou repetido por dois participantes, não dá pra endereçar por `/w` (o ack devolve erro pedindo pra usar o seletor "para" abaixo). Autocomplete com Tab enquanto digita o nickname.
+  - `/w <nickname> <mensagem>` — sussurro (docs/plano-narracao.md): manda uma mensagem de texto visível só pro GM, o autor e quem tem esse nickname (case-insensitive). Nickname de mais de uma palavra funciona com aspas (`/w "Ana Maria" oi`) ou sem — sem aspas, casa o MAIOR prefixo do texto que é nickname de alguém da sala ("Ana Maria" antes de "Ana", se as duas existirem); nickname inexistente ou repetido por dois participantes: o ack devolve erro e a mensagem NÃO é enviada (nem sussurrada, nem como texto normal — o autor claramente tentou sussurrar). Autocomplete com Tab (entre aspas sozinho quando o nickname tem espaço).
 - **Modo de rolagem** (botão na faixa "Rolar" do chat, ao lado dos dados rápidos, com ícone e rótulo; clique alterna para o próximo, clique longo ou a seta abre o menu com os três):
   - **Pública** (`visibility: "all"`): todos veem.
   - **Secreta** (`"gm"`): só o GM vê. Se quem rolou é jogador, ele **não** vê o próprio resultado (rolagem às cegas; o ack volta sem `roll` e o cliente mostra o toast "Rolagem às cegas enviada ao GM"). O GM vê quem rolou e o resultado.
@@ -84,7 +84,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - O modo vale para tudo que a pessoa rolar (faixa, `/r`, ficha, botões dos cards) até trocar; persiste na aba (`sessionStorage`). `/gmr` e `/pr` forçam secreta/pública pontualmente. Texto e cards de item (`character:use-item`) são sempre públicos.
   - Fora de "Pública", o campo do chat ganha borda âmbar e o rótulo do modo à direita.
   - `ChatMessage.visibility` (`all | gm | self`) é filtrado pelo servidor no broadcast e no snapshot (`messageVisibleTo`, `apps/server/src/services/chatVisibility.ts`). Quem não pode ver o resultado **não fica sem a mensagem**: recebe a mesma mensagem sem `roll`/`item`/`text` (placeholder "Fulano fez uma rolagem secreta/própria", `apps/server/src/services/chatVisibility.ts#redactMessage`) na hora da rolagem, e o cliente mostra um card oculto no lugar do card de rolagem. O GM tem o botão **Revelar** (`chat:reveal`) nesse card, que muda `visibility` para `all` e reenvia a mesma mensagem (mesmo `id`) a todos com o conteúdo completo: o cliente faz upsert ordenado por `createdAt`, então o card oculto vira o card cheio no lugar.
-  - **Sussurro** (`ChatMessage.whisperTo`, docs/plano-narracao.md): além do `/w` acima, um seletor "para" ao lado do botão de modo de rolagem escolhe um participante pontualmente — vale pra próxima mensagem (texto OU rolagem, inclusive `/r`), sem ficar "grudado" como o modo de rolagem: some sozinho depois de enviar. Setado, a mensagem existe só pro **GM e o alvo** — nem card, nem placeholder pros demais, independente de `visibility` (que o servidor força para `"all"` quando há sussurro — o `whisperTo` já restringe quem recebe). Mesmo campo/mecanismo que já existia só para `handout:show` "mostrar para X" (§9.10), agora reaproveitado pelo chat comum. O GM **sempre** vê um sussurro, mesmo entre dois jogadores (mesma postura de sempre no projeto — nunca um sussurro cego pro GM); nesse caso o card ganha o rótulo explícito "sussurro de X para Y" (autor/alvo veem só "para Y"/"de X"). Renderização com destaque visual (borda/fundo roxo).
+  - **Sussurro** (`ChatMessage.whisperTo`, docs/plano-narracao.md): além do `/w` acima, um seletor "para" ao lado do botão de modo de rolagem escolhe um participante pontualmente — vale pra próxima mensagem (texto OU rolagem, inclusive `/r`), sem ficar "grudado" como o modo de rolagem: some sozinho depois de enviar. Setado, a mensagem existe só pro **GM, o autor e o alvo** (o autor sempre recebe a própria mensagem, mesma regra de qualquer outra — bug corrigido, ver `docs/revisao-narracao.md`) — nem card, nem placeholder pros demais, independente de `visibility` (que o servidor força para `"all"` quando há sussurro — o `whisperTo` já restringe quem recebe). Mesmo campo/mecanismo que já existia só para `handout:show` "mostrar para X" (§9.10), agora reaproveitado pelo chat comum. O GM **sempre** vê um sussurro, mesmo entre dois jogadores que não são ele (mesma postura de sempre no projeto — nunca um sussurro cego pro GM); nesse caso (GM não é autor nem alvo) o card ganha o rótulo explícito "sussurro de X para Y" — autor vê só "para Y", alvo só "de X". Renderização com destaque visual (borda/fundo roxo).
   - **Rolagem ligada a um token** (`ChatMessage.tokenId`, opcional: combate — §3.5 — ou ficha com token vinculado a ela, em qualquer mapa da sala): quem não pode ver esse token (`visible = false` ou sob a névoa) **ou** cujo token está num mapa que não é o ATIVO da sala (mesmo que o token em si esteja perfeitamente visível — GM pode estar rolando num mapa que a mesa não vê, §9.7) não recebe a mensagem de jeito nenhum — nem o card, nem o placeholder acima — independente de `visibility`; o GM e o **autor da própria rolagem** sempre recebem (mesmo que o token dele esteja oculto ou no mapa errado), o gate vale só para os demais jogadores. Essa checagem roda **antes** e além da de `visibility` (`tokenGateOk`/`emitChatMessage` em `apps/server/src/services/chatVisibility.ts`) e é refeita do zero a cada snapshot (`room:join`): se o mapa depois vira o ativo (ou o token é revelado), a mensagem represada passa a ser entregue no próximo, sem reenvio ao vivo (mesma limitação anotada em `docs/backlog.md`). `character:roll`/`character:use-item` ligam a rolagem ao token vinculado à ficha em QUALQUER mapa (`findLinkedTokenId`, preferindo o ativo quando há mais de um) — sem isso a rolagem virava uma mensagem "solta" sem `tokenId`, sem gate nenhum. Rolagem solta de verdade (`/r` sem ficha vinculada) não tem `tokenId` e segue só a regra de `visibility`.
 - **Gramática da fórmula** (parser genérico em `packages/shared/src/dice`):
   ```
@@ -517,10 +517,10 @@ revisão pós-implementação em `docs/revisao-desfazer.md`.
   mapa quando isso reencaixa/redimensiona algum token (`scene:updateGrid`, §9.7 — só quando há
   token pra reencaixar; um patch que só muda cor/`snap` não entra na pilha), colocar/mover/girar/
   apagar um gabarito de área de efeito do GM (`template:upsert`/`template:remove`, §9.9 — do
-  jogador não entra aqui, tem a própria pilha local), fixar/editar/apagar um pino de handout ou
-  nota no mapa (`pin:create`/`pin:update`/`pin:remove`, §9.10/§9.16 — sem mover: reposicionar é
-  apagar e fixar de novo), e apagar um handout da biblioteca (`handout:delete`, §9.10 — apaga
-  junto, na mesma entrada, os pinos dele em qualquer mapa; desfazer restaura os dois). Fora:
+  jogador não entra aqui, tem a própria pilha local), fixar/mover/editar/apagar um pino de handout
+  ou nota no mapa (`pin:create`/`pin:update`/`pin:remove`, §9.10/§9.16 — mover vale pra qualquer
+  `kind`, editar conteúdo só pra nota), e apagar um handout da biblioteca (`handout:delete`, §9.10 —
+  apaga junto, na mesma entrada, os pinos dele em qualquer mapa; desfazer restaura os dois). Fora:
   notas do Mestre (`scene:set-notes`/`token:set-notes`, §9.16 — trivial de desfazer à mão: escreve
   de novo), chat/rolagens (inclusive
   `handout:show`/`handout:close`, que não mexem em nada persistido além da mensagem em si),
@@ -841,16 +841,25 @@ geometria, `visible`, soft delete e desfazer — ver eventos `pin:*` abaixo.
   sem névoa — um pino não tem "centro", é um ícone do GM); pino de handout não tem toggle depois
   (apagar e fixar de novo muda) — pino de nota pode editar (`pin:update`, só `kind:"note"`: título/
   texto/ícone/cor/visibilidade no lugar). Broadcast de mapa de sempre: GM recebe qualquer mapa;
-  jogador só se `visible` e `sceneId` é o mapa ATIVO da sala. Clique no pino (GM ou jogador,
-  ferramenta Selecionar) abre o overlay (handout, tela cheia) ou o cartão (nota, mais leve — GM
-  edita/apaga no próprio cartão), sem emitir nada além do que já veio no pino. Botão direito no
-  pino (GM, ferramenta Selecionar) apaga direto (`pin:remove`) — sem confirmação, o Ctrl+Z do GM
-  cobre um clique errado tão bem quanto um `confirm()` custaria uma interrupção. Sem arrastar pra
-  mover: reposicionar um pino de handout é apagar e fixar de novo (§8); um pino de nota também não
-  arrasta por ora (mesma limitação). `pin:create`/`pin:update`/`pin:remove` entram na pilha de
-  desfazer do GM, mesmo espírito de gabarito de área (§9.6) — diferente de gabarito (efêmero em
-  memória), o pino é persistido (`Prisma.pin`), então `revert`/`apply` alternam `deletedAt` (criar/
-  apagar) ou reescrevem os campos de nota (editar), sem precisar reconstruir nada.
+  jogador só se `visible` e `sceneId` é o mapa ATIVO da sala.
+  - **Interação no mapa (ferramenta Selecionar) — se comporta como token** (docs/plano-narracao.md):
+    clique simples (qualquer um) SELECIONA (halo tracejado dourado, igual token/gabarito), sem abrir
+    nada; duplo clique (qualquer um) abre o overlay (handout, tela cheia) ou o cartão (nota, mais
+    leve — GM edita/apaga no próprio cartão). Arrastar move o pino selecionado (só GM; jogador
+    seleciona/abre, não arrasta) — `pin:update { patch: { x, y } }`, que vale pra QUALQUER `kind`
+    (mover não mexe no conteúdo). **Delete/Backspace apaga o pino selecionado** (só GM — mesmo
+    atalho de token/gabarito, `lib/useDeleteSelectionShortcut.ts`; sem confirmação, o Ctrl+Z do GM
+    cobre um clique errado tão bem quanto um `confirm()` custaria uma interrupção); token, gabarito
+    e pino nunca ficam selecionados juntos (mesma exclusão mútua de sempre). Sem botão direito
+    próprio (diferente de token, que abre o menu de condições ali). Tudo detectado por GEOMETRIA em
+    `VttCanvas`, nunca pelo hit canvas do Konva — mesmo motivo de sempre neste projeto (canvas de
+    hit embaralhado por proteção anti-fingerprinting, docs/debug-condicoes.md); `PinLayer` continua
+    `listening={false}`, só desenho.
+  - `pin:create`/`pin:update`/`pin:remove` entram na pilha de desfazer do GM, mesmo espírito de
+    gabarito de área (§9.6) — diferente de gabarito (efêmero em memória), o pino é persistido
+    (`Prisma.pin`), então `revert`/`apply` alternam `deletedAt` (criar/apagar) ou reescrevem os
+    campos que mudaram — posição (mover) e/ou conteúdo de nota (editar) — sem precisar reconstruir
+    nada; o resumo no tooltip do botão Desfazer diferencia "mover pino" de "editar pino".
 - **Ícone/cor de pino de nota** (`SystemDefinition.pinIcons?[]`, opcional): lista de `{ key, label,
   icon (SVG), color }`, mesmo formato de `conditions[]` — não é regra de sistema (nenhuma mecânica
   lê isto), então sem essa lista o cliente usa uma paleta padrão embutida no código

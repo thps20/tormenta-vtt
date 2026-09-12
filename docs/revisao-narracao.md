@@ -195,10 +195,92 @@ saída.
   não no snapshot") é exatamente a diferença entre `toPin` (criação, estrito) e `toPinSafe`
   (snapshot, tolerante). `make typecheck`/`make test` verdes (569 testes: 370 + 136 + 63).
 
+## 3.2 Três ajustes pedidos depois da primeira revisão
+
+### 3.2.1 Pino/handout no mapa passa a se comportar como token
+
+Antes: clique simples abria o overlay/cartão direto (sem seleção), botão direito apagava sem
+confirmação, sem arrastar (reposicionar era apagar e fixar de novo). Mudou pra imitar exatamente a
+interação de token/gabarito:
+
+- **Clique simples**: seleciona (halo tracejado dourado — `PinLayer`, mesmo visual de token/
+  gabarito). Não abre mais nada.
+- **Duplo clique**: abre (mesmo mecanismo geométrico de `registerTokenClick`, agora
+  `registerPinClick` — dois `mousedown` no mesmo pino dentro de 300 ms).
+- **Arrastar** (só GM): move. Diferente de token/gabarito, **sem eco `live` pros outros** — um pino
+  não muda de posição durante uma cena jogada com a frequência de um token, então não parecia valer
+  a complexidade de replicar o sistema de `live`/throttle; o arrasto é só visual NESTE cliente
+  (`pinDragLive`, estado local do `VttCanvas`) até soltar, que manda UM `pin:update { patch: {x,y} }`
+  final. `x`/`y` agora valem pra **qualquer** `kind` (antes só existiam campos de nota no patch) —
+  mover não mexe em conteúdo, então não faz sentido restringir a handout.
+- **Delete/Backspace** (só GM): apaga o pino selecionado — trocou o botão direito (que apagava sem
+  seleção, sem histórico visível na UI) pelo mesmo atalho de token/gabarito
+  (`lib/useDeleteSelectionShortcut.ts`); token, gabarito e pino nunca ficam selecionados juntos (a
+  cada seleção nova, `VttCanvas` limpa as outras duas — mesmo padrão que token/gabarito já tinham
+  entre si).
+- Histórico: `pin:update` agora tem uma diff genérica por CAMPO (`pickTrackablePinPatch`,
+  `socket/pins.ts`) comparando a linha do banco antes/depois — o mesmo mecanismo cobre mover (só
+  x/y mudam) e editar nota (nome/texto/ícone/cor mudam), com o resumo do Ctrl+Z dizendo "mover
+  pino" ou "editar pino" dependendo de quais campos entraram no diff. Substituiu o
+  `buildPinUpdateHistoryEntry`/`writeNotePin` antigos, que só sabiam lidar com nota inteira.
+- Sem teste novo pedido para este ajuste (a diferença é majoritariamente de interação no canvas,
+  sem lógica pura nova que valesse a pena isolar) — verificado por leitura de código; recomendo um
+  `make dev` manual antes de dar como fechado (arrastar/selecionar/Delete no canvas de verdade).
+
+### 3.2.2 `/w` com nickname de mais de uma palavra
+
+Antes: `WHISPER_RE` só capturava a primeira palavra como nickname — "Mestre Sombrio" virava
+nickname "Mestre" + mensagem "Sombrio ...". Agora `parseChatCommand` recebe a lista de
+participantes da sala e resolve de duas formas:
+
+- **Entre aspas** (`/w "Ana Maria" oi`): tudo entre `"..."` é o nickname, literal.
+- **Sem aspas, guloso**: tenta o prefixo mais LONGO do texto primeiro (todas as palavras menos a
+  última), encurtando até achar um que seja nickname de alguém; para na primeira correspondência
+  (ambígua ou não) — não continua tentando prefixos mais curtos depois de achar uma correspondência
+  ambígua, só depois de um "não existe esse nickname" (`resolveWhisperTarget` ganhou um campo
+  `reason: "not-found" | "ambiguous"` pra `parseChatCommand` saber qual dos dois casos é).
+- **Nickname inexistente OU ambíguo**: `parseChatCommand` devolve `{ kind: "whisper-error" }` — o
+  handler (`socket/chat.ts`) lança `HandlerError` na hora, a mensagem NUNCA é criada (nem como
+  sussurro, nem como texto normal). Isto é uma mudança de comportamento deliberada: antes, um `/w`
+  que não casasse a regex virava mensagem de texto pública (o autor podia achar que sussurrou e na
+  verdade todo mundo leu); agora só acontece pra "/w <uma palavra só, sem mensagem depois>" (que
+  nem parece uma tentativa completa de sussurro) — qualquer coisa com cara de `/w <nickname>
+  <mensagem>` que falhe na resolução vira erro, nunca vazamento.
+- `chat.ts` só busca a lista de participantes quando o texto começa com `/w` (`/^\/w\b/i`), pra não
+  gastar uma consulta à toa em toda mensagem/rolagem normal.
+- **Autocomplete Tab** (`ChatTab.tsx`) completa nickname com espaço já entre aspas
+  (`/w "Ana Maria" `), detectando os dois casos em andamento (aspas já abertas, ou ainda sem aspas).
+- Testes (`chatCommands.test.ts`): nickname simples, com espaço sem aspas (prefixo mais longo
+  vencendo, e caindo pro mais curto quando o mais longo não existe), entre aspas (simples e com
+  espaço), inexistente (com e sem aspas) e ambíguo (com e sem aspas) — 12 casos novos, mais os 2 de
+  `resolveWhisperTarget` ganhando o campo `reason`.
+
+### 3.2.3 Bug: autor do sussurro não via a própria mensagem
+
+Achado real: `blockedPlayerIdsForWhisper` (broadcast) e `whisperGateOk` (snapshot/histórico) só
+liberavam GM e o ALVO do sussurro — nunca checavam se o viewer era o AUTOR. Enquanto só
+`handout:show` (sempre publicado pelo GM) usava `whisperTo`, isso nunca aparecia: "GM nunca é
+bloqueado por regra nenhuma" cobria o único autor que existia. Quando o sussurro comum passou a
+valer pra qualquer participante (docs/plano-narracao.md), um JOGADOR sussurrando pra outro sumia da
+própria mensagem — o efeito prático seria "mandei e não apareceu no meu chat", parecendo que o
+sussurro nem saiu.
+
+Corrigido: `whisperGateOk` e `blockedPlayerIdsForWhisper` agora também liberam
+`viewer.participantId === msg.participantId` (o autor), nos dois pontos (`emitChatMessage` e
+`emitRollWithTargetsMessage`). Um teste antigo (`whisperGateOk`, "quem não é o alvo nem o GM fica
+de fora", usando o AUTOR como viewer) esperava `false` — era o próprio bug codificado como
+comportamento esperado; virou `true`, com um comentário explicando a inversão. Adicionado um quarto
+viewer (`thirdParty`, nem autor nem alvo nem GM) pra cobrir de verdade "alguém de fora fica de
+fora", que o teste antigo não testava (usava sempre o mesmo `other` como alvo E como "terceiro").
+Cobertura agora: autor (sempre vê), destinatário (sempre vê), GM (sempre vê), terceiro jogador
+(nunca vê) — os quatro pedidos.
+
 ## 4. O que ficou por fazer (fora do pedido original, ou nice-to-have)
 
-- Arrastar um pino pra reposicionar (hoje: apagar e fixar de novo, igual handout já era).
 - Busca de notas não pagina (ok pra uma sala pequena; uma sala com centenas de tokens anotados
   ficaria lenta — não é o caso de uso do projeto).
 - O indicador de "tem nota" no token (canto inferior-esquerdo do círculo) não tem tooltip — só a
   presença do ícone; abrir o painel de notas é a única forma de confirmar o que diz.
+- Arrastar um pino não emite eco `live` pros outros verem em tempo real (§3.2.1) — só o commit
+  final broadcast. Se algum dia isso incomodar numa mesa (dois GMs mexendo no mapa ao mesmo tempo),
+  dá pra copiar o mecanismo de `template:upsert { live: true }`.

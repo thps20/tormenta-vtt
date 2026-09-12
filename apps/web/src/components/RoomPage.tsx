@@ -510,6 +510,9 @@ function Table() {
   const updatePin = usePins((s) => s.update);
   const removePin = usePins((s) => s.remove);
   const pinsByScene = usePins((s) => s.pinsByScene);
+  /** Seleção (halo) — pino se comporta como token, docs/plano-narracao.md. */
+  const selectedPinId = usePins((s) => s.selectedId);
+  const selectPin = usePins((s) => s.select);
   const pins = useMemo(() => scenePins(pinsByScene, scene?.id), [pinsByScene, scene?.id]);
   const pinIcons = useMemo(() => resolvePinIcons(systemDef), [systemDef]);
   /** Ponto pendente da ferramenta "Pino" (clicou no mapa, formulário ainda não confirmado). */
@@ -696,7 +699,8 @@ function Table() {
 
   /** Clique num pino (ferramenta Selecionar): handout abre o overlay de sempre; nota abre o cartão. */
   const handleOpenPin = (pin: Pin) => (pin.kind === "note" ? setOpenNotePin(pin) : openHandoutLocal(null, pinToCard(pin)));
-  const handleDeletePin = (pin: Pin) => scene && void removePin(scene.id, pin.id);
+  /** Arrastar move (GM) — mesmo `pin:update` da edição de nota, só que com x/y (vale pra qualquer kind). */
+  const handleMovePin = (pin: Pin, x: number, y: number) => scene && void updatePin(scene.id, pin.id, { x, y });
   const handleHandoutDrop = (handout: Handout, point: { x: number; y: number }) => {
     if (!scene) return;
     void createPin({ kind: "handout", sceneId: scene.id, x: point.x, y: point.y, visible: true, handoutId: handout.id });
@@ -835,8 +839,10 @@ function Table() {
                 onTemplateCommit={handleTemplateCommit}
                 pins={pins}
                 pinIcons={pinIcons}
+                selectedPinId={selectedPinId}
+                onSelectPin={selectPin}
                 onOpenPin={handleOpenPin}
-                onDeletePin={isGm ? handleDeletePin : undefined}
+                onMovePin={isGm ? handleMovePin : undefined}
                 onHandoutDrop={isGm ? handleHandoutDrop : undefined}
                 onPinToolClick={isGm ? handlePinToolClick : undefined}
                 myTargetIds={myTargetIds}

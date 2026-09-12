@@ -72,13 +72,20 @@ export const PinCreateSchema = z.discriminatedUnion("kind", [
 export type PinCreatePayload = z.infer<typeof PinCreateSchema>;
 
 /**
- * `pin:update` (GM) — só pinos `kind: "note"`: título/texto/ícone/cor/visibilidade editáveis no
- * lugar (o handout continua "apagar e fixar de novo", cópia denormalizada de outra entidade).
+ * `pin:update` (GM). `x`/`y` (docs/plano-narracao.md — pino se comporta como token: arrastar move)
+ * valem pra QUALQUER `kind` — mover não muda o conteúdo. `title`/`text`/`icon`/`color` continuam só
+ * pra `kind: "note"` (o handout continua "apagar e fixar de novo" pra editar conteúdo, cópia
+ * denormalizada de outra entidade) — o servidor confere isso à parte, o schema não sabe o `kind`
+ * atual do pino (só o payload de patch).
  */
 export const PinUpdateSchema = z.object({
   sceneId: IdSchema,
   pinId: IdSchema,
-  patch: PinNoteFieldsSchema.omit({ kind: true }).partial().extend({ visible: z.boolean().optional() }),
+  patch: PinNoteFieldsSchema.omit({ kind: true }).partial().extend({
+    x: z.number().finite().optional(),
+    y: z.number().finite().optional(),
+    visible: z.boolean().optional(),
+  }),
 });
 export type PinUpdatePayload = z.infer<typeof PinUpdateSchema>;
 

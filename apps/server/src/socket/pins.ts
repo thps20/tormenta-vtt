@@ -5,6 +5,7 @@
  * segue a regra de mapa de sempre (GM sempre recebe; jogador só se `visible` e `sceneId` é o mapa
  * ATIVO da sala) — entra no desfazer do GM, mesmo mecanismo de handout:pin/unpin de antes.
  */
+import type { Pin as DbPin } from "@prisma/client";
 import { PinCreateSchema, PinRemoveSchema, PinUpdateSchema, type Pin } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { buildHandoutCard, requireHandout, toHandout } from "../services/handouts.js";
@@ -72,32 +73,55 @@ function buildPinRemoveHistoryEntry(io: TypedServer, roomId: string, sceneId: st
   };
 }
 
-/** `pin:update` (só nota): revert/apply trocam o patch aplicado — mesmo padrão de
- *  `buildUpdateHistoryEntry` do token (docs/plano-desfazer.md §3), só um campo por vez aqui. */
-function buildPinUpdateHistoryEntry(io: TypedServer, roomId: string, sceneId: string, pinId: string, title: string, before: Pin, after: Pin): HistoryEntry {
+/**
+ * Campos de um `Pin` que entram no desfazer do GM: posição (`x`/`y` — mover, QUALQUER `kind`) e
+ * conteúdo de nota (`name`/`text`/`icon`/`color` — só `kind: "note"`, mas comparar por linha crua
+ * do banco não precisa saber disso: um handout nunca tem esses campos mudados, então a diferença
+ * dá vazia sozinha). `visible` também é trackable (mesmo padrão de `Token.visible`).
+ */
+const TRACKABLE_PIN_FIELDS = ["x", "y", "name", "text", "icon", "color", "visible"] as const;
+type TrackablePinField = (typeof TRACKABLE_PIN_FIELDS)[number];
+type TrackablePinPatch = Partial<Pick<DbPin, TrackablePinField>>;
+
+/** Mesmo padrão de `pickTrackableTokenPatch` (services/history.ts, docs/plano-desfazer.md §3): só
+ *  os campos que de fato mudaram entre a linha ANTES e DEPOIS do update. `null` = nada trackable
+ *  mudou (patch só tocou um campo que não entra no histórico — não deveria acontecer hoje, mas não
+ *  trava o resto do handler por isso). */
+function pickTrackablePinPatch(before: DbPin, after: DbPin): { before: TrackablePinPatch; after: TrackablePinPatch } | null {
+  const b: TrackablePinPatch = {};
+  const a: TrackablePinPatch = {};
+  for (const f of TRACKABLE_PIN_FIELDS) {
+    if (before[f] !== after[f]) {
+      // A união discriminada do Prisma não deixa TS provar que os dois lados do mesmo campo `f`
+      // batem tipo a tipo aqui (ele só sabe que cada um É um valor de Pin, não QUAL). Seguro na
+      // prática: os dois vêm da mesma coluna da mesma tabela.
+      (b as Record<string, unknown>)[f] = before[f];
+      (a as Record<string, unknown>)[f] = after[f];
+    }
+  }
+  return Object.keys(b).length > 0 ? { before: b, after: a } : null;
+}
+
+/** `pin:update`: revert/apply trocam o patch aplicado — mesmo padrão de `buildUpdateHistoryEntry`
+ *  do token (docs/plano-desfazer.md §3). Resumo diferencia "mover" (só x/y) de "editar" (conteúdo). */
+function buildPinPatchHistoryEntry(io: TypedServer, roomId: string, label: string, pinId: string, diff: { before: TrackablePinPatch; after: TrackablePinPatch }): HistoryEntry {
+  const isMoveOnly = Object.keys(diff.after).every((k) => k === "x" || k === "y");
   return {
-    summary: `editar pino "${title}"`,
-    async revert() {
-      await writeNotePin(io, roomId, sceneId, pinId, before);
-    },
-    async apply() {
-      await writeNotePin(io, roomId, sceneId, pinId, after);
-    },
+    summary: `${isMoveOnly ? "mover" : "editar"} pino "${label}"`,
+    revert: () => writeTrackablePinPatch(io, roomId, pinId, diff.before),
+    apply: () => writeTrackablePinPatch(io, roomId, pinId, diff.after),
   };
 }
 
-async function writeNotePin(io: TypedServer, roomId: string, sceneId: string, pinId: string, state: Pin): Promise<void> {
-  if (state.kind !== "note") return; // nunca deveria acontecer (pin:update só aceita nota)
+/** Reaplica só os campos rastreados capturados (before OU after) num pino — usado por revert/apply.
+ *  Pino apagado nesse meio tempo invalida a entrada inteira (mesmo espírito de writeTrackablePatch
+ *  do token). */
+async function writeTrackablePinPatch(io: TypedServer, roomId: string, pinId: string, patch: TrackablePinPatch): Promise<void> {
   const row = await prisma.pin.findUnique({ where: { id: pinId } });
-  if (!row || row.deletedAt !== null) throw new Error(`o pino "${state.title}" não existe mais`);
-  const updated = toPin(
-    await prisma.pin.update({
-      where: { id: pinId },
-      data: { name: state.title, text: state.text, icon: state.icon ?? null, color: state.color ?? null, visible: state.visible },
-    }),
-  );
-  const activeNow = await isActiveScene(roomId, sceneId);
-  emitPinUpdated(io, roomId, sceneId, updated, updated.visible && activeNow);
+  if (!row || row.deletedAt !== null) throw new Error(`o pino "${pinId}" não existe mais`);
+  const updated = toPin(await prisma.pin.update({ where: { id: pinId }, data: patch }));
+  const activeNow = await isActiveScene(roomId, updated.sceneId);
+  emitPinUpdated(io, roomId, updated.sceneId, updated, updated.visible && activeNow);
 }
 
 export function registerPinHandlers(io: TypedServer, socket: TypedSocket): void {
@@ -165,25 +189,35 @@ export function registerPinHandlers(io: TypedServer, socket: TypedSocket): void 
         await requireScene(sceneId, ctx.roomId);
         const row = await requirePin(pinId, sceneId);
         const before = toPin(row);
-        if (before.kind !== "note") throw new HandlerError('Só um pino de nota pode ser editado no lugar — apague e fixe o handout de novo');
 
-        const updated = toPin(
-          await prisma.pin.update({
-            where: { id: pinId },
-            data: {
-              name: patch.title ?? before.title,
-              text: patch.text ?? before.text,
-              icon: patch.icon !== undefined ? patch.icon : before.icon ?? null,
-              color: patch.color !== undefined ? patch.color : before.color ?? null,
-              visible: patch.visible ?? before.visible,
-            },
-          }),
-        );
+        // Mover (x/y) vale pra QUALQUER kind (docs/plano-narracao.md — pino se comporta como
+        // token: arrastar move); editar CONTEÚDO (título/texto/ícone/cor) continua só pra nota —
+        // handout é cópia denormalizada de outra entidade, "apague e fixe de novo" pra atualizar.
+        const isContentPatch = patch.title !== undefined || patch.text !== undefined || patch.icon !== undefined || patch.color !== undefined;
+        if (isContentPatch && before.kind !== "note") {
+          throw new HandlerError("Só um pino de nota pode ser editado no lugar — apague e fixe o handout de novo");
+        }
+
+        const data = {
+          ...(patch.x !== undefined ? { x: patch.x } : {}),
+          ...(patch.y !== undefined ? { y: patch.y } : {}),
+          ...(patch.visible !== undefined ? { visible: patch.visible } : {}),
+          ...(before.kind === "note" && patch.title !== undefined ? { name: patch.title } : {}),
+          ...(before.kind === "note" && patch.text !== undefined ? { text: patch.text } : {}),
+          ...(before.kind === "note" && patch.icon !== undefined ? { icon: patch.icon } : {}),
+          ...(before.kind === "note" && patch.color !== undefined ? { color: patch.color } : {}),
+        };
+        const updatedRow = await prisma.pin.update({ where: { id: pinId }, data });
+        const updated = toPin(updatedRow);
         const activeNow = await isActiveScene(ctx.roomId, sceneId);
         emitPinUpdated(io, ctx.roomId, sceneId, updated, updated.visible && activeNow);
 
-        pushEntry(ctx.roomId, buildPinUpdateHistoryEntry(io, ctx.roomId, sceneId, pinId, before.title, before, updated));
-        emitHistoryUpdated(io, ctx.roomId);
+        const diff = pickTrackablePinPatch(row, updatedRow);
+        if (diff) {
+          const label = before.kind === "note" ? before.title : (before.name ?? "");
+          pushEntry(ctx.roomId, buildPinPatchHistoryEntry(io, ctx.roomId, label, pinId, diff));
+          emitHistoryUpdated(io, ctx.roomId);
+        }
         return updated;
       },
       gmOnly,
