@@ -227,6 +227,22 @@ export const ConditionDefSchema = z.object({
 });
 export type ConditionDef = z.infer<typeof ConditionDefSchema>;
 
+/**
+ * Ícone/cor oferecido na ferramenta "Pino" pra pinos de nota (docs/plano-narracao.md). Não é regra
+ * de sistema (nenhuma mecânica lê isto) — é só uma lista de aparência que uma mesa pode querer com
+ * a cara do próprio sistema (T20 poderia ter um ícone de "pista" ou "perigo"). Mesmo formato de
+ * `ConditionDefSchema` (SVG monocromático embutido). Lista VAZIA (padrão) = o cliente usa uma
+ * paleta embutida no código (mobília de UI, Regra nº 1 — não hardcoda regra, mas ícone de pino não
+ * é regra); com itens aqui, eles aparecem primeiro no seletor, antes do padrão embutido.
+ */
+export const PinIconDefSchema = z.object({
+  key: KeySchema,
+  label: z.string().min(1),
+  icon: z.string().min(1),
+  color: HexColorSchema,
+});
+export type PinIconDef = z.infer<typeof PinIconDefSchema>;
+
 /** Campos de texto/enum da ficha sem regra associada (raça, origem, divindade...). */
 export const TraitFieldDefSchema = z.object({
   key: KeySchema,
@@ -461,6 +477,8 @@ export const SystemDefinitionSchema = z.object({
   activation: ActivationDefSchema.default({}),
   /** Marcadores de condição (T20: Abalado, Cego...) exibidos no token. Sem automação de regra por enquanto. */
   conditions: z.array(ConditionDefSchema).default([]),
+  /** Ícones extras pra pinos de nota (ver PinIconDefSchema). Vazio = só a paleta padrão embutida no cliente. */
+  pinIcons: z.array(PinIconDefSchema).default([]),
   /** Como ler um bloco de criatura no compêndio (ver CreatureDefSchema). Ausente = sistema sem criaturas. */
   creatures: CreatureDefSchema.optional(),
   /** Gabaritos de área de efeito (ver TemplatesDefSchema). Ausente = sistema sem a ferramenta "Área". */
@@ -596,6 +614,7 @@ export function validateSystemDefinition(input: unknown): SystemDefinition {
   assertUnique(def, "tipo de dano", def.damageTypes.map((d) => d.key));
   assertUnique(def, "grupo de tipo de dano", def.damageTypeGroups.map((g) => g.key));
   assertUnique(def, "condição", def.conditions.map((c) => c.key));
+  assertUnique(def, "ícone de pino", def.pinIcons.map((p) => p.key));
 
   for (const type of def.damageTypes) {
     if (type.group !== undefined && !def.damageTypeGroups.some((g) => g.key === type.group)) fail(def, `tipo de dano "${type.key}" referencia grupo inexistente "${type.group}"`);

@@ -47,17 +47,20 @@ import type {
   HandoutClosePayload,
   HandoutCreatePayload,
   HandoutDeletePayload,
-  HandoutPin,
-  HandoutPinCreatePayload,
   HandoutShowPayload,
-  HandoutUnpinPayload,
   HandoutUpdatePayload,
+  NotesSearchPayload,
+  NotesSearchResultItem,
   Participant,
   PartyAddPayload,
   PartyEntry,
   PartyRemovePayload,
   PartyReorderPayload,
   PartySetHiddenPayload,
+  Pin,
+  PinCreatePayload,
+  PinRemovePayload,
+  PinUpdatePayload,
   RoomJoinPayload,
   RoomPublic,
   Ruler,
@@ -70,11 +73,13 @@ import type {
   SceneDeleteResult,
   SceneDuplicatePayload,
   SceneEnterPayload,
+  SceneGetNotesPayload,
   SceneListItem,
   SceneRenamePayload,
   SceneReorderPayload,
   SceneSetArrivalPayload,
   SceneSetMapPayload,
+  SceneSetNotesPayload,
   SceneUpdateGridPayload,
   TargetSetPayload,
   Template,
@@ -84,8 +89,10 @@ import type {
   TokenApplyDamagePayload,
   TokenCreate,
   TokenDeleteManyPayload,
+  TokenGetNotesPayload,
   TokenLinkCharacterPayload,
   TokenPatch,
+  TokenSetNotesPayload,
   TokenUpdateManyPayload,
 } from "./schemas/index.js";
 
@@ -106,8 +113,9 @@ export interface RoomSnapshot {
   combat: Combat | null;
   /** Gabaritos de área de efeito da cena ativa (docs/plano-gabaritos.md). Efêmeros, não vêm do banco. */
   templates: Template[];
-  /** Pinos de handout fixados na cena ativa (§9.10), já filtrados pela visibilidade de quem recebe. */
-  handoutPins: HandoutPin[];
+  /** Pinos (handout ou nota) fixados na cena ativa (§9.10/§9.16), já filtrados pela visibilidade de
+   *  quem recebe. */
+  pins: Pin[];
   chat: ChatMessage[];
   /** Fichas da sala (jogadores não recebem as de kind = "npc"). */
   characters: Character[];
@@ -171,7 +179,7 @@ export interface ClientToServerEvents {
    */
   "scene:enter": (
     payload: SceneEnterPayload,
-    ack: Ack<{ tokens: Token[]; combat: Combat | null; templates: Template[]; handoutPins: HandoutPin[] }>,
+    ack: Ack<{ tokens: Token[]; combat: Combat | null; templates: Template[]; pins: Pin[] }>,
   ) => void;
   "scene:rename": (payload: SceneRenamePayload, ack: Ack<Scene>) => void;
   /** Copia mapUrl/mapWidth/mapHeight/grid/fog/arrival; NÃO copia tokens nem combate. */
@@ -183,6 +191,16 @@ export interface ClientToServerEvents {
   "scene:setArrival": (payload: SceneSetArrivalPayload, ack: Ack<Scene>) => void;
   /** Contagens/combate de cada mapa pro painel "Mapas" (dados que o cliente não carregou). */
   "scene:list": (payload: Record<string, never>, ack: Ack<{ items: SceneListItem[] }>) => void;
+
+  // Notas do Mestre (docs/plano-narracao.md, GM only): texto nunca vai no Scene/Token serializado
+  // (só `hasNotes: boolean`) — só sai por estes eventos dedicados, carregados sob demanda quando o
+  // painel/Inspector abre.
+  "scene:set-notes": (payload: SceneSetNotesPayload, ack: Ack<Scene>) => void;
+  "scene:get-notes": (payload: SceneGetNotesPayload, ack: Ack<{ notes: string }>) => void;
+  "token:set-notes": (payload: TokenSetNotesPayload, ack: Ack<Token>) => void;
+  "token:get-notes": (payload: TokenGetNotesPayload, ack: Ack<{ notes: string }>) => void;
+  /** Busca simples (contains) nas notas de mapa e de token da sala inteira. */
+  "notes:search": (payload: NotesSearchPayload, ack: Ack<{ items: NotesSearchResultItem[] }>) => void;
   /** Névoa manual da cena: add / removeLast / revealAll / hideAll / setEnabled. Ack devolve o estado completo. */
   "fog:update": (payload: FogUpdatePayload, ack: Ack<FogConfig>) => void;
 
@@ -297,9 +315,16 @@ export interface ClientToServerEvents {
   "handout:show": (payload: HandoutShowPayload, ack: Ack) => void;
   /** Fecha o overlay pra quem via a mensagem (ela continua no chat, clicável de novo). */
   "handout:close": (payload: HandoutClosePayload, ack: Ack) => void;
-  /** Fixa uma cópia denormalizada do handout como um pino no mapa (entra no desfazer do GM). */
-  "handout:pin": (payload: HandoutPinCreatePayload, ack: Ack<HandoutPin>) => void;
-  "handout:unpin": (payload: HandoutUnpinPayload, ack: Ack) => void;
+
+  // Pinos no mapa (docs/plano-narracao.md, unifica o antigo handout:pin/unpin com pino de nota):
+  // GM cria/edita/apaga; broadcast segue a regra de mapa de sempre (GM sempre; jogador só se
+  // `visible` e `sceneId` é o mapa ATIVO). Entram no desfazer do GM.
+  /** `kind: "handout"` fixa uma cópia denormalizada do handout; `kind: "note"` cria o pino com o
+   *  conteúdo (título/texto/ícone/cor) direto no payload. */
+  "pin:create": (payload: PinCreatePayload, ack: Ack<Pin>) => void;
+  /** Só pinos `kind: "note"` — handout continua "apagar e fixar de novo" (cópia denormalizada). */
+  "pin:update": (payload: PinUpdatePayload, ack: Ack<Pin>) => void;
+  "pin:remove": (payload: PinRemovePayload, ack: Ack) => void;
 
   // Chat + dados
   /**
@@ -427,13 +452,16 @@ export interface ServerToClientEvents {
   "template:upserted": (p: { sceneId: string; template: Template }) => void;
   "template:removed": (p: { sceneId: string; templateId: string }) => void;
 
-  // Handouts (§9.10). Biblioteca (created/updated/deleted) só vai pro GM. Pino segue a regra de
-  // broadcast de mapa de sempre: GM sempre recebe; jogador só se `visible` e `sceneId` é o mapa ATIVO.
+  // Handouts (§9.10). Biblioteca (created/updated/deleted) só vai pro GM.
   "handout:created": (handout: Handout) => void;
   "handout:updated": (handout: Handout) => void;
   "handout:deleted": (p: { id: string }) => void;
-  "handout:pinned": (p: { sceneId: string; pin: HandoutPin }) => void;
-  "handout:unpinned": (p: { sceneId: string; pinId: string }) => void;
+
+  // Pinos no mapa (§9.10/§9.16): mesma regra de broadcast de mapa de sempre — GM sempre recebe;
+  // jogador só se `visible` e `sceneId` é o mapa ATIVO.
+  "pin:created": (p: { sceneId: string; pin: Pin }) => void;
+  "pin:updated": (p: { sceneId: string; pin: Pin }) => void;
+  "pin:removed": (p: { sceneId: string; pinId: string }) => void;
 
   // Encontros salvos (§9.14): biblioteca por sala, só pro GM (rooms.gm) — mesmo desenho de handout:*.
   "encounter:created": (encounter: SavedEncounter) => void;

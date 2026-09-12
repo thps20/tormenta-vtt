@@ -8,7 +8,7 @@ import { emitAck } from "./connection";
  * "draw" já existe no tipo para a barra reservar o lugar, mas ainda não faz nada.
  * "fog" é só do GM (ver useToolShortcuts e Toolbar). "template" (Área) não é GM-only.
  */
-export type ToolMode = "select" | "pan" | "ruler" | "fog" | "template" | "draw";
+export type ToolMode = "select" | "pan" | "ruler" | "fog" | "template" | "draw" | "pin";
 
 /** Sub-modo da névoa: o que a forma desenhada faz. */
 export type FogToolMode = "reveal" | "hide";

@@ -66,15 +66,26 @@ export const TokenSchema = z.object({
    * igual a ownerId/characterId.
    */
   conditions: z.array(TokenConditionEntrySchema).default([]),
+  /**
+   * Só GM tem nota (docs/plano-narracao.md): o TEXTO nunca trafega aqui, nem para o GM — só este
+   * booleano (token tem alguma anotação ou não), pra desenhar o indicador no canvas e no
+   * TokenInspector/ficha rápida sem carregar o conteúdo. O texto de verdade só sai por
+   * `token:get-notes` (ack dedicado, GM only): assim nenhum caminho futuro de serialização do
+   * Token pode vazar a nota para um jogador — o campo simplesmente não existe no objeto.
+   */
+  hasNotes: z.boolean().default(false),
 });
 export type Token = z.infer<typeof TokenSchema>;
 
-/** Payload de criação: servidor gera o id. O vínculo com ficha é feito depois, por token:link-character. */
-export const TokenCreateSchema = TokenSchema.omit({ id: true, characterId: true });
+/** Payload de criação: servidor gera o id. O vínculo com ficha é feito depois, por token:link-character.
+ *  `hasNotes` também fica de fora: todo token nasce sem nota (texto só entra por token:set-notes). */
+export const TokenCreateSchema = TokenSchema.omit({ id: true, characterId: true, hasNotes: true });
 export type TokenCreate = z.infer<typeof TokenCreateSchema>;
 
-/** Atualização parcial (arrastar manda só x/y; redimensionar manda cells, sempre inteiro). */
-export const TokenPatchSchema = TokenSchema.omit({ characterId: true })
+/** Atualização parcial (arrastar manda só x/y; redimensionar manda cells, sempre inteiro). `hasNotes`
+ *  fica de fora: é computado pelo servidor a partir do texto de `token:set-notes`, nunca um campo
+ *  que o cliente escreve direto (nem o GM manda o texto por aqui). */
+export const TokenPatchSchema = TokenSchema.omit({ characterId: true, hasNotes: true })
   .partial()
   .required({ id: true })
   .extend({

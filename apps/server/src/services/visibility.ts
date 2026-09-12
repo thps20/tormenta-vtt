@@ -47,6 +47,19 @@ function hiddenByFog(token: Token, geom: SceneGeometry): boolean {
 }
 
 /**
+ * `Token.hasNotes` (docs/plano-narracao.md) é "só o GM vê" (pedido original: o indicador de nota
+ * no token nunca aparece pra jogador, nem no próprio token dele) — diferente de `Scene.hasNotes`,
+ * que viaja pra todo mundo sem redação (o mapa já é uma entidade compartilhada de sempre, e não
+ * há hoje um mecanismo de broadcast assimétrico por papel pra Scene; ver docs/revisao-narracao.md).
+ * Pura: usada tanto no broadcast ao vivo (emitTokenToPlayers) quanto nas listas por viewer de
+ * `buildSnapshot`/`scene:enter`.
+ */
+export function redactTokenForViewer(token: Token, viewer: Viewer): Token {
+  if (viewer.role === "gm") return token;
+  return token.hasNotes ? { ...token, hasNotes: false } : token;
+}
+
+/**
  * Envia o token aos JOGADORES respeitando a visibilidade. Quem não pode ver
  * recebe `token:deleted` (caso tivesse o token em cache), nunca o token em si:
  * assim nem nome nem existência vazam. Como "é dono" varia por pessoa, usamos
@@ -62,12 +75,15 @@ export function emitTokenToPlayers(io: TypedServer, roomId: string, token: Token
   };
 
   if (!token.visible) return hide();
-  if (!hiddenByFog(token, geom)) return void io.to(players).emit(event, token);
+  // `redactTokenForViewer` é a mesma pros dois ramos abaixo: dono e demais jogadores nunca veem
+  // `hasNotes` do próprio token (a nota é do Mestre, não do personagem).
+  const redacted = redactTokenForViewer(token, { role: "player", participantId: "" });
+  if (!hiddenByFog(token, geom)) return void io.to(players).emit(event, redacted);
 
   // Oculto pela névoa: só o dono (se houver) recebe o token; os outros jogadores apagam.
   if (token.ownerId) {
     const ownerRoom = rooms.participant(token.ownerId);
-    io.to(ownerRoom).emit(event, token);
+    io.to(ownerRoom).emit(event, redacted);
     hide(ownerRoom);
   } else {
     hide();

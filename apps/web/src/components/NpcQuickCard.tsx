@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Anchor, Check, FileText, Heart, Info, Plus, Shield, SlidersHorizontal, Sparkles, Swords, Trash2, X, Zap } from "lucide-react";
+import { Anchor, Check, FileText, Heart, Info, NotebookText, Plus, Shield, SlidersHorizontal, Sparkles, Swords, Trash2, X, Zap } from "lucide-react";
 import { formatArea, type Character, type CharacterItem, type ComputedCharacter, type ConditionDef, type SystemDefinition, type Token, type TokenCondition } from "@tormenta-vtt/shared";
 import { DamageTypeBadge } from "./DamageTypeBadge";
 
@@ -23,6 +23,8 @@ export interface NpcQuickCardProps {
   onToggleCondition: (key: string) => void;
   onOpenFullSheet: () => void;
   onOpenTokenInspector: () => void;
+  /** Notas do Mestre sobre este token (docs/plano-narracao.md), só GM. */
+  onOpenNotes: () => void;
   onDelete: () => void;
   onClose: () => void;
 }
@@ -86,6 +88,7 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
   onToggleCondition,
   onOpenFullSheet,
   onOpenTokenInspector,
+  onOpenNotes,
   onDelete,
   onClose,
 }) => {
@@ -275,6 +278,16 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
             className="p-1.5 rounded text-zinc-400 hover:text-amber-300 hover:bg-[#25201a] border border-transparent hover:border-[#3d311f] transition-all cursor-pointer"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
+          </button>
+          <button
+            id="npc-btn-notes"
+            onClick={onOpenNotes}
+            title={token.hasNotes ? "Notas do Mestre (tem nota — só você vê)" : "Notas do Mestre (só você vê)"}
+            className={`p-1.5 rounded border transition-all cursor-pointer ${
+              token.hasNotes ? "text-amber-300 bg-[#25201a] border-[#3d311f]" : "text-zinc-400 hover:text-amber-300 hover:bg-[#25201a] border-transparent hover:border-[#3d311f]"
+            }`}
+          >
+            <NotebookText className="w-3.5 h-3.5" />
           </button>
           <button
             id="npc-btn-delete"

@@ -50,6 +50,12 @@ export const SceneSchema = z.object({
   order: z.number().int().default(0),
   /** Onde tokens levados de outro mapa aparecem ao ativar (espiral a partir daí). null = sem marcador. */
   arrival: ArrivalPointSchema.nullable().default(null),
+  /**
+   * Só GM tem nota do mapa (docs/plano-narracao.md), mesmo padrão de `Token.hasNotes`: o TEXTO
+   * nunca sai daqui, só este booleano — pra saber se há algo pra mostrar sem carregar o conteúdo.
+   * O texto vem por `scene:get-notes` (GM only).
+   */
+  hasNotes: z.boolean().default(false),
   createdAt: z.string().datetime(),
 });
 export type Scene = z.infer<typeof SceneSchema>;

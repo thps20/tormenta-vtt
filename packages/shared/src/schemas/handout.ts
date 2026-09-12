@@ -15,15 +15,16 @@ const HandoutTagsSchema = z.array(HandoutTagSchema).max(10).default([]);
 /** "Leve": não é a ficha inteira, mas dá pra escrever um texto de pista/nota razoável. */
 const HandoutTextSchema = z.string().trim().min(1).max(20_000);
 
-/** Campos que só existem em `kind: "image"` (mesmo formato de UploadResult: URL + dimensões). */
-const HandoutImageFieldsSchema = z.object({
+/** Campos que só existem em `kind: "image"` (mesmo formato de UploadResult: URL + dimensões).
+ *  Exportado: `./pin.js` reaproveita pro pino de handout, que tem o mesmo formato. */
+export const HandoutImageFieldsSchema = z.object({
   kind: z.literal("image"),
   imageUrl: z.string().min(1),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
 });
-/** Campos que só existem em `kind: "text"`. */
-const HandoutTextFieldsSchema = z.object({
+/** Campos que só existem em `kind: "text"`. Exportado, mesmo motivo acima. */
+export const HandoutTextFieldsSchema = z.object({
   kind: z.literal("text"),
   text: HandoutTextSchema,
 });
@@ -68,8 +69,9 @@ export type HandoutShowPayload = z.infer<typeof HandoutShowSchema>;
 export const HandoutCloseSchema = z.object({ messageId: IdSchema });
 export type HandoutClosePayload = z.infer<typeof HandoutCloseSchema>;
 
-/** Campos comuns de uma cópia denormalizada de Handout (card do chat e pino do mapa). */
-const HandoutCardBaseSchema = z.object({ handoutId: IdSchema, name: HandoutNameSchema });
+/** Campos comuns de uma cópia denormalizada de Handout (card do chat e pino do mapa). Exportado
+ *  pelo mesmo motivo de HandoutImageFieldsSchema/HandoutTextFieldsSchema acima. */
+export const HandoutCardBaseSchema = z.object({ handoutId: IdSchema, name: HandoutNameSchema });
 
 /**
  * Cópia denormalizada de um Handout, embutida em `ChatMessage.handout` no momento de `handout:show`
@@ -83,33 +85,5 @@ export const HandoutCardSchema = z.discriminatedUnion("kind", [
 ]);
 export type HandoutCard = z.infer<typeof HandoutCardSchema>;
 
-/**
- * Pino de um handout fixado no mapa (`handout:pin`). Geometria em PIXELS DO MAPA, como token e
- * gabarito. Mesma denormalização do card acima, capturada no momento de fixar — editar o handout
- * original depois não atualiza pinos já fixados (fixar de novo, se quiser atualizar um).
- */
-const HandoutPinBaseSchema = z.object({
-  id: IdSchema,
-  sceneId: IdSchema,
-  x: z.number().finite(),
-  y: z.number().finite(),
-  /** GM controla: pino invisível só aparece pro GM (mesma regra de Token.visible). */
-  visible: z.boolean(),
-});
-export const HandoutPinSchema = z.discriminatedUnion("kind", [
-  HandoutPinBaseSchema.extend(HandoutCardBaseSchema.shape).extend(HandoutImageFieldsSchema.shape),
-  HandoutPinBaseSchema.extend(HandoutCardBaseSchema.shape).extend(HandoutTextFieldsSchema.shape),
-]);
-export type HandoutPin = z.infer<typeof HandoutPinSchema>;
-
-export const HandoutPinCreateSchema = z.object({
-  sceneId: IdSchema,
-  handoutId: IdSchema,
-  x: z.number().finite(),
-  y: z.number().finite(),
-  visible: z.boolean().default(true),
-});
-export type HandoutPinCreatePayload = z.infer<typeof HandoutPinCreateSchema>;
-
-export const HandoutUnpinSchema = z.object({ sceneId: IdSchema, pinId: IdSchema });
-export type HandoutUnpinPayload = z.infer<typeof HandoutUnpinSchema>;
+// Pino de handout no mapa: unificado com pino de nota em `./pin.js` (docs/plano-narracao.md) —
+// `Pin{kind:"handout"}` carrega um `HandoutCard` (acima) por dentro. Ver pin.ts.

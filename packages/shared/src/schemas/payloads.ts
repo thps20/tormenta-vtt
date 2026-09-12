@@ -117,6 +117,33 @@ export type SceneReorderPayload = z.infer<typeof SceneReorderSchema>;
 export const SceneSetArrivalSchema = z.object({ sceneId: IdSchema, arrival: ArrivalPointSchema.nullable() });
 export type SceneSetArrivalPayload = z.infer<typeof SceneSetArrivalSchema>;
 
+// --- Notas do Mestre (docs/plano-narracao.md) -------------------------------
+// Texto nunca entra em Scene/Token (só `hasNotes: boolean` — ver schemas/scene.ts e token.ts):
+// vem/vai só por estes 4 eventos dedicados, GM only, pra nenhum caminho de serialização vazar nota
+// pra jogador. Nota vazia ("" ou só espaço) equivale a "sem nota" (hasNotes volta a false).
+
+const GmNoteTextSchema = z.string().max(20_000);
+
+export const SceneSetNotesSchema = z.object({ sceneId: IdSchema, notes: GmNoteTextSchema });
+export type SceneSetNotesPayload = z.infer<typeof SceneSetNotesSchema>;
+export const SceneGetNotesSchema = z.object({ sceneId: IdSchema });
+export type SceneGetNotesPayload = z.infer<typeof SceneGetNotesSchema>;
+
+export const TokenSetNotesSchema = z.object({ tokenId: IdSchema, notes: GmNoteTextSchema });
+export type TokenSetNotesPayload = z.infer<typeof TokenSetNotesSchema>;
+export const TokenGetNotesSchema = z.object({ tokenId: IdSchema });
+export type TokenGetNotesPayload = z.infer<typeof TokenGetNotesSchema>;
+
+/** Busca simples (contains, case-insensitive) nas notas de mapa e de token da sala inteira. */
+export const NotesSearchSchema = z.object({ query: z.string().trim().min(1).max(200) });
+export type NotesSearchPayload = z.infer<typeof NotesSearchSchema>;
+
+export const NotesSearchResultItemSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("scene"), sceneId: IdSchema, name: z.string(), snippet: z.string() }),
+  z.object({ kind: z.literal("token"), sceneId: IdSchema, tokenId: IdSchema, name: z.string(), snippet: z.string() }),
+]);
+export type NotesSearchResultItem = z.infer<typeof NotesSearchResultItemSchema>;
+
 // --- Névoa (fog of war manual) ----------------------------------------------
 
 /**
@@ -247,10 +274,19 @@ export type CharacterUseItemPayload = z.infer<typeof CharacterUseItemSchema>;
 /**
  * `visibility` é o modo de rolagem atual do autor e só vale para rolagens
  * (texto é sempre público). "/gmr" e "/pr" no texto forçam secreta/pública.
+ *
+ * `whisperTo` (docs/plano-narracao.md, seletor "para" ao lado do modo de rolagem): sussurro pontual
+ * pra UM participante, pra esta mensagem (texto OU rolagem) — o próprio autor decide, sem precisar
+ * de `/w` no texto (que continua funcionando: `parseChatCommand` resolve o nickname e devolve o
+ * mesmo `whisperTo` pro handler, ver services/chatCommands.ts). Reaproveita tal e qual o
+ * `ChatMessage.whisperTo` que já existia só para `handout:show`: o GM sempre recebe também (regra
+ * 3 de chatVisibility.ts), mesmo num sussurro entre dois jogadores — mesma postura de sempre no
+ * projeto ("o GM vê tudo"), não um sussurro cego pro GM.
  */
 export const ChatSendSchema = z.object({
   text: z.string().trim().min(1).max(2000),
   visibility: RollVisibilitySchema.default("all"),
+  whisperTo: IdSchema.nullable().optional(),
 });
 export type ChatSendPayload = z.infer<typeof ChatSendSchema>;
 

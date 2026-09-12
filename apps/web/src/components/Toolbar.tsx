@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { CloudFog, Hand, MousePointer2, Pencil, Redo2, Ruler, Shapes, Undo2 } from "lucide-react";
+import { CloudFog, Hand, MapPin, MousePointer2, Pencil, Redo2, Ruler, Shapes, Undo2 } from "lucide-react";
 import type { ToolMode } from "../store/tools";
 import { useBarTranslucency } from "../lib/useBarTranslucency";
 
@@ -44,8 +44,11 @@ const TOOLS: ToolDef[] = [
 /** Só quando o sistema declara `templates` (docs/plano-gabaritos.md) — não é GM-only. */
 const TEMPLATE_TOOL: ToolDef = { mode: "template", label: "Área", shortcut: "T", Icon: Shapes };
 
-/** Só o GM: pintar a névoa (ver FogToolbar para os sub-modos). */
-const GM_TOOLS: ToolDef[] = [{ mode: "fog", label: "Névoa", shortcut: "F", Icon: CloudFog }];
+/** Só o GM: pintar a névoa (ver FogToolbar para os sub-modos) e fixar pinos (docs/plano-narracao.md). */
+const GM_TOOLS: ToolDef[] = [
+  { mode: "fog", label: "Névoa", shortcut: "F", Icon: CloudFog },
+  { mode: "pin", label: "Pino", shortcut: "P", Icon: MapPin },
+];
 
 const FUTURE_TOOLS: ToolDef[] = [{ mode: "draw", label: "Desenho", shortcut: null, Icon: Pencil, soon: true }];
 

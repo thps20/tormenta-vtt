@@ -198,10 +198,11 @@ export const ChatMessageSchema = z.object({
   /** Quem recebe a mensagem (servidor filtra no broadcast e no snapshot). "Revelar" (GM) muda para "all". */
   visibility: RollVisibilitySchema.default("all"),
   /**
-   * Sussurro visual (handout:show "para X"): setado, a mensagem só existe pro GM e para este
-   * participante — nem card, nem placeholder pros demais, igual ao gate de `tokenId` acima, mas
-   * por PESSOA em vez de por token. Independente de `visibility` (que fica "all" nesse caso).
-   * Só handout usa por enquanto; campo genérico caso outra coisa precise de sussurro no futuro.
+   * Sussurro visual (handout:show "para X", ou o seletor "para"/`/w` do chat comum — docs/plano-narracao.md):
+   * setado, a mensagem só existe pro GM e para este participante — nem card, nem placeholder pros
+   * demais, igual ao gate de `tokenId` acima, mas por PESSOA em vez de por token. Independente de
+   * `visibility` (que fica "all" nesse caso). O GM sempre recebe também, mesmo num sussurro entre
+   * dois jogadores (mesma postura de sempre no projeto: nunca um sussurro cego pro GM).
    */
   whisperTo: IdSchema.nullable().default(null),
   createdAt: z.string().datetime(),

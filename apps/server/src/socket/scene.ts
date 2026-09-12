@@ -41,8 +41,8 @@ import { reanchorActiveCombatant } from "../services/movement.js";
 import { pushEntry, type HistoryEntry } from "../services/history.js";
 import { toScene, toToken } from "../services/serialize.js";
 import { clearTemplates, listTemplates } from "../services/templates.js";
-import { tokenVisibleTo } from "../services/visibility.js";
-import { handoutPinVisibleTo, toHandoutPin } from "../services/handouts.js";
+import { redactTokenForViewer, tokenVisibleTo } from "../services/visibility.js";
+import { pinVisibleTo, toPin } from "../services/pins.js";
 import { clearSceneTargets } from "../services/targets.js";
 import { guarded, HandlerError } from "./ack.js";
 import { emitHistoryUpdated } from "./history.js";
@@ -318,16 +318,19 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
       const scene = toScene(sceneRow);
       const geom = sceneGeometry(scene);
       const viewer = { role: ctx.role, participantId: ctx.participantId };
-      const [tokenRows, combatRow, def, handoutPinRows] = await Promise.all([
+      const [tokenRows, combatRow, def, pinRows] = await Promise.all([
         prisma.token.findMany({ where: { sceneId, deletedAt: null }, orderBy: { zIndex: "asc" } }),
         loadCombatRow(sceneId),
         requireSystem(ctx.roomId),
-        prisma.handoutPin.findMany({ where: { sceneId, deletedAt: null } }),
+        prisma.pin.findMany({ where: { sceneId, deletedAt: null } }),
       ]);
-      const tokens = tokenRows.map(toToken).filter((t) => tokenVisibleTo(t, viewer, geom));
+      const tokens = tokenRows
+        .map(toToken)
+        .filter((t) => tokenVisibleTo(t, viewer, geom))
+        .map((t) => redactTokenForViewer(t, viewer));
       const combat = combatRow ? toCombat(combatRow, def, viewer, geom) : null;
-      const handoutPins = handoutPinRows.map(toHandoutPin).filter((p) => handoutPinVisibleTo(p, viewer, sceneId));
-      return { tokens, combat, templates: listTemplates(sceneId), handoutPins };
+      const pins = pinRows.map(toPin).filter((p) => pinVisibleTo(p, viewer, sceneId));
+      return { tokens, combat, templates: listTemplates(sceneId), pins };
     }),
   );
 

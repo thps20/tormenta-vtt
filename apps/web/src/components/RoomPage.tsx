@@ -5,7 +5,9 @@ import { sceneTokens, useTokens } from "../store/tokens";
 import { sceneTemplates, useTemplates } from "../store/templates";
 import { useTemplateHistory } from "../store/templateHistory";
 import { useTargets } from "../store/targets";
-import { scenePins, useHandouts } from "../store/handouts";
+import { useHandouts } from "../store/handouts";
+import { scenePins, usePins } from "../store/pins";
+import { resolvePinIcons } from "../lib/pinIcons";
 import { describeTemplateAreaChange } from "../lib/templates";
 import { effectiveCellSize, sizeTokens } from "../lib/grid";
 import { useChat } from "../store/chat";
@@ -30,7 +32,7 @@ import {
   tokenCenter,
   type Handout,
   type HandoutCard,
-  type HandoutPin,
+  type Pin,
   type Template,
   type TemplateChangeAction,
 } from "@tormenta-vtt/shared";
@@ -42,6 +44,9 @@ import { MapSelector } from "./MapSelector";
 import { HandoutSelector } from "./HandoutSelector";
 import { HandoutOverlay } from "./HandoutOverlay";
 import { HandoutDragGhost } from "./HandoutDragGhost";
+import { NotePinCard } from "./NotePinCard";
+import { PinCreatePopover } from "./PinCreatePopover";
+import { NotesPanel, type NotesPanelTarget } from "./NotesPanel";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
 import { FogToolbar } from "./FogToolbar";
@@ -212,7 +217,7 @@ function Table() {
   useTokenMoveShortcuts();
 
   // Handouts (docs/SPEC.md §9.10): biblioteca por sala (só GM, carregada sob demanda ao abrir o
-  // HandoutSelector) + pinos do mapa visitado + overlay em tela cheia atualmente aberto.
+  // HandoutSelector) + overlay em tela cheia atualmente aberto.
   const handoutLibrary = useHandouts((s) => s.library);
   const loadHandoutLibrary = useHandouts((s) => s.loadLibrary);
   const createHandout = useHandouts((s) => s.create);
@@ -220,13 +225,9 @@ function Table() {
   const deleteHandout = useHandouts((s) => s.remove);
   const showHandout = useHandouts((s) => s.show);
   const closeHandoutForAll = useHandouts((s) => s.closeForAll);
-  const pinHandout = useHandouts((s) => s.pin);
-  const unpinHandout = useHandouts((s) => s.unpin);
   const openHandoutLocal = useHandouts((s) => s.openLocal);
   const closeHandoutLocal = useHandouts((s) => s.closeLocal);
   const openHandout = useHandouts((s) => s.open);
-  const pinsByScene = useHandouts((s) => s.pinsByScene);
-  const handoutPins = useMemo(() => scenePins(pinsByScene, scene?.id), [pinsByScene, scene?.id]);
 
   // Esc cancela o modo "definir ponto de chegada" em andamento (mesmo gesto de cancelar de sempre).
   useEffect(() => {
@@ -503,6 +504,22 @@ function Table() {
   const linkCharacter = useTokens((s) => s.linkCharacter);
   const systemDef = useSystemDef();
 
+  // Pinos no mapa (docs/plano-narracao.md — unifica handout:pin com pino de nota): pinos do mapa
+  // visitado + ícones disponíveis (do sistema, senão o padrão embutido) + o cartão de nota aberto.
+  const createPin = usePins((s) => s.create);
+  const updatePin = usePins((s) => s.update);
+  const removePin = usePins((s) => s.remove);
+  const pinsByScene = usePins((s) => s.pinsByScene);
+  const pins = useMemo(() => scenePins(pinsByScene, scene?.id), [pinsByScene, scene?.id]);
+  const pinIcons = useMemo(() => resolvePinIcons(systemDef), [systemDef]);
+  /** Ponto pendente da ferramenta "Pino" (clicou no mapa, formulário ainda não confirmado). */
+  const [pendingPinPoint, setPendingPinPoint] = useState<{ x: number; y: number } | null>(null);
+  /** Cartão de nota aberto (diferente do overlay de handout, que usa `openHandout` acima). */
+  const [openNotePin, setOpenNotePin] = useState<(Pin & { kind: "note" }) | null>(null);
+
+  // Notas do Mestre (docs/plano-narracao.md), por mapa ou por token — painel único, GM only.
+  const [notesTarget, setNotesTarget] = useState<NotesPanelTarget | null>(null);
+
   // Visão de grupo (SPEC §9.15): grupo já filtrado pra este cliente (jogador nunca recebe oculto).
   const party = useParty((s) => s.entries);
   const addToParty = useParty((s) => s.add);
@@ -654,6 +671,10 @@ function Table() {
     onSetArrivalMode: handleSetArrivalMode,
     onClearArrival: (sceneId: string) => void setSceneArrival(sceneId, null),
     arrivalPickingSceneId: settingArrivalSceneId,
+    onOpenNotes: (sceneId: string) => {
+      const target = scenes.find((sc) => sc.id === sceneId);
+      if (target) setNotesTarget({ kind: "scene", id: target.id, name: target.name });
+    },
   };
 
   // --- Handouts (docs/SPEC.md §9.10) --------------------------------------------------------
@@ -666,17 +687,27 @@ function Table() {
     onShow: (id: string, target: Parameters<typeof showHandout>[1]) => void showHandout(id, target),
   };
 
-  /** Card denormalizado a partir de um pino (mesmos campos de HandoutCard, o pino só tem 3 a mais: id/sceneId/visible). */
-  const pinToCard = (pin: HandoutPin): HandoutCard =>
+  // --- Pinos (docs/plano-narracao.md — unifica handout:pin com pino de nota) ----------------
+  /** Card denormalizado a partir de um pino de handout (mesmos campos de HandoutCard, o pino só tem 3 a mais: id/sceneId/visible). */
+  const pinToCard = (pin: Pin & { kind: "image" | "text" }): HandoutCard =>
     pin.kind === "image"
       ? { handoutId: pin.handoutId, name: pin.name, kind: "image", imageUrl: pin.imageUrl, width: pin.width, height: pin.height }
       : { handoutId: pin.handoutId, name: pin.name, kind: "text", text: pin.text };
 
-  const handleOpenHandoutPin = (pin: HandoutPin) => openHandoutLocal(null, pinToCard(pin));
-  const handleDeleteHandoutPin = (pin: HandoutPin) => scene && void unpinHandout(scene.id, pin.id);
+  /** Clique num pino (ferramenta Selecionar): handout abre o overlay de sempre; nota abre o cartão. */
+  const handleOpenPin = (pin: Pin) => (pin.kind === "note" ? setOpenNotePin(pin) : openHandoutLocal(null, pinToCard(pin)));
+  const handleDeletePin = (pin: Pin) => scene && void removePin(scene.id, pin.id);
   const handleHandoutDrop = (handout: Handout, point: { x: number; y: number }) => {
     if (!scene) return;
-    void pinHandout(scene.id, handout.id, point.x, point.y, true);
+    void createPin({ kind: "handout", sceneId: scene.id, x: point.x, y: point.y, visible: true, handoutId: handout.id });
+  };
+
+  /** Ferramenta "Pino" (atalho P): clique no mapa guarda o ponto e abre o formulário de nota. */
+  const handlePinToolClick = (point: { x: number; y: number }) => setPendingPinPoint(point);
+  const handleCreateNotePin = (data: { title: string; text: string; icon: string; color: string; visible: boolean }) => {
+    if (!scene || !pendingPinPoint) return;
+    void createPin({ kind: "note", sceneId: scene.id, x: pendingPinPoint.x, y: pendingPinPoint.y, ...data });
+    setPendingPinPoint(null);
   };
 
   return (
@@ -691,6 +722,7 @@ function Table() {
           navigate("/");
         }}
         onOpenMapConfig={isGm ? () => setMapConfigOpen(true) : undefined}
+        onOpenMapNotes={isGm && scene ? () => setNotesTarget({ kind: "scene", id: scene.id, name: scene.name }) : undefined}
         characterMenu={
           <CharacterMenu
             me={me}
@@ -772,6 +804,7 @@ function Table() {
                 linkableCharacters={linkableCharacters}
                 onLinkCharacter={(tokenId, characterId) => void linkCharacter(tokenId, characterId)}
                 onOpenCharacter={openCharacter}
+                onOpenTokenNotes={(token) => setNotesTarget({ kind: "token", id: token.id, name: token.name })}
                 onTokenOpenSheet={(tokenId) => {
                   // Duplo clique num token vinculado a uma ficha que eu vejo abre a ficha.
                   const characterId = byId[tokenId]?.characterId;
@@ -800,10 +833,12 @@ function Table() {
                 onTemplateCreate={handleTemplateCreate}
                 onTemplateLive={(t) => scene && templateLive(scene.id, t)}
                 onTemplateCommit={handleTemplateCommit}
-                handoutPins={handoutPins}
-                onOpenHandoutPin={handleOpenHandoutPin}
-                onDeleteHandoutPin={isGm ? handleDeleteHandoutPin : undefined}
+                pins={pins}
+                pinIcons={pinIcons}
+                onOpenPin={handleOpenPin}
+                onDeletePin={isGm ? handleDeletePin : undefined}
                 onHandoutDrop={isGm ? handleHandoutDrop : undefined}
+                onPinToolClick={isGm ? handlePinToolClick : undefined}
                 myTargetIds={myTargetIds}
                 othersTargets={othersTargets}
                 showOtherTargets={showOtherTargets}
@@ -959,6 +994,37 @@ function Table() {
         />
       )}
       {isGm && <HandoutDragGhost />}
+
+      {openNotePin && (
+        <NotePinCard
+          pin={openNotePin}
+          icons={pinIcons}
+          isGm={isGm}
+          onClose={() => setOpenNotePin(null)}
+          onSave={(patch) => {
+            if (!scene) return;
+            void updatePin(scene.id, openNotePin.id, patch).then((updated) => {
+              if (updated && updated.kind === "note") setOpenNotePin(updated);
+            });
+          }}
+          onDelete={() => {
+            if (scene) void removePin(scene.id, openNotePin.id);
+            setOpenNotePin(null);
+          }}
+        />
+      )}
+      {pendingPinPoint && isGm && <PinCreatePopover icons={pinIcons} onCreate={handleCreateNotePin} onCancel={() => setPendingPinPoint(null)} />}
+
+      {notesTarget && isGm && (
+        <NotesPanel
+          target={notesTarget}
+          onChangeTarget={setNotesTarget}
+          onGoToScene={(sceneId) => {
+            if (scene?.id !== sceneId) void enterScene(sceneId);
+          }}
+          onClose={() => setNotesTarget(null)}
+        />
+      )}
     </div>
   );
 }

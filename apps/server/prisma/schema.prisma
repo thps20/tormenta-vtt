@@ -75,12 +75,16 @@ model Scene {
   /// ArrivalPointSchema serializado ({ x, y } em pixels do mapa): onde tokens levados de outro mapa
   /// aparecem ao ativar (docs/plano-mapas.md §9). null = sem marcador definido (usa o centro do mapa).
   arrival   Json?
+  /// Nota do Mestre sobre o mapa (docs/plano-narracao.md), markdown leve. NUNCA sai no `Scene`
+  /// serializado (só `hasNotes: boolean`, calculado em toScene) — o texto só sai por
+  /// `scene:get-notes` (GM only), pra nenhum caminho futuro de serialização vazar a nota.
+  gmNotes   String?
   createdAt DateTime  @default(now())
 
-  room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  tokens      Token[]
-  combat      Combat?
-  handoutPins HandoutPin[]
+  room   Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tokens Token[]
+  combat Combat?
+  pins   Pin[]
 
   @@index([roomId])
 }
@@ -110,6 +114,10 @@ model Token {
   /// combat:next comparado a Combat.round). Ver TokenConditionEntrySchema — Json porque o formato
   /// mistura os dois (campo flexível, mesma convenção de grid/fog/hp).
   conditions  Json      @default("[]")
+  /// Nota do Mestre sobre o token (docs/plano-narracao.md), markdown leve. Mesmo padrão de
+  /// Scene.gmNotes: NUNCA sai no `Token` serializado (só `hasNotes: boolean`), texto só por
+  /// `token:get-notes` (GM only).
+  notes       String?
   /// Soft delete (docs/plano-desfazer.md §2): token:delete/token:delete-many só marcam esta data,
   /// não apagam a linha — assim PV/condições/characterId/Combatant sobrevivem pro desfazer restaurar
   /// tudo de graça. null = token "existe" normalmente. Consultas de "tokens da cena agora" filtram
@@ -254,8 +262,8 @@ model Combatant {
 }
 
 /// Biblioteca de handouts por sala (docs/SPEC.md §9.10): imagem ou texto que o GM mostra pros
-/// jogadores (overlay em tela cheia + card no chat) ou fixa no mapa como um pino (HandoutPin
-/// abaixo). Só o GM vê esta tabela (handout:list é gmOnly). `kind` decide quais campos valem.
+/// jogadores (overlay em tela cheia + card no chat) ou fixa no mapa como um Pin (abaixo). Só o GM
+/// vê esta tabela (handout:list é gmOnly). `kind` decide quais campos valem.
 model Handout {
   id        String    @id @default(cuid())
   roomId    String
@@ -271,36 +279,46 @@ model Handout {
   deletedAt DateTime?
   createdAt DateTime  @default(now())
 
-  room Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  pins HandoutPin[]
+  room Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  pins Pin[]
 
   @@index([roomId])
 }
 
-/// Pino de um handout fixado num mapa. Geometria em pixels do mapa, como Token/Template. Campos de
-/// conteúdo são uma CÓPIA denormalizada do Handout no momento de fixar (mesmo padrão de
-/// Combatant.name/color): editar o handout original depois não atualiza pinos já fixados.
-model HandoutPin {
+/// Pino no mapa (docs/plano-narracao.md): unifica o antigo HandoutPin com o pino de nota pedido
+/// pelo dono do projeto. Geometria em pixels do mapa, como Token/Template. `kind` = "image" | "text"
+/// (pino de handout — `handoutId` setado, campos de conteúdo são uma CÓPIA denormalizada do Handout
+/// no momento de fixar, mesmo padrão de Combatant.name/color: editar o handout original depois não
+/// atualiza pinos já fixados) | "note" (pino de nota — `handoutId` null, conteúdo é o próprio dado,
+/// escrito direto no pino: `name` faz o papel de título, `text` o corpo, `icon`/`color` a aparência).
+model Pin {
   id        String    @id @default(cuid())
   sceneId   String
-  handoutId String
+  kind      String // "image" | "text" | "note"
+  /// Só setado em kind "image"/"text" (pino de handout). null em "note".
+  handoutId String?
   x         Float
   y         Float
   /// GM controla: pino invisível só aparece pro GM (mesma regra de Token.visible).
   visible   Boolean   @default(true)
-  name      String
-  kind      String // "image" | "text"
+  /// Handout: nome do handout. Nota: título do pino.
+  name      String?
   imageUrl  String?
   width     Int?
   height    Int?
+  /// Handout kind "text": corpo do texto. Nota: corpo da nota.
   text      String?
-  /// Soft delete (docs/plano-desfazer.md): handout:unpin, e a cascata de handout:delete, só marcam
+  /// Só kind "note": chave de SystemDefinition.pinIcons[], ou ausente (paleta padrão do cliente).
+  icon      String?
+  /// Só kind "note": hex resolvido no cliente a partir do ícone escolhido.
+  color     String?
+  /// Soft delete (docs/plano-desfazer.md): pin:remove, e a cascata de handout:delete, só marcam
   /// esta data — o desfazer do GM restaura sem precisar de snapshot manual.
   deletedAt DateTime?
   createdAt DateTime  @default(now())
 
-  scene   Scene   @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-  handout Handout @relation(fields: [handoutId], references: [id], onDelete: Cascade)
+  scene   Scene    @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  handout Handout? @relation(fields: [handoutId], references: [id], onDelete: Cascade)
 
   @@index([sceneId])
   @@index([handoutId])

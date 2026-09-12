@@ -30,6 +30,7 @@ const token = (patch: Partial<Token> = {}): Token => ({
   characterId: null,
   hp: null,
   conditions: [],
+  hasNotes: false,
   ...patch,
 });
 

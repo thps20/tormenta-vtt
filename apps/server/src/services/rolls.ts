@@ -120,6 +120,13 @@ export interface RollMessageInput {
   targets?: RollTargetInput[];
   isAttack?: boolean;
   def?: SystemDefinition;
+  /**
+   * Sussurro pontual desta rolagem (docs/plano-narracao.md, seletor "para" do chat): só GM e este
+   * participantId recebem — mesmo campo/gate de `ChatMessage.whisperTo` que já existia só para
+   * handout:show (services/chatVisibility.ts). null/ausente = sem sussurro, regra normal de
+   * `visibility`.
+   */
+  whisperTo?: string | null;
 }
 
 export interface RollMessageResult {
@@ -199,6 +206,7 @@ export async function createRollMessage(io: TypedServer, roomId: string, me: DbP
         roll: diceRoll,
         visibility: input.visibility,
         tokenId: input.tokenId ?? null,
+        whisperTo: input.whisperTo ?? null,
       },
     }),
   );

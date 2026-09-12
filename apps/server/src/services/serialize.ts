@@ -48,6 +48,9 @@ export function toScene(scene: DbScene): Scene {
     // `deletedAt` NÃO entra no Scene do shared (é coluna só do banco, como Token.deletedAt): um
     // mapa apagado simplesmente não é serializado para ninguém.
     arrival: ArrivalPointSchema.nullable().parse(scene.arrival),
+    // `gmNotes` (texto) NUNCA entra aqui (docs/plano-narracao.md) — só este booleano. O texto sai
+    // só por `scene:get-notes` (GM only, apps/server/src/socket/notes.ts).
+    hasNotes: (scene.gmNotes ?? "").trim() !== "",
     createdAt: scene.createdAt.toISOString(),
   };
 }
@@ -71,6 +74,10 @@ export function toToken(t: DbToken): Token {
     // `conditions` é Json no banco (sem tipo garantido pelo Prisma): o preprocess do schema aceita
     // tanto a forma antiga (string, gravada antes desta mudança) quanto { key, expiresRound? }.
     conditions: TokenConditionEntrySchema.array().parse(t.conditions),
+    // `notes` (texto) NUNCA entra aqui (docs/plano-narracao.md) — só este booleano, e mesmo ele é
+    // redigido pra jogador em services/visibility.ts#redactTokenForViewer (o indicador no token é
+    // "só o GM vê", pedido original). O texto sai só por `token:get-notes` (GM only).
+    hasNotes: (t.notes ?? "").trim() !== "",
   };
 }
 

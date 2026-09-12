@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Dices, Scroll, Eye, Flame } from 'lucide-react';
+import { Send, Dices, Scroll, Eye, Flame, MessageCircle } from 'lucide-react';
 import {
   hitRuleTargetLabel,
   isCombinedAttackRoll,
@@ -22,6 +22,7 @@ import { HandoutCardMessage } from './chat/HandoutCardMessage';
 import { InitiativeBatchMessage } from './chat/InitiativeBatchMessage';
 import { ItemCardMessage } from './chat/ItemCardMessage';
 import { RollModeButton } from './chat/RollModeButton';
+import { WhisperTargetButton } from './chat/WhisperTargetButton';
 import { DamageFormula, DamageTypeBadge } from './DamageTypeBadge';
 import { useHandouts } from '../store/handouts';
 
@@ -46,6 +47,20 @@ function targetLineText(def: ReturnType<typeof useSystemDef>, roll: DiceRoll, ta
   if (target.targetValue === undefined) return { text: `${verb} ${name}`, color: target.hit ? 'text-emerald-400' : 'text-red-400' };
   const label = def?.rolls.attackHit ? hitRuleTargetLabel(def, def.rolls.attackHit) : 'alvo';
   return { text: `${verb} ${name} (${roll.total} vs ${label} ${target.targetValue})`, color: target.hit ? 'text-emerald-400' : 'text-red-400' };
+}
+
+/**
+ * Rótulo do sussurro (docs/plano-narracao.md), quando `msg.whisperTo` está setado — texto e rolagem
+ * usam o mesmo. Quem é autor OU alvo vê "para X"/"de X"; o GM, quando não é nenhum dos dois (um
+ * sussurro entre dois jogadores — só o GM recebe essa mensagem, o gate do servidor garante isso),
+ * vê o rótulo explícito "de X para Y" pedido pelo dono do projeto, pra ficar claro que ele vê.
+ */
+function whisperLabel(msg: ChatMessage, me: Participant, participants: Participant[]): string | null {
+  if (!msg.whisperTo) return null;
+  const targetName = participants.find((p) => p.id === msg.whisperTo)?.nickname ?? 'alguém';
+  if (msg.participantId === me.id) return `sussurro para ${targetName}`;
+  if (msg.whisperTo === me.id) return `sussurro de ${msg.nickname}`;
+  return `sussurro de ${msg.nickname} para ${targetName}`;
 }
 
 interface ChatTabProps {
@@ -76,6 +91,8 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   // são estado do próprio chat, e assim a ficha e os cards leem o mesmo modo.
   const rollMode = useChat((s) => s.rollMode);
   const setRollMode = useChat((s) => s.setRollMode);
+  const whisperTarget = useChat((s) => s.whisperTarget);
+  const setWhisperTarget = useChat((s) => s.setWhisperTarget);
   const revealMessage = useChat((s) => s.reveal);
   const applyDamage = useChat((s) => s.applyDamage);
   // "Rolar dano junto com o ataque" (§9.13): preferência por usuário, localStorage — lida aqui só
@@ -93,6 +110,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   const [inputText, setInputText] = useState('');
   const isRollCommand = /^\/(r|roll|gmr|gr|pr)\b/i.test(inputText);
   const nonPublic = rollMode !== 'all';
+  const whispering = whisperTarget !== null;
   const modeInfo = rollModeInfo(rollMode);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -114,6 +132,21 @@ export const ChatTab: React.FC<ChatTabProps> = ({
 
   const handleQuickDice = (sides: number) => {
     onSendMessage(`/r 1d${sides}`);
+  };
+
+  /**
+   * Tab completa o nickname em "/w <início>" (docs/plano-narracao.md) — primeiro nickname da sala
+   * que bate (case-insensitive), sem mexer no resto da mensagem se ela já tiver começado.
+   */
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Tab') return;
+    const m = /^\/w\s+(\S*)$/i.exec(inputText);
+    if (!m) return;
+    const partial = (m[1] ?? '').toLowerCase();
+    const match = participants.find((p) => p.id !== me.id && p.nickname.toLowerCase().startsWith(partial));
+    if (!match) return;
+    e.preventDefault();
+    setInputText(`/w ${match.nickname} `);
   };
 
   const formatTime = (isoString: string) => {
@@ -270,17 +303,21 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             // "Rolar dano junto com o ataque" (§9.13): ataque em cima (roll.total/groups são DELE) e
             // dano embaixo, num bloco à parte — não misturado no número do header como o dano avulso.
             const combined = isCombinedAttackRoll(roll);
+            const rollWhisper = whisperLabel(msg, me, participants);
 
             return (
               <div
                 key={msg.id}
                 id={`chat-msg-${msg.id}`}
+                data-whisper-to={msg.whisperTo ?? undefined}
                 className={`p-3 rounded border shadow-inner transition-all ${
-                  isCritical
-                    ? 'bg-[#2d2417]/40 border-[#d4af37] shadow-[#d4af37]/10'
-                    : isFumble
-                    ? 'bg-red-950/20 border-red-900/50'
-                    : 'bg-black/35 border-zinc-800/60'
+                  rollWhisper
+                    ? 'bg-purple-950/20 border-purple-700/50'
+                    : isCritical
+                      ? 'bg-[#2d2417]/40 border-[#d4af37] shadow-[#d4af37]/10'
+                      : isFumble
+                        ? 'bg-red-950/20 border-red-900/50'
+                        : 'bg-black/35 border-zinc-800/60'
                 }`}
               >
                 {/* Roll Header */}
@@ -300,6 +337,12 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                     {isGm && (
                       <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40 font-serif font-bold">
                         GM
+                      </span>
+                    )}
+                    {rollWhisper && (
+                      <span className="flex items-center gap-1 text-[9px] px-1 rounded bg-purple-950/50 text-purple-300 border border-purple-700/50 font-mono lowercase">
+                        <MessageCircle className="w-2.5 h-2.5" />
+                        {rollWhisper}
                       </span>
                     )}
                   </div>
@@ -495,14 +538,18 @@ export const ChatTab: React.FC<ChatTabProps> = ({
           }
 
           // 5. STANDARD TEXT MESSAGE - Elegant Dark
+          const textWhisper = whisperLabel(msg, me, participants);
           return (
             <div
               key={msg.id}
               id={`chat-msg-${msg.id}`}
+              data-whisper-to={msg.whisperTo ?? undefined}
               className={`p-2.5 rounded border ${
-                isMe
-                  ? 'bg-black/40 border-[#2d2417] ml-3'
-                  : 'bg-black/25 border-zinc-800/50 mr-3'
+                textWhisper
+                  ? 'bg-purple-950/20 border-purple-700/50'
+                  : isMe
+                    ? 'bg-black/40 border-[#2d2417] ml-3'
+                    : 'bg-black/25 border-zinc-800/50 mr-3'
               }`}
             >
               <div className="flex items-center justify-between text-xs mb-1">
@@ -521,6 +568,12 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                   {isGm && (
                     <span className="text-[9px] px-1 rounded bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40 font-serif font-bold">
                       GM
+                    </span>
+                  )}
+                  {textWhisper && (
+                    <span className="flex items-center gap-1 text-[9px] px-1 rounded bg-purple-950/50 text-purple-300 border border-purple-700/50 font-mono lowercase">
+                      <MessageCircle className="w-2.5 h-2.5" />
+                      {textWhisper}
                     </span>
                   )}
                 </div>
@@ -546,6 +599,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             ROLAR:
           </span>
           <RollModeButton mode={rollMode} onChange={setRollMode} />
+          <WhisperTargetButton participants={participants.filter((p) => p.id !== me.id)} target={whisperTarget} onChange={setWhisperTarget} />
           <button
             type="button"
             id="roll-damage-with-attack-btn"
@@ -587,22 +641,25 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Mensagem, /r 2d6+3 # rótulo, /gmr (secreta) ou /pr (pública)..."
+            onKeyDown={handleInputKeyDown}
+            placeholder="Mensagem, /r 2d6+3 # rótulo, /gmr (secreta), /pr (pública) ou /w <nickname> (sussurro)..."
             data-roll-mode={rollMode}
             className={`w-full bg-[#1a1a1a] border rounded-md px-3 py-2 text-xs focus:outline-none text-zinc-200 placeholder:text-zinc-600 ${
-              nonPublic ? 'border-amber-500/70 focus:border-amber-400' : 'border-[#3d3d3d] focus:border-[#d4af37]'
+              whispering ? 'border-purple-500/70 focus:border-purple-400' : nonPublic ? 'border-amber-500/70 focus:border-amber-400' : 'border-[#3d3d3d] focus:border-[#d4af37]'
             }`}
           />
-          {/* Indicador discreto: modo fora de "Pública" e/ou comando de dado digitado. */}
-          {(isRollCommand || nonPublic) && (
+          {/* Indicador discreto: sussurro ativo, modo fora de "Pública" e/ou comando de dado digitado. */}
+          {(isRollCommand || nonPublic || whispering) && (
             <span
               className={`absolute right-2.5 top-2 text-[10px] font-mono pointer-events-none uppercase tracking-widest ${
-                nonPublic ? 'text-amber-400' : 'text-[#d4af37]'
+                whispering ? 'text-purple-400' : nonPublic ? 'text-amber-400' : 'text-[#d4af37]'
               }`}
             >
               {isRollCommand && 'DADO'}
-              {isRollCommand && nonPublic && ' · '}
+              {isRollCommand && (nonPublic || whispering) && ' · '}
               {nonPublic && modeInfo.label}
+              {nonPublic && whispering && ' · '}
+              {whispering && 'SUSSURRO'}
             </span>
           )}
         </div>

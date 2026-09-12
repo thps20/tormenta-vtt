@@ -23,6 +23,7 @@ import { useCharacters } from "./characters";
 import { useParty } from "./party";
 import { useCompendium } from "./compendium";
 import { useHandouts } from "./handouts";
+import { usePins } from "./pins";
 import { useEncounters } from "./encounters";
 import { useSceneList } from "./sceneList";
 import { toast } from "./ui";
@@ -172,6 +173,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useParty.getState().setAll([]);
     useCompendium.getState().reset();
     useHandouts.getState().reset();
+    usePins.getState().reset();
     useEncounters.getState().reset();
     useSceneList.getState().reset();
     // Desconectar e reconectar é o jeito simples de sair das salas do Socket.io.
@@ -193,7 +195,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useChat.getState().setAll(snap.chat);
     useCombat.getState().setSnapshot(snap.room.activeSceneId, snap.combat);
     useTemplates.getState().setSnapshot(snap.room.activeSceneId, snap.templates);
-    useHandouts.getState().setSnapshot(snap.room.activeSceneId, snap.handoutPins);
+    usePins.getState().setSnapshot(snap.room.activeSceneId, snap.pins);
     useTargets.getState().setSnapshot(snap.targets, snap.me.id);
     useCharacters.getState().setAll(snap.characters);
     useParty.getState().setAll(snap.party);
@@ -260,7 +262,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useTokens.getState().replaceScene(sceneId, res.data.tokens);
     useCombat.getState().setSceneState(sceneId, res.data.combat);
     useTemplates.getState().replaceScene(sceneId, res.data.templates);
-    useHandouts.getState().replaceScene(sceneId, res.data.handoutPins);
+    usePins.getState().replaceScene(sceneId, res.data.pins);
     set({ viewingSceneId: sceneId });
     const roomId = get().room?.id;
     if (roomId) setViewingScene(roomId, sceneId);

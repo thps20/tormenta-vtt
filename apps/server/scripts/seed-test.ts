@@ -339,7 +339,7 @@ async function main(): Promise<void> {
       tags: ["teste", "pista"],
     },
   });
-  await prisma.handoutPin.create({
+  await prisma.pin.create({
     data: {
       sceneId: taverna.id,
       handoutId: handoutImage.id,
@@ -351,6 +351,19 @@ async function main(): Promise<void> {
       imageUrl: handoutImage.imageUrl,
       width: handoutImage.width,
       height: handoutImage.height,
+    },
+  });
+
+  // Pino de nota (docs/plano-narracao.md), pra quem for testar já ver um exemplo.
+  await prisma.pin.create({
+    data: {
+      sceneId: taverna.id,
+      kind: "note",
+      x: 260,
+      y: 300,
+      visible: false,
+      name: "O taberneiro mente",
+      text: "Ele conhece o vilão de outra vida — não conta pra ninguém, nem se perguntarem direto.",
     },
   });
 

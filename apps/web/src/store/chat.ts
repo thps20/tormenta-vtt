@@ -8,12 +8,21 @@ interface ChatState {
   messages: ChatMessage[];
   /** Modo de rolagem atual (vale para faixa, /r, ficha e cards até trocar). */
   rollMode: RollVisibility;
+  /**
+   * Sussurro pontual (docs/plano-narracao.md — seletor "para" ao lado do modo de rolagem):
+   * participantId escolhido pra PRÓXIMA mensagem (texto ou rolagem), ou null = todos. Diferente de
+   * `rollMode`, NÃO fica "grudado": `send` reseta pra null depois de enviar, pra não sussurrar sem
+   * querer na mensagem seguinte.
+   */
+  whisperTarget: string | null;
   setAll: (messages: ChatMessage[]) => void;
   /** Insere ou substitui (mesma mensagem revelada volta com visibility nova). */
   append: (msg: ChatMessage) => void;
   setRollMode: (mode: RollVisibility) => void;
   cycleRollMode: () => void;
-  /** Envia texto ou comando (/r, /gmr, /pr). Sem otimismo: a rolagem só existe depois do servidor. */
+  setWhisperTarget: (participantId: string | null) => void;
+  /** Envia texto ou comando (/r, /gmr, /pr, /w). Sem otimismo: a rolagem só existe depois do
+   *  servidor. Usa `whisperTarget` (se setado) e reseta ele depois de enviar. */
   send: (text: string) => Promise<boolean>;
   /** GM torna pública uma mensagem secreta/própria. */
   reveal: (messageId: string) => Promise<boolean>;
@@ -34,6 +43,7 @@ export function notifyBlindRoll(msg: ChatMessage): void {
 export const useChat = create<ChatState>((set, get) => ({
   messages: [],
   rollMode: loadRollMode(),
+  whisperTarget: null,
   setAll: (messages) => set({ messages }),
   append: (msg) =>
     set((s) => {
@@ -55,11 +65,19 @@ export const useChat = create<ChatState>((set, get) => ({
     set({ rollMode: mode });
   },
   cycleRollMode: () => get().setRollMode(nextRollMode(get().rollMode)),
+  setWhisperTarget: (participantId) => set({ whisperTarget: participantId }),
   send: async (text) => {
-    const res = await emitAck("chat:send", { text, visibility: get().rollMode });
-    if (!res.ok) toast(res.error);
-    else notifyBlindRoll(res.data);
-    return res.ok;
+    const whisperTo = get().whisperTarget;
+    const res = await emitAck("chat:send", { text, visibility: get().rollMode, whisperTo });
+    if (!res.ok) {
+      toast(res.error);
+      return false;
+    }
+    notifyBlindRoll(res.data);
+    // Um-shot (docs/plano-narracao.md): não fica "grudado" como o modo de rolagem, pra não
+    // sussurrar sem querer na mensagem seguinte.
+    if (whisperTo) set({ whisperTarget: null });
+    return true;
   },
   reveal: async (messageId) => {
     const res = await emitAck("chat:reveal", { messageId });

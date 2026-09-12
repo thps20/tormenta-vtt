@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Crown, Copy, Check, Users, MapPin, LogOut, Settings } from "lucide-react";
+import { Crown, Copy, Check, Users, MapPin, LogOut, NotebookText, Settings } from "lucide-react";
 import type { Participant, RoomPublic, Scene } from "@tormenta-vtt/shared";
 import { roomPath } from "../lib/router";
 
@@ -11,6 +11,8 @@ interface TopBarProps {
   onLeaveToLobby: () => void;
   /** Só o GM recebe este handler (botão "Configurar Mapa"). */
   onOpenMapConfig?: () => void;
+  /** Só o GM, e só quando há mapa sendo visto (docs/plano-narracao.md, botão "Notas"). */
+  onOpenMapNotes?: () => void;
   /** Botão de ficha ("Meu personagem" / "Fichas"), montado pela página. */
   characterMenu?: React.ReactNode;
   /** Seletor de mapa (`MapSelector`), montado pela página — só GM. Sem ele, mostra só o nome do mapa ativo. */
@@ -19,7 +21,18 @@ interface TopBarProps {
   handoutSelector?: React.ReactNode;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, onLeaveToLobby, onOpenMapConfig, characterMenu, mapSelector, handoutSelector }) => {
+export const TopBar: React.FC<TopBarProps> = ({
+  room,
+  scene,
+  participants,
+  me,
+  onLeaveToLobby,
+  onOpenMapConfig,
+  onOpenMapNotes,
+  characterMenu,
+  mapSelector,
+  handoutSelector,
+}) => {
   const [copied, setCopied] = useState(false);
   const isGM = me.role === "gm";
 
@@ -150,6 +163,22 @@ export const TopBar: React.FC<TopBarProps> = ({ room, scene, participants, me, o
 
         <div className="flex items-center gap-2 ml-2">
           {characterMenu}
+          {isGM && onOpenMapNotes && scene && (
+            <button
+              id="btn-topbar-map-notes"
+              onClick={onOpenMapNotes}
+              title="Notas do Mestre sobre este mapa (só você vê)"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-serif font-bold transition-colors cursor-pointer shadow-sm ${
+                scene.hasNotes
+                  ? "bg-[#2d2417] border-[#d4af37]/60 text-[#d4af37]"
+                  : "bg-[#252525] hover:bg-[#2d2417] border-[#3d3d3d] hover:border-[#d4af37] text-zinc-200 hover:text-[#d4af37]"
+              }`}
+            >
+              <NotebookText className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Notas</span>
+            </button>
+          )}
+
           {isGM && onOpenMapConfig && (
             <button
               id="btn-topbar-map-config"

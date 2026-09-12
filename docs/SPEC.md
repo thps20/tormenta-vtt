@@ -50,6 +50,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - **Mover mapa (H)**: arrastar em qualquer lugar faz pan; tokens não respondem. Barra de espaço segurada ativa este modo temporariamente.
   - **Régua (R)**: clicar e arrastar mede do ponto inicial ao ponteiro (pontos grudam no centro da célula quando há grid e snap). A distância usa `grid` do `SystemDefinition` (`cellSize` na unidade do jogo, `unit`, regra de diagonais `euclidean | manhattan | alternating | chebyshev`; `rules/measure.ts` faz a conta) e o `cellSize` em px da cena. A régua é enviada por `ruler:update` (efêmero) e os outros a veem com o nickname do autor; some ao soltar.
   - **Névoa (F, só GM)**: fog of war manual, descrita em §9.3. Desenho: botão reservado (desabilitado), fora do MVP.
+  - **Pino (P, só GM)**: clique no mapa abre o formulário de um pino de nota (título, texto, ícone/cor, visibilidade) — ver §9.16. Fixar um pino de handout é feito arrastando um card da biblioteca (§9.10), não por esta ferramenta.
   - Esc cancela o gesto em andamento e volta para Selecionar. Scroll = zoom em todos os modos.
   - **Desfazer/refazer (Ctrl+Z / Ctrl+Shift+Z ou Ctrl+Y, só GM)**: com a ferramenta Névoa ativa, Ctrl+Z desfaz a última forma pintada (§9.3, sem refazer); fora dela é o desfazer geral descrito em §9.6. Fora de campo de texto (`isTyping`), igual aos outros atalhos.
 - Sem mapa (`mapUrl = null`) o canvas desenha um retângulo escuro de `mapWidth × mapHeight` (padrão 1600×1100) só para o grid e os tokens terem onde ficar.
@@ -75,6 +76,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Comandos:
   - `/r <fórmula> [# rótulo]` — rola no **modo de rolagem** atual do autor (abaixo), ex.: `/r 2d6+3`, `/r 1d20+5 # Ataque`.
   - `/gmr <fórmula>` — força rolagem secreta (só o GM vê); `/gr` é sinônimo. `/pr <fórmula>` — força rolagem pública.
+  - `/w <nickname> <mensagem>` — sussurro (docs/plano-narracao.md): manda uma mensagem de texto visível só pro GM e pra quem tem esse nickname (case-insensitive). `<nickname>` é uma palavra só (sem espaço) — nickname com espaço, ou repetido por dois participantes, não dá pra endereçar por `/w` (o ack devolve erro pedindo pra usar o seletor "para" abaixo). Autocomplete com Tab enquanto digita o nickname.
 - **Modo de rolagem** (botão na faixa "Rolar" do chat, ao lado dos dados rápidos, com ícone e rótulo; clique alterna para o próximo, clique longo ou a seta abre o menu com os três):
   - **Pública** (`visibility: "all"`): todos veem.
   - **Secreta** (`"gm"`): só o GM vê. Se quem rolou é jogador, ele **não** vê o próprio resultado (rolagem às cegas; o ack volta sem `roll` e o cliente mostra o toast "Rolagem às cegas enviada ao GM"). O GM vê quem rolou e o resultado.
@@ -82,6 +84,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - O modo vale para tudo que a pessoa rolar (faixa, `/r`, ficha, botões dos cards) até trocar; persiste na aba (`sessionStorage`). `/gmr` e `/pr` forçam secreta/pública pontualmente. Texto e cards de item (`character:use-item`) são sempre públicos.
   - Fora de "Pública", o campo do chat ganha borda âmbar e o rótulo do modo à direita.
   - `ChatMessage.visibility` (`all | gm | self`) é filtrado pelo servidor no broadcast e no snapshot (`messageVisibleTo`, `apps/server/src/services/chatVisibility.ts`). Quem não pode ver o resultado **não fica sem a mensagem**: recebe a mesma mensagem sem `roll`/`item`/`text` (placeholder "Fulano fez uma rolagem secreta/própria", `apps/server/src/services/chatVisibility.ts#redactMessage`) na hora da rolagem, e o cliente mostra um card oculto no lugar do card de rolagem. O GM tem o botão **Revelar** (`chat:reveal`) nesse card, que muda `visibility` para `all` e reenvia a mesma mensagem (mesmo `id`) a todos com o conteúdo completo: o cliente faz upsert ordenado por `createdAt`, então o card oculto vira o card cheio no lugar.
+  - **Sussurro** (`ChatMessage.whisperTo`, docs/plano-narracao.md): além do `/w` acima, um seletor "para" ao lado do botão de modo de rolagem escolhe um participante pontualmente — vale pra próxima mensagem (texto OU rolagem, inclusive `/r`), sem ficar "grudado" como o modo de rolagem: some sozinho depois de enviar. Setado, a mensagem existe só pro **GM e o alvo** — nem card, nem placeholder pros demais, independente de `visibility` (que o servidor força para `"all"` quando há sussurro — o `whisperTo` já restringe quem recebe). Mesmo campo/mecanismo que já existia só para `handout:show` "mostrar para X" (§9.10), agora reaproveitado pelo chat comum. O GM **sempre** vê um sussurro, mesmo entre dois jogadores (mesma postura de sempre no projeto — nunca um sussurro cego pro GM); nesse caso o card ganha o rótulo explícito "sussurro de X para Y" (autor/alvo veem só "para Y"/"de X"). Renderização com destaque visual (borda/fundo roxo).
   - **Rolagem ligada a um token** (`ChatMessage.tokenId`, opcional: combate — §3.5 — ou ficha com token vinculado a ela, em qualquer mapa da sala): quem não pode ver esse token (`visible = false` ou sob a névoa) **ou** cujo token está num mapa que não é o ATIVO da sala (mesmo que o token em si esteja perfeitamente visível — GM pode estar rolando num mapa que a mesa não vê, §9.7) não recebe a mensagem de jeito nenhum — nem o card, nem o placeholder acima — independente de `visibility`; o GM e o **autor da própria rolagem** sempre recebem (mesmo que o token dele esteja oculto ou no mapa errado), o gate vale só para os demais jogadores. Essa checagem roda **antes** e além da de `visibility` (`tokenGateOk`/`emitChatMessage` em `apps/server/src/services/chatVisibility.ts`) e é refeita do zero a cada snapshot (`room:join`): se o mapa depois vira o ativo (ou o token é revelado), a mensagem represada passa a ser entregue no próximo, sem reenvio ao vivo (mesma limitação anotada em `docs/backlog.md`). `character:roll`/`character:use-item` ligam a rolagem ao token vinculado à ficha em QUALQUER mapa (`findLinkedTokenId`, preferindo o ativo quando há mais de um) — sem isso a rolagem virava uma mensagem "solta" sem `tokenId`, sem gate nenhum. Rolagem solta de verdade (`/r` sem ficha vinculada) não tem `tokenId` e segue só a regra de `visibility`.
 - **Gramática da fórmula** (parser genérico em `packages/shared/src/dice`):
   ```
@@ -156,16 +159,16 @@ Room 1───* SavedEncounter
 |---|---|---|
 | **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId, party(JSON)` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`). `activeSceneId` sempre aponta pra um mapa não apagado da sala (invariante mantida por `scene:activate`/`scene:delete`, §9.7). `party` = `PartyEntry[]` da Visão de grupo (§9.15, `{ characterId, hidden }[]`), não serializado em `RoomPublic`/`Room` do shared — vai à parte, já filtrado por papel, em `RoomSnapshot.party` (§5) |
 | **Participant** | `id, roomId, nickname, role, sessionToken` | `connected` é estado em memória, não persistido |
-| **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON), order, arrival(JSON), deletedAt?` | Múltiplos mapas por sala (§9.7). `grid` e `fog` são JSON para evoluir sem migration; `fog` segue `FogConfigSchema` (§9.3). `order`: posição no painel "Mapas", renumerada 0..n-1 a cada `scene:reorder`. `arrival` = `{x,y} \| null` (pixels do mapa): onde tokens levados de outro mapa aparecem ao ativar. `deletedAt` (coluna só do banco, nunca serializada no `Scene` do shared, mesmo padrão de `Token.deletedAt`): soft delete de `scene:delete` — todo lugar que lista "mapas da sala agora" filtra `deletedAt: null`; limpeza definitiva depois de 30 dias (`services/cleanup.ts`) |
-| **Token** | `id, sceneId, name, imageUrl, x, y, cells, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[]), deletedAt?` | Posição (`x, y`) em **pixels do mapa**, não em células (docs/plano-grid.md). `cells` (inteiro ≥ 1) é a fonte da verdade do TAMANHO — lado do token em células, sempre quadrado; os pixels (`width`/`height` do `Token` do shared, nunca persistidos nem trafegados no socket) são derivados on-the-fly de `cells × cellSize do grid ATUAL da cena` (`tokenPixelSize`, `packages/shared/src/rules/placement.ts`) em quem precisa (canvas, espiral de posicionamento, névoa) — trocar de mapa ou editar o `cellSize` do mapa (`scene:updateGrid`) nunca precisa "converter" tamanho nenhum. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto). `deletedAt` (coluna só do banco, nunca serializada no `Token` do shared): soft delete de `token:delete`/`token:delete-many` (§9.6) — todo lugar que lista "tokens da cena agora" filtra `deletedAt: null`; a limpeza definitiva apaga a linha de vez depois de 30 dias (`services/cleanup.ts`) |
+| **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON), order, arrival(JSON), gmNotes?, deletedAt?` | Múltiplos mapas por sala (§9.7). `grid` e `fog` são JSON para evoluir sem migration; `fog` segue `FogConfigSchema` (§9.3). `order`: posição no painel "Mapas", renumerada 0..n-1 a cada `scene:reorder`. `arrival` = `{x,y} \| null` (pixels do mapa): onde tokens levados de outro mapa aparecem ao ativar. `gmNotes` (docs/plano-narracao.md, §9.16): nota do Mestre sobre o mapa, markdown leve — coluna só do banco, **nunca** sai no `Scene` do shared (só `hasNotes: boolean`, calculado em `toScene`); o texto só sai por `scene:get-notes` (GM only). `deletedAt` (coluna só do banco, nunca serializada no `Scene` do shared, mesmo padrão de `Token.deletedAt`): soft delete de `scene:delete` — todo lugar que lista "mapas da sala agora" filtra `deletedAt: null`; limpeza definitiva depois de 30 dias (`services/cleanup.ts`) |
+| **Token** | `id, sceneId, name, imageUrl, x, y, cells, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[]), notes?, deletedAt?` | Posição (`x, y`) em **pixels do mapa**, não em células (docs/plano-grid.md). `cells` (inteiro ≥ 1) é a fonte da verdade do TAMANHO — lado do token em células, sempre quadrado; os pixels (`width`/`height` do `Token` do shared, nunca persistidos nem trafegados no socket) são derivados on-the-fly de `cells × cellSize do grid ATUAL da cena` (`tokenPixelSize`, `packages/shared/src/rules/placement.ts`) em quem precisa (canvas, espiral de posicionamento, névoa) — trocar de mapa ou editar o `cellSize` do mapa (`scene:updateGrid`) nunca precisa "converter" tamanho nenhum. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto). `notes` (docs/plano-narracao.md, §9.16): nota do Mestre sobre o token — coluna só do banco, **nunca** sai no `Token` do shared (só `hasNotes: boolean`); redigido de novo pra jogador mesmo quando `true` (`redactTokenForViewer`, `services/visibility.ts`) — o indicador no token é "só o GM vê" mesmo sendo o dono. Texto só sai por `token:get-notes` (GM only). `deletedAt` (coluna só do banco, nunca serializada no `Token` do shared): soft delete de `token:delete`/`token:delete-many` (§9.6) — todo lugar que lista "tokens da cena agora" filtra `deletedAt: null`; a limpeza definitiva apaga a linha de vez depois de 30 dias (`services/cleanup.ts`). Uma nota sobrevive ao soft delete/desfazer do token normalmente (a coluna não é tocada por `token:delete`), mas `token:get-notes`/`token:set-notes` recusam um token soft-deleted (mesma regra "não encontrado" de qualquer handler normal) |
 | **Character** | `id, roomId, ownerId?, name, kind, data(JSON), compendiumEntryId?` | `data` segue `CharacterDataSchema` (atributos, perícias, recursos, modificadores, itens...). Colunas só para o que precisa de índice/permissão; o resto é agnóstico de sistema e evolui sem migration. `compendiumEntryId` (coluna só do banco, nunca serializada no `Character` do shared): id da entrada do compêndio que gerou este NPC (`compendium:spawn-creature`/`encounter:spawn`, §9.5/§9.14) — metadado de app, não regra de sistema; `null` = ficha feita à mão (ou PC). Usado só por "salvar tokens selecionados como encontro" (§9.14) pra reconstruir de qual criatura cada token veio |
 | **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), initiativeBatch?(JSON), handout?(JSON), visibility, tokenId?, whisperTo?` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3; `natural`/`targets[]` são o sistema de alvos, §9.12 — ataque OU dano com alvo marcado, congelados na hora da rolagem, ataque com acerto/erro calculado e dano só com o nome; `criticalConfirmed` é o crítico confirmado de "Rolar dano junto com o ataque", §9.13); `item` segue `ItemCardSchema` (kind `item`); `initiativeBatch` segue `InitiativeBatchSchema` (kind `initiative-batch`: `{ round, entries: [{ combatantId, tokenId, name, formula?, result? }] }`, `combat:roll` rolando mais de um combatente, §3.5); `handout` segue `HandoutCardSchema` (kind `handout`, §9.10: cópia denormalizada do handout mostrado); `visibility` = `all \| gm \| self` (§3.4, sempre `all` num handout — quem recebe é decidido por `whisperTo`); `tokenId?` liga a rolagem a um token (combate/ficha), filtrado à parte de `visibility` (§3.4/§3.5) — um `initiative-batch` não usa este campo (várias linhas, vários tokens): o gate é por linha, dentro de `initiativeBatch.entries`; `whisperTo?` (§9.10) é um sussurro visual por PESSOA (`participantId`): setado, só o GM e ele recebem a mensagem, nem card nem placeholder pros demais — mesmo mecanismo de exclusão de `tokenId`, só que por pessoa |
-| **Handout** | `id, roomId, name, kind, imageUrl?, width?, height?, text?, tags[], deletedAt?` | Biblioteca por sala (§9.10), só o GM vê (`handout:list` é `gmOnly`). `kind` = `image \| text`; imagem reaproveita `POST /api/upload` (mesmo limite de 20 MB do mapa), texto vai até 20 000 caracteres, sem parser de markdown (texto puro). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Token.deletedAt`): soft delete de `handout:delete`, que também soft-deleta os pinos deste handout em qualquer mapa (§9.10) |
-| **HandoutPin** | `id, sceneId, handoutId, x, y, visible, name, kind, imageUrl?, width?, height?, text?, deletedAt?` | Handout fixado no mapa como um ícone (§9.10). Geometria em pixels do mapa, como `Token`/`Template`. Campos de conteúdo são uma CÓPIA denormalizada do `Handout` no momento de `handout:pin` (mesmo padrão de `Combatant.name/color`): editar o handout original depois não atualiza pinos já fixados — reposicionar/atualizar é apagar e fixar de novo. `visible` = GM controla se o pino aparece pros jogadores (mesma regra de `Token.visible`, sem névoa). `deletedAt`: soft delete de `handout:unpin` (e da cascata de `handout:delete`), entra no desfazer do GM (§9.6) |
+| **Handout** | `id, roomId, name, kind, imageUrl?, width?, height?, text?, tags[], deletedAt?` | Biblioteca por sala (§9.10), só o GM vê (`handout:list` é `gmOnly`). `kind` = `image \| text`; imagem reaproveita `POST /api/upload` (mesmo limite de 20 MB do mapa), texto vai até 20 000 caracteres, sem parser de markdown (texto puro). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Token.deletedAt`): soft delete de `handout:delete`, que também soft-deleta os `Pin` deste handout em qualquer mapa (§9.10) |
+| **Pin** | `id, sceneId, kind, handoutId?, x, y, visible, name?, imageUrl?, width?, height?, text?, icon?, color?, deletedAt?` | Pino no mapa (§9.10/§9.16, docs/plano-narracao.md — unifica o antigo `HandoutPin` com pino de nota). Geometria em pixels do mapa, como `Token`/`Template`. `kind` = `image \| text` (handout — `handoutId` setado, campos de conteúdo são uma CÓPIA denormalizada do `Handout` no momento de `pin:create`, mesmo padrão de `Combatant.name/color`: editar o handout original depois não atualiza pinos já fixados) \| `note` (`handoutId` null; `name` faz o papel de título, `text` o corpo, `icon`/`color` a aparência — conteúdo é o próprio dado, editável no lugar por `pin:update`). `visible` = GM controla se o pino aparece pros jogadores (mesma regra de `Token.visible`, sem névoa). `deletedAt`: soft delete de `pin:remove` (e da cascata de `handout:delete`), entra no desfazer do GM (§9.6) |
 | **SavedEncounter** | `id, roomId, name, tags[], notes, entries(JSON), deletedAt?` | Encontro salvo (§9.14): grupo de criaturas do compêndio que o GM monta uma vez e solta de uma vez. `entries` = `{ entryId, count, visibleOnSpawn, nameOverride? }[]` (`SavedEncounterEntrySchema`) — só a "receita", nunca cópia de ficha; resolvida contra o compêndio ATUAL na hora de soltar (`encounter:spawn`). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Handout.deletedAt`): soft delete de `encounter:delete` |
 | **Combat** | `id, roomId, sceneId (único: um combate por cena), round, status, activeCombatantId?` | `status` = `rolling \| active \| ended` (§3.5). Persistido (ao contrário da iniciativa manual anterior, que vivia em memória) |
 | **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, bonus, delayed, surprised, order, addedRound, movementBudget?, movementUsed, movementDiagonals, movementAnchorX?, movementAnchorY?, movementPath?(JSON)` | `initiative = null` = ainda não rolou. `combat:remove` apaga o combatente (e ajusta `activeCombatantId`/`round` se o removido era o ativo, `stateAfterRemoval`, §3.5). `token:delete`/`token:delete-many` **não** apagam mais a linha do combatente (o token agora é soft delete, §9.6): só param de listá-lo (o combate ignora combatente cujo token tem `deletedAt`) e fazem o mesmo ajuste de turno/`order`; a linha volta se o GM desfizer. Os seis últimos campos são o orçamento de deslocamento do turno (§9.11): `movementAnchorX/Y` (de onde o próximo movimento é medido) e `movementPath` (o caminho desenhado) são colunas só do banco, nunca serializadas no `Combatant` do shared — o cliente só recebe `movementBudget/Used/Diagonals` e `movementPath` via `Combat` (§5) |
-| **SystemDefinition** | `id, name, attributes[], skills[], resources[] (com `color?`, §9.15), derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), skillTotal, rolls{} (inclui `attackHit?`/`attackAutoHit?`/`attackAutoMiss?`, §9.12, e `critical?`, §9.13), combat{} (§3.5), damageAttribute, tokenBar, grid?, race? (§9.11), movement? (§9.11), trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código. `race?` aponta o `itemKinds[]` que alimenta o placeholder `{race.<campo>}` nas fórmulas (§9.11); `movement?` declara o orçamento de deslocamento por turno (ausente = sistema sem a regra); `rolls.attackHit?`/`attackAutoHit?`/`attackAutoMiss?` são a regra de acerto do sistema de alvos (§9.12, ausentes = sistema sem a regra); `rolls.critical?` confirma um crítico ameaçado ao rolar dano junto com o ataque (§9.13, mesma gramática de `attackAutoHit`, só `{natural}`; ausente = sistema não confirma sozinho) |
+| **SystemDefinition** | `id, name, attributes[], skills[], resources[] (com `color?`, §9.15), derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), pinIcons[] (§9.16), skillTotal, rolls{} (inclui `attackHit?`/`attackAutoHit?`/`attackAutoMiss?`, §9.12, e `critical?`, §9.13), combat{} (§3.5), damageAttribute, tokenBar, grid?, race? (§9.11), movement? (§9.11), trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código. `pinIcons[]` (`key, label, icon, color`, docs/plano-narracao.md): ícones extras pra pino de nota — mesmo formato de `conditions[]`, mas NÃO é regra de sistema (é mobília de UI); vazio (padrão) = o cliente usa uma paleta embutida no código. `race?` aponta o `itemKinds[]` que alimenta o placeholder `{race.<campo>}` nas fórmulas (§9.11); `movement?` declara o orçamento de deslocamento por turno (ausente = sistema sem a regra); `rolls.attackHit?`/`attackAutoHit?`/`attackAutoMiss?` são a regra de acerto do sistema de alvos (§9.12, ausentes = sistema sem a regra); `rolls.critical?` confirma um crítico ameaçado ao rolar dano junto com o ataque (§9.13, mesma gramática de `attackAutoHit`, só `{natural}`; ausente = sistema não confirma sozinho) |
 
 Decisão: posição em pixels (não células) para o token poder ficar "fora do grid" e para suportar `grid.type = none`. A conversão célula↔pixel é uma função pura usando `cellSize` e `offset`. Uma etapa futura pode mover a posição pra células também — só o TAMANHO (`cells`) já é célula hoje (docs/plano-grid.md).
 
@@ -235,12 +238,18 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `template:remove` | `{ sceneId, templateId }` | GM, ou dono (só no mapa ativo) | `template:removed` |
 | `handout:create` | `{ name, tags?, kind: "image", imageUrl, width, height } \| { name, tags?, kind: "text", text }` (`imageUrl` vem do upload HTTP feito antes) | GM | `handout:created` (só pra `rooms.gm`) |
 | `handout:update` | `{ id, patch: { name?, tags? } }` (trocar imagem/texto é apagar e criar de novo) | GM | `handout:updated` (só GM) |
-| `handout:delete` | `{ id }` | GM | ack; `handout:deleted` (só GM) + `handout:unpinned` de cada pino deste handout em qualquer mapa (soft delete em cascata, uma entrada de desfazer só, §9.6) |
+| `handout:delete` | `{ id }` | GM | ack; `handout:deleted` (só GM) + `pin:removed` de cada pino deste handout em qualquer mapa (soft delete em cascata, uma entrada de desfazer só, §9.6) |
 | `handout:list` | `{}` | GM | ack `{ items: Handout[] }` da biblioteca da sala; sem broadcast |
 | `handout:show` | `{ id, target: "all" \| { participantId } }` | GM | publica `chat:message{kind:"handout"}` (visibility `all`, `whisperTo` = `participantId` do alvo ou `null`); quem recebe o broadcast AO VIVO abre o overlay sozinho (cliente) |
 | `handout:close` | `{ messageId }` | GM | `handout:closed` pro mesmo público da mensagem (fecha o overlay de quem a via; a mensagem continua no chat) |
-| `handout:pin` | `{ sceneId, handoutId, x, y, visible }` (pixels do mapa) | GM | `handout:pinned`; entra no desfazer do GM (§9.6) |
-| `handout:unpin` | `{ sceneId, pinId }` | GM | `handout:unpinned`; entra no desfazer do GM (§9.6) |
+| `pin:create` | `{ sceneId, x, y, visible, kind: "handout", handoutId } \| { sceneId, x, y, visible, kind: "note", title, text, icon?, color? }` (pixels do mapa) | GM | ack `Pin`; `pin:created`; entra no desfazer do GM (§9.6) |
+| `pin:update` | `{ sceneId, pinId, patch: { title?, text?, icon?, color?, visible? } }` (só pino `kind: "note"`) | GM | ack `Pin`; `pin:updated`; entra no desfazer do GM (§9.6) |
+| `pin:remove` | `{ sceneId, pinId }` | GM | `pin:removed`; entra no desfazer do GM (§9.6) |
+| `scene:set-notes` | `{ sceneId, notes }` (docs/plano-narracao.md §9.16) | GM | ack `Scene`; `scene:updated` (só pra `rooms.gm` — o conteúdo é só do GM) |
+| `scene:get-notes` | `{ sceneId }` | GM | ack `{ notes: string }` |
+| `token:set-notes` | `{ tokenId, notes }` | GM | ack `Token`; `token:updated` (só pra `rooms.gm`) |
+| `token:get-notes` | `{ tokenId }` | GM | ack `{ notes: string }` |
+| `notes:search` | `{ query }` | GM | ack `{ items: [{ kind: "scene", sceneId, name, snippet } \| { kind: "token", sceneId, tokenId, name, snippet }] }` — busca `contains` (case-insensitive) nas notas de mapa e de token da sala inteira; mapa/token apagado nunca aparece |
 | `history:undo` / `history:redo` | `{}` | GM | desfaz/refaz o topo da pilha da sala (§9.6); ack `{ summary } \| null` (`null` = pilha vazia); broadcasts normais das entidades afetadas + `history:updated` |
 | `party:add` | `{ characterId }` (idempotente) | GM | Visão de grupo (§9.15); ack `PartyEntry[]` (visão do GM); `party:updated` (uma lista por papel) |
 | `party:remove` | `{ characterId }` (idempotente) | GM | idem |
@@ -271,7 +280,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `template:upserted` / `template:removed` | `{ sceneId, template }` / `{ sceneId, templateId }` (§9.9; cliente faz upsert por id) |
 | `handout:created` / `handout:updated` | `Handout` (§9.10; só pra `rooms.gm`, cliente faz upsert por id) |
 | `handout:deleted` | `{ id }` (só pra `rooms.gm`) |
-| `handout:pinned` / `handout:unpinned` | `{ sceneId, pin }` / `{ sceneId, pinId }` (§9.10; mesma regra de broadcast de mapa de sempre — GM sempre, jogador só se `pin.visible` e `sceneId` é o mapa ATIVO) |
+| `pin:created` / `pin:updated` / `pin:removed` | `{ sceneId, pin }` / `{ sceneId, pin }` / `{ sceneId, pinId }` (§9.10/§9.16; mesma regra de broadcast de mapa de sempre — GM sempre, jogador só se `pin.visible` e `sceneId` é o mapa ATIVO) |
 | `handout:closed` | `{ messageId }` (efêmero: instrui quem via a mensagem a fechar o overlay, sem mudar a mensagem no chat) |
 | `encounter:created` / `encounter:updated` | `SavedEncounter` (§9.14; só pra `rooms.gm`, cliente faz upsert por id) |
 | `encounter:deleted` | `{ id }` (só pra `rooms.gm`) |
@@ -312,10 +321,13 @@ apps/web/src/
                 TemplateToolbar (painel da ferramenta Área), TemplateLayer (desenho dos
                 gabaritos no canvas, §9.9), HandoutSelector (botão-dropdown na TopBar, atalho J,
                 §9.10), HandoutsPanel (biblioteca dentro do dropdown), HandoutOverlay (tela cheia,
-                zoom/arrastar imagem), HandoutDragGhost (arrastar card pro mapa), HandoutPinLayer
-                (desenho dos pinos no canvas, só geometria — §9.10)
+                zoom/arrastar imagem), HandoutDragGhost (arrastar card pro mapa), PinLayer (desenho
+                dos pinos no canvas, só geometria — §9.10/§9.16), NotePinCard (cartão de um pino de
+                nota), PinCreatePopover (formulário da ferramenta "Pino"), NotesPanel (notas do
+                Mestre + busca, §9.16)
   components/chat/  ItemCardMessage, InitiativeBatchMessage, HandoutCardMessage (miniatura
-                clicável do handout mostrado, §9.10), ApplyDamageButton, RollModeButton
+                clicável do handout mostrado, §9.10), ApplyDamageButton, RollModeButton,
+                WhisperTargetButton (seletor "para" do sussurro, §3.4)
   components/compendium/  CompendiumPalette (paleta encaixada ou flutuante), EntryPreview, DragGhost (arrasto)
   components/character/  seções da ficha: CharacterHeader, AttributesGrid, ResourcesBlock,
                 DerivedStatsBar, SkillsSection, ItemsSection, ModifiersSection, DetailsSection,
@@ -326,12 +338,13 @@ apps/web/src/
                 sceneList.ts (contagens/combate de cada mapa pro painel "Mapas", §9.7),
                 tools.ts (ferramenta ativa, régua, forma/tamanho da ferramenta Área — §9.9),
                 templates.ts (gabaritos por mapa, §9.9), compendium.ts (entradas, paleta, arrasto),
-                handouts.ts (biblioteca, pinos por mapa, overlay aberto, arrasto — §9.10)
+                handouts.ts (biblioteca, overlay aberto, arrasto — §9.10),
+                pins.ts (pinos por mapa, handout ou nota — §9.10/§9.16)
   lib/          router.ts (2 rotas, sem lib), api.ts (HTTP), grid.ts (célula↔pixel, puro),
                 session.ts (localStorage/sessionStorage), throttle.ts, useImage.ts,
                 thumbnails.ts (miniatura de mapa gerada no cliente, cacheada — §9.7),
-                system.ts (useSystemDef), ids.ts,
-                useToolShortcuts.ts (V/H/R/T/Esc/espaço), useTurnTitle.ts (título da aba pisca no seu turno),
+                system.ts (useSystemDef), ids.ts, pinIcons.ts (paleta padrão de pino, §9.16),
+                useToolShortcuts.ts (V/H/R/T/P/Esc/espaço), useTurnTitle.ts (título da aba pisca no seu turno),
                 compendium.ts (regras de inserção, puro), dropTargets.ts (alvos de soltura por
                 data-drop-target, genérico — mesmo id "map" aceita criatura do compêndio E handout
                 ao mesmo tempo, §9.10), templates.ts (ponte pixel↔metro dos gabaritos, §9.9),
@@ -342,7 +355,8 @@ apps/server/src/
   http/         rooms.ts, upload.ts
   socket/       index.ts, types.ts, ack.ts (validação Zod + ack), room.ts, scene.ts,
                 token.ts, chat.ts, combat.ts (modo de combate), character.ts, ruler.ts (efêmero),
-                compendium.ts, templates.ts (efêmero, §9.9), handout.ts (biblioteca + pinos, §9.10)
+                compendium.ts, templates.ts (efêmero, §9.9), handout.ts (biblioteca, §9.10),
+                pins.ts (pino de handout ou nota, §9.10/§9.16), notes.ts (notas do Mestre, §9.16)
   services/     serialize.ts (Prisma → shared), snapshot.ts, presence.ts,
                 combat.ts (carregar/ordenar/filtrar/emitir combate; regras de ordem em si em shared/rules/combat.ts),
                 permissions.ts, chatCommands.ts, ids.ts,
@@ -352,8 +366,8 @@ apps/server/src/
                 `whisperTo`, §9.10),
                 compendium.ts (sistema + sala via mergeCompendium; a sala ainda é um stub vazio),
                 templates.ts (gabaritos em memória por mapa, nunca no banco — §9.9),
-                handouts.ts (Prisma ↔ Handout/HandoutPin, HandoutCard denormalizado, visibilidade
-                de pino — §9.10)
+                handouts.ts (Prisma ↔ Handout, HandoutCard denormalizado — §9.10),
+                pins.ts (Prisma ↔ Pin — handout ou nota —, visibilidade de pino — §9.10/§9.16)
 packages/shared/src/
   schemas/      (Zod, inclui payloads.ts, character.ts, combat.ts e template.ts)  events.ts
   dice/         parser + roller, puro, sem I/O
@@ -503,10 +517,12 @@ revisão pós-implementação em `docs/revisao-desfazer.md`.
   mapa quando isso reencaixa/redimensiona algum token (`scene:updateGrid`, §9.7 — só quando há
   token pra reencaixar; um patch que só muda cor/`snap` não entra na pilha), colocar/mover/girar/
   apagar um gabarito de área de efeito do GM (`template:upsert`/`template:remove`, §9.9 — do
-  jogador não entra aqui, tem a própria pilha local), fixar/apagar um pino de handout no mapa
-  (`handout:pin`/`handout:unpin`, §9.10 — sem mover: reposicionar é apagar e fixar de novo), e
-  apagar um handout da biblioteca (`handout:delete`, §9.10 — apaga junto, na mesma entrada, os
-  pinos dele em qualquer mapa; desfazer restaura os dois). Fora: chat/rolagens (inclusive
+  jogador não entra aqui, tem a própria pilha local), fixar/editar/apagar um pino de handout ou
+  nota no mapa (`pin:create`/`pin:update`/`pin:remove`, §9.10/§9.16 — sem mover: reposicionar é
+  apagar e fixar de novo), e apagar um handout da biblioteca (`handout:delete`, §9.10 — apaga
+  junto, na mesma entrada, os pinos dele em qualquer mapa; desfazer restaura os dois). Fora:
+  notas do Mestre (`scene:set-notes`/`token:set-notes`, §9.16 — trivial de desfazer à mão: escreve
+  de novo), chat/rolagens (inclusive
   `handout:show`/`handout:close`, que não mexem em nada persistido além da mensagem em si),
   ações de `combat:*` disparadas pelo usuário, ficha de personagem, criar token em branco, os
   demais campos de `token:update` (nome, cor, imagem, dono — painel do token),
@@ -774,19 +790,24 @@ desenha e destaca) e interação com a névoa (gabarito aparece independente del
   sem reparsear texto no card); clicar já abre a ferramenta com a forma e o tamanho do item, o
   clique no mapa escolhe onde colocar (não ancora no token de quem usou o item).
 
-### 9.10 Handouts
+### 9.10 Handouts e pinos no mapa
 
-O GM mostra uma imagem ou um texto curto pros jogadores, em tela cheia, ou fixa como um pino no
-mapa (setembro/2026). Biblioteca por sala, permissão de criar/editar/apagar/mostrar/fixar é sempre
-do GM; jogador só vê o que é mostrado pra ele (chat) ou fixado visível no mapa.
+O GM mostra uma imagem ou um texto curto pros jogadores, em tela cheia, ou fixa um pino no mapa
+(setembro/2026). Biblioteca de handouts por sala, permissão de criar/editar/apagar/mostrar/fixar é
+sempre do GM; jogador só vê o que é mostrado pra ele (chat) ou fixado visível no mapa.
+
+O pino no mapa foi **unificado** com o pino de nota (docs/plano-narracao.md, §9.16): um único
+modelo `Pin`, `kind: "image" | "text"` (pino de handout, como sempre) ou `"note"` (pino de nota —
+título/texto/ícone/cor escritos direto no pino, sem passar pela biblioteca). Os três compartilham
+geometria, `visible`, soft delete e desfazer — ver eventos `pin:*` abaixo.
 
 - **Modelo**: `Handout` (biblioteca da sala, §4) — `kind: "image" | "text"`; imagem reaproveita
   `POST /api/upload` (mesmo fluxo de `scene:setMap`: o cliente sobe o arquivo primeiro, manda a URL
   pronta pro socket), até 20 MB; texto vai direto no evento, até 20 000 caracteres, sempre texto
   puro (sem parser de markdown — ver §8). Até 10 tags de até 30 caracteres cada, sem uso ainda além
   de guardar (busca/filtro por tag fica pra depois). Soft delete (`deletedAt`, mesmo padrão de
-  `Token`/`Scene`): `handout:delete` marca a data — e a de todo `HandoutPin` dele em qualquer mapa
-  na mesma transação — numa única entrada de desfazer (§9.6); a limpeza definitiva segue o mesmo
+  `Token`/`Scene`): `handout:delete` marca a data — e a de todo `Pin` dele em qualquer mapa na
+  mesma transação — numa única entrada de desfazer (§9.6); a limpeza definitiva segue o mesmo
   `services/cleanup.ts` dos outros soft deletes.
 - **Mostrar** (`handout:show { id, target }`, GM): monta uma cópia denormalizada do handout
   (`HandoutCard` — nome, tipo, URL/dimensões ou texto) e publica `ChatMessage{kind:"handout"}` com
@@ -795,10 +816,11 @@ do GM; jogador só vê o que é mostrado pra ele (chat) ou fixado visível no ma
   sussurro visual: só o GM e aquele jogador recebem a mensagem — nem card, nem placeholder pros
   demais (mesmo mecanismo de exclusão total que já existia pro `tokenId` de uma rolagem ligada a um
   token oculto, §3.4, só que por PESSOA — `whisperGateOk`/`blockedPlayerIdsForWhisper`,
-  `apps/server/src/services/chatVisibility.ts`). A mensagem denormaliza o conteúdo (mesmo padrão do
-  `ItemCard`): mesmo se o handout original for editado ou apagado depois, o card já publicado no
-  chat continua mostrando o que foi mostrado na hora — é assim que "fica no histórico" funciona sem
-  precisar reconsultar a biblioteca (que, de qualquer forma, o jogador nunca acessa).
+  `apps/server/src/services/chatVisibility.ts` — reaproveitado tal e qual pelo sussurro do chat
+  comum, §3.4). A mensagem denormaliza o conteúdo (mesmo padrão do `ItemCard`): mesmo se o handout
+  original for editado ou apagado depois, o card já publicado no chat continua mostrando o que foi
+  mostrado na hora — é assim que "fica no histórico" funciona sem precisar reconsultar a biblioteca
+  (que, de qualquer forma, o jogador nunca acessa).
 - **Abrir automaticamente**: o cliente NÃO tem um evento separado de "abrir overlay" — ele abre
   sozinho quando o handler de `chat:message` recebe AO VIVO (via socket, não a hidratação em lote
   do `room:join`) uma mensagem `kind:"handout"` que chegou até ele (`store/handouts.ts#openFromLiveMessage`,
@@ -811,19 +833,29 @@ do GM; jogador só vê o que é mostrado pra ele (chat) ou fixado visível no ma
   fechar. O card continua no chat, clicável — reabrir é 100% local (o conteúdo já está denormalizado
   na mensagem, sem round-trip ao servidor). Cada um também pode fechar só o próprio, a qualquer
   hora, sem avisar ninguém.
-- **Pino no mapa** (`HandoutPin`, §4): `handout:pin { sceneId, handoutId, x, y, visible }` cria uma
-  cópia denormalizada (mesmos campos do `HandoutCard`, mais `visible`) na posição — pixels do mapa,
-  como token/gabarito. `visible` é o GM quem decide na hora de fixar (sem toggle depois: apagar e
-  fixar de novo muda); pino invisível só aparece pro GM (mesma regra de `Token.visible`, sem névoa —
-  um pino não tem "centro", é um ícone do GM). Broadcast de mapa de sempre: GM recebe qualquer
-  mapa; jogador só se `visible` e `sceneId` é o mapa ATIVO da sala. Clique no pino (GM ou jogador,
-  ferramenta Selecionar) abre o overlay local, sem emitir nada — o conteúdo já veio no pino.
-  Botão direito no pino (GM, ferramenta Selecionar) apaga direto — sem confirmação, o Ctrl+Z do GM
+- **Pino no mapa** (`Pin`, §4): `pin:create { sceneId, x, y, visible, kind: "handout", handoutId }`
+  cria uma cópia denormalizada do handout (mesmos campos do `HandoutCard`, o `kind` gravado vira
+  "image"/"text" — o servidor consulta a biblioteca pra saber qual); `pin:create { ..., kind: "note",
+  title, text, icon?, color? }` cria um pino de nota com o conteúdo direto (§9.16). `visible` é o
+  GM quem decide na hora de fixar (pino invisível só aparece pro GM, mesma regra de `Token.visible`,
+  sem névoa — um pino não tem "centro", é um ícone do GM); pino de handout não tem toggle depois
+  (apagar e fixar de novo muda) — pino de nota pode editar (`pin:update`, só `kind:"note"`: título/
+  texto/ícone/cor/visibilidade no lugar). Broadcast de mapa de sempre: GM recebe qualquer mapa;
+  jogador só se `visible` e `sceneId` é o mapa ATIVO da sala. Clique no pino (GM ou jogador,
+  ferramenta Selecionar) abre o overlay (handout, tela cheia) ou o cartão (nota, mais leve — GM
+  edita/apaga no próprio cartão), sem emitir nada além do que já veio no pino. Botão direito no
+  pino (GM, ferramenta Selecionar) apaga direto (`pin:remove`) — sem confirmação, o Ctrl+Z do GM
   cobre um clique errado tão bem quanto um `confirm()` custaria uma interrupção. Sem arrastar pra
-  mover: reposicionar é apagar e fixar de novo (§8). `handout:pin`/`handout:unpin` entram na pilha
-  de desfazer do GM, mesmo espírito de gabarito de área (§9.6) — diferente de gabarito (efêmero em
-  memória), o pino é persistido (`Prisma.handoutPin`), então `revert`/`apply` só alternam
-  `deletedAt` e reemitem, sem precisar reconstruir nada.
+  mover: reposicionar um pino de handout é apagar e fixar de novo (§8); um pino de nota também não
+  arrasta por ora (mesma limitação). `pin:create`/`pin:update`/`pin:remove` entram na pilha de
+  desfazer do GM, mesmo espírito de gabarito de área (§9.6) — diferente de gabarito (efêmero em
+  memória), o pino é persistido (`Prisma.pin`), então `revert`/`apply` alternam `deletedAt` (criar/
+  apagar) ou reescrevem os campos de nota (editar), sem precisar reconstruir nada.
+- **Ícone/cor de pino de nota** (`SystemDefinition.pinIcons?[]`, opcional): lista de `{ key, label,
+  icon (SVG), color }`, mesmo formato de `conditions[]` — não é regra de sistema (nenhuma mecânica
+  lê isto), então sem essa lista o cliente usa uma paleta padrão embutida no código
+  (`lib/pinIcons.ts`, mesmo espírito de `TOKEN_COLORS`); com a lista, ela entra primeiro no
+  seletor. `Pin{kind:"note"}.icon` guarda a CHAVE escolhida (ou ausente = padrão embutido).
 - **UI**: `HandoutSelector` na TopBar, ao lado do `MapSelector` — ícone de imagem, atalho **J**
   (H já é "Mover mapa", §3.2), abre um dropdown (`HandoutsPanel`) com a biblioteca em cards
   (miniatura, nome, tipo) — mesmo padrão visual do painel "Mapas" (§9.7). Cada card tem: "Mostrar
@@ -835,20 +867,24 @@ do GM; jogador só vê o que é mostrado pra ele (chat) ou fixado visível no ma
   criatura do compêndio e handout registram cada um o seu `accepts`/`onDrop` sob o mesmo id "map";
   o primeiro cujo `accepts` topa o que está sendo arrastado ganha (o `DropTarget` virou genérico em
   `T`, um id pode ter mais de um registro). Rodapé: "+ Imagem" (upload) / "+ Texto" (nome + textarea).
-  `HandoutOverlay` é tela cheia (`position: fixed`, por cima de tudo): imagem com zoom (scroll ou
-  botões +/−) e arrastar (pointer events, `translate`+`scale` em CSS); texto com rolagem simples.
-  Botão fechar sempre (qualquer um, local); "Fechar para todos" só pro GM, e só quando a exibição
-  veio de uma mensagem de chat (um pino aberto não tem `messageId`, então não tem esse botão — é só
-  uma visualização local, como abrir a ficha de um token). `HandoutCardMessage` no chat (miniatura
-  + nome) reabre com o mesmo componente. `HandoutPinLayer` no canvas é só desenho
+  **Ferramenta "Pino" na barra** (atalho **P**, só GM): clique no mapa abre um formulário
+  (`PinCreatePopover`) com título, nota, ícone/cor e visibilidade; confirmar chama `pin:create` no
+  ponto clicado. `HandoutOverlay` (handout) é tela cheia (`position: fixed`, por cima de tudo):
+  imagem com zoom (scroll ou botões +/−) e arrastar (pointer events, `translate`+`scale` em CSS);
+  texto com rolagem simples. Botão fechar sempre (qualquer um, local); "Fechar para todos" só pro
+  GM, e só quando a exibição veio de uma mensagem de chat (um pino aberto não tem `messageId`,
+  então não tem esse botão — é só uma visualização local, como abrir a ficha de um token).
+  `NotePinCard` (nota) é um cartão flutuante menor, mais adequado a um texto curto: GM edita
+  (título/texto no lugar, `pin:update`) ou apaga; jogador só lê. `HandoutCardMessage` no chat
+  (miniatura + nome) reabre o handout com `HandoutOverlay`. `PinLayer` no canvas é só desenho
   (`listening={false}`) — clique/apagar são detectados por geometria em `VttCanvas`, mesmo motivo
   de sempre neste projeto: o canvas de hit do Konva é embaralhado por proteção anti-fingerprinting
   (docs/debug-condicoes.md). Raio do pino constante em pixels de TELA (não cresce com o zoom, como
   o rótulo "N alvos" dos gabaritos).
-- **Permissões**: todo evento `handout:*` de criar/editar/apagar/listar/mostrar/fechar/fixar/
-  desfixar é `gmOnly` no servidor (não só escondido na UI). Biblioteca (`handout:created/updated/
-  deleted`) é enviada só pra `rooms.gm` — o jogador nunca recebe, nem filtrado; pino segue a regra
-  de broadcast de mapa de sempre (§9.7).
+- **Permissões**: todo evento `handout:*` de criar/editar/apagar/listar/mostrar/fechar e `pin:*` de
+  criar/editar/apagar é `gmOnly` no servidor (não só escondido na UI). Biblioteca (`handout:created/
+  updated/deleted`) é enviada só pra `rooms.gm` — o jogador nunca recebe, nem filtrado; pino segue a
+  regra de broadcast de mapa de sempre (§9.7).
 
 ### 9.11 Movimento por teclado e orçamento de deslocamento
 
@@ -1205,3 +1241,40 @@ está na faixa, em que ordem, quem está oculto) é gerenciado pelo Mestre e per
   inteiro): um chevron no cabeçalho "Grupo" alterna só esta faixa entre expandida (chips) e
   recolhida (só o cabeçalho, pra reabrir rápido) — some só pra quem desligou, o grupo em si (§ acima)
   não muda pra ninguém.
+
+### 9.16 Notas do Mestre
+
+Um bloco de texto (markdown leve, sem parser — texto puro, mesmo padrão de Handout de texto) que só
+o GM escreve e só o GM vê, por mapa e por token, com busca simples na sala inteira (setembro/2026).
+Plano e decisões em `docs/plano-narracao.md`; revisão pós-implementação em `docs/revisao-narracao.md`.
+
+- **Modelo**: `Scene.gmNotes` e `Token.notes` (§4) — colunas de texto simples, `null`/vazio = sem
+  nota. Nenhum dos dois é regra de sistema (não entra no `SystemDefinitionSchema`) — é dado de app,
+  como `Scene.name`. **O texto nunca sai serializado** em `Scene`/`Token` (só `hasNotes: boolean`,
+  calculado em `toScene`/`toToken`): assim nenhum caminho futuro de serialização do Token/Scene pode
+  vazar a nota pra quem não devia — o campo simplesmente não existe no objeto que viaja. `Token.
+  hasNotes` é redigido pra jogador mesmo quando `true` (`redactTokenForViewer`,
+  `apps/server/src/services/visibility.ts`, aplicado em todo broadcast/snapshot de token): o
+  indicador no token é "só o GM vê" mesmo pro dono do próprio token — a nota é do Mestre sobre o
+  personagem, não do personagem. `Scene.hasNotes`, por outro lado, viaja sem redação nenhuma (um
+  mapa já é uma entidade compartilhada de sempre, sem broadcast assimétrico por papel hoje) —
+  assimetria deliberada, registrada em `docs/revisao-narracao.md`.
+- **Eventos** (`scene:set-notes`/`scene:get-notes`/`token:set-notes`/`token:get-notes`, todos
+  `gmOnly`): o texto de verdade só entra/sai por eles — nunca em `token:update`/`scene:updateGrid`
+  etc. `set-notes` com string vazia (ou só espaço) volta `hasNotes` pra `false`. Um token soft-
+  deletado (`Token.deletedAt`, §9.6) é "não encontrado" pra `token:get-notes`/`set-notes`, mesma
+  regra de qualquer handler normal — mas a nota em si **sobrevive** ao soft delete/desfazer (a
+  coluna não é tocada por `token:delete`): apagar e desfazer um token não perde a nota dele.
+- **Busca** (`notes:search { query }`, `gmOnly`): `contains` case-insensitive nas notas de mapa E de
+  token da sala inteira, devolvendo `{ kind, sceneId, tokenId?, name, snippet }[]` (recorte de ~80
+  chars ao redor do match, `buildNoteSnippet`). Mapa apagado, ou token apagado/de um mapa apagado,
+  nunca aparece (mesmo filtro `deletedAt: null` de sempre, dos dois lados).
+- **UI**: botão "Notas" na TopBar (só GM, só com um mapa sendo visto) abre o mesmo painel
+  (`NotesPanel`) que o item "Notas do mapa" no menu ⋯ de cada card do painel "Mapas" (§9.7) — este
+  último funciona pra qualquer mapa, sem precisar estar vendo ele. `TokenInspector` e a ficha rápida
+  de NPC (`NpcQuickCard`, §3.3) ganham um botão "Notas" (com indicador se já há alguma) que abre o
+  mesmo painel pro token. O painel: textarea (salva ao sair do campo) + campo de busca no topo;
+  clicar num resultado troca o alvo mostrado no MESMO painel (mapa ou token) e, se for um mapa
+  diferente do que o GM está vendo, navega pra ele (`scene:enter`) — sem fechar/reabrir o painel.
+  Indicador no canvas: um ponto discreto no canto do token quando `hasNotes` (nunca aparece pro
+  jogador, pela redação do servidor acima — o cliente nem checa `role`, o dado já chega `false`).

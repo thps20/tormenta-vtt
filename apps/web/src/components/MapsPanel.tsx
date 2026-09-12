@@ -9,6 +9,7 @@ import {
   GripVertical,
   MapPin,
   MoreVertical,
+  NotebookText,
   Play,
   Plus,
   Swords,
@@ -42,6 +43,8 @@ export interface MapsPanelProps {
   onSetArrivalMode: (sceneId: string) => void;
   onClearArrival: (sceneId: string) => void;
   arrivalPickingSceneId: string | null;
+  /** Notas do Mestre sobre este mapa (docs/plano-narracao.md) — abre o mesmo painel do botão da TopBar. */
+  onOpenNotes: (sceneId: string) => void;
 }
 
 /** "Mapa N": próximo número livre, sem colidir com os nomes já usados. */
@@ -79,6 +82,7 @@ export const MapsPanel: React.FC<MapsPanelProps> = ({
   onSetArrivalMode,
   onClearArrival,
   arrivalPickingSceneId,
+  onOpenNotes,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -178,6 +182,10 @@ export const MapsPanel: React.FC<MapsPanelProps> = ({
                 onClearArrival(scene.id);
                 setOpenMenuId(null);
               }}
+              onOpenNotes={() => {
+                onOpenNotes(scene.id);
+                setOpenMenuId(null);
+              }}
               onDragStart={() => setDraggedId(scene.id)}
               onDragOver={() => draggedId && draggedId !== scene.id && setDragOverId(scene.id)}
               onDrop={() => handleDrop(scene.id)}
@@ -246,6 +254,7 @@ interface MapCardProps {
   onDelete: () => void;
   onSetArrivalMode: () => void;
   onClearArrival: () => void;
+  onOpenNotes: () => void;
   onDragStart: () => void;
   onDragOver: () => void;
   onDrop: () => void;
@@ -275,6 +284,7 @@ const MapCard: React.FC<MapCardProps> = ({
   onDelete,
   onSetArrivalMode,
   onClearArrival,
+  onOpenNotes,
   onDragStart,
   onDragOver,
   onDrop,
@@ -472,6 +482,7 @@ const MapCard: React.FC<MapCardProps> = ({
                 ) : (
                   <MenuItem icon={FlagTriangleRight} label="Definir ponto de chegada" onClick={onSetArrivalMode} />
                 )}
+                <MenuItem icon={NotebookText} label={scene.hasNotes ? "Notas do mapa (tem nota)" : "Notas do mapa"} onClick={onOpenNotes} />
                 <div className="h-px bg-[#2d2417] my-0.5" />
                 <MenuItem icon={Trash2} label="Apagar" danger onClick={onDelete} />
               </div>,

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { BookOpen, Eye, EyeOff, Heart, ImagePlus, Sparkles, Trash2, User, X } from "lucide-react";
+import { BookOpen, Eye, EyeOff, Heart, ImagePlus, NotebookText, Sparkles, Trash2, User, X } from "lucide-react";
 import type { Character, ConditionDef, Participant, TokenPatch } from "@tormenta-vtt/shared";
 import { uploadImage } from "../lib/api";
 import type { SizedToken } from "../lib/grid";
@@ -23,6 +23,8 @@ interface TokenInspectorProps {
   conditions: ConditionDef[];
   /** Abre o ConditionMenu (VttCanvas decide a posição a partir do clique). */
   onOpenConditions: () => void;
+  /** Notas do Mestre sobre este token (docs/plano-narracao.md), só GM. */
+  onOpenNotes: () => void;
 }
 
 /**
@@ -41,6 +43,7 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({
   onOpenCharacter,
   conditions,
   onOpenConditions,
+  onOpenNotes,
 }) => {
   const isGm = me.role === "gm";
   const canDelete = isGm || token.ownerId === me.id;
@@ -189,6 +192,20 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({
               className="flex items-center gap-1 px-2 py-0.5 rounded border border-[#3d3d3d] hover:border-[#d4af37] text-[10px] text-zinc-300 hover:text-[#d4af37] cursor-pointer"
             >
               {token.conditions.length > 0 ? `${token.conditions.length} ativa${token.conditions.length > 1 ? "s" : ""}` : "Nenhuma"}
+            </button>
+          </Row>
+        )}
+
+        {isGm && (
+          <Row label="Notas" icon={<NotebookText className="w-3.5 h-3.5 text-[#d4af37]" />}>
+            <button
+              onClick={onOpenNotes}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] cursor-pointer ${
+                token.hasNotes ? "border-[#d4af37]/60 text-[#d4af37] bg-[#2d2417]" : "border-[#3d3d3d] text-zinc-300 hover:border-[#d4af37] hover:text-[#d4af37]"
+              }`}
+              title="Só o GM vê"
+            >
+              {token.hasNotes ? "Tem nota" : "Nenhuma"}
             </button>
           </Row>
         )}

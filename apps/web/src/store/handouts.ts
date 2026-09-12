@@ -1,27 +1,18 @@
 import { create } from "zustand";
-import type {
-  ChatMessage,
-  Handout,
-  HandoutCard,
-  HandoutCreatePayload,
-  HandoutPatch,
-  HandoutPin,
-  HandoutShowTarget,
-} from "@tormenta-vtt/shared";
+import type { ChatMessage, Handout, HandoutCard, HandoutCreatePayload, HandoutPatch, HandoutShowTarget } from "@tormenta-vtt/shared";
 import { dropTargetAt, type DropPoint } from "../lib/dropTargets";
 import { emitAck } from "./connection";
 import { toast } from "./ui";
 
 /**
- * Handouts (docs/SPEC.md §9.10): biblioteca por sala (só GM, carregada sob demanda — mesmo padrão
- * de `sceneList.ts`/`scene:list`) + pinos por mapa (mesmo padrão de `templates.ts`:
- * `pinsByScene[sceneId][pinId]`, só a cena ativa vem no room:join, as demais via `scene:enter`) +
- * o overlay em tela cheia atualmente aberto.
+ * Biblioteca de handouts por sala (docs/SPEC.md §9.10, só GM, carregada sob demanda — mesmo padrão
+ * de `sceneList.ts`/`scene:list`) + o overlay em tela cheia atualmente aberto + o arrasto de um
+ * card da biblioteca até o mapa. O PINO em si (fixar um handout, ou um pino de nota) mudou pra
+ * `store/pins.ts` (docs/plano-narracao.md — unificado com pino de nota).
  */
 interface HandoutsState {
   library: Handout[];
   libraryStatus: "idle" | "loading" | "ready" | "error";
-  pinsByScene: Record<string, Record<string, HandoutPin>>;
 
   /**
    * Overlay aberto agora (null = fechado). `messageId` é `null` quando veio de um clique num pino
@@ -41,20 +32,12 @@ interface HandoutsState {
   show: (id: string, target: HandoutShowTarget) => Promise<boolean>;
   /** "Fechar para todos" (GM): fecha o overlay de quem via a mensagem — a mensagem continua no chat. */
   closeForAll: (messageId: string) => Promise<boolean>;
-  pin: (sceneId: string, handoutId: string, x: number, y: number, visible: boolean) => Promise<HandoutPin | null>;
-  unpin: (sceneId: string, pinId: string) => Promise<boolean>;
 
   // Broadcasts (bindSocket) — idempotentes, a mesma função cobre o eco otimista das ações acima.
   upsertLibrary: (handout: Handout) => void;
   removeFromLibrary: (id: string) => void;
-  upsertPin: (sceneId: string, pin: HandoutPin) => void;
-  removePin: (sceneId: string, pinId: string) => void;
   /** `handout:closed`: fecha o overlay LOCAL se for esta mesma mensagem (senão não faz nada). */
   closeIfOpen: (messageId: string) => void;
-
-  // Ciclo de vida do mapa (room:join / scene:enter / leave — mesmo padrão de `templates.ts`).
-  setSnapshot: (activeSceneId: string | null, pins: HandoutPin[]) => void;
-  replaceScene: (sceneId: string, pins: HandoutPin[]) => void;
 
   /**
    * Chamado pelo handler de `chat:message` AO VIVO (bindSocket), nunca pela hidratação do
@@ -79,7 +62,6 @@ interface HandoutsState {
 export const useHandouts = create<HandoutsState>((set, get) => ({
   library: [],
   libraryStatus: "idle",
-  pinsByScene: {},
   open: null,
   drag: null,
 
@@ -137,26 +119,6 @@ export const useHandouts = create<HandoutsState>((set, get) => ({
     return res.ok;
   },
 
-  pin: async (sceneId, handoutId, x, y, visible) => {
-    const res = await emitAck("handout:pin", { sceneId, handoutId, x, y, visible });
-    if (!res.ok) {
-      toast(res.error);
-      return null;
-    }
-    get().upsertPin(sceneId, res.data);
-    return res.data;
-  },
-
-  unpin: async (sceneId, pinId) => {
-    const res = await emitAck("handout:unpin", { sceneId, pinId });
-    if (!res.ok) {
-      toast(res.error);
-      return false;
-    }
-    get().removePin(sceneId, pinId);
-    return true;
-  },
-
   upsertLibrary: (handout) =>
     set((s) => ({
       library: s.library.some((h) => h.id === handout.id) ? s.library.map((h) => (h.id === handout.id ? handout : h)) : [...s.library, handout],
@@ -164,20 +126,7 @@ export const useHandouts = create<HandoutsState>((set, get) => ({
 
   removeFromLibrary: (id) => set((s) => ({ library: s.library.filter((h) => h.id !== id) })),
 
-  upsertPin: (sceneId, pin) => set((s) => ({ pinsByScene: { ...s.pinsByScene, [sceneId]: { ...s.pinsByScene[sceneId], [pin.id]: pin } } })),
-
-  removePin: (sceneId, pinId) =>
-    set((s) => {
-      const { [pinId]: _removed, ...rest } = s.pinsByScene[sceneId] ?? {};
-      return { pinsByScene: { ...s.pinsByScene, [sceneId]: rest } };
-    }),
-
   closeIfOpen: (messageId) => set((s) => (s.open?.messageId === messageId ? { open: null } : {})),
-
-  setSnapshot: (activeSceneId, pins) =>
-    set({ pinsByScene: activeSceneId ? { [activeSceneId]: Object.fromEntries(pins.map((p) => [p.id, p])) } : {} }),
-
-  replaceScene: (sceneId, pins) => set((s) => ({ pinsByScene: { ...s.pinsByScene, [sceneId]: Object.fromEntries(pins.map((p) => [p.id, p])) } })),
 
   openFromLiveMessage: (msg) => {
     if (msg.kind === "handout" && msg.handout) set({ open: { messageId: msg.id, card: msg.handout } });
@@ -201,11 +150,5 @@ export const useHandouts = create<HandoutsState>((set, get) => ({
   },
   cancelDrag: () => set({ drag: null }),
 
-  reset: () => set({ library: [], libraryStatus: "idle", pinsByScene: {}, open: null, drag: null }),
+  reset: () => set({ library: [], libraryStatus: "idle", open: null, drag: null }),
 }));
-
-/** Lista dos pinos de UM mapa. Função pura para useMemo (não use como seletor do hook). */
-export function scenePins(pinsByScene: Record<string, Record<string, HandoutPin>>, sceneId: string | null | undefined): HandoutPin[] {
-  if (!sceneId) return [];
-  return Object.values(pinsByScene[sceneId] ?? {});
-}

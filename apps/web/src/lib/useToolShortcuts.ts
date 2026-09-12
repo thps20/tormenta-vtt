@@ -6,10 +6,10 @@ import { useTools, type ToolMode } from "../store/tools";
 import { isTyping } from "./isTyping";
 
 /** Tecla → modo. Letras em minúsculo; comparamos com e.key.toLowerCase(). */
-const KEY_TO_MODE: Record<string, ToolMode> = { v: "select", h: "pan", r: "ruler", f: "fog", t: "template" };
+const KEY_TO_MODE: Record<string, ToolMode> = { v: "select", h: "pan", r: "ruler", f: "fog", t: "template", p: "pin" };
 
 /** Modos que só o GM pode ativar. */
-const GM_ONLY_MODES = new Set<ToolMode>(["fog"]);
+const GM_ONLY_MODES = new Set<ToolMode>(["fog", "pin"]);
 
 /**
  * Atalhos globais da barra de ferramentas: V/H/R/F/T trocam o modo (F só para o GM; T = Área,

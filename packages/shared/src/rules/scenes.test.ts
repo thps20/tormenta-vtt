@@ -23,6 +23,7 @@ const scene = (patch: Partial<Scene> = {}): Scene => ({
   fog: { enabled: false, base: "hidden", shapes: [] },
   order: 0,
   arrival: null,
+  hasNotes: false,
   createdAt: "2026-01-01T00:00:00.000Z",
   ...patch,
 });
@@ -43,6 +44,7 @@ const token = (patch: Partial<Token> = {}): Token => ({
   characterId: null,
   hp: null,
   conditions: [],
+  hasNotes: false,
   ...patch,
 });
 

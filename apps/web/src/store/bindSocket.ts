@@ -12,6 +12,7 @@ import { useHistory } from "./history";
 import { useSceneList } from "./sceneList";
 import { useTools } from "./tools";
 import { useHandouts } from "./handouts";
+import { usePins } from "./pins";
 import { useEncounters } from "./encounters";
 import { toast } from "./ui";
 
@@ -84,13 +85,16 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
 
   socket.on("history:updated", (p) => useHistory.getState().setState(p));
 
-  // Handouts (§9.10): biblioteca só chega pro GM (rooms.gm); pino segue a regra de mapa de sempre.
+  // Handouts (§9.10): biblioteca só chega pro GM (rooms.gm).
   socket.on("handout:created", (h) => useHandouts.getState().upsertLibrary(h));
   socket.on("handout:updated", (h) => useHandouts.getState().upsertLibrary(h));
   socket.on("handout:deleted", ({ id }) => useHandouts.getState().removeFromLibrary(id));
-  socket.on("handout:pinned", ({ sceneId, pin }) => useHandouts.getState().upsertPin(sceneId, pin));
-  socket.on("handout:unpinned", ({ sceneId, pinId }) => useHandouts.getState().removePin(sceneId, pinId));
   socket.on("handout:closed", ({ messageId }) => useHandouts.getState().closeIfOpen(messageId));
+
+  // Pinos no mapa (docs/plano-narracao.md): mesma regra de broadcast de mapa de sempre.
+  socket.on("pin:created", ({ sceneId, pin }) => usePins.getState().upsertPin(sceneId, pin));
+  socket.on("pin:updated", ({ sceneId, pin }) => usePins.getState().upsertPin(sceneId, pin));
+  socket.on("pin:removed", ({ sceneId, pinId }) => usePins.getState().removePin(sceneId, pinId));
 
   socket.on("encounter:created", (e) => useEncounters.getState().upsert(e));
   socket.on("encounter:updated", (e) => useEncounters.getState().upsert(e));

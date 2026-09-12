@@ -1,5 +1,5 @@
 import React, { forwardRef, useRef, useState, useEffect, useImperativeHandle, useMemo } from "react";
-import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
+import { Stage, Layer, Rect, Circle, Text, Group, Line, Path, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus, Blend } from "lucide-react";
 import {
@@ -22,7 +22,8 @@ import {
   type FogShape,
   type GridConfig,
   type Handout,
-  type HandoutPin,
+  type Pin,
+  type PinIconDef,
   type Participant,
   type Ruler,
   type SavedEncounter,
@@ -66,7 +67,7 @@ import { NpcQuickCard } from "./NpcQuickCard";
 import { ConditionMenu } from "./ConditionMenu";
 import { FogLayer } from "./FogLayer";
 import { TemplateLayer } from "./TemplateLayer";
-import { HandoutPinLayer, HANDOUT_PIN_RADIUS } from "./HandoutPinLayer";
+import { PinLayer, PIN_RADIUS } from "./PinLayer";
 import { MovementLayer } from "./MovementLayer";
 
 /** Tamanho padrão quando a cena ainda não tem mapa (shared: o servidor usa o mesmo, ver compendium:spawn-creature). */
@@ -134,6 +135,8 @@ interface VttCanvasProps {
   linkableCharacters: Character[];
   onLinkCharacter: (tokenId: string, characterId: string | null) => void;
   onOpenCharacter: (characterId: string) => void;
+  /** Notas do Mestre sobre um token (docs/plano-narracao.md), do TokenInspector ou da ficha rápida. GM only. */
+  onOpenTokenNotes: (token: Token) => void;
   /** Duplo clique num token vinculado a uma ficha (padrão Foundry): RoomPage decide se o usuário
    *  pode vê-la e abre. Token sem ficha: não é chamado. */
   onTokenOpenSheet: (tokenId: string) => void;
@@ -185,12 +188,15 @@ interface VttCanvasProps {
    *  gesto de mover/girar terminou — pro histórico do GM saber o "antes" de verdade (docs/plano-gabaritos.md §4). */
   onTemplateCommit: (template: Template, dragFrom?: { x: number; y: number; rotation: number }) => void;
 
-  /** Pinos de handout fixados na cena visitada (docs/SPEC.md §9.10), já filtrados por quem pode ver. */
-  handoutPins: HandoutPin[];
-  /** Clique num pino, modo Selecionar (qualquer um): abre o overlay local. */
-  onOpenHandoutPin: (pin: HandoutPin) => void;
+  /** Pinos (handout ou nota) fixados na cena visitada (docs/plano-narracao.md), já filtrados por
+   *  quem pode ver. */
+  pins: Pin[];
+  /** Ícones/cores disponíveis pra pino de nota (do sistema, senão o padrão embutido, `lib/pinIcons.ts`). */
+  pinIcons: PinIconDef[];
+  /** Clique num pino, modo Selecionar (qualquer um): abre o cartão/overlay local. */
+  onOpenPin: (pin: Pin) => void;
   /** Botão direito num pino, modo Selecionar: apaga (entra no desfazer do GM). GM only; ausente = jogador. */
-  onDeleteHandoutPin?: (pin: HandoutPin) => void;
+  onDeletePin?: (pin: Pin) => void;
   /**
    * Arrastar um card da biblioteca de handouts até o mapa fixa um pino no ponto (pixels do mapa) —
    * mesmo mecanismo de soltar criatura do compêndio (§9.5), registrado no mesmo alvo "mapa" (o
@@ -198,6 +204,9 @@ interface VttCanvasProps {
    * mapa não aceita o drop.
    */
   onHandoutDrop?: (handout: Handout, point: { x: number; y: number }) => void;
+  /** Ferramenta "Pino" (atalho P, docs/plano-narracao.md): clique no mapa abre o formulário de nota
+   *  no ponto clicado (RoomPage guarda x/y e chama `pin:create` ao confirmar). GM only. */
+  onPinToolClick?: (point: { x: number; y: number }) => void;
 
   /** Sistema de alvos (docs/plano-alvos.md): meus alvos (anel sempre visível). */
   myTargetIds: string[];
@@ -246,6 +255,7 @@ const MODE_HINTS: Record<ToolMode, string> = {
   ruler: "Clique e arraste para medir • Scroll = zoom",
   fog: "Névoa: escolha Revelar/Ocultar e uma forma no painel • Scroll = zoom",
   template: "Clique e arraste para definir tamanho/direção (Alt/Shift soltam o snap) • Clique parado usa o tamanho da barra • Scroll = zoom",
+  pin: "Clique no mapa para fixar um pino de nota • Scroll = zoom",
   draw: "Desenho: em breve",
 };
 
@@ -328,6 +338,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   linkableCharacters,
   onLinkCharacter,
   onOpenCharacter,
+  onOpenTokenNotes,
   onTokenOpenSheet,
   onCharacterPatch,
   onCharacterRoll,
@@ -344,10 +355,12 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   selectedTemplateId,
   onSelectTemplate,
   onTemplateCreate,
-  handoutPins,
-  onOpenHandoutPin,
-  onDeleteHandoutPin,
+  pins,
+  pinIcons,
+  onOpenPin,
+  onDeletePin,
   onHandoutDrop,
+  onPinToolClick,
   onTemplateLive,
   onTemplateCommit,
   myTargetIds,
@@ -1025,17 +1038,18 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   };
 
   /**
-   * Pino de handout sob o ponteiro, por GEOMETRIA (mesmo motivo de tokenAtPointer/templateAtPointer:
-   * `HandoutPinLayer` é só desenho, `listening={false}`, docs/SPEC.md §9.10). Raio constante em
-   * pixels de TELA (o pino não muda de tamanho com o zoom), por isso divide por stageScale em vez
-   * de multiplicar como os outros hit-tests em pixels do mapa. O de cima (último da lista) primeiro.
+   * Pino (handout ou nota) sob o ponteiro, por GEOMETRIA (mesmo motivo de
+   * tokenAtPointer/templateAtPointer: `PinLayer` é só desenho, `listening={false}`,
+   * docs/plano-narracao.md). Raio constante em pixels de TELA (o pino não muda de tamanho com o
+   * zoom), por isso divide por stageScale em vez de multiplicar como os outros hit-tests em pixels
+   * do mapa. O de cima (último da lista) primeiro.
    */
-  const handoutPinAtPointer = (): HandoutPin | null => {
+  const pinAtPointer = (): Pin | null => {
     const p = pointerMapPos();
     if (!p) return null;
-    const r = HANDOUT_PIN_RADIUS / stageScale;
-    for (let i = handoutPins.length - 1; i >= 0; i--) {
-      const pin = handoutPins[i];
+    const r = PIN_RADIUS / stageScale;
+    for (let i = pins.length - 1; i >= 0; i--) {
+      const pin = pins[i];
       if (!pin) continue;
       const dx = p.x - pin.x;
       const dy = p.y - pin.y;
@@ -1360,6 +1374,11 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (p && e.evt.button === 0) fogClick(p);
       return;
     }
+    if (mode === "pin") {
+      const p = pointerMapPos();
+      if (p && e.evt.button === 0) onPinToolClick?.(p);
+      return;
+    }
     if (mode !== "select") return;
     // Alt já foi tratado inteiro no mousedown (marcar/desmarcar alvo, ou limpar) — nada a fazer
     // aqui, senão um hit sabotado chamaria selectByClick por cima (ver handleStageMouseDown).
@@ -1374,12 +1393,13 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (!hitLandedOnToken(e.target, t.id)) selectByClick(t.id, e.evt.shiftKey);
       return;
     }
-    // Pino de handout (§9.10): qualquer um (GM ou jogador) clica pra abrir — sem seleção, sem
-    // Transformer, só abre o overlay local. `HandoutPinLayer` é listening={false}, então o hit do
-    // Konva nunca "aterrissa" nele; sempre passa por aqui, por geometria.
-    const pin = handoutPinAtPointer();
+    // Pino (handout ou nota, docs/plano-narracao.md): qualquer um (GM ou jogador) clica pra abrir
+    // — sem seleção, sem Transformer, só abre o cartão/overlay local. `PinLayer` é
+    // listening={false}, então o hit do Konva nunca "aterrissa" nele; sempre passa por aqui, por
+    // geometria.
+    const pin = pinAtPointer();
     if (pin) {
-      onOpenHandoutPin(pin);
+      onOpenPin(pin);
       return;
     }
     if (e.target === stageRef.current || e.target.name() === "map-background") {
@@ -1408,9 +1428,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     }
     // Botão direito num pino apaga direto (GM only — entra no desfazer, sem confirmação: Ctrl+Z
     // corrige um clique errado tão fácil quanto um confirm() teria custado, §9.10).
-    if (!onDeleteHandoutPin) return;
-    const pin = handoutPinAtPointer();
-    if (pin) onDeleteHandoutPin(pin);
+    if (!onDeletePin) return;
+    const pin = pinAtPointer();
+    if (pin) onDeletePin(pin);
   };
 
   /** Clique num token: seleciona só ele; com Shift, entra/sai da seleção atual. Token e gabarito
@@ -1775,7 +1795,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
             cellSize={effectiveCellSize(scene.grid)}
             stageScale={stageScale}
           />
-          <HandoutPinLayer pins={handoutPins} stageScale={stageScale} />
+          <PinLayer pins={pins} icons={pinIcons} stageScale={stageScale} />
           {movementDisplay && <MovementLayer {...movementDisplay} stageScale={stageScale} />}
           {selectionBox && (
             <Rect
@@ -1886,6 +1906,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           }}
           onOpenFullSheet={() => onOpenCharacter(selectedCharacter.id)}
           onOpenTokenInspector={() => setForceInspector(true)}
+          onOpenNotes={() => onOpenTokenNotes(selectedToken)}
           onDelete={onDeleteSelected}
           onClose={() => onSelectToken(null)}
         />
@@ -1903,6 +1924,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           onOpenCharacter={onOpenCharacter}
           conditions={systemDef?.conditions ?? []}
           onOpenConditions={() => openConditionMenuAt(selectedToken)}
+          onOpenNotes={() => onOpenTokenNotes(selectedToken)}
         />
       )}
 
@@ -2161,6 +2183,19 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, comba
         Um clique num badge ainda seleciona o token normalmente (sem handler próprio, o evento sobe
         pro onClick do Group principal). Ver comentário geométrico em ConditionMarkers.
       */}
+      {/*
+        Nota do Mestre (docs/plano-narracao.md): indicador discreto, "só o GM vê" — sem checar
+        `me.role` aqui porque o SERVIDOR já zera `hasNotes` pra jogador (redactTokenForViewer);
+        se chegou `true` até aqui, quem está vendo já é o GM. Canto oposto aos marcadores de alvo
+        (topo) e à coluna de condições (borda direita) — bottom-left fica livre.
+      */}
+      {token.hasNotes && (
+        <Group x={cx - radius * 0.62} y={cy + radius * 0.62} listening={false}>
+          <Circle radius={6} fill="#1a1206" stroke="#d4af37" strokeWidth={1.3} />
+          <Path data="M -2.5 -3 L 2.5 -3 L 2.5 3 L -2.5 3 Z" x={0} y={0} offsetX={0} offsetY={0} fill="#d4af37" scaleX={0.8} scaleY={0.8} />
+        </Group>
+      )}
+
       {token.conditions.length > 0 && (
         <ConditionMarkers
           width={token.width}

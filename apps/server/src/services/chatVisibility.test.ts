@@ -91,6 +91,7 @@ const tokenFixture: Token = {
   characterId: null,
   hp: null,
   conditions: [],
+  hasNotes: false,
 };
 
 // tokenFixture.sceneId = "s1": maioria dos testes trata "s1" como mapa ATIVO da sala.
