@@ -68,6 +68,11 @@ import type {
   PinCreatePayload,
   PinRemovePayload,
   PinUpdatePayload,
+  RoomCompendiumCreatePayload,
+  RoomCompendiumDeletePayload,
+  RoomCompendiumImportPayload,
+  RoomCompendiumImportResult,
+  RoomCompendiumUpdatePayload,
   RoomJoinPayload,
   RoomPublic,
   Ruler,
@@ -276,6 +281,25 @@ export interface ClientToServerEvents {
    * NPC) e token:created (visibilidade normal) para cada um, feito separadamente deste ack.
    */
   "compendium:spawn-creature": (payload: CompendiumSpawnCreaturePayload, ack: Ack<Token[]>) => void;
+
+  // Homebrew da sala (docs/plano-compendio-sala.md, §9.18), só GM — mesmo desenho de handout:*
+  // (broadcast pra rooms.gm, pode haver mais de uma aba/GM). O editor sempre manda a entrada
+  // MECÂNICA inteira (nunca um patch parcial); `entryId` nasce do nome só na criação e é fixo depois.
+  /** Gera `entryId` do nome (`slugify`, com desempate se colidir com qualquer id já usado na sala,
+   *  inclusive apagado). Ack devolve a entrada completa (já com o id novo). */
+  "compendium:room-create": (payload: RoomCompendiumCreatePayload, ack: Ack<CompendiumEntry>) => void;
+  /** Substitui o corpo inteiro da entrada; `entryId` não muda. */
+  "compendium:room-update": (payload: RoomCompendiumUpdatePayload, ack: Ack<CompendiumEntry>) => void;
+  /** Soft delete + entrada no desfazer do GM (Ctrl+Z restaura, mesmo padrão de handout:delete). */
+  "compendium:room-delete": (payload: RoomCompendiumDeletePayload, ack: Ack) => void;
+  /** Tudo que não está apagado, pro cliente virar um arquivo .json ("levar homebrew de uma sala a outra"). */
+  "compendium:room-export": (payload: Record<string, never>, ack: Ack<{ entries: CompendiumEntry[] }>) => void;
+  /**
+   * Valida cada entrada do arquivo separadamente: a que falhar é pulada e reportada, não derruba o
+   * lote inteiro. Id que já existe na sala é pulado por padrão (`skipped`); com
+   * `overwriteConflicts: true` é sobrescrito (`overwritten`) — checkbox na tela de importação.
+   */
+  "compendium:room-import": (payload: RoomCompendiumImportPayload, ack: Ack<RoomCompendiumImportResult>) => void;
 
   // Encontros salvos (§9.14): biblioteca por sala, só GM — mesmo desenho de handout:* (list/create/
   // update/delete, broadcast pra rooms.gm porque pode haver mais de uma aba/GM olhando a sala).
@@ -504,6 +528,11 @@ export interface ServerToClientEvents {
   "drawing:cleared": (p: { sceneId: string; drawingIds: string[] }) => void;
   /** `drawing:set-player-permission`: novo estado de "jogadores podem desenhar" da SALA, para todos. */
   "drawing:playerPermissionChanged": (p: { enabled: boolean }) => void;
+
+  // Homebrew da sala (§9.18): biblioteca por sala, só pro GM (rooms.gm) — mesmo desenho de handout:*.
+  "compendium:room-created": (entry: CompendiumEntry) => void;
+  "compendium:room-updated": (entry: CompendiumEntry) => void;
+  "compendium:room-deleted": (p: { entryId: string }) => void;
 
   // Encontros salvos (§9.14): biblioteca por sala, só pro GM (rooms.gm) — mesmo desenho de handout:*.
   "encounter:created": (encounter: SavedEncounter) => void;

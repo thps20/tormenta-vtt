@@ -1,17 +1,17 @@
 import { mergeCompendium, type CompendiumList, type CompendiumSource } from "@tormenta-vtt/shared";
 import { getSystemCompendium } from "@tormenta-vtt/shared/compendium";
+import { roomCompendiumEntries } from "./roomCompendium.js";
 
 /** Prioridade da fonte da sala: acima do sistema (0), para o homebrew do GM substituir entradas pelo id. */
 const ROOM_PRIORITY = 10;
 
 /**
- * Compêndio da SALA (homebrew do GM). Ainda não existe tela nem tabela: devolve
- * uma fonte vazia. Quando existir, é só trocar o corpo desta função (ler do
- * banco e validar com validateCompendiumEntries), e o merge abaixo já aplica a
- * prioridade.
+ * Compêndio da SALA (homebrew do GM, docs/plano-compendio-sala.md): lê `RoomCompendiumEntry` da
+ * sala. Entradas ruins (não deveria acontecer — já validamos na gravação) ficam de fora, avisadas no
+ * log (`roomCompendiumEntries`), em vez de derrubar a sala inteira.
  */
 async function roomCompendiumSource(roomId: string): Promise<CompendiumSource> {
-  return { id: `room:${roomId}`, label: "Homebrew da sala", priority: ROOM_PRIORITY, entries: [] };
+  return { id: `room:${roomId}`, label: "Homebrew da sala", priority: ROOM_PRIORITY, entries: await roomCompendiumEntries(roomId) };
 }
 
 /**

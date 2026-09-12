@@ -29,13 +29,14 @@ model Room {
   /// mesmo raciocínio de Scene.grid/fog.
   party         Json     @default("[]")
 
-  scenes          Scene[]
-  participants    Participant[]
-  messages        ChatMessage[]
-  combats         Combat[]
-  characters      Character[]
-  handouts        Handout[]
-  savedEncounters SavedEncounter[]
+  scenes                Scene[]
+  participants          Participant[]
+  messages              ChatMessage[]
+  combats               Combat[]
+  characters            Character[]
+  handouts              Handout[]
+  savedEncounters       SavedEncounter[]
+  roomCompendiumEntries RoomCompendiumEntry[]
 }
 
 model Participant {
@@ -331,7 +332,7 @@ model Pin {
 /// apagar individualmente. Geometria em colunas tipadas nullable por `kind` (mesmo padrão de Pin;
 /// só a caneta usa um array nativo pra polilinha, como Handout.tags).
 model Drawing {
-  id          String    @id @default(cuid())
+  id          String  @id @default(cuid())
   sceneId     String
   kind        String // "pen" | "line" | "rect" | "ellipse" | "arrow" | "text"
   /// Sempre o participantId de quem criou (GM ou jogador) — nunca confiado do payload (mesmo
@@ -341,10 +342,10 @@ model Drawing {
   /// Espessura do traço (pen/line/rect/ellipse/arrow) OU tamanho da fonte (text) — mesmo slider.
   strokeWidth Float
   /// Só kind "rect"/"ellipse" (forma fechada). Ignorado nos demais.
-  filled      Boolean   @default(false)
+  filled      Boolean @default(false)
   /// GM decide: "todos" (true, padrão) ou "só GM" (false) — pra marcar coisas na preparação.
   /// Traço de jogador é sempre true: o servidor ignora o que vier no payload dele.
-  visible     Boolean   @default(true)
+  visible     Boolean @default(true)
 
   // Geometria por kind — só os campos do kind atual são não-nulos (mesmo padrão de Pin).
   /// kind "pen": polilinha achatada [x1,y1,x2,y2,...], já decimada/suavizada pelo cliente.
@@ -361,12 +362,12 @@ model Drawing {
   width  Float?
   height Float?
   /// kind "ellipse": centro + raios.
-  cx Float?
-  cy Float?
-  rx Float?
-  ry Float?
+  cx     Float?
+  cy     Float?
+  rx     Float?
+  ry     Float?
   /// kind "text": conteúdo.
-  text String?
+  text   String?
 
   /// Soft delete (docs/plano-desfazer.md): drawing:remove e as cascatas de "limpar" só marcam esta
   /// data — o desfazer do GM restaura sem precisar de snapshot manual, mesmo padrão de Pin.deletedAt.
@@ -399,4 +400,40 @@ model SavedEncounter {
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@index([roomId])
+}
+
+/// Homebrew do GM (docs/plano-compendio-sala.md, SPEC §9.18): entrada de compêndio própria da
+/// sala, com prioridade sobre a do sistema quando `entryId` bate (mergeCompendium, packages/shared).
+/// Chave primária composta pelo id LEGÍVEL (`entryId`, ex.: "goblin-veterano") — o mesmo que vira
+/// CompendiumEntry.id ao montar a entrada — porque só precisa ser único DENTRO da sala (é o que
+/// mergeCompendium compara) e todo acesso já passa por roomId; um cuid a mais só duplicaria a
+/// chave sem servir pra nada. Nome do modelo é `RoomCompendiumEntry`, não `CompendiumEntry`: esse já
+/// é o tipo do shared, e usar o mesmo nome forçaria um alias (`CompendiumEntry as DbCompendiumEntry`)
+/// em todo arquivo que lida com os dois.
+model RoomCompendiumEntry {
+  roomId      String
+  /// Slug do nome (packages/shared/src/rules/compendium.ts#slugify), fixo desde a criação —
+  /// colisão (inclusive com uma linha já apagada: a chave primária não distingue) ganha sufixo
+  /// numérico. Nunca editável pela UI (docs/plano-compendio-sala.md, decisão confirmada).
+  entryId     String
+  /// Discriminante de CompendiumEntry (shared): "item" | "creature".
+  type        String
+  /// Só em type "item": chave de itemKinds[] do sistema (arma, armadura, magia...). null em "creature".
+  kind        String?
+  name        String
+  tags        String[]  @default([])
+  description String    @default("")
+  page        Int?
+  /// Resto do corpo mecânico — CompendiumItemBody (menos description/page, já colunas acima) se
+  /// type "item", ou { sheet: CreatureSheet } se type "creature". Confirmado por
+  /// validateCompendiumEntry (rules/compendium.ts) ANTES de gravar; a coluna Json não valida sozinha.
+  data        Json
+  /// Soft delete (mesmo padrão de Handout.deletedAt): apagar entra no desfazer do GM.
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, entryId])
 }

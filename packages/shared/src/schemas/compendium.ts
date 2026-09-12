@@ -99,3 +99,45 @@ export interface CompendiumSource {
   priority: number;
   entries: CompendiumEntry[];
 }
+
+/**
+ * Homebrew da sala (docs/plano-compendio-sala.md, §9.18): o mesmo `CompendiumEntry`, sem `id` — o
+ * servidor gera o `entryId` a partir do nome só na CRIAÇÃO (`compendium:room-create`); depois disso
+ * é fixo (decisão confirmada: sem campo pra editar, evita sobrepor uma entrada do sistema sem
+ * querer). `compendium:room-update` reenvia este mesmo formato: o editor sempre manda a entrada
+ * MECÂNICA inteira, nunca um patch parcial — igual `ItemsSection` já reescreve o array de itens
+ * inteiro ao editar a ficha.
+ */
+export const RoomCompendiumEntryInputSchema = z.discriminatedUnion("type", [
+  CompendiumItemEntrySchema.omit({ id: true }),
+  CompendiumCreatureEntrySchema.omit({ id: true }),
+]);
+export type RoomCompendiumEntryInput = z.infer<typeof RoomCompendiumEntryInputSchema>;
+
+export const RoomCompendiumCreateSchema = z.object({ entry: RoomCompendiumEntryInputSchema });
+export type RoomCompendiumCreatePayload = z.infer<typeof RoomCompendiumCreateSchema>;
+
+export const RoomCompendiumUpdateSchema = z.object({ entryId: CompendiumIdSchema, entry: RoomCompendiumEntryInputSchema });
+export type RoomCompendiumUpdatePayload = z.infer<typeof RoomCompendiumUpdateSchema>;
+
+export const RoomCompendiumDeleteSchema = z.object({ entryId: CompendiumIdSchema });
+export type RoomCompendiumDeletePayload = z.infer<typeof RoomCompendiumDeleteSchema>;
+
+/**
+ * `compendium:room-import`: entradas completas (COM `id` — é o `entryId` que decide se cada uma é
+ * nova ou já existe na sala), tipicamente vindas de `compendium:room-export` de outra sala.
+ * `overwriteConflicts` (checkbox desmarcado por padrão na tela): id que já existe na sala é pulado
+ * e reportado, a menos que venha `true`, quando é sobrescrito.
+ */
+export const RoomCompendiumImportSchema = z.object({
+  entries: z.array(CompendiumEntrySchema).min(1).max(500),
+  overwriteConflicts: z.boolean().default(false),
+});
+export type RoomCompendiumImportPayload = z.infer<typeof RoomCompendiumImportSchema>;
+
+/** Ack de `compendium:room-import`: números pro resumo da tela + o nome de cada pulada (motivo). */
+export interface RoomCompendiumImportResult {
+  imported: number;
+  overwritten: number;
+  skipped: { id: string; name: string; reason: string }[];
+}
