@@ -352,6 +352,12 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 40, y: 30 });
+  /** Já enquadramos o mapa alguma vez (1ª medição válida do container)? Evita reenquadrar de novo
+   *  a cada resize do container — ver efeito de "Enquadra automaticamente" abaixo. */
+  const hasFittedRef = useRef(false);
+  /** Último tamanho do MAPA que enquadramos, pra distinguir "o mapa mudou de tamanho" (troca de
+   *  cena/mapa → reenquadra) de "só o container mudou de tamanho" (painel lateral, janela → preserva). */
+  const prevMapDimsRef = useRef<{ w: number; h: number } | null>(null);
   // Preferências locais de visualização (não vão ao servidor).
   const [snapEnabled, setSnapEnabled] = useState(scene.grid.snap);
   const [gridVisible, setGridVisible] = useState(true);
@@ -501,9 +507,39 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     });
   };
 
-  // Centraliza quando o container ou o mapa mudam de tamanho.
+  /** Evita que o mapa saia TOTALMENTE da vista depois que só o tamanho do container mudou (painel
+   *  lateral recolhendo/expandindo, janela redimensionada) — desloca o mínimo pra alguma parte do
+   *  mapa voltar a aparecer. Fora desse caso extremo, escala e posição ficam exatamente como o
+   *  usuário deixou (nada de recentralizar). */
+  const clampMapIntoView = (pos: { x: number; y: number }, scale: number): { x: number; y: number } => {
+    const margin = 40;
+    const w = mapWidth * scale;
+    const h = mapHeight * scale;
+    let { x, y } = pos;
+    if (x + w < margin) x = margin - w;
+    else if (x > dimensions.width - margin) x = dimensions.width - margin;
+    if (y + h < margin) y = margin - h;
+    else if (y > dimensions.height - margin) y = dimensions.height - margin;
+    return x === pos.x && y === pos.y ? pos : { x, y };
+  };
+
+  // Enquadra automaticamente só quando é preciso de verdade: a primeira medição válida do container
+  // (abrir a sala) ou quando o MAPA da cena muda de tamanho (trocou de mapa/cena). Um resize do
+  // container por si só — painel lateral recolhendo/expandindo (\, Ctrl+B) ou redimensionar a janela
+  // — NÃO deve resetar o zoom/pan do usuário: só width/height do Stage mudam, escala e posição ficam
+  // como estavam (bug relatado: recolher o painel devolvia o mapa ao enquadramento padrão). Nesse
+  // caso só clampamos a posição pro mapa não sumir totalmente da vista.
   useEffect(() => {
-    if (dimensions.width > 0 && dimensions.height > 0) fitToScreen();
+    if (dimensions.width <= 0 || dimensions.height <= 0) return;
+    const prevMapDims = prevMapDimsRef.current;
+    const mapChanged = prevMapDims !== null && (prevMapDims.w !== mapWidth || prevMapDims.h !== mapHeight);
+    prevMapDimsRef.current = { w: mapWidth, h: mapHeight };
+    if (!hasFittedRef.current || mapChanged) {
+      hasFittedRef.current = true;
+      fitToScreen();
+      return;
+    }
+    setStagePos((pos) => clampMapIntoView(pos, stageScale));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dimensions.width, dimensions.height, mapWidth, mapHeight]);
 
