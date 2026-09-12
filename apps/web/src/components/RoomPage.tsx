@@ -65,6 +65,9 @@ const PARTY_VIEW_EXPANDED_KEY = "tvtt:partyViewExpanded";
 // Sistema de alvos (docs/plano-alvos.md): preferências por usuário, mesmo padrão de CENTER_ON_TURN_KEY.
 const SHOW_OTHER_TARGETS_KEY = "tvtt:showOtherTargets";
 const CLEAR_TARGETS_ON_TURN_END_KEY = "tvtt:clearTargetsOnTurnEnd";
+// Barras flutuantes translúcidas sobre o mapa: preferência por usuário, padrão ligada — mesmo
+// padrão de PARTY_VIEW_EXPANDED_KEY (botão no HUD inferior do VttCanvas, ver useBarTranslucency).
+const TRANSLUCENT_BARS_OVER_MAP_KEY = "tvtt:translucentBarsOverMap";
 
 /**
  * Página da mesa: entra na sala pela URL e liga as stores aos componentes.
@@ -377,6 +380,22 @@ function Table() {
       /* ignora (aba anônima etc.) */
     }
   }, [centerOnActiveTurn]);
+  // Barras flutuantes (Toolbar, HUD do canvas) translúcidas sobre o mapa: botão no próprio HUD.
+  const [translucentBarsOverMap, setTranslucentBarsOverMap] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(TRANSLUCENT_BARS_OVER_MAP_KEY);
+      return saved === null ? true : saved === "1";
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(TRANSLUCENT_BARS_OVER_MAP_KEY, translucentBarsOverMap ? "1" : "0");
+    } catch {
+      /* ignora (aba anônima etc.) */
+    }
+  }, [translucentBarsOverMap]);
 
   // "Centralizar no token da vez": ao mudar quem age, foca (e seleciona) o token dele.
   const activeTurnTokenId = activeCombatant(combat)?.tokenId ?? null;
@@ -789,6 +808,8 @@ function Table() {
                 showOtherTargets={showOtherTargets}
                 onToggleTarget={(tokenId, additive) => void toggleTarget(tokenId, additive)}
                 onClearTargets={() => void clearTargets()}
+                translucentBarsOverMap={translucentBarsOverMap}
+                onToggleTranslucentBarsOverMap={() => setTranslucentBarsOverMap((v) => !v)}
               />
               <Toolbar
                 isGm={isGm}
@@ -802,6 +823,7 @@ function Table() {
                 redoSummary={redoSummary}
                 onUndo={() => void undoHistory()}
                 onRedo={() => void redoHistory()}
+                translucentBarsOverMap={translucentBarsOverMap}
               />
               {isGm && toolMode === "fog" && (
                 <FogToolbar

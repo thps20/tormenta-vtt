@@ -1,7 +1,7 @@
 import React, { forwardRef, useRef, useState, useEffect, useImperativeHandle, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
-import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus, Blend } from "lucide-react";
 import {
   applyResourceDelta,
   cellsFromPixels,
@@ -53,10 +53,12 @@ import {
 import { useImage } from "../lib/useImage";
 import { newId } from "../lib/ids";
 import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
+import { throttle } from "../lib/throttle";
+import { useBarTranslucency } from "../lib/useBarTranslucency";
 import { useCompendium } from "../store/compendium";
 import { useEncounters } from "../store/encounters";
 import { canMoveNow, movementBudgetFallback } from "../store/combat";
-import { toast } from "../store/ui";
+import { toast, useUi } from "../store/ui";
 import type { FogToolMode, FogToolShape, RemoteRuler, ToolMode } from "../store/tools";
 import { TokenInspector } from "./TokenInspector";
 import { NpcQuickCard } from "./NpcQuickCard";
@@ -205,6 +207,11 @@ interface VttCanvasProps {
   onToggleTarget: (tokenId: string, additive: boolean) => void;
   /** Alt+clique em área vazia: limpa meus alvos. */
   onClearTargets: () => void;
+
+  /** Preferência por usuário (padrão ligada): barras flutuantes (esta e a Toolbar) ficam
+   *  translúcidas quando estão sobre o mapa e o mouse não está nelas — ver lib/useBarTranslucency. */
+  translucentBarsOverMap: boolean;
+  onToggleTranslucentBarsOverMap: () => void;
 }
 
 /** Forma + tamanho (metros) escolhidos na TemplateToolbar, e a sobrescrita de ângulo/largura de um preset. */
@@ -344,10 +351,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   showOtherTargets,
   onToggleTarget,
   onClearTargets,
+  translucentBarsOverMap,
+  onToggleTranslucentBarsOverMap,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
+  /** HUD inferior (zoom/snap/grid/token): translúcido sobre o mapa — ver lib/useBarTranslucency. */
+  const hudBarRef = useRef<HTMLDivElement>(null);
 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [stageScale, setStageScale] = useState(1);
@@ -542,6 +553,50 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     setStagePos((pos) => clampMapIntoView(pos, stageScale));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dimensions.width, dimensions.height, mapWidth, mapHeight]);
+
+  // Tamanho do mapa sempre acessível por uma ref (não muda de identidade a cada render): o
+  // publicador do retângulo abaixo é criado uma vez só (useRef), então só pode ler valores que
+  // mudam por uma ref, nunca fechar sobre a variável comum (ficaria presa no mapa da 1ª renderização).
+  const mapDimsRef = useRef({ w: mapWidth, h: mapHeight });
+  mapDimsRef.current = { w: mapWidth, h: mapHeight };
+
+  /** Retângulo do mapa em coordenadas de TELA agora mesmo — lê a posição/escala direto do Stage do
+   *  Konva (nunca fica atrasado por um render pendente, ao contrário do estado `stagePos`/`stageScale`
+   *  do React, que só é commitado ao SOLTAR um arrasto de pan). Publica em `useUi` pra Toolbar e o
+   *  HUD abaixo decidirem se ficam translúcidos (lib/useBarTranslucency). */
+  const publishMapRect = () => {
+    const container = containerRef.current;
+    const stage = stageRef.current;
+    if (!container || !stage) return;
+    const box = container.getBoundingClientRect();
+    const scale = stage.scaleX();
+    const x = stage.x();
+    const y = stage.y();
+    const { w, h } = mapDimsRef.current;
+    useUi.getState().setMapScreenRect({ left: box.left + x, top: box.top + y, right: box.left + x + w * scale, bottom: box.top + y + h * scale });
+  };
+  // Throttled e criado uma ÚNICA vez (useRef, não useMemo/useCallback): assim o arrasto de pan
+  // (onDragMove do Stage, abaixo) chama sempre a MESMA função com o mesmo temporizador interno.
+  // Só toca refs estáveis (containerRef/stageRef/mapDimsRef), então nunca fica com dado velho.
+  const publishMapRectThrottled = useRef(throttle(() => publishMapRect(), 50)).current;
+
+  // Recalcula o retângulo em zoom/pan (botões, roda do mouse, ajustar à tela) e no resize do
+  // container — tudo que muda `stagePos`/`stageScale`/`dimensions` já passa por aqui. O arrasto de
+  // pan em si (que não atualiza esse estado até soltar) é coberto pelo onDragMove do Stage.
+  useEffect(() => {
+    publishMapRectThrottled();
+  }, [stagePos.x, stagePos.y, stageScale, dimensions.width, dimensions.height, mapWidth, mapHeight, publishMapRectThrottled]);
+
+  // Desmontou (trocou de sala, por ex.): não deixa um retângulo velho de outra cena/canvas por aí.
+  useEffect(() => {
+    return () => {
+      publishMapRectThrottled.cancel();
+      useUi.getState().setMapScreenRect(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const hudTranslucent = useBarTranslucency(hudBarRef, translucentBarsOverMap);
 
   // Centraliza no token quando pedido de fora (clique na iniciativa).
   useEffect(() => {
@@ -1580,6 +1635,12 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         onDragStart={(e) => {
           if (e.target === stageRef.current) setCursor("grabbing");
         }}
+        onDragMove={(e) => {
+          // Arrastar o mapa (modo "Mover mapa") não passa por `setStagePos` até soltar — só assim dá
+          // pra ler a posição ao vivo do Konva sem re-renderizar a árvore toda a cada pixel. O
+          // retângulo do mapa em tela (pras barras translúcidas) precisa acompanhar em tempo real.
+          if (e.target === stageRef.current) publishMapRectThrottled();
+        }}
         onDragEnd={(e) => {
           if (e.target === stageRef.current) {
             setCursor("grab");
@@ -1707,8 +1768,15 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         </Layer>
       </Stage>
 
-      {/* HUD inferior esquerdo: zoom, snap, grid */}
-      <div className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 p-1.5 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl text-zinc-300">
+      {/* HUD inferior esquerdo: zoom, snap, grid. Translúcido sobre o mapa (preferência do usuário,
+       *  ver lib/useBarTranslucency) — opacidade some no CSS, nunca no layout (senão o
+       *  ResizeObserver do hook perderia o elemento). */}
+      <div
+        ref={hudBarRef}
+        id="vtt-hud-bottom"
+        style={{ opacity: hudTranslucent ? 0.55 : 1 }}
+        className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 p-1.5 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl text-zinc-300 transition-opacity duration-150"
+      >
         <HudButton title="Aproximar (+)" onClick={() => handleZoom("in")}>
           <ZoomIn className="w-4 h-4" />
         </HudButton>
@@ -1726,6 +1794,13 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         <HudToggle active={gridVisible} title={`Exibir grid: ${gridVisible ? "visível" : "oculto"}`} onClick={() => setGridVisible(!gridVisible)}>
           <GridIcon className="w-3.5 h-3.5" />
           <span className="hidden sm:inline text-[10px] font-serif font-bold uppercase tracking-wider">Grid</span>
+        </HudToggle>
+        <HudToggle
+          active={translucentBarsOverMap}
+          title={`Barras translúcidas sobre o mapa: ${translucentBarsOverMap ? "ativado" : "desativado"}`}
+          onClick={onToggleTranslucentBarsOverMap}
+        >
+          <Blend className="w-3.5 h-3.5" />
         </HudToggle>
         <span className="text-[10px] font-mono text-zinc-400 px-1.5 border-l border-[#2d2417]">{Math.round(stageScale * 100)}%</span>
         {me.role === "gm" && (

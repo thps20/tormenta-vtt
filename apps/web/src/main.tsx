@@ -23,7 +23,8 @@ if (import.meta.env.DEV) {
     import("./store/history"),
     import("./store/sceneList"),
     import("./store/encounters"),
-  ]).then(([c, r, t, ch, cb, ca, tl, co, h, sl, en]) => {
+    import("./store/ui"),
+  ]).then(([c, r, t, ch, cb, ca, tl, co, h, sl, en, ui]) => {
     Object.assign(window, {
       __vtt: {
         useConnection: c.useConnection,
@@ -37,6 +38,7 @@ if (import.meta.env.DEV) {
         useHistory: h.useHistory,
         useSceneList: sl.useSceneList,
         useEncounters: en.useEncounters,
+        useUi: ui.useUi,
       },
     });
   });
