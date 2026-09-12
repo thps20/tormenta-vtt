@@ -74,3 +74,46 @@ export function setViewingScene(roomId: string, sceneId: string): void {
     /* ignora */
   }
 }
+
+/**
+ * Enquadramento (zoom/pan) do mapa, por sala+mapa, nesta aba (`sessionStorage`, mesmo raciocínio de
+ * `getViewingScene`/`setViewingScene`: cada aba/usuário tem o seu, sobrevive a F5, não é a fonte da
+ * verdade de nada no servidor). `VttCanvas` grava a cada mudança de zoom/pan e restaura ao entrar
+ * num mapa (`scene:enter`, ativação, jogador seguindo o ativo); mapa nunca visto nesta sessão cai no
+ * padrão (ajustar à tela).
+ */
+export interface SavedView {
+  x: number;
+  y: number;
+  scale: number;
+}
+
+const viewKey = (roomId: string, sceneId: string) => `tvtt:view:${roomId}:${sceneId}`;
+
+export function getSavedView(roomId: string, sceneId: string): SavedView | null {
+  try {
+    const raw = sessionStorage.getItem(viewKey(roomId, sceneId));
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      typeof (parsed as SavedView).x === "number" &&
+      typeof (parsed as SavedView).y === "number" &&
+      typeof (parsed as SavedView).scale === "number"
+    ) {
+      return parsed as SavedView;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function setSavedView(roomId: string, sceneId: string, view: SavedView): void {
+  try {
+    sessionStorage.setItem(viewKey(roomId, sceneId), JSON.stringify(view));
+  } catch {
+    /* ignora */
+  }
+}

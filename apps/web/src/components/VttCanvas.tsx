@@ -36,6 +36,7 @@ import {
 } from "@tormenta-vtt/shared";
 import { assetUrl } from "../lib/api";
 import { isTyping } from "../lib/isTyping";
+import { getSavedView, setSavedView } from "../lib/session";
 import { cellAt, cellCenter, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, sizeTokens, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox, type Box, type SizedToken } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
 import {
@@ -79,6 +80,8 @@ export interface VttCanvasHandle {
 }
 
 interface VttCanvasProps {
+  /** Id da sala: só pra chave do enquadramento salvo por sala+mapa (lib/session.ts#getSavedView). */
+  roomId: string;
   scene: Scene;
   /** Ferramenta em vigor (ver store/tools): decide quem responde ao arraste. */
   mode: ToolMode;
@@ -295,6 +298,7 @@ function buildClickCellTemplate(
 }
 
 export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
+  roomId,
   scene,
   mode,
   tokens: tokensProp,
@@ -363,11 +367,13 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 40, y: 30 });
-  /** Já enquadramos o mapa alguma vez (1ª medição válida do container)? Evita reenquadrar de novo
-   *  a cada resize do container — ver efeito de "Enquadra automaticamente" abaixo. */
-  const hasFittedRef = useRef(false);
-  /** Último tamanho do MAPA que enquadramos, pra distinguir "o mapa mudou de tamanho" (troca de
-   *  cena/mapa → reenquadra) de "só o container mudou de tamanho" (painel lateral, janela → preserva). */
+  /** Último mapa (scene.id) que exibimos: distingue "trocou de mapa" (restaura/enquadra — ver efeito
+   *  abaixo) de "só o container mudou de tamanho" (painel lateral, janela → preserva zoom/pan). null
+   *  = ainda não mostramos mapa nenhum (1ª medição válida do container). */
+  const prevSceneIdRef = useRef<string | null>(null);
+  /** Último tamanho do MAPA (imagem) que enquadramos, pra reenquadrar quando o GM troca a imagem da
+   *  cena ATUAL (mesmo `scene.id`, dimensões diferentes) — sem isso a imagem nova apareceria com o
+   *  zoom/pan da antiga. */
   const prevMapDimsRef = useRef<{ w: number; h: number } | null>(null);
   // Preferências locais de visualização (não vão ao servidor).
   const [snapEnabled, setSnapEnabled] = useState(scene.grid.snap);
@@ -511,11 +517,13 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     const scaleY = (dimensions.height - 60) / mapHeight;
     // Mapas pequenos podem ser ampliados até 2x para os tokens não ficarem minúsculos.
     const fitScale = Math.min(Math.max(Math.min(scaleX, scaleY), 0.1), 2.0);
-    setStageScale(fitScale);
-    setStagePos({
+    const pos = {
       x: Math.max(20, (dimensions.width - mapWidth * fitScale) / 2),
       y: Math.max(20, (dimensions.height - mapHeight * fitScale) / 2),
-    });
+    };
+    setStageScale(fitScale);
+    setStagePos(pos);
+    saveView({ ...pos, scale: fitScale });
   };
 
   /** Evita que o mapa saia TOTALMENTE da vista depois que só o tamanho do container mudou (painel
@@ -534,25 +542,51 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     return x === pos.x && y === pos.y ? pos : { x, y };
   };
 
-  // Enquadra automaticamente só quando é preciso de verdade: a primeira medição válida do container
-  // (abrir a sala) ou quando o MAPA da cena muda de tamanho (trocou de mapa/cena). Um resize do
-  // container por si só — painel lateral recolhendo/expandindo (\, Ctrl+B) ou redimensionar a janela
-  // — NÃO deve resetar o zoom/pan do usuário: só width/height do Stage mudam, escala e posição ficam
-  // como estavam (bug relatado: recolher o painel devolvia o mapa ao enquadramento padrão). Nesse
-  // caso só clampamos a posição pro mapa não sumir totalmente da vista.
+  /**
+   * Grava o enquadramento (zoom/pan) sob o mapa ATUAL (sessionStorage, sobrevive a F5 — ver
+   * lib/session.ts#setSavedView). Chamada com o valor recém-calculado em cada gesto/botão que MUDA
+   * o enquadramento de propósito (roda, +/−, "Ajustar", arrastar o mapa) — nunca a partir de um
+   * `useEffect` reativo em `stagePos`/`stageScale`: o efeito de restaurar abaixo também os altera
+   * (troca de mapa), e um efeito reativo gravaria o valor ANTIGO nesse mesmo instante (fica um
+   * commit atrás do `setState`), sobrescrevendo a restauração que acabou de pedir. Por isso
+   * `handleTokenDragMove`/condições/seleção etc. (que não tocam zoom/pan) não precisam chamar isto,
+   * e "centralizar no token da vez" (focusRequest, abaixo) também não chama — é um overlay
+   * temporário, não uma mudança de enquadramento que o usuário quis guardar (SPEC §9.7).
+   */
+  const saveView = (view: { x: number; y: number; scale: number }) => setSavedView(roomId, scene.id, view);
+
+  // Enquadra/restaura só quando é preciso de verdade: a primeira medição válida do container (abrir
+  // a sala — inclusive F5, ver getSavedView abaixo), trocar de MAPA (scene.id — scene:enter,
+  // ativação, jogador seguindo o ativo) ou o GM subir uma imagem nova NA cena atual (mesmo id,
+  // dimensões diferentes). Um resize do container por si só — painel lateral recolhendo/expandindo
+  // (\, Ctrl+B) ou redimensionar a janela — NÃO deve mudar o zoom/pan do usuário: só clampamos a
+  // posição pro mapa não sumir totalmente da vista (bug relatado: recolher o painel devolvia o mapa
+  // ao enquadramento padrão).
   useEffect(() => {
     if (dimensions.width <= 0 || dimensions.height <= 0) return;
+    const prevSceneId = prevSceneIdRef.current;
+    const isNewScene = prevSceneId === null || prevSceneId !== scene.id;
     const prevMapDims = prevMapDimsRef.current;
-    const mapChanged = prevMapDims !== null && (prevMapDims.w !== mapWidth || prevMapDims.h !== mapHeight);
+    const mapDimsChanged = !isNewScene && prevMapDims !== null && (prevMapDims.w !== mapWidth || prevMapDims.h !== mapHeight);
+    prevSceneIdRef.current = scene.id;
     prevMapDimsRef.current = { w: mapWidth, h: mapHeight };
-    if (!hasFittedRef.current || mapChanged) {
-      hasFittedRef.current = true;
-      fitToScreen();
+
+    if (!isNewScene && !mapDimsChanged) {
+      setStagePos((pos) => clampMapIntoView(pos, stageScale));
       return;
     }
-    setStagePos((pos) => clampMapIntoView(pos, stageScale));
+    // Enquadramento lembrado por sala+mapa nesta aba (sessionStorage, sobrevive a F5): só faz
+    // sentido pro MESMO mapa que já vimos antes — imagem nova na cena atual sempre reenquadra do
+    // zero, senão a imagem trocada apareceria com o zoom/pan da anterior.
+    const saved = isNewScene ? getSavedView(roomId, scene.id) : null;
+    if (saved) {
+      setStageScale(saved.scale);
+      setStagePos({ x: saved.x, y: saved.y });
+      return;
+    }
+    fitToScreen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dimensions.width, dimensions.height, mapWidth, mapHeight]);
+  }, [scene.id, dimensions.width, dimensions.height, mapWidth, mapHeight, roomId]);
 
   // Tamanho do mapa sempre acessível por uma ref (não muda de identidade a cada render): o
   // publicador do retângulo abaixo é criado uma vez só (useRef), então só pode ler valores que
@@ -723,8 +757,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     const scaleBy = 1.1;
     const newScale = Math.max(0.1, Math.min(3, e.evt.deltaY < 0 ? stageScale * scaleBy : stageScale / scaleBy));
     const mousePointTo = { x: (pointer.x - stagePos.x) / stageScale, y: (pointer.y - stagePos.y) / stageScale };
+    const pos = { x: pointer.x - mousePointTo.x * newScale, y: pointer.y - mousePointTo.y * newScale };
     setStageScale(newScale);
-    setStagePos({ x: pointer.x - mousePointTo.x * newScale, y: pointer.y - mousePointTo.y * newScale });
+    setStagePos(pos);
+    saveView({ ...pos, scale: newScale });
   };
 
   const handleZoom = (direction: "in" | "out" | "reset") => {
@@ -733,8 +769,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     const centerX = dimensions.width / 2;
     const centerY = dimensions.height / 2;
     const stagePoint = { x: (centerX - stagePos.x) / stageScale, y: (centerY - stagePos.y) / stageScale };
+    const pos = { x: centerX - stagePoint.x * newScale, y: centerY - stagePoint.y * newScale };
     setStageScale(newScale);
-    setStagePos({ x: centerX - stagePoint.x * newScale, y: centerY - stagePoint.y * newScale });
+    setStagePos(pos);
+    saveView({ ...pos, scale: newScale });
   };
 
   const lines = useMemo(() => (gridVisible ? gridLines(scene.grid, map) : []), [gridVisible, scene.grid, map]);
@@ -1644,7 +1682,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         onDragEnd={(e) => {
           if (e.target === stageRef.current) {
             setCursor("grab");
-            setStagePos({ x: e.target.x(), y: e.target.y() });
+            const pos = { x: e.target.x(), y: e.target.y() };
+            setStagePos(pos);
+            saveView({ ...pos, scale: stageScale });
           }
         }}
         onMouseMove={handleStageMouseMove}

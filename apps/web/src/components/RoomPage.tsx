@@ -725,6 +725,7 @@ function Table() {
             <>
               <VttCanvas
                 ref={vttCanvasRef}
+                roomId={room.id}
                 scene={scene}
                 mode={effectiveMode}
                 tokens={tokens}

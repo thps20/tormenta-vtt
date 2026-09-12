@@ -563,6 +563,19 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   criatura, `MapConfigModal`); `selectActiveScene` continua valendo pro `MapSelector`. Quando os
   dois divergem, o botão-seletor da TopBar troca para "Vendo X · ativo: Y" com destaque âmbar — o
   aviso que evita o erro mais provável da feature: editar um mapa achando que a mesa está vendo.
+- **Enquadramento (zoom/pan) por mapa e por usuário** (`VttCanvas`, `lib/session.ts#getSavedView`/
+  `setSavedView`): cada aba lembra o zoom/pan de cada mapa que já viu nesta sessão, em
+  `sessionStorage` por sala+mapa (`tvtt:view:<roomId>:<sceneId>` — sobrevive a F5, igual a
+  `viewingSceneId` acima). Ao trocar de mapa visto (`scene:enter`: `scene:activate`, jogador
+  seguindo `room:activeSceneChanged`, GM navegando pelo `MapSelector`) restaura o enquadramento
+  salvo desse mapa; nunca visto nesta sessão cai no padrão (ajustar à tela). Vale pra GM e jogador,
+  cada um com o seu (é por ABA, mesmo raciocínio de `viewingSceneId`: duas pessoas — ou duas abas —
+  nunca compartilham enquadramento). Só muda o enquadramento salvo o que o usuário decide de
+  propósito — roda do mouse, botões +/−/"Ajustar" e arrastar o mapa (gravado ali mesmo, nunca por um
+  efeito reativo em zoom/pan — ver comentário de `saveView` em `VttCanvas.tsx`); receber
+  `token:updated`/`fog:updated`/`combat:updated` nunca reenquadra. "Centralizar no token da vez"
+  (§3.5, preferência por usuário) continua sobrepondo por cima quando ligada, mas não é salvo como
+  enquadramento do mapa — é um foco temporário, não a escolha do usuário para aquele mapa.
 - **`scene:enter`**: troca de mapa sem os efeitos colaterais de `room:join` (presença, snapshot
   inteiro) — busca só tokens+combate do mapa pedido. GM entra em qualquer mapa vivo da sala;
   jogador só no ativo. `room:join` continua devolvendo tokens/combate do mapa ATIVO (o que todo
