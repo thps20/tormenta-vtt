@@ -7,6 +7,7 @@
 import type { RoomCompendiumEntry as DbRoomCompendiumEntry } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { CompendiumEntrySchema, slugify, validateCompendiumEntry, type CompendiumEntry, type RoomCompendiumEntryInput, type SystemDefinition } from "@tormenta-vtt/shared";
+import { getSystemCompendium } from "@tormenta-vtt/shared/compendium";
 import { prisma } from "../db.js";
 import { HandlerError } from "../socket/ack.js";
 
@@ -73,11 +74,16 @@ export function validateRoomEntry(def: SystemDefinition, entryId: string, entry:
 
 /**
  * Id novo a partir do nome (`slugify`): colisão com QUALQUER id já usado na sala — inclusive de uma
- * entrada apagada, porque a chave primária (roomId, entryId) não distingue — ganha sufixo numérico,
- * mesma regra do importador offline (scripts/import-foundry-compendium.ts).
+ * entrada apagada, porque a chave primária (roomId, entryId) não distingue — OU já usado pelo
+ * compêndio do SISTEMA ganha sufixo numérico, mesma regra do importador offline
+ * (scripts/import-foundry-compendium.ts). Checar o sistema também é o que evita "Duplicar para a
+ * sala" (ou só um nome parecido) sobrepor uma entrada do sistema sem o GM ter escolhido isso de
+ * propósito — decisão confirmada em docs/plano-compendio-sala.md (id da sala é fixo, sem edição).
  */
-export async function nextEntryId(roomId: string, name: string): Promise<string> {
-  const used = new Set((await prisma.roomCompendiumEntry.findMany({ where: { roomId }, select: { entryId: true } })).map((r) => r.entryId));
+export async function nextEntryId(systemId: string, roomId: string, name: string): Promise<string> {
+  const roomIds = (await prisma.roomCompendiumEntry.findMany({ where: { roomId }, select: { entryId: true } })).map((r) => r.entryId);
+  const systemIds = getSystemCompendium(systemId).entries.map((e) => e.id);
+  const used = new Set([...roomIds, ...systemIds]);
   const base = slugify(name);
   if (!used.has(base)) return base;
   let n = 2;

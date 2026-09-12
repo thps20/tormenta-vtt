@@ -69,18 +69,23 @@ describe("services/roomCompendium", () => {
 
   describe("nextEntryId", () => {
     it("sem colisão: usa o slug puro do nome", async () => {
-      expect(await nextEntryId(roomId, "Goblin Veterano")).toBe("goblin-veterano");
+      expect(await nextEntryId("tormenta20", roomId, "Goblin Veterano")).toBe("goblin-veterano");
     });
 
-    it("colisão com uma entrada viva: ganha sufixo numérico", async () => {
+    it("colisão com uma entrada viva da sala: ganha sufixo numérico", async () => {
       await createRoomCompendiumEntry(roomId, "goblin-veterano", creatureInput());
-      expect(await nextEntryId(roomId, "Goblin Veterano")).toBe("goblin-veterano-2");
+      expect(await nextEntryId("tormenta20", roomId, "Goblin Veterano")).toBe("goblin-veterano-2");
     });
 
     it("colisão com uma entrada APAGADA também ganha sufixo (a chave primária não distingue)", async () => {
       const row = await createRoomCompendiumEntry(roomId, "goblin-veterano", creatureInput());
       await prisma.roomCompendiumEntry.update({ where: { roomId_entryId: { roomId, entryId: row.entryId } }, data: { deletedAt: new Date() } });
-      expect(await nextEntryId(roomId, "Goblin Veterano")).toBe("goblin-veterano-2");
+      expect(await nextEntryId("tormenta20", roomId, "Goblin Veterano")).toBe("goblin-veterano-2");
+    });
+
+    it("colisão com uma entrada do SISTEMA também ganha sufixo (nunca sobrepõe sem querer)", async () => {
+      // "espada-longa" já existe no compêndio do sistema (custom.json).
+      expect(await nextEntryId("tormenta20", roomId, "Espada Longa")).toBe("espada-longa-2");
     });
   });
 

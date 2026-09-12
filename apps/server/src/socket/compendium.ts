@@ -179,7 +179,7 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
       RoomCompendiumCreateSchema,
       async ({ entry }, ctx) => {
         const def = await requireRoomDef(ctx.roomId);
-        const entryId = await nextEntryId(ctx.roomId, entry.name);
+        const entryId = await nextEntryId(def.id, ctx.roomId, entry.name);
         const err = validateRoomEntry(def, entryId, entry);
         if (err) throw new HandlerError(err);
         const row = await createRoomCompendiumEntry(ctx.roomId, entryId, entry);
