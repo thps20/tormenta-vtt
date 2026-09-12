@@ -28,6 +28,7 @@ import { parse as parseYaml } from "yaml";
 import { CUSTOM_FILE, DESCRIPTIONS_FILE, compendiumDir, creatureItemTextKey, enhancementTextKey, readCompendiumFile, validateCompendiumEntries } from "../packages/shared/src/compendium/index.js";
 import { parseFormula } from "../packages/shared/src/dice/index.js";
 import { saveSkills } from "../packages/shared/src/rules/activation.js";
+import { slugify as slug } from "../packages/shared/src/rules/compendium.js";
 import { computeCharacter } from "../packages/shared/src/rules/compute.js";
 import { parseAreaText } from "../packages/shared/src/rules/templates.js";
 import { createDefaultCharacterData } from "../packages/shared/src/rules/defaults.js";
@@ -140,7 +141,7 @@ const str = (v: unknown): string => (typeof v === "string" ? v : v === null || v
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : 0);
 const obj = (v: unknown): Record<string, unknown> => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
-/** Sem acento, minúsculo, espaços normalizados: base para comparar rótulos e gerar ids. */
+/** Sem acento, minúsculo, espaços normalizados: base para comparar rótulos. Ids vêm de `slug` (rules/compendium.ts, compartilhado com o editor do compêndio da sala). */
 function normalize(s: string): string {
   return s
     .normalize("NFD")
@@ -150,12 +151,6 @@ function normalize(s: string): string {
     .trim();
 }
 
-function slug(s: string): string {
-  return normalize(s)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
 
 /** Primeiro número depois de "p." em `source` ("Tormenta20 — Edição Jogo do Ano, p. 148"). */
 function pageOf(source: string): number | null {

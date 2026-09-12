@@ -12,7 +12,7 @@ import {
   type CharacterData,
   type CharacterItem,
 } from "../schemas/character.js";
-import type { CompendiumCreatureEntry, CompendiumEntry, CompendiumItemBody, CompendiumSource } from "../schemas/compendium.js";
+import { CompendiumItemBodySchema, CreatureSheetSchema, type CompendiumCreatureEntry, type CompendiumEntry, type CompendiumItemBody, type CompendiumSource, type CreatureSheet } from "../schemas/compendium.js";
 import type { ItemFieldDef, SystemDefinition } from "../schemas/system.js";
 import { saveSkills } from "./activation.js";
 import { emptyFieldValue } from "./progression.js";
@@ -237,6 +237,61 @@ export function entryToCharacter(
     items: entry.sheet.items.map((body) => entryToItem(def, body, newId)),
   });
   return { name: opts.name ?? entry.name, kind: "npc", data };
+}
+
+/**
+ * Caminho INVERSO de `entryToItem`: um item da ficha vira um corpo de item do compêndio, sem `id`
+ * (nem o do item, nem o das ações — nascem de novo na próxima cópia) e sem `quantity`/`equipped`
+ * (só fazem sentido numa ficha; um item do compêndio não tem "quantidade" ou "equipado"). Usado
+ * pelo editor do compêndio da sala (docs/plano-compendio-sala.md): o GM edita um item novo/existente
+ * reaproveitando a mesma seção da ficha (`ItemsSection`) e, ao salvar, este é o passo que separa "o
+ * que vai pro compêndio" de "o que só existe numa ficha".
+ */
+export function characterItemToCompendiumBody(item: CharacterItem): CompendiumItemBody {
+  return CompendiumItemBodySchema.parse({
+    kind: item.kind,
+    name: item.name,
+    description: item.description,
+    fields: item.fields,
+    statBonuses: item.statBonuses,
+    actions: item.actions.map(({ id: _id, ...body }) => body),
+    activation: item.activation,
+    enhancements: item.enhancements,
+    save: item.save,
+    slots: item.slots,
+    price: item.price,
+    page: item.page,
+  });
+}
+
+/**
+ * Caminho INVERSO de `entryToCharacter`: os dados de uma ficha (`CharacterData`) viram uma
+ * `CreatureSheet` de compêndio. `imageUrl`/`bio` são descartados (o parse contra
+ * `CreatureSheetSchema`, que não os declara, já ignora essas chaves); os itens embutidos passam por
+ * `characterItemToCompendiumBody`. Mesmo uso de `characterItemToCompendiumBody`: editor de criatura
+ * homebrew da sala, que reaproveita a ficha inteira em modo edição.
+ */
+export function creatureSheetFromCharacterData(data: CharacterData): CreatureSheet {
+  return CreatureSheetSchema.parse({ ...data, items: data.items.map(characterItemToCompendiumBody) });
+}
+
+/**
+ * Id legível a partir de um nome ("Goblin Veterano" -> "goblin-veterano"): tira acento, baixa a
+ * caixa, troca tudo que não é `[a-z0-9]` por hífen e corta nas bordas — mesma regra do importador
+ * (`scripts/import-foundry-compendium.ts`), agora compartilhada porque o editor do compêndio da sala
+ * (docs/plano-compendio-sala.md) também precisa gerar o `entryId` de uma entrada nova a partir do
+ * nome que o GM digitou. Nome sem nenhum caractere aproveitável (só símbolos/emoji) cai em
+ * "entrada", pra sempre bater com `CompendiumIdSchema` (mín. 1 caractere, começa com letra/número).
+ */
+export function slugify(name: string): string {
+  const slug = name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return slug || "entrada";
 }
 
 /**

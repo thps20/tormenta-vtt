@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CompendiumCreatureEntrySchema, CompendiumEntrySchema, CompendiumItemEntrySchema, type CompendiumCreatureEntry, type CompendiumItemEntry } from "../schemas/compendium.js";
 import { getSystemDefinition } from "../systems.js";
-import { creatureColor, entryToCharacter, entryToItem, mergeCompendium, validateCompendiumEntry } from "./compendium.js";
+import { characterItemToCompendiumBody, creatureColor, creatureSheetFromCharacterData, entryToCharacter, entryToItem, mergeCompendium, slugify, validateCompendiumEntry } from "./compendium.js";
 
 const def = getSystemDefinition("tormenta20");
 
@@ -237,5 +237,60 @@ describe("creatureColor", () => {
 
   it("cai no defaultColor quando o tipo não está em typeColors (ou não foi definido)", () => {
     expect(creatureColor(def, creature({ traits: {} }))).toBe(def.creatures?.defaultColor);
+  });
+});
+
+describe("characterItemToCompendiumBody (docs/plano-compendio-sala.md — inverso de entryToItem)", () => {
+  it("ida e volta: entryToItem -> characterItemToCompendiumBody preserva os campos mecânicos, sem id", () => {
+    const item = entryToItem(def, weapon(), () => "x");
+    const body = characterItemToCompendiumBody(item);
+    expect(body).not.toHaveProperty("id");
+    expect(body.kind).toBe("weapon");
+    expect(body.name).toBe("Espada longa");
+    expect(body.fields.purpose).toBe("melee");
+    expect(body.slots).toBe(1);
+    expect(body.price).toBe(15);
+    expect(body.actions).toHaveLength(2);
+    expect(body.actions[0]).not.toHaveProperty("id");
+    expect(body.actions.map((a) => a.label)).toEqual(["Ataque", "Dano"]);
+    // Volta a validar como uma entrada nova (o corpo é reaproveitável, não só espiado).
+    expect(validateCompendiumEntry(def, CompendiumItemEntrySchema.parse({ ...body, type: "item", id: "espada-nova", tags: [] }))).toBeNull();
+  });
+
+  it("descarta quantity/equipped (só fazem sentido numa ficha, não num item do compêndio)", () => {
+    const item = { ...entryToItem(def, weapon(), () => "x"), quantity: 3, equipped: true };
+    expect(characterItemToCompendiumBody(item)).not.toHaveProperty("quantity");
+    expect(characterItemToCompendiumBody(item)).not.toHaveProperty("equipped");
+  });
+});
+
+describe("creatureSheetFromCharacterData (docs/plano-compendio-sala.md — inverso de entryToCharacter)", () => {
+  it("ida e volta: entryToCharacter -> creatureSheetFromCharacterData preserva a ficha, sem imageUrl/bio", () => {
+    const { data } = entryToCharacter(def, creature(), () => "x");
+    const sheet = creatureSheetFromCharacterData({ ...data, imageUrl: "http://x/y.png", bio: "Um goblin qualquer" });
+    expect(sheet).not.toHaveProperty("imageUrl");
+    expect(sheet).not.toHaveProperty("bio");
+    expect(sheet.traits.tipo).toBe("humanoide");
+    expect(sheet.items).toHaveLength(1);
+    expect(sheet.items[0]).not.toHaveProperty("id");
+    expect(sheet.items[0]?.name).toBe("Adaga");
+    // Volta a validar como uma entrada de criatura nova.
+    expect(validateCompendiumEntry(def, CompendiumCreatureEntrySchema.parse({ type: "creature", id: "goblin-2", name: "Goblin 2", sheet }))).toBeNull();
+  });
+});
+
+describe("slugify", () => {
+  it("tira acento, baixa a caixa e troca espaço/pontuação por hífen", () => {
+    expect(slugify("Goblin Veterano")).toBe("goblin-veterano");
+    expect(slugify("Espada-Longa (Élfica)")).toBe("espada-longa-elfica");
+  });
+
+  it("corta hífen nas bordas e limita a 80 caracteres", () => {
+    expect(slugify("  Goblin!!  ")).toBe("goblin");
+    expect(slugify("a".repeat(100))).toHaveLength(80);
+  });
+
+  it("nome sem nenhum caractere aproveitável cai em 'entrada', pra sempre bater com CompendiumIdSchema", () => {
+    expect(slugify("🐉🐉🐉")).toBe("entrada");
   });
 });
