@@ -6,6 +6,16 @@ export interface DialogProps {
   ariaLabel: string;
   /** Largura máxima do conteúdo (classe Tailwind, ex. "max-w-sm", "max-w-xl"). */
   maxWidthClassName?: string;
+  /**
+   * Deixa o diálogo inteiro (fundo + caixa) sem reagir a clique, e semitransparente, SEM fechar —
+   * pra quem arrasta algo de DENTRO do diálogo pra um alvo por BAIXO dele (`HandoutGallery`,
+   * arrastar um card de handout até o mapa): o alvo de soltura usa `document.elementFromPoint`
+   * (`lib/dropTargets.ts`), que só enxerga o mapa se este diálogo sair da frente enquanto isso
+   * acontece. Mesmo espírito de `CompendiumPalette#anyDialogOpen`, só que na direção oposta (aqui
+   * é o PRÓPRIO diálogo que fica inerte, não algo por cima dele). Default false: não muda nenhum
+   * uso existente.
+   */
+  inert?: boolean;
   children: React.ReactNode;
 }
 
@@ -31,7 +41,7 @@ const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), textarea:not([disab
  * Prende o foco dentro (Tab/Shift+Tab não escapam) enquanto aberto e devolve o foco a quem tinha
  * antes, ao fechar (acessibilidade básica de modal).
  */
-export const Dialog: React.FC<DialogProps> = ({ onClose, ariaLabel, maxWidthClassName = "max-w-xl", children }) => {
+export const Dialog: React.FC<DialogProps> = ({ onClose, ariaLabel, maxWidthClassName = "max-w-xl", inert = false, children }) => {
   const boxRef = useRef<HTMLDivElement>(null);
   // Inicializador preguiçoso: roda na fase de RENDER, antes de o diálogo ser inserido no DOM — pega
   // quem tinha o foco de verdade (ex.: a busca da paleta), sem correr atrás de um autoFocus de
@@ -78,7 +88,7 @@ export const Dialog: React.FC<DialogProps> = ({ onClose, ariaLabel, maxWidthClas
         e.stopPropagation();
         onClose();
       }}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-[1px]"
+      className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-[1px] transition-opacity ${inert ? "opacity-25 pointer-events-none" : ""}`}
     >
       <div
         ref={boxRef}

@@ -4,7 +4,9 @@ import { useHandouts } from "../store/handouts";
 
 /** "Fantasma" que segue o cursor ao arrastar um card da biblioteca de handouts pro mapa (§9.10) —
  *  mesmo papel de `components/compendium/DragGhost.tsx`, arrastando um `Handout` em vez de uma
- *  `CompendiumEntry`. Fora do dropdown pra não herdar nenhuma transparência/clip dele. */
+ *  `CompendiumEntry`. Fora da galeria (`HandoutGallery`) pra não herdar nenhuma
+ *  transparência/clip dela — e acima do `z-[100]` do `Dialog` que a galeria usa agora (era um
+ *  dropdown de `z-50` antes, por isso o `z-[60]` de sempre já bastava). */
 export const HandoutDragGhost: React.FC = () => {
   const drag = useHandouts((s) => s.drag);
   const handout = useHandouts((s) => (s.drag ? s.library.find((h) => h.id === s.drag?.handoutId) : undefined));
@@ -14,7 +16,7 @@ export const HandoutDragGhost: React.FC = () => {
   return (
     <div
       id="handout-drag-ghost"
-      className={`fixed z-[60] pointer-events-none flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-[#1a1712]/95 shadow-[0_8px_24px_rgba(0,0,0,0.7)] text-xs font-serif transition-colors ${
+      className={`fixed z-[110] pointer-events-none flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-[#1a1712]/95 shadow-[0_8px_24px_rgba(0,0,0,0.7)] text-xs font-serif transition-colors ${
         overTarget ? "border-[#d4af37] text-amber-100" : "border-zinc-600 text-zinc-300"
       }`}
       style={{ left: drag.point.x + 14, top: drag.point.y + 10 }}
