@@ -1585,3 +1585,36 @@ direto.
   "Rolar" do próprio card já fazia, e abre o mesmo criador. Teclas **1..9** (fora de campo de texto,
   `useMacroShortcuts.ts`, mesmo padrão de `isTyping`/`useToolShortcuts.ts`) disparam a macro na
   posição correspondente da barra.
+
+### 9.21 Aparência do grid por usuário
+
+Preferência **pessoal** (setembro/2026) de como o grid é DESENHADO na tela de cada um — nunca muda
+geometria (`Scene.grid`), snap, medidas ou gabaritos, que continuam só do Mestre e compartilhados por
+todos. Fica inteiramente no cliente: não é regra de sistema nem config de sala, então não entra em
+`packages/shared` (regra número 1 do CLAUDE.md é só pra regras de RPG) nem em nenhum evento socket.
+
+- **Preferências** (`GridAppearancePrefs`, `apps/web/src/lib/gridAppearance.ts`): `visible`
+  (mostrar/ocultar o grid só pra mim — ocultar não desliga snap nem medidas, só não desenha) e
+  `override` (`null` = seguir o padrão do mapa). Um override tem `style` (`lines` = linhas cheias,
+  `dashed` = pontilhado, `crosses` = só uma marca em cada cruzamento — mais leve visualmente em
+  mapas grandes), `color` (`#rrggbb`, sem alfa — a opacidade é campo separado, mesma convenção da
+  "Cor do Grid" do Mestre em `MapConfigModal`), `opacity` (0..1) e `thickness` (1 a 3 px de **tela**,
+  constante com o zoom, não px do mapa — por isso não fica mais grosso/fino ao dar zoom). Sem
+  override, o padrão é `style: "lines"` na cor que o Mestre escolheu (`Scene.grid.color`), opacidade
+  cheia e 1px de tela.
+- **Persistência**: `localStorage`, uma chave por SALA (`vtt:gridAppearance:<roomId>`) — a mesma
+  preferência vale em qualquer mapa daquela sala, não por cena. Nunca lança (mesmo padrão de
+  `lib/thumbnails.ts`/`lib/session.ts`): `localStorage` bloqueado/indisponível cai no padrão
+  (mostrar, seguindo o mapa).
+- **UI**: botão **"Grid"** do HUD inferior do canvas (`GridAppearanceMenu.tsx`) abre um menu (não
+  mais um toggle simples) com o checkbox "Exibir grid", os três estilos, cor, opacidade e espessura,
+  e um botão **"Usar o padrão do mapa"** que zera o `override` (`visible` não muda). Mudar qualquer
+  campo de estilo/cor/opacidade/espessura cria o override a partir do valor EFETIVO atual (assim as
+  outras propriedades continuam iguais ao que já se via) — o botão do HUD ganha um indicador
+  discreto (pontinho) enquanto houver override.
+- **Render eficiente** (`GridLayer.tsx`): o grid inteiro NUNCA vira uma lista de nós Konva (uma
+  `Line` por linha, ou um nó por marca no estilo "cruzamentos" — em mapas grandes isso são facilmente
+  milhares de nós, cada um com custo de reconciliação/hit-graph mesmo com `listening={false}`). Em
+  vez disso é um único nó `Shape` com `sceneFunc` de canvas puro, que desenha só a faixa
+  correspondente ao retângulo VISÍVEL do mapa (calculado pelo `VttCanvas` a partir de pan/zoom
+  atuais) — o custo fica proporcional à tela, não ao mapa inteiro nem ao zoom.

@@ -1,7 +1,7 @@
 import React, { forwardRef, useRef, useState, useEffect, useImperativeHandle, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Path, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
-import { ZoomIn, ZoomOut, Maximize2, Magnet, Grid as GridIcon, Info, Plus, Blend } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Magnet, Info, Plus, Blend } from "lucide-react";
 import {
   applyResourceDelta,
   cellsFromPixels,
@@ -43,8 +43,11 @@ import {
 import { assetUrl } from "../lib/api";
 import { isTyping } from "../lib/isTyping";
 import { getSavedView, setSavedView } from "../lib/session";
-import { cellAt, cellCenter, cellRect, cellToPoint, clampToMap, effectiveCellSize, gridLines, sizeTokens, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox, type Box, type SizedToken } from "../lib/grid";
+import { cellAt, cellCenter, cellRect, cellToPoint, clampToMap, effectiveCellSize, sizeTokens, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox, type Box, type SizedToken } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
+import { loadGridAppearancePrefs, saveGridAppearancePrefs, resolveGridAppearance, type GridAppearancePrefs } from "../lib/gridAppearance";
+import { GridLayer } from "./GridLayer";
+import { GridAppearanceMenu } from "./GridAppearanceMenu";
 import {
   cellCountFromPixels,
   cellsFromSizeUnits,
@@ -455,7 +458,12 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   const prevMapDimsRef = useRef<{ w: number; h: number } | null>(null);
   // Preferências locais de visualização (não vão ao servidor).
   const [snapEnabled, setSnapEnabled] = useState(scene.grid.snap);
-  const [gridVisible, setGridVisible] = useState(true);
+  // Aparência do grid é preferência PESSOAL, por sala (docs/SPEC.md §9.21) — carregada uma vez do
+  // localStorage e regravada a cada mudança pelo menu do botão "Grid".
+  const [gridAppearancePrefs, setGridAppearancePrefs] = useState<GridAppearancePrefs>(() => loadGridAppearancePrefs(roomId));
+  useEffect(() => {
+    saveGridAppearancePrefs(roomId, gridAppearancePrefs);
+  }, [roomId, gridAppearancePrefs]);
 
   /** `systemDef` com a escala do MAPA por cima da do sistema (docs/SPEC.md §3.2, "Escala por
    *  mapa") — régua, gabaritos e orçamento de deslocamento usam este, não `systemDef` cru; o resto
@@ -894,7 +902,13 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     saveView({ ...pos, scale: newScale });
   };
 
-  const lines = useMemo(() => (gridVisible ? gridLines(scene.grid, map) : []), [gridVisible, scene.grid, map]);
+  const gridAppearance = useMemo(() => resolveGridAppearance(gridAppearancePrefs, scene.grid), [gridAppearancePrefs, scene.grid]);
+  // Retângulo visível do MAPA (pixels do mapa) a partir de pan/zoom atuais: o `GridLayer` só
+  // desenha essa faixa, em vez do mapa inteiro (docs/SPEC.md §9.21).
+  const gridViewport = useMemo(
+    () => ({ x: -stagePos.x / stageScale, y: -stagePos.y / stageScale, width: dimensions.width / stageScale, height: dimensions.height / stageScale }),
+    [stagePos.x, stagePos.y, stageScale, dimensions.width, dimensions.height],
+  );
 
   const setCursor = (cursor: string) => {
     if (stageRef.current) stageRef.current.container().style.cursor = cursor;
@@ -2103,9 +2117,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           ) : (
             <Rect name="map-background" x={0} y={0} width={mapWidth} height={mapHeight} fill="#121212" stroke="#2d2417" strokeWidth={3} />
           )}
-          {lines.map((points, i) => (
-            <Line key={i} points={points} stroke={scene.grid.color} strokeWidth={1} listening={false} />
-          ))}
+          <GridLayer grid={scene.grid} map={map} appearance={gridAppearance} viewport={gridViewport} stageScale={stageScale} />
         </Layer>
 
         {/*
@@ -2242,10 +2254,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           <Magnet className="w-3.5 h-3.5" />
           <span className="hidden sm:inline text-[10px] font-serif font-bold uppercase tracking-wider">Snap</span>
         </HudToggle>
-        <HudToggle active={gridVisible} title={`Exibir grid: ${gridVisible ? "visível" : "oculto"}`} onClick={() => setGridVisible(!gridVisible)}>
-          <GridIcon className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline text-[10px] font-serif font-bold uppercase tracking-wider">Grid</span>
-        </HudToggle>
+        <GridAppearanceMenu prefs={gridAppearancePrefs} effective={gridAppearance} onChange={setGridAppearancePrefs} />
         <HudToggle
           active={translucentBarsOverMap}
           title={`Barras translúcidas sobre o mapa: ${translucentBarsOverMap ? "ativado" : "desativado"}`}
