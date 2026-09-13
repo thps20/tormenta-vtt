@@ -906,11 +906,20 @@ geometria, `visible`, soft delete e desfazer — ver eventos `pin:*` abaixo.
 - **UI**: `HandoutSelector` na TopBar, ao lado do `MapSelector` — ícone de imagem, atalho **J**
   (H já é "Mover mapa", §3.2), abre a `HandoutGallery` (`Dialog` padrão do projeto — portal, Esc,
   clique fora) com a biblioteca inteira: busca, chips de tag, alternar grade/lista e uma prévia
-  grande (imagem com zoom, ou o texto num "manuscrito") do handout selecionado. Cada item tem:
-  "Mostrar para todos" (👁), "Mostrar para..." (mini-menu com os jogadores da sala), editar
-  nome/tags, apagar, **fixar no mapa** — clique fixa no centro do VIEWPORT do mapa visto agora
-  (mesmo ponto de "soltar uma criatura do compêndio sem arrastar", `VttCanvasHandle.getViewportCenter`),
-  ou **arrastar o card até o mapa** fixa no ponto exato largado — mesmo mecanismo de arrastar uma
+  grande (imagem com zoom, ou o texto num "manuscrito") do handout selecionado. **Mostrar fecha a
+  galeria sozinha**: ao "Mostrar para todos"/"Mostrar para...", `HandoutSelector` fecha o `Dialog`
+  na hora, deixando só o `HandoutOverlay` visível pro GM (que também recebe a própria mensagem);
+  reabre sozinha quando esse overlay fecha de novo ("Fechar para todos" ou o fechar local), com
+  busca/filtro/seleção de antes intactos — a galeria continua montada o tempo todo, só oculta. No
+  card da grade, o hover mostra só as 2 ações mais comuns em ícones grandes — "Mostrar para todos"
+  (👁) e "fixar no mapa" — pra não lotar o card nem cobrir o nome (que fica fora da miniatura); o
+  resto ("Mostrar para...", editar nome/tags, apagar) fica atrás de um "⋯" no canto, que abre um
+  `AnchoredMenu` (portal em `document.body`, `position: fixed` calculada a partir do botão, clique
+  fora/Esc/rolagem fecham — mesmo problema/solução de `MapsPanel`/`PartyView`: um menu `absolute`
+  comum seria cortado pelo `overflow-y-auto` da grade). Fixar no mapa: clique fixa no centro do
+  VIEWPORT do mapa visto agora (mesmo ponto de "soltar uma criatura do compêndio sem arrastar",
+  `VttCanvasHandle.getViewportCenter`), ou **arrastar o card até o mapa** fixa no ponto exato
+  largado — mesmo mecanismo de arrastar uma
   criatura do compêndio pro mapa (§9.5): pointer events (não HTML5 drag, por causa do Konva),
   fantasma seguindo o cursor (`HandoutDragGhost`, acima do `Dialog` no z-index pra continuar visível
   por cima dele). Enquanto um card está sendo arrastado, o `Dialog` da galeria fica inerte
