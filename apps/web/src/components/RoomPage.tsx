@@ -259,7 +259,7 @@ function Table() {
   const handoutLibrary = useHandouts((s) => s.library);
   const loadHandoutLibrary = useHandouts((s) => s.loadLibrary);
   const createHandout = useHandouts((s) => s.create);
-  const renameHandout = useHandouts((s) => s.update);
+  const updateHandout = useHandouts((s) => s.update);
   const deleteHandout = useHandouts((s) => s.remove);
   const showHandout = useHandouts((s) => s.show);
   const closeHandoutForAll = useHandouts((s) => s.closeForAll);
@@ -763,13 +763,23 @@ function Table() {
   };
 
   // --- Handouts (docs/SPEC.md §9.10) --------------------------------------------------------
-  const handoutsProps = {
+  const handoutGalleryProps = {
     handouts: handoutLibrary,
+    pins,
     participants,
+    /** Sem mapa aberto, não tem onde fixar (mesma guarda de `handleHandoutDrop`, arrasto). */
+    canPinToMap: scene !== null,
     onCreate: (payload: Parameters<typeof createHandout>[0]) => void createHandout(payload),
-    onRename: (id: string, name: string) => void renameHandout(id, { name }),
+    onEdit: (id: string, patch: Parameters<typeof updateHandout>[1]) => void updateHandout(id, patch),
     onDelete: (id: string) => void deleteHandout(id),
     onShow: (id: string, target: Parameters<typeof showHandout>[1]) => void showHandout(id, target),
+    /** Clique (sem arrastar): fixa no centro do VIEWPORT do mapa visto agora — mesmo ponto que
+     *  `onSpawnCreature`/`onSpawnEncounter` usam pro mesmo tipo de ação (`VttCanvasHandle`). */
+    onPinToMap: (handoutId: string) => {
+      if (!scene) return;
+      const point = vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 };
+      void createPin({ kind: "handout", sceneId: scene.id, x: point.x, y: point.y, visible: true, handoutId });
+    },
   };
 
   // --- Pinos (docs/plano-narracao.md — unifica handout:pin com pino de nota) ----------------
@@ -825,7 +835,7 @@ function Table() {
           ) : undefined
         }
         handoutSelector={
-          isGm ? <HandoutSelector handouts={handoutsProps} onOpen={() => void loadHandoutLibrary()} /> : undefined
+          isGm ? <HandoutSelector gallery={handoutGalleryProps} onOpen={() => void loadHandoutLibrary()} /> : undefined
         }
         onOpenMacros={() => macroBarController.setCreating(true)}
       />
