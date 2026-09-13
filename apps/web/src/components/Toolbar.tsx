@@ -24,6 +24,9 @@ interface ToolbarProps {
   /** Preferência por usuário (padrão ligada, botão no HUD inferior do VttCanvas): translúcida
    *  quando esta barra está sobre o mapa e o mouse/foco não está nela — ver lib/useBarTranslucency. */
   translucentBarsOverMap: boolean;
+  /** Modo imersivo (docs/SPEC.md §9.22): some de vez (opacidade 0, sem pointer-events) depois de
+   *  2s sem mouse/tecla — sobrepõe a translucidez normal, que continua valendo fora da ociosidade. */
+  immersiveHidden: boolean;
 }
 
 interface ToolDef {
@@ -68,6 +71,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onUndo,
   onRedo,
   translucentBarsOverMap,
+  immersiveHidden,
 }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const translucent = useBarTranslucency(rootRef, translucentBarsOverMap);
@@ -77,8 +81,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       id="vtt-toolbar"
       role="toolbar"
       aria-orientation="vertical"
-      style={{ opacity: translucent ? 0.55 : 1 }}
-      className="absolute top-4 left-4 z-10 flex flex-col gap-1 p-1.5 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl transition-opacity duration-150"
+      style={{ opacity: immersiveHidden ? 0 : translucent ? 0.55 : 1, pointerEvents: immersiveHidden ? "none" : undefined }}
+      className="absolute top-4 left-4 z-10 flex flex-col gap-1 p-1.5 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl transition-opacity duration-300"
     >
       {TOOLS.map((t) => (
         <ToolButton key={t.mode} tool={t} active={effectiveMode === t.mode} chosen={mode === t.mode} onClick={() => onChange(t.mode)} />

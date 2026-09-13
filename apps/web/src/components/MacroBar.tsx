@@ -27,7 +27,7 @@ export function useMacroBarController() {
 
 export type MacroBarController = ReturnType<typeof useMacroBarController>;
 
-export const MacroBar: React.FC<{ controller: MacroBarController }> = ({ controller }) => {
+export const MacroBar: React.FC<{ controller: MacroBarController; immersiveHidden?: boolean }> = ({ controller, immersiveHidden }) => {
   const macros = orderedMacros(useMacros((s) => s.macros));
   const characters = sortedCharacters(useCharacters((s) => s.byId));
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -91,7 +91,8 @@ export const MacroBar: React.FC<{ controller: MacroBarController }> = ({ control
         }}
         onDragLeave={() => setDragOverBar(false)}
         onDrop={handleBarDrop}
-        className={`fixed bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-1.5 py-1.5 rounded-lg border shadow-xl transition-colors ${
+        style={{ opacity: immersiveHidden ? 0 : 1, pointerEvents: immersiveHidden ? "none" : undefined }}
+        className={`fixed bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-1.5 py-1.5 rounded-lg border shadow-xl transition-all duration-300 ${
           dragOverBar ? "bg-[#2d2417] border-[#d4af37]" : "bg-[#161513]/95 border-[#2d2417]"
         }`}
       >

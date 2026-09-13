@@ -23,6 +23,9 @@ import { deleteSelectedTokens, useDeleteSelectionShortcut } from "../lib/useDele
 import { useTokenMoveShortcuts } from "../lib/useTokenMoveShortcuts";
 import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
 import { useSidePanelShortcut } from "../lib/useSidePanelShortcut";
+import { useImmersiveModeShortcut } from "../lib/useImmersiveModeShortcut";
+import { useFullscreen } from "../lib/useFullscreen";
+import { useIdle } from "../lib/useIdle";
 import { useTurnTitle } from "../lib/useTurnTitle";
 import { useHistory } from "../store/history";
 import { useSceneList } from "../store/sceneList";
@@ -83,6 +86,10 @@ const CLEAR_TARGETS_ON_TURN_END_KEY = "tvtt:clearTargetsOnTurnEnd";
 // Barras flutuantes translúcidas sobre o mapa: preferência por usuário, padrão ligada — mesmo
 // padrão de PARTY_VIEW_EXPANDED_KEY (botão no HUD inferior do VttCanvas, ver useBarTranslucency).
 const TRANSLUCENT_BARS_OVER_MAP_KEY = "tvtt:translucentBarsOverMap";
+// Modo imersivo (docs/SPEC.md §9.22): só a cor de fundo fora do mapa é preferência persistida
+// (`null` = padrão quase preto, ver lib/immersiveMode.ts) — o modo em si (entrar/sair) é uma ação de
+// cada sessão, como tela cheia, não algo que volta sozinho ao recarregar a página.
+const IMMERSIVE_BG_COLOR_KEY = "tvtt:immersiveBgColor";
 
 /** Patch de um traço já existente (SPEC §9.17) — mesmo shape do payload do servidor. */
 type DrawingPatch = DrawingPatchPayload["patch"];
@@ -170,6 +177,47 @@ function Table() {
     }
   }, [sidePanelCollapsed]);
   useSidePanelShortcut(() => setSidePanelCollapsed((v) => !v));
+
+  // --- Modo imersivo do mapa (docs/SPEC.md §9.22) -------------------------------------------------
+  // `immersiveMode` não é persistido (ver comentário de IMMERSIVE_BG_COLOR_KEY no topo do arquivo).
+  // O painel lateral recolhido AO ENTRAR usa um flag à parte de `sidePanelCollapsed`
+  // (`immersiveSidePanelCollapsed`) — assim entrar/sair do modo nunca sobrescreve a preferência
+  // normal de recolhido do usuário (só ela vai pro localStorage), e "restaurar o layout anterior" ao
+  // sair sai de graça: já não mexemos nela. `effectiveSidePanelCollapsed` é o que todo o resto do
+  // componente (painel, badge de não lidas) deve enxergar.
+  const [immersiveMode, setImmersiveMode] = useState(false);
+  const [immersiveSidePanelCollapsed, setImmersiveSidePanelCollapsed] = useState(true);
+  const effectiveSidePanelCollapsed = immersiveMode ? immersiveSidePanelCollapsed : sidePanelCollapsed;
+  const toggleSidePanelCollapsed = () => (immersiveMode ? setImmersiveSidePanelCollapsed((v) => !v) : setSidePanelCollapsed((v) => !v));
+  const enterImmersiveMode = () => {
+    setImmersiveSidePanelCollapsed(true);
+    setImmersiveMode(true);
+  };
+  const exitImmersiveMode = () => setImmersiveMode(false);
+  const toggleImmersiveMode = () => (immersiveMode ? exitImmersiveMode() : enterImmersiveMode());
+  useImmersiveModeShortcut(immersiveMode, toggleImmersiveMode, exitImmersiveMode);
+  // Barras flutuantes (TopBar, Toolbar, HUD do canvas, barra de macros) somem de vez depois de 2s
+  // sem mouse/tecla; qualquer atividade traz tudo de volta na hora (lib/useIdle).
+  const immersiveIdle = useIdle(immersiveMode, 2000);
+  const immersiveBarsHidden = immersiveMode && immersiveIdle;
+  // "Tela cheia do navegador": item do menu do botão Imersivo, mas independente — combinável.
+  const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
+  // Cor de fundo fora do mapa nesse modo: preferência pessoal (`null` = padrão quase preto).
+  const [immersiveBgColor, setImmersiveBgColor] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(IMMERSIVE_BG_COLOR_KEY);
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    try {
+      if (immersiveBgColor) localStorage.setItem(IMMERSIVE_BG_COLOR_KEY, immersiveBgColor);
+      else localStorage.removeItem(IMMERSIVE_BG_COLOR_KEY);
+    } catch {
+      /* ignora (aba anônima etc.) */
+    }
+  }, [immersiveBgColor]);
   const [partyViewExpanded, setPartyViewExpanded] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem(PARTY_VIEW_EXPANDED_KEY);
@@ -332,9 +380,9 @@ function Table() {
   // para de seguir e a diferença vira o badge — reabrir volta a seguir (zera na hora).
   const [seenMessageCount, setSeenMessageCount] = useState(messages.length);
   useEffect(() => {
-    if (!sidePanelCollapsed) setSeenMessageCount(messages.length);
-  }, [messages.length, sidePanelCollapsed]);
-  const unreadMessages = sidePanelCollapsed ? Math.max(0, messages.length - seenMessageCount) : 0;
+    if (!effectiveSidePanelCollapsed) setSeenMessageCount(messages.length);
+  }, [messages.length, effectiveSidePanelCollapsed]);
+  const unreadMessages = effectiveSidePanelCollapsed ? Math.max(0, messages.length - seenMessageCount) : 0;
 
   // Combate do mapa VISITADO (docs/plano-mapas.md §7): não existe mais "o combate da sala" — cada
   // mapa tem o seu (ou nenhum), independente do que os outros mapas têm.
@@ -813,37 +861,48 @@ function Table() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0c0c0c] text-zinc-100 antialiased">
-      <TopBar
-        room={room}
-        scene={scene}
-        participants={participants}
-        me={me}
-        onLeaveToLobby={() => {
-          leave();
-          navigate("/");
-        }}
-        onOpenMapConfig={isGm ? () => setMapConfigOpen(true) : undefined}
-        onOpenMapNotes={isGm && scene ? () => setNotesTarget({ kind: "scene", id: scene.id, name: scene.name }) : undefined}
-        characterMenu={
-          <CharacterMenu
-            me={me}
-            participants={participants}
-            characters={characters}
-            onOpenCharacter={openCharacter}
-            onOpenEmpty={openEmptySheet}
-            onNewCharacter={() => setSidePanelTab("characters")}
-          />
+      {/* Modo imersivo (docs/SPEC.md §9.22): a TopBar deixa de ocupar altura no layout e vira um
+       *  overlay flutuante por cima do mapa (mapa ocupa a área toda) que some de vez por ociosidade,
+       *  igual às outras barras — fora do modo é o cabeçalho fixo de sempre. */}
+      <div
+        className={
+          immersiveMode
+            ? `absolute top-0 left-0 right-0 z-40 transition-opacity duration-300 ${immersiveBarsHidden ? "opacity-0 pointer-events-none" : "opacity-100"}`
+            : "shrink-0"
         }
-        mapSelector={
-          isGm ? (
-            <MapSelector viewingScene={scene} activeScene={activeScene} maps={mapsProps} onOpen={() => void loadSceneList()} />
-          ) : undefined
-        }
-        handoutSelector={
-          isGm ? <HandoutSelector gallery={handoutGalleryProps} onOpen={() => void loadHandoutLibrary()} /> : undefined
-        }
-        onOpenMacros={() => macroBarController.setCreating(true)}
-      />
+      >
+        <TopBar
+          room={room}
+          scene={scene}
+          participants={participants}
+          me={me}
+          onLeaveToLobby={() => {
+            leave();
+            navigate("/");
+          }}
+          onOpenMapConfig={isGm ? () => setMapConfigOpen(true) : undefined}
+          onOpenMapNotes={isGm && scene ? () => setNotesTarget({ kind: "scene", id: scene.id, name: scene.name }) : undefined}
+          characterMenu={
+            <CharacterMenu
+              me={me}
+              participants={participants}
+              characters={characters}
+              onOpenCharacter={openCharacter}
+              onOpenEmpty={openEmptySheet}
+              onNewCharacter={() => setSidePanelTab("characters")}
+            />
+          }
+          mapSelector={
+            isGm ? (
+              <MapSelector viewingScene={scene} activeScene={activeScene} maps={mapsProps} onOpen={() => void loadSceneList()} />
+            ) : undefined
+          }
+          handoutSelector={
+            isGm ? <HandoutSelector gallery={handoutGalleryProps} onOpen={() => void loadHandoutLibrary()} /> : undefined
+          }
+          onOpenMacros={() => macroBarController.setCreating(true)}
+        />
+      </div>
 
       <div className="flex-1 flex overflow-hidden relative">
         <main className="flex-1 h-full relative overflow-hidden">
@@ -855,7 +914,7 @@ function Table() {
             onDelay={(combatantId) => viewedSceneId && void combatDelay(viewedSceneId, combatantId)}
             onResume={(combatantId) => viewedSceneId && void combatResume(viewedSceneId, combatantId)}
           />
-          <MacroBar controller={macroBarController} />
+          <MacroBar controller={macroBarController} immersiveHidden={immersiveBarsHidden} />
           {scene ? (
             <>
               <VttCanvas
@@ -959,6 +1018,13 @@ function Table() {
                 onClearTargets={() => void clearTargets()}
                 translucentBarsOverMap={translucentBarsOverMap}
                 onToggleTranslucentBarsOverMap={() => setTranslucentBarsOverMap((v) => !v)}
+                immersiveMode={immersiveMode}
+                onToggleImmersiveMode={toggleImmersiveMode}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={toggleFullscreen}
+                immersiveBgColor={immersiveBgColor}
+                onImmersiveBgColorChange={setImmersiveBgColor}
+                immersiveBarsHidden={immersiveBarsHidden}
               />
               <Toolbar
                 isGm={isGm}
@@ -973,6 +1039,7 @@ function Table() {
                 onUndo={() => void undoHistory()}
                 onRedo={() => void redoHistory()}
                 translucentBarsOverMap={translucentBarsOverMap}
+                immersiveHidden={immersiveBarsHidden}
               />
               {isGm && toolMode === "fog" && (
                 <FogToolbar
@@ -1084,8 +1151,8 @@ function Table() {
           onOpenCharacter={openCharacter}
           onCreateCharacter={(payload) => void createCharacter(payload).then((c) => c && openCharacter(c.id))}
           onDeleteCharacter={(id) => void deleteCharacter(id)}
-          collapsed={sidePanelCollapsed}
-          onToggleCollapsed={() => setSidePanelCollapsed((v) => !v)}
+          collapsed={effectiveSidePanelCollapsed}
+          onToggleCollapsed={toggleSidePanelCollapsed}
           unreadMessages={unreadMessages}
           isMyTurn={myTurn}
         />

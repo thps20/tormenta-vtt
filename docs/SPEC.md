@@ -1618,3 +1618,36 @@ todos. Fica inteiramente no cliente: não é regra de sistema nem config de sala
   vez disso é um único nó `Shape` com `sceneFunc` de canvas puro, que desenha só a faixa
   correspondente ao retângulo VISÍVEL do mapa (calculado pelo `VttCanvas` a partir de pan/zoom
   atuais) — o custo fica proporcional à tela, não ao mapa inteiro nem ao zoom.
+
+### 9.22 Modo imersivo do mapa
+
+Preferência **pessoal** (setembro/2026), como a de 9.21: fica inteiramente no cliente, não muda
+geometria, snap, medidas, eventos socket nem nada compartilhado — só como o MAPA aparece na tela de
+cada um. Jogador também usa, não é GM-only.
+
+- **Entrar/sair**: botão "Imersivo" no HUD inferior do canvas (`ImmersiveModeMenu.tsx`) ou Shift+F
+  (`useImmersiveModeShortcut.ts`) alternam; Esc ou o botão discreto no canto inferior direito do mapa
+  só saem. Ao entrar, o painel lateral recolhe (mesmo "recolhido" de sempre, ícone pra reabrir) e a
+  `TopBar` deixa de ocupar altura no layout — vira um overlay por cima do mapa, que passa a ocupar a
+  área toda. Nenhuma das duas preferências normais (painel recolhido, `TopBar` sempre visível) é
+  sobrescrita no localStorage: `RoomPage` usa um estado à parte só pro painel enquanto imersivo, então
+  sair restaura o layout de antes sem precisar "lembrar" nada explicitamente.
+- **Barras somem por ociosidade** (`lib/useIdle.ts`): 2s sem mousemove/clique/tecla e a `TopBar`
+  (overlay), a `Toolbar`, o HUD inferior, a barra de macros e a dica de modo no canto somem de vez
+  (opacidade 0 e sem `pointer-events`, pra não capturar clique destinado ao mapa); qualquer atividade
+  em QUALQUER lugar da tela traz tudo de volta na hora — inclusive o mouse se aproximando de uma
+  barra, já que o listener é na janela inteira, não em cada barra. O botão discreto de saída no canto
+  não some de vez, só fica bem apagado, pra sempre ter uma saída visível sem precisar mexer o mouse.
+- **Enquadramento preservado**: zoom/pan (`stageScale`/`stagePos` do `VttCanvas`) não são tocados por
+  nada disso — só o layout ao redor muda. O clamp que já existia (mapa nunca sai totalmente da tela
+  ao redimensionar o container) cobre a folga extra que sobra quando a `TopBar` vira overlay.
+- **Tela cheia do navegador** (`lib/useFullscreen.ts`): item do menu do botão, mas independente do
+  modo imersivo — combinável (dá pra usar só um dos dois). Reflete o estado REAL via
+  `fullscreenchange`: sair pelo F11 ou pelo Esc nativo do navegador também atualiza o checkbox.
+- **Fundo fora do mapa**: cor de preferência pessoal (`lib/immersiveMode.ts`,
+  `DEFAULT_IMMERSIVE_BG_COLOR = "#0a0a0a"`, `null` = usar esse padrão) mais uma vinheta leve nas
+  bordas (só decorativa, `box-shadow: inset`, sem `pointer-events`). Persistida no localStorage numa
+  chave só (não por sala — é gosto de tela). O menu tem um seletor de cor e um botão "Usar o padrão"
+  que zera a preferência, mesmo padrão do "Usar o padrão do mapa" de 9.21.
+- **Shift+F livre**: `useToolShortcuts` (barra de ferramentas) ignora combinações com Shift ao mapear
+  tecla → modo — sem isso, Shift+F também cairia em "Névoa" (F sozinho já é o atalho dela).

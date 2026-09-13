@@ -23,6 +23,9 @@ const GM_ONLY_MODES = new Set<ToolMode>(["fog", "pin"]);
  * (`store/drawingHistory.ts`, SPEC §9.17), uma por ferramenta (Ctrl+Z no modo Desenho desfaz o
  * último traço; qualquer outro modo desfaz o último gabarito) — só Ctrl+Z, sem refazer, mesmo
  * motivo da Névoa não ter. Um único listener na janela (montado pela página da mesa).
+ *
+ * Shift+letra nunca troca de modo (só letra solta) — deixa a combinação livre pra outros atalhos,
+ * como o Shift+F do modo imersivo (docs/SPEC.md §9.22, `useImmersiveModeShortcut`).
  */
 export function useToolShortcuts(): void {
   useEffect(() => {
@@ -68,7 +71,9 @@ export function useToolShortcuts(): void {
         setMode("select");
         return;
       }
-      const mode = KEY_TO_MODE[e.key.toLowerCase()];
+      // Shift+letra fica de fora do mapeamento tecla→modo (Shift+F é o atalho do modo imersivo,
+      // docs/SPEC.md §9.22 — sem isso, também cairia em "Névoa" aqui).
+      const mode = e.shiftKey ? undefined : KEY_TO_MODE[e.key.toLowerCase()];
       if (mode && (isGm || !GM_ONLY_MODES.has(mode))) setMode(mode);
     };
     const onKeyUp = (e: KeyboardEvent) => {

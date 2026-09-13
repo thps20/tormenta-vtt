@@ -1,7 +1,7 @@
 import React, { forwardRef, useRef, useState, useEffect, useImperativeHandle, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Line, Path, Label, Tag, Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
-import { ZoomIn, ZoomOut, Maximize2, Magnet, Info, Plus, Blend } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Magnet, Info, Plus, Blend, X } from "lucide-react";
 import {
   applyResourceDelta,
   cellsFromPixels,
@@ -46,8 +46,10 @@ import { getSavedView, setSavedView } from "../lib/session";
 import { cellAt, cellCenter, cellRect, cellToPoint, clampToMap, effectiveCellSize, sizeTokens, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox, type Box, type SizedToken } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
 import { loadGridAppearancePrefs, saveGridAppearancePrefs, resolveGridAppearance, type GridAppearancePrefs } from "../lib/gridAppearance";
+import { DEFAULT_IMMERSIVE_BG_COLOR } from "../lib/immersiveMode";
 import { GridLayer } from "./GridLayer";
 import { GridAppearanceMenu } from "./GridAppearanceMenu";
+import { ImmersiveModeMenu } from "./ImmersiveModeMenu";
 import {
   cellCountFromPixels,
   cellsFromSizeUnits,
@@ -264,6 +266,20 @@ interface VttCanvasProps {
    *  translúcidas quando estão sobre o mapa e o mouse não está nelas — ver lib/useBarTranslucency. */
   translucentBarsOverMap: boolean;
   onToggleTranslucentBarsOverMap: () => void;
+
+  /** Modo imersivo (docs/SPEC.md §9.22): painel lateral recolhido e barras que somem por
+   *  ociosidade ficam a cargo de quem monta o canvas (RoomPage) — aqui só o botão do HUD, o fundo
+   *  fora do mapa, a vinheta e o botão discreto de saída no canto. */
+  immersiveMode: boolean;
+  onToggleImmersiveMode: () => void;
+  isFullscreen: boolean;
+  onToggleFullscreen: () => void;
+  /** `null` = cor padrão (quase preto) — ver `DEFAULT_IMMERSIVE_BG_COLOR`. */
+  immersiveBgColor: string | null;
+  onImmersiveBgColorChange: (color: string | null) => void;
+  /** Barras flutuantes (Toolbar e o HUD abaixo) totalmente escondidas por ociosidade no modo
+   *  imersivo — ver lib/useIdle, calculado por quem monta o canvas (RoomPage). */
+  immersiveBarsHidden: boolean;
 }
 
 /** Forma + tamanho (metros) escolhidos na TemplateToolbar, e a sobrescrita de ângulo/largura de um preset. */
@@ -438,6 +454,13 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   onClearTargets,
   translucentBarsOverMap,
   onToggleTranslucentBarsOverMap,
+  immersiveMode,
+  onToggleImmersiveMode,
+  isFullscreen,
+  onToggleFullscreen,
+  immersiveBgColor,
+  onImmersiveBgColorChange,
+  immersiveBarsHidden,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -2068,7 +2091,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       ref={containerRef}
       id="vtt-canvas-container"
       {...(onSpawnCreature || onHandoutDrop || onSpawnEncounter ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
-      className={`relative flex-1 h-full w-full bg-stone-950 overflow-hidden select-none ${mode === "pan" ? "cursor-grab" : mode === "select" ? "cursor-default" : "cursor-crosshair"}`}
+      // Modo imersivo (docs/SPEC.md §9.22): fundo fora do mapa vira a cor da preferência (padrão
+      // quase preto); fora dele é sempre o mesmo bg-stone-950 de sempre.
+      style={immersiveMode ? { backgroundColor: immersiveBgColor ?? DEFAULT_IMMERSIVE_BG_COLOR } : undefined}
+      className={`relative flex-1 h-full w-full ${immersiveMode ? "" : "bg-stone-950"} overflow-hidden select-none ${mode === "pan" ? "cursor-grab" : mode === "select" ? "cursor-default" : "cursor-crosshair"}`}
     >
       <Stage
         ref={stageRef}
@@ -2231,14 +2257,21 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         </Layer>
       </Stage>
 
+      {/* Modo imersivo (docs/SPEC.md §9.22): vinheta leve nas bordas por cima de tudo, só
+       *  decorativa (sem pointer-events) — o fundo em si já mudou no container acima. */}
+      {immersiveMode && (
+        <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: "inset 0 0 min(18vmin, 200px) min(5vmin, 60px) rgba(0,0,0,0.55)" }} />
+      )}
+
       {/* HUD inferior esquerdo: zoom, snap, grid. Translúcido sobre o mapa (preferência do usuário,
        *  ver lib/useBarTranslucency) — opacidade some no CSS, nunca no layout (senão o
-       *  ResizeObserver do hook perderia o elemento). */}
+       *  ResizeObserver do hook perderia o elemento). No modo imersivo, `immersiveBarsHidden` some
+       *  de vez (e desliga pointer-events) por cima da translucidez normal. */}
       <div
         ref={hudBarRef}
         id="vtt-hud-bottom"
-        style={{ opacity: hudTranslucent ? 0.55 : 1 }}
-        className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 p-1.5 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl text-zinc-300 transition-opacity duration-150"
+        style={{ opacity: immersiveBarsHidden ? 0 : hudTranslucent ? 0.55 : 1, pointerEvents: immersiveBarsHidden ? "none" : undefined }}
+        className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 p-1.5 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl text-zinc-300 transition-opacity duration-300"
       >
         <HudButton title="Aproximar (+)" onClick={() => handleZoom("in")}>
           <ZoomIn className="w-4 h-4" />
@@ -2262,6 +2295,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         >
           <Blend className="w-3.5 h-3.5" />
         </HudToggle>
+        <ImmersiveModeMenu
+          active={immersiveMode}
+          onToggle={onToggleImmersiveMode}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={onToggleFullscreen}
+          backgroundColor={immersiveBgColor}
+          onBackgroundColorChange={onImmersiveBgColorChange}
+        />
         <span className="text-[10px] font-mono text-zinc-400 px-1.5 border-l border-[#2d2417]">{Math.round(stageScale * 100)}%</span>
         {me.role === "gm" && (
           <>
@@ -2278,6 +2319,21 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           </>
         )}
       </div>
+
+      {/* Botão discreto de saída (docs/SPEC.md §9.22): canto oposto ao HUD, sempre presente (não
+       *  some de vez com `immersiveBarsHidden`, só fica bem apagado) — Esc faz o mesmo. */}
+      {immersiveMode && (
+        <button
+          id="btn-immersive-exit"
+          type="button"
+          onClick={onToggleImmersiveMode}
+          title="Sair do modo imersivo (Esc)"
+          style={{ opacity: immersiveBarsHidden ? 0.15 : undefined }}
+          className="absolute bottom-4 right-4 z-20 p-2 rounded-full bg-[#1a1a1a]/70 border border-[#2d2417] text-zinc-500 opacity-40 hover:opacity-100 hover:text-[#d4af37] hover:bg-[#1a1a1a] hover:border-[#d4af37]/50 transition-colors cursor-pointer shadow-lg"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
 
       {selectedToken && showQuickCard && systemDef && selectedCharacter && (
         <NpcQuickCard
@@ -2345,7 +2401,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       })()}
 
       {!selectedToken && (
-      <div className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a1a]/95 border border-[#2d2417] text-[11px] text-zinc-400 shadow-xl pointer-events-none">
+      <div
+        style={{ opacity: immersiveBarsHidden ? 0 : 1 }}
+        className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a1a]/95 border border-[#2d2417] text-[11px] text-zinc-400 shadow-xl pointer-events-none transition-opacity duration-300"
+      >
         <Info className="w-3.5 h-3.5 text-[#d4af37]" />
         {/* "Delete apaga" só pro GM: jogador não apaga token por este atalho (ver useDeleteSelectionShortcut). */}
         <span>
