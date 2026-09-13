@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Search,
   LayoutGrid,
@@ -19,6 +20,7 @@ import {
   ChevronDown,
   AlertCircle,
   GripHorizontal,
+  MoreVertical,
 } from "lucide-react";
 import type { Handout, HandoutCreatePayload, HandoutPatch, HandoutShowTarget, Participant, Pin } from "@tormenta-vtt/shared";
 import { assetUrl, uploadImage } from "../lib/api";
@@ -65,14 +67,86 @@ const Thumb: React.FC<{ h: Handout; className: string }> = ({ h, className }) =>
     </div>
   );
 
+interface MenuPos {
+  left: number;
+  top?: number;
+  bottom?: number;
+}
+
+const MENU_WIDTH = 176;
+
+/** Posição (`position: fixed`) de um menu ancorado a um botão: gruda embaixo dele, ou em cima se
+ *  não tiver espaço embaixo (mesma ideia de MapsPanel#menuPos, adaptada pra um botão qualquer em
+ *  vez de um ref fixo — os cards da grade são muitos e mudam de card pra card). */
+function menuPositionFromButton(btn: HTMLElement): MenuPos {
+  const r = btn.getBoundingClientRect();
+  const left = Math.max(4, Math.min(r.left, window.innerWidth - MENU_WIDTH - 4));
+  const spaceBelow = window.innerHeight - r.bottom;
+  if (spaceBelow < 160 && r.top > spaceBelow) return { left, bottom: window.innerHeight - r.top + 4 };
+  return { left, top: r.bottom + 4 };
+}
+
+/**
+ * Menu pequeno ancorado a um botão (⋯ do card da grade, "Mostrar para..."): portal em
+ * `document.body`, `position: fixed` calculada a partir do botão que abriu — sai da clipagem do
+ * `overflow-y-auto` da grade (mesmo problema/solução de `MapsPanel`/`PartyView`, cada um com sua
+ * própria cópia pequena — não compartilhada num arquivo à parte, mesmo espírito de
+ * `useHandoutDrag`/`useCompendiumDrag`). Fecha em clique fora (exclui o próprio botão que abriu,
+ * senão reabriria sozinho no mesmo clique) e rolagem da grade; Esc fecha só ESTE menu, capturado
+ * no `window` **antes** de chegar no `Dialog` da galeria — senão Esc fecharia a galeria inteira
+ * por baixo (mesmo truque de `useHandoutDrag`, Esc durante o arrasto cancela só o arrasto).
+ */
+function AnchoredMenu({ anchorEl, pos, onClose, children }: { anchorEl: HTMLElement; pos: MenuPos; onClose: () => void; children: React.ReactNode }) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onPointerDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (anchorEl.contains(t) || menuRef.current?.contains(t)) return;
+      onClose();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("scroll", onClose, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("scroll", onClose, true);
+    };
+  }, [anchorEl, onClose]);
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      role="menu"
+      style={{ position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, width: MENU_WIDTH }}
+      className="z-[105] bg-[#1a1611] border border-[#3d311f] rounded-lg shadow-2xl py-1 text-left"
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
 /**
  * Biblioteca de handouts da sala (docs/SPEC.md §9.10): busca por nome/tag/conteúdo, filtro por
  * tag, grade ou lista, prévia grande com zoom (imagem) ou "manuscrito" (texto), e as ações de
- * sempre — mostrar (pra todos ou sussurro pra um jogador), fixar no mapa (clique, no centro do
- * mapa visto agora, ou arrastar o card até o ponto exato — mesmo mecanismo de sempre,
- * `useHandoutDrag`/`HandoutDragGhost`), editar nome/tags, apagar. Substitui o antigo dropdown
- * `HandoutsPanel`: agora é o `Dialog` padrão do projeto (portal, Esc, clique fora), aberto pelo
- * `HandoutSelector` da TopBar.
+ * sempre — mostrar (pra todos ou sussurro pra um jogador; `HandoutSelector` fecha a galeria
+ * sozinha nesse momento, o overlay do handout fica visível sem o diálogo por cima, e reabre
+ * quando o overlay fecha de novo), fixar no mapa (clique, no centro do mapa visto agora, ou
+ * arrastar o card até o ponto exato — mesmo mecanismo de sempre, `useHandoutDrag`/
+ * `HandoutDragGhost`), editar nome/tags, apagar. No card da grade, só as 2 ações mais comuns
+ * (mostrar pra todos, fixar no mapa) aparecem grandes no hover; o resto (mostrar pra alguém,
+ * editar, apagar) fica atrás do "⋯", um `AnchoredMenu` — portal em `document.body`, sai da
+ * clipagem do `overflow-y-auto` da grade (mesmo problema/solução de `MapsPanel`/`PartyView`).
+ * Substitui o antigo dropdown `HandoutsPanel`: agora é o `Dialog` padrão do projeto (portal, Esc,
+ * clique fora), aberto pelo `HandoutSelector` da TopBar.
  */
 export const HandoutGallery: React.FC<HandoutGalleryProps> = ({
   isOpen,
@@ -104,11 +178,13 @@ export const HandoutGallery: React.FC<HandoutGalleryProps> = ({
   const [editTags, setEditTags] = useState("");
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [showToMenuHandoutId, setShowToMenuHandoutId] = useState<string | null>(null);
+  /** Menu "Mostrar para..." (todos + cada jogador) aberto agora, e de qual handout/botão. */
+  const [showToMenu, setShowToMenu] = useState<{ handoutId: string; anchorEl: HTMLElement; pos: MenuPos } | null>(null);
+  /** Menu "⋯" do card da grade aberto agora (Mostrar para.../Editar/Apagar). */
+  const [cardMenu, setCardMenu] = useState<{ handoutId: string; anchorEl: HTMLElement; pos: MenuPos } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const showToMenuRef = useRef<HTMLDivElement>(null);
 
   // Arrastar um card pro mapa: mesmo mecanismo de sempre (pointer events, ghost fica por conta de
   // `HandoutDragGhost`, montado uma vez em RoomPage). `dragging` deixa o `Dialog` inerte
@@ -118,15 +194,6 @@ export const HandoutGallery: React.FC<HandoutGalleryProps> = ({
   const dragging = useHandouts((s) => s.drag !== null);
 
   useEffect(() => setZoomLevel(1), [selectedHandoutId]);
-
-  useEffect(() => {
-    if (!showToMenuHandoutId) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (showToMenuRef.current && !showToMenuRef.current.contains(e.target as Node)) setShowToMenuHandoutId(null);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [showToMenuHandoutId]);
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -207,15 +274,16 @@ export const HandoutGallery: React.FC<HandoutGalleryProps> = ({
 
   if (!isOpen) return null;
 
-  /** Menu "Mostrar para..." (todos + cada jogador), reaproveitado no card hover e no rodapé da prévia. */
-  const showToMenu = (handoutId: string) => (
-    <div ref={showToMenuRef} className="absolute z-30 w-44 bg-[#1a1611] border border-[#3d311f] rounded-lg shadow-2xl py-1 text-left">
+  /** Linhas do menu "Mostrar para..." (todos + cada jogador) — reaproveitadas no ⋯ do card da
+   *  grade e no rodapé da prévia, sempre dentro de um `AnchoredMenu`. */
+  const showToMenuItems = (handoutId: string) => (
+    <>
       <div className="px-2.5 py-1 text-[10px] font-serif font-bold text-amber-300/70 border-b border-[#2d2417] uppercase tracking-wider">Revelar para:</div>
       <button
         type="button"
         onClick={() => {
           onShow(handoutId, "all");
-          setShowToMenuHandoutId(null);
+          setShowToMenu(null);
         }}
         className="w-full px-2.5 py-1.5 text-xs text-amber-200 hover:bg-[#2b2216] flex items-center gap-1.5 transition-colors cursor-pointer"
       >
@@ -230,7 +298,7 @@ export const HandoutGallery: React.FC<HandoutGalleryProps> = ({
           type="button"
           onClick={() => {
             onShow(handoutId, { participantId: player.id });
-            setShowToMenuHandoutId(null);
+            setShowToMenu(null);
           }}
           className="w-full px-2.5 py-1.5 text-xs text-zinc-300 hover:text-amber-100 hover:bg-[#2b2216] flex items-center justify-between gap-1 transition-colors cursor-pointer"
         >
@@ -238,7 +306,50 @@ export const HandoutGallery: React.FC<HandoutGalleryProps> = ({
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${player.connected ? "bg-green-500" : "bg-zinc-600"}`} />
         </button>
       ))}
-    </div>
+    </>
+  );
+
+  /** Linhas do menu "⋯" do card da grade: o resto das ações que não cabem como ícone grande no
+   *  hover (Mostrar para... abre o mesmo `AnchoredMenu` de sempre, ancorado no mesmo botão "⋯"). */
+  const cardMenuItems = (handout: Handout) => (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          if (!cardMenu) return;
+          const { anchorEl, pos } = cardMenu;
+          setCardMenu(null);
+          setShowToMenu({ handoutId: handout.id, anchorEl, pos });
+        }}
+        className="w-full text-left px-2.5 py-1.5 text-xs text-zinc-200 hover:bg-[#241d15] hover:text-amber-200 flex items-center gap-2 transition-colors cursor-pointer"
+      >
+        <Users className="w-3.5 h-3.5 text-zinc-400" />
+        Mostrar para...
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setCardMenu(null);
+          handleOpenEdit(handout);
+        }}
+        className="w-full text-left px-2.5 py-1.5 text-xs text-zinc-200 hover:bg-[#241d15] hover:text-amber-200 flex items-center gap-2 transition-colors cursor-pointer"
+      >
+        <Pencil className="w-3.5 h-3.5 text-zinc-400" />
+        Editar
+      </button>
+      <div className="h-[1px] bg-[#2d2417] my-0.5" />
+      <button
+        type="button"
+        onClick={() => {
+          setCardMenu(null);
+          setDeleteConfirmId(handout.id);
+        }}
+        className="w-full text-left px-2.5 py-1.5 text-xs text-red-300 hover:bg-red-950/40 hover:text-red-200 flex items-center gap-2 transition-colors cursor-pointer"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+        Apagar
+      </button>
+    </>
   );
 
   return (
@@ -470,11 +581,10 @@ export const HandoutGallery: React.FC<HandoutGalleryProps> = ({
                         <div className="absolute bottom-1.5 right-1.5 px-1 py-0.5 rounded bg-black/70 text-[9px] font-mono text-zinc-300 backdrop-blur-xs">
                           {handout.kind === "image" ? "IMG" : "TXT"}
                         </div>
-                        <div className="absolute top-1.5 right-1.5 p-1 rounded bg-black/60 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <GripHorizontal className="w-3 h-3" />
-                        </div>
 
-                        <div className="absolute inset-0 bg-black/85 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 px-1 z-20">
+                        {/* Hover: só as 2 ações principais, grandes — o resto vai no menu "⋯" (evita
+                            lotar o card e nunca cobre o nome, que fica fora desta miniatura). */}
+                        <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 z-20">
                           <button
                             type="button"
                             onPointerDown={(e) => e.stopPropagation()}
@@ -482,27 +592,11 @@ export const HandoutGallery: React.FC<HandoutGalleryProps> = ({
                               e.stopPropagation();
                               onShow(handout.id, "all");
                             }}
-                            className="p-1.5 rounded bg-[#2b2216] hover:bg-[#3d311f] text-amber-300 hover:text-amber-100 border border-[#d4af37]/40 transition-colors"
+                            className="p-2.5 rounded-full bg-[#2b2216] hover:bg-[#3d311f] text-amber-300 hover:text-amber-100 border border-[#d4af37]/50 transition-colors shadow-lg cursor-pointer"
                             title="Mostrar para todos"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-5 h-5" />
                           </button>
-
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowToMenuHandoutId(showToMenuHandoutId === handout.id ? null : handout.id);
-                              }}
-                              className="p-1.5 rounded bg-[#241d15] hover:bg-[#33291d] text-zinc-300 hover:text-zinc-100 border border-[#3d311f] transition-colors"
-                              title="Mostrar para..."
-                            >
-                              <Users className="w-3.5 h-3.5" />
-                            </button>
-                            {showToMenuHandoutId === handout.id && <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1">{showToMenu(handout.id)}</div>}
-                          </div>
 
                           <button
                             type="button"
@@ -512,40 +606,28 @@ export const HandoutGallery: React.FC<HandoutGalleryProps> = ({
                               onPinToMap(handout.id);
                             }}
                             disabled={!canPinToMap}
-                            className={`p-1.5 rounded border transition-colors disabled:opacity-40 ${
-                              pinned ? "bg-emerald-950/80 border-emerald-500 text-emerald-300" : "bg-[#241d15] hover:bg-[#33291d] text-zinc-300 hover:text-zinc-100 border-[#3d311f]"
+                            className={`p-2.5 rounded-full border transition-colors shadow-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                              pinned ? "bg-emerald-950/80 border-emerald-500 text-emerald-300" : "bg-[#241d15] hover:bg-[#33291d] text-zinc-200 hover:text-zinc-100 border-[#3d311f]"
                             }`}
                             title={canPinToMap ? "Fixar no centro do mapa atual" : "Nenhum mapa aberto"}
                           >
-                            <MapPin className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEdit(handout);
-                            }}
-                            className="p-1.5 rounded bg-[#241d15] hover:bg-[#33291d] text-zinc-300 hover:text-zinc-100 border border-[#3d311f] transition-colors"
-                            title="Editar nome e tags"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteConfirmId(handout.id);
-                            }}
-                            className="p-1.5 rounded bg-[#2c1313] hover:bg-[#421b1b] text-red-300 border border-red-900/60 transition-colors"
-                            title="Apagar handout"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <MapPin className="w-5 h-5" />
                           </button>
                         </div>
+
+                        <button
+                          type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const btn = e.currentTarget;
+                            setCardMenu((prev) => (prev?.handoutId === handout.id ? null : { handoutId: handout.id, anchorEl: btn, pos: menuPositionFromButton(btn) }));
+                          }}
+                          className="absolute top-1.5 right-1.5 z-20 p-1 rounded bg-black/60 hover:bg-black/80 text-zinc-300 hover:text-amber-200 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          title="Mais ações"
+                        >
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </button>
                       </div>
 
                       <div className="p-2 flex flex-col gap-1">
@@ -787,20 +869,21 @@ export const HandoutGallery: React.FC<HandoutGalleryProps> = ({
                     <span>Mostrar para todos</span>
                   </button>
 
-                  <div className="relative">
-                    <button
-                      id="btn-preview-show-to"
-                      type="button"
-                      onClick={() => setShowToMenuHandoutId(showToMenuHandoutId === selectedHandout.id ? null : selectedHandout.id)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#221c15] hover:bg-[#2f261d] border border-[#3d311f] hover:border-[#d4af37]/50 text-zinc-300 hover:text-amber-200 text-xs font-serif font-medium transition-colors cursor-pointer"
-                      title="Revelar em segredo para um jogador específico (sussurro visual)"
-                    >
-                      <Users className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>Mostrar para...</span>
-                      <ChevronDown className="w-3 h-3 text-zinc-500" />
-                    </button>
-                    {showToMenuHandoutId === selectedHandout.id && <div className="absolute left-0 bottom-full mb-1.5">{showToMenu(selectedHandout.id)}</div>}
-                  </div>
+                  <button
+                    id="btn-preview-show-to"
+                    type="button"
+                    onClick={(e) => {
+                      const handoutId = selectedHandout.id;
+                      const btn = e.currentTarget;
+                      setShowToMenu((prev) => (prev?.handoutId === handoutId ? null : { handoutId, anchorEl: btn, pos: menuPositionFromButton(btn) }));
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#221c15] hover:bg-[#2f261d] border border-[#3d311f] hover:border-[#d4af37]/50 text-zinc-300 hover:text-amber-200 text-xs font-serif font-medium transition-colors cursor-pointer"
+                    title="Revelar em segredo para um jogador específico (sussurro visual)"
+                  >
+                    <Users className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>Mostrar para...</span>
+                    <ChevronDown className="w-3 h-3 text-zinc-500" />
+                  </button>
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -844,6 +927,24 @@ export const HandoutGallery: React.FC<HandoutGalleryProps> = ({
           )}
         </div>
       </div>
+
+      {cardMenu &&
+        (() => {
+          const handout = handouts.find((h) => h.id === cardMenu.handoutId);
+          return (
+            handout && (
+              <AnchoredMenu anchorEl={cardMenu.anchorEl} pos={cardMenu.pos} onClose={() => setCardMenu(null)}>
+                {cardMenuItems(handout)}
+              </AnchoredMenu>
+            )
+          );
+        })()}
+
+      {showToMenu && (
+        <AnchoredMenu anchorEl={showToMenu.anchorEl} pos={showToMenu.pos} onClose={() => setShowToMenu(null)}>
+          {showToMenuItems(showToMenu.handoutId)}
+        </AnchoredMenu>
+      )}
 
       {/* ================= NOVO TEXTO ================= */}
       {isCreatingText && (
