@@ -20,6 +20,16 @@ export const GridConfigSchema = z.object({
   color: z.string().default("#00000055"),
   /** Se true, tokens "grudam" nas células ao soltar. */
   snap: z.boolean().default(true),
+  /**
+   * Escala do MAPA: quanto vale 1 célula na unidade do jogo (docs/SPEC.md §3.2, "Escala por
+   * mapa"). Não confundir com `cellSize` acima (pixels da imagem) — este é o equivalente, por
+   * cena, de `SystemDefinition.grid.cellSize` (metros em T20). `undefined` = mapa não sobrescreve,
+   * usa o padrão do sistema (`withMapScale`, `packages/shared/src/rules/scale.ts`).
+   */
+  unitsPerCell: z.number().positive().optional(),
+  /** Rótulo da unidade neste mapa (ex.: "km" num mapa de região). `undefined` = usa
+   *  `SystemDefinition.grid.unit`. Mesmos limites de `SystemGridDefSchema.unit`. */
+  unit: z.string().min(1).max(8).optional(),
 });
 export type GridConfig = z.infer<typeof GridConfigSchema>;
 

@@ -43,12 +43,13 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - `POST /api/upload` (multipart, PNG/JPG/WebP, máx. 20 MB) → salva em `apps/server/uploads/` e devolve `{ url, width, height }`.
 - GM emite `scene:setMap` com a URL e dimensões. Servidor persiste e faz broadcast de `scene:updated`.
 - Painel de grid: tipo (`square`/`none`), `cellSize` (px), `offsetX/Y`, cor, snap. Emite `scene:updateGrid`.
+- **Escala do mapa** (`grid.unitsPerCell`/`grid.unit`, ambos opcionais — `GridConfigSchema`): quanto vale 1 célula NESTE mapa na unidade do jogo. Sem eles, cai no padrão do sistema (`SystemDefinition.grid.cellSize`/`unit`, T20 = 1,5 m); `withMapScale` (`packages/shared/src/rules/scale.ts`) resolve o valor efetivo por cima do sistema — nunca a regra de diagonais, que continua sempre a do sistema. Campo "Escala" no modal "Configurar mapa": 4 presets (1,5 m — batalha; 15 m; 100 m; 1 km — região) + campo livre (valor + rótulo, até 8 caracteres); só aparece quando o sistema declara `grid`. Como `cellSize`/offsets, "Salvar" sempre grava um valor concreto (nunca fica "em branco" depois de aberto uma vez). Tudo que converte célula → distância (régua, gabaritos, orçamento de deslocamento) usa essa escala, nunca hardcoda a do sistema.
 - **Calibrar pela imagem** (docs/plano-grid.md, `GridCalibrator.tsx`): botão no modal "Configurar mapa", desabilitado sem imagem. Arrasta-se um retângulo SEMPRE quadrado sobre uma célula do desenho (zoom livre com a roda, pan com Espaço+arrasto ou botão do meio); `cellSize = lado do retângulo / N` e `offsetX/Y = canto do retângulo módulo cellSize`, onde N ("Cobre N células", padrão 1) deixa arrastar sobre várias células pra ganhar precisão. Prévia do grid ao vivo sobre a imagem; ajuste fino por teclado (setas ±1px, Shift ±0,1px na posição; +/− no tamanho da célula) ou pelos campos numéricos. "Aplicar" só preenche `cellSize`/`offsetX`/`offsetY` nos campos do modal — quem persiste de verdade continua sendo "Salvar" do modal (`scene:updateGrid`); "Cancelar" descarta tudo. `cellSize`/`offsetX`/`offsetY` aceitam decimal (`GridConfigSchema`, sem `.int()`) porque uma calibração real quase nunca cai num valor redondo. Só calibração manual — não detecta grid já desenhado na imagem. Como `Token.cells` é a fonte da verdade do tamanho (docs/plano-grid.md), recalibrar NUNCA muda o tamanho relativo dos tokens — só reencaixa a posição deles (mesmo caminho de `scene:updateGrid` normal, §9.7).
 - O canvas (react-konva) desenha: imagem do mapa → linhas do grid → tokens → réguas/caixa de seleção. Pan no modo "Mover mapa" (ou espaço segurado); zoom com scroll e botões +/−/ajustar.
 - **Barra de ferramentas** (coluna à esquerda do canvas, um modo por vez, estado em `store/tools.ts`, atalhos em `lib/useToolShortcuts.ts`):
   - **Selecionar (V)**: clicar num token só seleciona (mantém o TokenInspector aberto, não abre ficha); duplo clique abre a ficha vinculada, se houver e o usuário puder vê-la (token sem ficha: duplo clique não faz nada além de selecionar); botão direito sempre abre o menu de condições (§3.3), mesmo em token com ficha — padrão Foundry. Arrastar no mapa vazio desenha uma caixa que seleciona os tokens com o centro dentro dela; shift+clique entra/sai da seleção; arrastar um token selecionado move todos os selecionados que o usuário controla. Arrastar um token que NÃO está selecionado já o seleciona no ato — padrão Foundry, `docs/fix-movimento-turno.md` — trocando a seleção por só ele (shift+arrastar entra na seleção atual em vez de trocar, mesma regra do shift+clique); o arraste em si sempre move só o token agarrado, os outros da seleção entram no próximo arraste. O Stage não faz pan. Duplo clique é detectado por geometria (dois `mousedown` no mesmo token dentro de ~300 ms), não pelo `dblclick` nativo do Konva — mesmo motivo do hit de token/badge de condição (`docs/debug-condicoes.md`): o canvas de hit do Konva é embaralhado por proteção anti-fingerprinting.
   - **Mover mapa (H)**: arrastar em qualquer lugar faz pan; tokens não respondem. Barra de espaço segurada ativa este modo temporariamente.
-  - **Régua (R)**: clicar e arrastar mede do ponto inicial ao ponteiro (pontos grudam no centro da célula quando há grid e snap). A distância usa `grid` do `SystemDefinition` (`cellSize` na unidade do jogo, `unit`, regra de diagonais `euclidean | manhattan | alternating | chebyshev`; `rules/measure.ts` faz a conta) e o `cellSize` em px da cena. A régua é enviada por `ruler:update` (efêmero) e os outros a veem com o nickname do autor; some ao soltar.
+  - **Régua (R)**: clicar e arrastar mede do ponto inicial ao ponteiro (pontos grudam no centro da célula quando há grid e snap). A distância usa `grid` do `SystemDefinition` sobrescrito pela escala do MAPA quando `Scene.grid.unitsPerCell`/`unit` estão definidos (`withMapScale`; `cellSize` na unidade do jogo, `unit`, regra de diagonais `euclidean | manhattan | alternating | chebyshev` sempre do sistema; `rules/measure.ts` faz a conta) e o `cellSize` em px da cena. A régua é enviada por `ruler:update` (efêmero) e os outros a veem com o nickname do autor; some ao soltar.
   - **Névoa (F, só GM)**: fog of war manual, descrita em §9.3. Desenho: botão reservado (desabilitado), fora do MVP.
   - **Pino (P, só GM)**: clique no mapa abre o formulário de um pino de nota (título, texto, ícone/cor, visibilidade) — ver §9.16. Fixar um pino de handout é feito arrastando um card da biblioteca (§9.10), não por esta ferramenta.
   - Esc cancela o gesto em andamento e volta para Selecionar. Scroll = zoom em todos os modos.
@@ -738,7 +739,11 @@ desenha e destaca) e interação com a névoa (gabarito aparece independente del
   `cone {length, angle}`, `line {length, width}`, `square {side}`), com `id, ownerId, x, y,
   rotation, label` em comum — geometria em **pixels do mapa**, como token/fog; `angle`/`width` de
   cone/linha são copiados do padrão do sistema (ou do preset) no momento da criação, então o
-  gabarito continua correto mesmo se o JSON mudar depois.
+  gabarito continua correto mesmo se o JSON mudar depois. O tamanho declarado (raio/comprimento/
+  lado) e o rótulo (`templateAreaLabel`/`formatArea`) usam a unidade e a escala do MAPA onde o
+  gabarito é colocado (`withMapScale`, §3.2 "Escala do mapa") — um cone de 9 m ocupa menos pixels/
+  células num mapa de escala grande (100 m/célula) do que num de batalha (1,5 m/célula); nos itens
+  da ficha/compêndio/chat (sem mapa em contexto) o rótulo continua usando só o padrão do sistema.
 - **Persistência**: efêmeros por sessão — guardados em memória no servidor
   (`apps/server/src/services/templates.ts`, `Map<sceneId, Map<templateId, Template>>`, mesmo
   padrão de `presence.ts`), nunca no banco. Sobrevivem a F5/reconexão (vêm no `RoomSnapshot` do
@@ -1041,6 +1046,17 @@ sempre em linha reta entre os pontos do caminho, como a régua, §3.2).
   posição) e o broadcast recoloca o token pra todo mundo, corrigindo até os ecos `live` que já
   tinham sido gravados. Toast "Deslocamento insuficiente (restam N m)", no máximo um por gesto
   mesmo em arraste de grupo.
+- **Escala do mapa e passo mínimo** (§3.2 "Escala do mapa"): o orçamento (`movement.default`/
+  `derived`, na unidade do sistema) e o `grid` usado por `stepCost`/`fitsInBudget` vêm do MAPA
+  (`withMapScale` por cima de `SystemDefinition.grid`) — num mapa de escala grande (15 m/célula),
+  9 m de orçamento viram menos de 1 célula. `fitsInBudget` (`packages/shared/src/rules/movement.ts`)
+  tem uma exceção: quando o passo é o MÍNIMO possível (mover pra uma célula vizinha), nada foi
+  gasto ainda no turno (`state.used === 0`) e o orçamento é positivo, deixa passar mesmo estourando
+  o orçamento inteiro — senão o combatente ficaria travado o combate todo (nem 1 célula caberia).
+  Só vale uma vez por turno: depois de aplicado o passo, o gasto já passa do orçamento e os
+  seguintes voltam a bloquear normalmente. Orçamento zerado de propósito (override do GM pra
+  congelar alguém, ou a futura condição Imóvel) continua bloqueando 100% — a exceção é só pra
+  escala de mapa, não pra deslocamento zerado.
 - **No mapa** (`MovementLayer`, `apps/web/src/components`, camada Konva só-desenho): polilinha do
   caminho do combatente da vez (tracejada, dourada, espessura constante em pixels de tela — mesmo
   truque `k = 1 / stageScale` da régua e dos pinos), mais o segmento AO VIVO do último ponto
@@ -1048,7 +1064,9 @@ sempre em linha reta entre os pontos do caminho, como a régua, §3.2).
   token, "4,5 / 9 m": dourado enquanto o passo em andamento cabe, vermelho quando estoura — o
   número ao vivo soma `movementUsed` ao `stepCost` do segmento em andamento, com as mesmas funções
   puras do servidor. Trava desligada na sala: mostra só o gasto ("4,5 m"), sem o "/ 9" e sem
-  vermelho — não há bloqueio, o número é só informativo.
+  vermelho — não há bloqueio, o número é só informativo. Quando o orçamento não cobre nem 1 célula
+  na escala do mapa (`budgetBelowOneCell`), o rótulo ganha uma 2ª linha ("escala do mapa: 15
+  m/célula") explicando por que o passo passou mesmo "estourando".
 - **No painel de combate** (`CombatPanel`): barra fina (dourada, vermelha em 0) na linha do
   combatente da vez, só quando `movementBudget != null`; GM ganha um campo numérico pro orçamento
   (vazio = segue a ficha) e um botão de zerar o gasto, os dois via `combat:set-movement`.

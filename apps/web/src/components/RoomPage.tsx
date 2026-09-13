@@ -33,6 +33,7 @@ import {
   pickTokensToCarry,
   targetsFromTemplate,
   tokenCenter,
+  withMapScale,
   type Drawing,
   type DrawingPatchPayload,
   type Handout,
@@ -541,6 +542,10 @@ function Table() {
   const insertFromCompendium = useCharacters((s) => s.insertFromCompendium);
   const linkCharacter = useTokens((s) => s.linkCharacter);
   const systemDef = useSystemDef();
+  /** `systemDef` com a escala do MAPA visitado por cima da do sistema (docs/SPEC.md §3.2, "Escala
+   *  por mapa") — usado só onde célula→distância importa (rótulo do Ctrl+Z local de gabarito,
+   *  unidade da barra de gabaritos); o resto continua em `systemDef`. */
+  const mapSystemDef = useMemo(() => (systemDef && scene ? withMapScale(systemDef, scene.grid) : null), [systemDef, scene?.grid]);
 
   // Pinos no mapa (docs/plano-narracao.md — unifica handout:pin com pino de nota): pinos do mapa
   // visitado + ícones disponíveis (do sistema, senão o padrão embutido) + o cartão de nota aberto.
@@ -611,9 +616,9 @@ function Table() {
   // O GM já tem tudo isso pela pilha geral do servidor (socket/templates.ts empilha sozinho); aqui
   // só cobre o jogador, que não tem acesso a `history:undo` (gmOnly). Efêmero: some ao recarregar.
   const pushTemplateUndo = (action: TemplateChangeAction, template: Template, revert: () => Promise<boolean>) => {
-    if (isGm || !scene || !systemDef) return;
+    if (isGm || !scene || !mapSystemDef) return;
     const cellSizePx = effectiveCellSize(scene.grid);
-    useTemplateHistory.getState().push({ summary: describeTemplateAreaChange(action, systemDef, template, cellSizePx), revert });
+    useTemplateHistory.getState().push({ summary: describeTemplateAreaChange(action, mapSystemDef, template, cellSizePx), revert });
   };
   const handleTemplateCreate = (t: Template) => {
     if (!scene) return;
@@ -986,7 +991,7 @@ function Table() {
                 <TemplateToolbar
                   shape={templateShape}
                   size={templateSize}
-                  unit={systemDef.grid?.unit ?? ""}
+                  unit={mapSystemDef?.grid?.unit ?? ""}
                   presets={systemDef.templates.presets}
                   onShape={setTemplateShape}
                   onSize={setTemplateSize}
@@ -1103,7 +1108,7 @@ function Table() {
       )}
 
       {isGm && scene && (
-        <MapConfigModal isOpen={isMapConfigOpen} scene={scene} onSave={(r) => void handleSaveMapConfig(r)} onClose={() => setMapConfigOpen(false)} />
+        <MapConfigModal isOpen={isMapConfigOpen} scene={scene} systemDef={systemDef} onSave={(r) => void handleSaveMapConfig(r)} onClose={() => setMapConfigOpen(false)} />
       )}
 
       {carryDestScene && (

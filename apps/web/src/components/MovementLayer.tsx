@@ -1,6 +1,6 @@
 import React from "react";
 import { Group, Label, Line, Tag, Text } from "react-konva";
-import { fitsInBudget, stepCost, type SystemDefinition } from "@tormenta-vtt/shared";
+import { budgetBelowOneCell, fitsInBudget, stepCost, type SystemDefinition } from "@tormenta-vtt/shared";
 
 const GOLD = "#d4af37";
 const RED = "#ef4444";
@@ -12,6 +12,8 @@ function fmt(n: number): string {
 }
 
 export interface MovementLayerProps {
+  /** Já com a escala do MAPA aplicada por cima da do sistema (`withMapScale`, docs/SPEC.md §3.2) —
+   *  quem monta este objeto (VttCanvas) nunca passa o `systemDef` cru aqui. */
   def: SystemDefinition;
   /** Caminho do combatente da vez (Combatant.movementPath), já convertido pra CENTRO do token —
    *  pixels do mapa. Pelo menos 1 ponto (início do turno) sempre que este layer é montado. */
@@ -49,7 +51,12 @@ export const MovementLayer: React.FC<MovementLayerProps> = ({ def, path, current
   const fits = !limitEnabled || fitsInBudget(def, budget, state, dxCells, dyCells);
   const color = fits ? GOLD : RED;
   const unit = def.grid?.unit ?? "";
-  const label = limitEnabled ? `${fmt(liveUsed)} / ${fmt(budget)} ${unit}` : `${fmt(liveUsed)} ${unit}`;
+  const mainLabel = limitEnabled ? `${fmt(liveUsed)} / ${fmt(budget)} ${unit}` : `${fmt(liveUsed)} ${unit}`;
+  // Orçamento não cobre nem 1 célula na escala deste mapa (docs/SPEC.md §9.11) — o jogador vê o
+  // gasto passar do orçamento mesmo sem estar bloqueado (fitsInBudget libera o passo mínimo); esta
+  // 2ª linha explica o porquê.
+  const scaleWarning = limitEnabled && budgetBelowOneCell(def, budget) ? `escala do mapa: ${fmt(def.grid!.cellSize)} ${unit}/célula` : null;
+  const label = scaleWarning ? `${mainLabel}\n${scaleWarning}` : mainLabel;
   const pathPoints = path.flatMap((p) => [p.x, p.y]);
 
   return (

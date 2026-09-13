@@ -94,9 +94,28 @@ export function movementRemaining(budget: number, state: MovementState): number 
   return Math.max(0, budget - state.used);
 }
 
-/** O próximo passo (dxCells, dyCells) cabe no orçamento? */
+/**
+ * O próximo passo (dxCells, dyCells) cabe no orçamento? Exceção de mapa de escala grande
+ * (docs/SPEC.md §9.11): quando o passo MÍNIMO possível (mover pra uma célula vizinha) já custa mais
+ * que o orçamento inteiro, e nada foi gasto ainda no turno (`state.used === 0`, ou seja
+ * `remaining === budget`), deixa passar mesmo assim — senão um mapa de região (15 m/célula) com
+ * orçamento de 9 m travaria o combatente pra sempre (nem 1 célula caberia). Só vale pro primeiro
+ * passo do turno: depois de aplicado, `state.used` já passa do orçamento e os seguintes voltam a
+ * bloquear normalmente (anda 1 célula por turno nesse mapa, não fica livre). `budget > EPSILON`
+ * evita a exceção quando o orçamento foi ZERADO de propósito (override do GM pra congelar alguém,
+ * ou a futura condição Imóvel) — aí o problema não é escala de mapa, é bloqueio total mesmo.
+ */
 export function fitsInBudget(def: MovementSystem, budget: number, state: MovementState, dxCells: number, dyCells: number): boolean {
   const step = stepCost(def, state, dxCells, dyCells);
   if (!step) return true;
-  return step.cost <= movementRemaining(budget, state) + EPSILON;
+  if (step.cost <= movementRemaining(budget, state) + EPSILON) return true;
+  const isMinimalStep = Math.max(Math.abs(dxCells), Math.abs(dyCells)) <= 1 + EPSILON;
+  return isMinimalStep && state.used === 0 && budget > EPSILON;
+}
+
+/** O orçamento do turno não cobre nem 1 célula na escala deste mapa — mesma condição que ativa a
+ *  exceção de `fitsInBudget` acima; exportada pro aviso "escala do mapa: N unit/célula" no rótulo
+ *  (`MovementLayer`, apps/web/src/components) sem duplicar a conta. */
+export function budgetBelowOneCell(def: MovementSystem, budget: number): boolean {
+  return !!def.grid && budget > 0 && budget < def.grid.cellSize;
 }

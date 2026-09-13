@@ -1,4 +1,4 @@
-import { GridConfigSchema, TemplateRemoveSchema, TemplateUpsertSchema, describeTemplateChange, type SystemDefinition, type Template } from "@tormenta-vtt/shared";
+import { GridConfigSchema, TemplateRemoveSchema, TemplateUpsertSchema, describeTemplateChange, withMapScale, type GridConfig, type SystemDefinition, type Template } from "@tormenta-vtt/shared";
 import { prisma } from "../db.js";
 import { requireSystem } from "../services/characters.js";
 import { requirePlayerOnActiveScene } from "../services/combat.js";
@@ -26,12 +26,14 @@ function templateSizePx(t: Template): number {
 }
 
 /** Pixels-por-célula da CENA (não confundir com `def.grid.cellSize`, que é metros-por-célula do
- *  SISTEMA) — mesma regra de `effectiveCellSize` (apps/web/src/lib/grid.ts): grid "none" cai no
- *  mesmo 70 que o resto do projeto já assume pra mapa sem grade. */
-async function sceneCellSizePx(sceneId: string): Promise<number> {
+ *  SISTEMA) + o `GridConfig` inteiro, pra escalar o `def` do sistema com a escala do MAPA
+ *  (`withMapScale`, docs/SPEC.md §3.2) antes de rotular o gabarito — mesma regra de
+ *  `effectiveCellSize` (apps/web/src/lib/grid.ts): grid "none" cai no mesmo 70 que o resto do
+ *  projeto já assume pra mapa sem grade. */
+async function sceneGridInfo(sceneId: string): Promise<{ cellSizePx: number; grid: GridConfig }> {
   const row = await prisma.scene.findUnique({ where: { id: sceneId }, select: { grid: true } });
   const grid = GridConfigSchema.parse(row?.grid ?? {});
-  return grid.type === "square" ? grid.cellSize : 70;
+  return { cellSizePx: grid.type === "square" ? grid.cellSize : 70, grid };
 }
 
 /** "cone 9 m" — rótulo pro resumo do desfazer/refazer (`describeTemplateChange`), convertendo o
@@ -98,8 +100,8 @@ export function registerTemplateHandlers(io: TypedServer, socket: TypedSocket): 
         const action = templateChangeAction(historyBefore, saved);
         if (action) {
           const def = await requireSystem(ctx.roomId);
-          const cellSizePx = await sceneCellSizePx(sceneId);
-          const areaLabel = templateAreaLabel(def, saved, cellSizePx);
+          const { cellSizePx, grid } = await sceneGridInfo(sceneId);
+          const areaLabel = templateAreaLabel(withMapScale(def, grid), saved, cellSizePx);
           const entry: HistoryEntry = {
             summary: describeTemplateChange(action, areaLabel),
             revert: async () => {
@@ -133,8 +135,8 @@ export function registerTemplateHandlers(io: TypedServer, socket: TypedSocket): 
 
       if (ctx.role === "gm" && removed) {
         const def = await requireSystem(ctx.roomId);
-        const cellSizePx = await sceneCellSizePx(sceneId);
-        const areaLabel = templateAreaLabel(def, removed, cellSizePx);
+        const { cellSizePx, grid } = await sceneGridInfo(sceneId);
+        const areaLabel = templateAreaLabel(withMapScale(def, grid), removed, cellSizePx);
         const entry: HistoryEntry = {
           summary: describeTemplateChange("apagar", areaLabel),
           revert: async () => writeTemplate(io, ctx.roomId, sceneId, removed),

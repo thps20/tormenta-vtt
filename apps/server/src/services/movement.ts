@@ -12,6 +12,7 @@ import {
   fitsInBudget,
   movementBase,
   movementRemaining,
+  withMapScale,
   type MovementState,
   type SystemDefinition,
   type TokenPatch,
@@ -131,6 +132,9 @@ export async function checkMovement(io: TypedServer, def: SystemDefinition, ctx:
   const grid = toScene(sceneRow).grid;
   if (!def.movement || !def.grid || grid.type === "none" || !isMovementLimitEnabled(ctx.roomId)) return null;
 
+  // Escala do MAPA por cima da do sistema (docs/SPEC.md §3.2/§9.11) — `cellSizePx` continua sendo
+  // pixels da cena, não confundir com `scaledDef.grid.cellSize` (unidade do jogo por célula).
+  const scaledDef = withMapScale(def, grid);
   const cellSizePx = grid.cellSize;
   const anchorX = combatant.movementAnchorX ?? tokenRow.x;
   const anchorY = combatant.movementAnchorY ?? tokenRow.y;
@@ -141,14 +145,14 @@ export async function checkMovement(io: TypedServer, def: SystemDefinition, ctx:
 
   const state: MovementState = { used: combatant.movementUsed, diagonals: combatant.movementDiagonals };
   const budget = combatant.movementBudget ?? 0;
-  if (!fitsInBudget(def, budget, state, dxCells, dyCells)) {
+  if (!fitsInBudget(scaledDef, budget, state, dxCells, dyCells)) {
     const remaining = Math.round(movementRemaining(budget, state) * 10) / 10;
-    throw new HandlerError(`Deslocamento insuficiente: restam ${remaining} ${def.grid.unit}`);
+    throw new HandlerError(`Deslocamento insuficiente: restam ${remaining} ${scaledDef.grid!.unit}`);
   }
 
   return {
     commit: async () => {
-      const next = applyStep(def, state, dxCells, dyCells);
+      const next = applyStep(scaledDef, state, dxCells, dyCells);
       const path = pushPoint(pathOf(combatant), { x: destX, y: destY });
       await prisma.combatant.update({
         where: { id: combatant.id },

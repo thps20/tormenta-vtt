@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Settings, Upload, Image as ImageIcon, X, Check, RotateCcw, Sliders, Grid, Eye, EyeOff, Palette, Magnet, Crosshair } from "lucide-react";
-import type { GridConfig, Scene } from "@tormenta-vtt/shared";
+import type { GridConfig, Scene, SystemDefinition } from "@tormenta-vtt/shared";
 import { assetUrl, uploadImage } from "../lib/api";
 import { normalizeOffset } from "../lib/grid";
 import { useImage } from "../lib/useImage";
@@ -16,9 +16,20 @@ export interface MapConfigResult {
 interface MapConfigModalProps {
   isOpen: boolean;
   scene: Scene;
+  /** Pra pré-carregar/rotular o bloco "Escala" com o padrão do sistema — null enquanto o sistema
+   *  ainda não carregou, ou sistema sem `grid` (aí o bloco nem aparece, docs/SPEC.md §3.2). */
+  systemDef: SystemDefinition | null;
   onSave: (result: MapConfigResult) => void;
   onClose: () => void;
 }
+
+/** Presets do bloco "Escala" (docs/SPEC.md §3.2): quanto vale 1 célula neste mapa. */
+const SCALE_PRESETS: { label: string; value: number; unit: string }[] = [
+  { label: "1,5 m — batalha", value: 1.5, unit: "m" },
+  { label: "15 m", value: 15, unit: "m" },
+  { label: "100 m", value: 100, unit: "m" },
+  { label: "1 km — região", value: 1, unit: "km" },
+];
 
 const GRID_COLOR_PRESETS = [
   { name: "Ouro Antigo", hex: "#d4af37" },
@@ -64,7 +75,7 @@ function parseColor(colorStr: string): { hex: string; opacity: number } {
  * Modal do GM: imagem do mapa (upload real) + grid. Só chama onSave ao
  * confirmar; o pai emite scene:setMap e scene:updateGrid.
  */
-export const MapConfigModal: React.FC<MapConfigModalProps> = ({ isOpen, scene, onSave, onClose }) => {
+export const MapConfigModal: React.FC<MapConfigModalProps> = ({ isOpen, scene, systemDef, onSave, onClose }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -78,6 +89,10 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({ isOpen, scene, o
   const [gridHexColor, setGridHexColor] = useState<string>(parseColor(scene.grid.color).hex);
   const [gridOpacity, setGridOpacity] = useState<number>(parseColor(scene.grid.color).opacity);
   const [snap, setSnap] = useState<boolean>(scene.grid.snap);
+  // Escala do mapa (docs/SPEC.md §3.2): pré-carrega o valor EFETIVO (override do mapa, senão o
+  // padrão do sistema) — igual cellSize/offsets, "Salvar" sempre grava um valor concreto.
+  const [scaleValue, setScaleValue] = useState<number>(scene.grid.unitsPerCell ?? systemDef?.grid?.cellSize ?? 1);
+  const [scaleUnit, setScaleUnit] = useState<string>(scene.grid.unit ?? systemDef?.grid?.unit ?? "");
   const [calibratorOpen, setCalibratorOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -98,7 +113,9 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({ isOpen, scene, o
     setGridHexColor(c.hex);
     setGridOpacity(c.opacity);
     setSnap(scene.grid.snap);
-  }, [isOpen, scene]);
+    setScaleValue(scene.grid.unitsPerCell ?? systemDef?.grid?.cellSize ?? 1);
+    setScaleUnit(scene.grid.unit ?? systemDef?.grid?.unit ?? "");
+  }, [isOpen, scene, systemDef]);
 
   // Esc fecha.
   useEffect(() => {
@@ -203,6 +220,8 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({ isOpen, scene, o
         offsetY: round1(offsetY),
         color: toHex8(gridHexColor, gridOpacity),
         snap,
+        unitsPerCell: Math.max(0.01, round1(scaleValue)),
+        unit: (scaleUnit.trim() || systemDef?.grid?.unit || "m").slice(0, 8),
       },
     });
     onClose();
@@ -353,6 +372,50 @@ export const MapConfigModal: React.FC<MapConfigModalProps> = ({ isOpen, scene, o
                 Zerar deslocamentos
               </button>
             </div>
+
+            {systemDef?.grid && (
+              <div className="space-y-1.5 pt-2 border-t border-[#2d2417]">
+                <label className="text-xs font-serif font-medium text-zinc-300">Escala (quanto vale 1 célula neste mapa)</label>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {SCALE_PRESETS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => {
+                        setScaleValue(p.value);
+                        setScaleUnit(p.unit);
+                      }}
+                      className={`px-2 py-1 rounded text-[10px] font-mono border cursor-pointer ${
+                        Math.abs(scaleValue - p.value) < 0.001 && scaleUnit === p.unit
+                          ? "bg-[#2d2417] text-[#d4af37] border-[#d4af37]/50"
+                          : "bg-[#252525] text-zinc-400 border-[#3d3d3d] hover:border-zinc-400"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={0.01}
+                    step={0.1}
+                    value={scaleValue}
+                    onChange={(e) => setScaleValue(Number(e.target.value))}
+                    className={numberInput}
+                  />
+                  <input
+                    type="text"
+                    maxLength={8}
+                    value={scaleUnit}
+                    onChange={(e) => setScaleUnit(e.target.value)}
+                    placeholder={systemDef.grid.unit}
+                    className="w-16 bg-[#141414] border border-[#2d2417] rounded px-2 py-0.5 text-xs text-zinc-200 focus:outline-none focus:border-[#d4af37]"
+                  />
+                  <span className="text-[10px] text-zinc-500">por célula</span>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-1.5 pt-1 border-t border-[#2d2417]">
               <div className="flex items-center justify-between">

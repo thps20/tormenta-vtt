@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getSystemDefinition, type GridConfig } from "@tormenta-vtt/shared";
+import { getSystemDefinition, withMapScale, type GridConfig } from "@tormenta-vtt/shared";
 import {
   cellsFromSizeUnits,
   describeTemplateAreaChange,
@@ -181,5 +181,31 @@ describe("templateAreaLabel / describeTemplateAreaChange", () => {
     const t = { id: "t1", ownerId: "p1", label: "", shape: "circle" as const, x: 0, y: 0, rotation: 0, r: unitToPixels(6, def, cellSizePx) };
     expect(templateAreaLabel(def, t, cellSizePx)).toBe("esfera 6 m");
     expect(describeTemplateAreaChange("colocar", def, t, cellSizePx)).toBe("colocar área (esfera 6 m)");
+  });
+});
+
+describe("gabarito com escala do mapa (withMapScale, docs/SPEC.md §3.2)", () => {
+  const cellSizePx = 100; // mesmo tanto de pixel-por-célula nos dois mapas
+
+  it("unitToPixels/pixelsToUnit: 9 unidades viram 10x menos pixels num mapa de 15 m/célula do que no padrão T20 (1,5 m/célula)", () => {
+    const battleMap = def; // sem override: 1,5 m/célula
+    const regionMap = withMapScale(def, { unitsPerCell: 15 });
+    const pxBattle = unitToPixels(9, battleMap, cellSizePx);
+    const pxRegion = unitToPixels(9, regionMap, cellSizePx);
+    expect(pxRegion).toBeCloseTo(pxBattle / 10);
+    expect(pixelsToUnit(pxRegion, regionMap, cellSizePx)).toBeCloseTo(9);
+  });
+
+  it("templateAreaLabel usa a unidade do MAPA quando ele sobrescreve (1 km/célula)", () => {
+    const worldMap = withMapScale(def, { unitsPerCell: 1, unit: "km" });
+    const t = { id: "t1", ownerId: "p1", label: "", shape: "circle" as const, x: 0, y: 0, rotation: 0, r: unitToPixels(6, worldMap, cellSizePx) };
+    expect(templateAreaLabel(worldMap, t, cellSizePx)).toBe("esfera 6 km");
+  });
+
+  it("cellsFromSizeUnits muda a contagem de células pro mesmo tamanho em unidades, na escala do mapa", () => {
+    const regionMap = withMapScale(def, { unitsPerCell: 15 });
+    // 30 "metros" (agora a unidade do mapa) em 1,5 m/célula = 20 células; em 15 m/célula = 2 células.
+    expect(cellsFromSizeUnits(30, def)).toBe(20);
+    expect(cellsFromSizeUnits(30, regionMap)).toBe(2);
   });
 });

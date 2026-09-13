@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { measureCellsFrom } from "./measure.js";
-import { computeMovementBudget, EMPTY_MOVEMENT, applyStep, fitsInBudget, movementBase, movementRemaining, stepCost, type MovementState } from "./movement.js";
+import { computeMovementBudget, EMPTY_MOVEMENT, applyStep, budgetBelowOneCell, fitsInBudget, movementBase, movementRemaining, stepCost, type MovementState } from "./movement.js";
+import { withMapScale } from "./scale.js";
 import { getSystemDefinition } from "../systems.js";
 
 const t20 = getSystemDefinition("tormenta20");
@@ -96,5 +97,33 @@ describe("stepCost / applyStep / fitsInBudget", () => {
   it("movementRemaining nunca é negativo", () => {
     expect(movementRemaining(9, { used: 12, diagonals: 0 })).toBe(0);
     expect(movementRemaining(9, { used: 3, diagonals: 0 })).toBe(6);
+  });
+});
+
+describe("fitsInBudget: mapa de escala grande, passo mínimo estourando o orçamento", () => {
+  const big = withMapScale(t20, { unitsPerCell: 15 }); // 15 m/célula, orçamento T20 padrão é 9 m
+
+  it("budgetBelowOneCell: true na escala grande, false na escala normal do sistema", () => {
+    expect(budgetBelowOneCell(big, 9)).toBe(true);
+    expect(budgetBelowOneCell(t20, 9)).toBe(false);
+  });
+
+  it("1ª célula do turno é permitida mesmo custando mais que o orçamento inteiro (9 m < 15 m)", () => {
+    expect(fitsInBudget(big, 9, EMPTY_MOVEMENT, 1, 0)).toBe(true);
+  });
+
+  it("depois de aplicado o passo mínimo, o PRÓXIMO passo do turno volta a bloquear", () => {
+    const state = applyStep(big, EMPTY_MOVEMENT, 1, 0);
+    expect(state.used).toBe(15);
+    expect(fitsInBudget(big, 9, state, 1, 0)).toBe(false);
+  });
+
+  it("um passo MAIOR que 1 célula continua bloqueado mesmo na escala grande (não é o passo mínimo)", () => {
+    expect(fitsInBudget(big, 9, EMPTY_MOVEMENT, 2, 0)).toBe(false);
+  });
+
+  it("orçamento zerado de propósito (congelar/Imóvel) continua bloqueando mesmo na escala grande", () => {
+    expect(fitsInBudget(big, 0, EMPTY_MOVEMENT, 1, 0)).toBe(false);
+    expect(budgetBelowOneCell(big, 0)).toBe(false);
   });
 });

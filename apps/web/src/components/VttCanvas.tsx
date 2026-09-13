@@ -15,6 +15,7 @@ import {
   pointInTemplate,
   smoothPenPoints,
   tokensInTemplate,
+  withMapScale,
   type Character,
   type CharacterPatch,
   type CharacterRollRequest,
@@ -455,6 +456,11 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   // Preferências locais de visualização (não vão ao servidor).
   const [snapEnabled, setSnapEnabled] = useState(scene.grid.snap);
   const [gridVisible, setGridVisible] = useState(true);
+
+  /** `systemDef` com a escala do MAPA por cima da do sistema (docs/SPEC.md §3.2, "Escala por
+   *  mapa") — régua, gabaritos e orçamento de deslocamento usam este, não `systemDef` cru; o resto
+   *  do componente (condições, tokenBar, tamanho de criatura em células) continua em `systemDef`. */
+  const mapSystemDef = useMemo(() => (systemDef ? withMapScale(systemDef, scene.grid) : null), [systemDef, scene.grid]);
 
   // Menu de condições: botão direito no token, ou botão "Condições" do TokenInspector. Posição já
   // em pixels do container (não do mapa), pra desenhar por cima de tudo sem depender do zoom/pan.
@@ -1318,7 +1324,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       setCursor("crosshair");
       const gesture = templateCreateRef.current;
       const p = pointerMapPos();
-      if (gesture && p && systemDef) {
+      if (gesture && p && mapSystemDef) {
         const grid = scene.grid;
         const cellSizePx = effectiveCellSize(grid);
         if (gesture.kind === "cell") {
@@ -1340,12 +1346,12 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         // "free": círculo/cone sempre; quadrado/linha quando o grid está inativo ou Alt solta o snap.
         // Alt solta o snap o tempo todo do arrasto, não só na origem (docs/plano-gabaritos.md §7).
         const gridActive = snapEnabled && grid.type !== "none" && !e.evt.altKey;
-        let sizeUnits = pixelsToUnit(Math.hypot(p.x - gesture.origin.x, p.y - gesture.origin.y), systemDef, cellSizePx);
+        let sizeUnits = pixelsToUnit(Math.hypot(p.x - gesture.origin.x, p.y - gesture.origin.y), mapSystemDef, cellSizePx);
         let rotation = 0;
         if (gesture.shape === "cone") {
           rotation = Math.atan2(p.y - gesture.origin.y, p.x - gesture.origin.x);
           if (gridActive) {
-            sizeUnits = roundToHalfCell(sizeUnits, systemDef); // regra do centro decide as células, meia célula basta
+            sizeUnits = roundToHalfCell(sizeUnits, mapSystemDef); // regra do centro decide as células, meia célula basta
             if (!e.evt.shiftKey) rotation = roundAngleToStep(rotation, 15);
           }
         } else if (gesture.shape === "line") {
@@ -1360,7 +1366,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
             angleOverride: templateTool?.angleOverride,
             widthOverride: templateTool?.widthOverride,
             ownerId: me.id,
-            def: systemDef,
+            def: mapSystemDef,
             cellSizePx,
           }),
         );
@@ -1494,7 +1500,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       onRulerUpdate({ start, end: start });
       return;
     }
-    if (templateActive && templateTool && systemDef) {
+    if (templateActive && templateTool && mapSystemDef) {
       const p = pointerMapPos();
       if (!p) return;
       const grid = scene.grid;
@@ -1504,7 +1510,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       if (gridActive && (templateTool.shape === "square" || templateTool.shape === "line")) {
         const anchorCell = cellAt(p, grid);
         templateCreateRef.current = { kind: "cell", shape: templateTool.shape, anchorCell, startPointer: p };
-        setTemplateDraftLive(buildClickCellTemplate(templateTool, anchorCell, grid, systemDef, me.id));
+        setTemplateDraftLive(buildClickCellTemplate(templateTool, anchorCell, grid, mapSystemDef, me.id));
         return;
       }
       // "Livre": círculo/cone sempre; quadrado/linha quando o grid está inativo ou Alt solta o snap.
@@ -1525,7 +1531,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           angleOverride: templateTool.angleOverride,
           widthOverride: templateTool.widthOverride,
           ownerId: me.id,
-          def: systemDef,
+          def: mapSystemDef,
           cellSizePx: effectiveCellSize(grid),
         }),
       );
@@ -1622,7 +1628,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
 
   /** Soltou o mouse: fecha a régua (some) ou a caixa de seleção (seleciona o que está dentro). */
   const handleStageMouseUp = () => {
-    if (templateCreateRef.current && templateTool && systemDef) {
+    if (templateCreateRef.current && templateTool && mapSystemDef) {
       const gesture = templateCreateRef.current;
       const draft = templateDraftLive;
       templateCreateRef.current = null;
@@ -1636,7 +1642,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         // O rascunho já É o Template calculado ao vivo no último mousemove — reusa direto.
         onTemplateCreate(draft);
       } else if (gesture.kind === "cell") {
-        onTemplateCreate(buildClickCellTemplate(templateTool, gesture.anchorCell, scene.grid, systemDef, me.id));
+        onTemplateCreate(buildClickCellTemplate(templateTool, gesture.anchorCell, scene.grid, mapSystemDef, me.id));
       } else {
         onTemplateCreate(
           newTemplate({
@@ -1646,7 +1652,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
             angleOverride: templateTool.angleOverride,
             widthOverride: templateTool.widthOverride,
             ownerId: me.id,
-            def: systemDef,
+            def: mapSystemDef,
             cellSizePx: effectiveCellSize(scene.grid),
           }),
         );
@@ -1862,9 +1868,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
    *  do destino (docs/plano-movimento.md §4.2) — o servidor aceita (custo zero) e o broadcast
    *  recoloca o token pra todo mundo. Toast só uma vez por gesto, mesmo em arraste de grupo. */
   const clampToMovementBudget = (tok: SizedToken, dest: { x: number; y: number }, warnRef: { warned: boolean }): { x: number; y: number } => {
-    if (!systemDef) return dest;
+    if (!mapSystemDef) return dest;
     const cellSizePx = effectiveCellSize(scene.grid);
-    const fallback = movementBudgetFallback(systemDef, combat, movementLimitEnabled, cellSizePx, tok.id, dest);
+    const fallback = movementBudgetFallback(mapSystemDef, combat, movementLimitEnabled, cellSizePx, tok.id, dest);
     if (!fallback) return dest;
     if (!warnRef.warned) {
       toast(`Deslocamento insuficiente (restam ${Math.round(fallback.remaining * 10) / 10} ${fallback.unit})`);
@@ -1910,14 +1916,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   // VEZ, só quando o sistema declara `movement` e o combate está com turno ativo. `path`/`current`
   // já em CENTRO do token (visual), não canto superior esquerdo (como Combatant.movementPath grava).
   const movementDisplay = useMemo(() => {
-    if (!systemDef?.movement || !systemDef.grid || combat?.status !== "active" || !combat.activeCombatantId) return null;
+    if (!mapSystemDef?.movement || !mapSystemDef.grid || combat?.status !== "active" || !combat.activeCombatantId) return null;
     const active = combat.combatants.find((c) => c.id === combat.activeCombatantId);
     if (!active || active.movementBudget === null || active.movementPath.length === 0) return null;
     const activeToken = tokens.find((t) => t.id === active.tokenId);
     if (!activeToken) return null;
     const center = (p: { x: number; y: number }) => ({ x: p.x + activeToken.width / 2, y: p.y + activeToken.height / 2 });
     return {
-      def: systemDef,
+      def: mapSystemDef,
       path: active.movementPath.map(center),
       current: center(activeToken),
       budget: active.movementBudget,
@@ -1927,7 +1933,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       limitEnabled: movementLimitEnabled,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [combat, tokens, systemDef, scene.grid, movementLimitEnabled]);
+  }, [combat, tokens, mapSystemDef, scene.grid, movementLimitEnabled]);
 
   // --- Gabaritos de área de efeito: preview durante a colocação, contagem/destaque de alvos e a
   // alça de rotação do selecionado (docs/plano-gabaritos.md).
@@ -1937,14 +1943,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
 
   /** Rótulo ao vivo do rascunho: tamanho na unidade do sistema + contagem de alvos (docs/plano-gabaritos.md §5). */
   const templateDraftLabel = useMemo(() => {
-    if (!templateDraft || !systemDef) return null;
+    if (!templateDraft || !mapSystemDef) return null;
     const cellSizePx = effectiveCellSize(scene.grid);
-    const size = Math.round(pixelsToUnit(templateSizePx(templateDraft), systemDef, cellSizePx) * 10) / 10;
-    const unit = systemDef.grid?.unit ?? "";
+    const size = Math.round(pixelsToUnit(templateSizePx(templateDraft), mapSystemDef, cellSizePx) * 10) / 10;
+    const unit = mapSystemDef.grid?.unit ?? "";
     const count = tokensInTemplate(tokens, templateDraft, cellSizePx).size;
     return `${size}${unit ? ` ${unit}` : ""} • ${count} ${count === 1 ? "alvo" : "alvos"}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateDraft, systemDef, scene.grid, tokens]);
+  }, [templateDraft, mapSystemDef, scene.grid, tokens]);
 
   const templateTargets = useMemo(() => {
     const cellSizePx = effectiveCellSize(scene.grid);
@@ -2161,9 +2167,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         {/* Camada 3: réguas e caixa de seleção (só desenho) */}
         <Layer listening={false}>
           {remoteRulers.map((r) => (
-            <RulerShape key={r.participantId} ruler={r.ruler} grid={scene.grid} systemDef={systemDef} stageScale={stageScale} color="#60a5fa" author={r.nickname} />
+            <RulerShape key={r.participantId} ruler={r.ruler} grid={scene.grid} systemDef={mapSystemDef} stageScale={stageScale} color="#60a5fa" author={r.nickname} />
           ))}
-          {ruler && <RulerShape ruler={ruler} grid={scene.grid} systemDef={systemDef} stageScale={stageScale} color="#d4af37" author={null} />}
+          {ruler && <RulerShape ruler={ruler} grid={scene.grid} systemDef={mapSystemDef} stageScale={stageScale} color="#d4af37" author={null} />}
           {fogActive && fogTool && (
             <FogGestureOverlay tool={fogTool} pointer={fogPointer} polygonPoints={polygonPoints} draft={fogDraft} stageScale={stageScale} />
           )}
