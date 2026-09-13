@@ -340,9 +340,10 @@ apps/web/src/
                 CarryTokensDialog ("Levar para o mapa" ao ativar, §9.7), MapConfigModal,
                 NicknamePrompt, Toasts, CharacterSheetDrawer (gaveta da ficha),
                 TemplateToolbar (painel da ferramenta Área), TemplateLayer (desenho dos
-                gabaritos no canvas, §9.9), HandoutSelector (botão-dropdown na TopBar, atalho J,
-                §9.10), HandoutsPanel (biblioteca dentro do dropdown), HandoutOverlay (tela cheia,
-                zoom/arrastar imagem), HandoutDragGhost (arrastar card pro mapa), PinLayer (desenho
+                gabaritos no canvas, §9.9), HandoutSelector (botão da TopBar, atalho J, §9.10),
+                HandoutGallery (biblioteca — busca/tags/grade-lista/prévia — num Dialog padrão),
+                HandoutOverlay (tela cheia, zoom/arrastar imagem), HandoutDragGhost (arrastar card
+                pro mapa), PinLayer (desenho
                 dos pinos no canvas, só geometria — §9.10/§9.16), NotePinCard (cartão de um pino de
                 nota), PinCreatePopover (formulário da ferramenta "Pino"), NotesPanel (notas do
                 Mestre + busca, §9.16), DrawToolbar (painel da ferramenta Desenho, §9.17),
@@ -840,8 +841,9 @@ geometria, `visible`, soft delete e desfazer — ver eventos `pin:*` abaixo.
 - **Modelo**: `Handout` (biblioteca da sala, §4) — `kind: "image" | "text"`; imagem reaproveita
   `POST /api/upload` (mesmo fluxo de `scene:setMap`: o cliente sobe o arquivo primeiro, manda a URL
   pronta pro socket), até 20 MB; texto vai direto no evento, até 20 000 caracteres, sempre texto
-  puro (sem parser de markdown — ver §8). Até 10 tags de até 30 caracteres cada, sem uso ainda além
-  de guardar (busca/filtro por tag fica pra depois). Soft delete (`deletedAt`, mesmo padrão de
+  puro (sem parser de markdown — ver §8). Até 10 tags de até 30 caracteres cada; a `HandoutGallery`
+  (abaixo) busca por nome/tag/conteúdo e filtra por tag, tudo client-side sobre a biblioteca já
+  carregada (sem evento próprio). Soft delete (`deletedAt`, mesmo padrão de
   `Token`/`Scene`): `handout:delete` marca a data — e a de todo `Pin` dele em qualquer mapa na
   mesma transação — numa única entrada de desfazer (§9.6); a limpeza definitiva segue o mesmo
   `services/cleanup.ts` dos outros soft deletes.
@@ -902,16 +904,23 @@ geometria, `visible`, soft delete e desfazer — ver eventos `pin:*` abaixo.
   (`lib/pinIcons.ts`, mesmo espírito de `TOKEN_COLORS`); com a lista, ela entra primeiro no
   seletor. `Pin{kind:"note"}.icon` guarda a CHAVE escolhida (ou ausente = padrão embutido).
 - **UI**: `HandoutSelector` na TopBar, ao lado do `MapSelector` — ícone de imagem, atalho **J**
-  (H já é "Mover mapa", §3.2), abre um dropdown (`HandoutsPanel`) com a biblioteca em cards
-  (miniatura, nome, tipo) — mesmo padrão visual do painel "Mapas" (§9.7). Cada card tem: "Mostrar
-  para todos" (👁), "Mostrar para..." (envia, abre um mini-menu com os jogadores da sala),
-  renomear inline, apagar, e **arrastar o card até o mapa fixa um pino** no ponto largado — mesmo
-  mecanismo de arrastar uma criatura do compêndio pro mapa (§9.5): pointer events (não HTML5 drag,
-  por causa do Konva), fantasma seguindo o cursor (`HandoutDragGhost`). O alvo de soltura "mapa"
-  (`lib/dropTargets.ts`) passou a aceitar **os dois arrastos ao mesmo tempo** no mesmo elemento —
-  criatura do compêndio e handout registram cada um o seu `accepts`/`onDrop` sob o mesmo id "map";
-  o primeiro cujo `accepts` topa o que está sendo arrastado ganha (o `DropTarget` virou genérico em
-  `T`, um id pode ter mais de um registro). Rodapé: "+ Imagem" (upload) / "+ Texto" (nome + textarea).
+  (H já é "Mover mapa", §3.2), abre a `HandoutGallery` (`Dialog` padrão do projeto — portal, Esc,
+  clique fora) com a biblioteca inteira: busca, chips de tag, alternar grade/lista e uma prévia
+  grande (imagem com zoom, ou o texto num "manuscrito") do handout selecionado. Cada item tem:
+  "Mostrar para todos" (👁), "Mostrar para..." (mini-menu com os jogadores da sala), editar
+  nome/tags, apagar, **fixar no mapa** — clique fixa no centro do VIEWPORT do mapa visto agora
+  (mesmo ponto de "soltar uma criatura do compêndio sem arrastar", `VttCanvasHandle.getViewportCenter`),
+  ou **arrastar o card até o mapa** fixa no ponto exato largado — mesmo mecanismo de arrastar uma
+  criatura do compêndio pro mapa (§9.5): pointer events (não HTML5 drag, por causa do Konva),
+  fantasma seguindo o cursor (`HandoutDragGhost`, acima do `Dialog` no z-index pra continuar visível
+  por cima dele). Enquanto um card está sendo arrastado, o `Dialog` da galeria fica inerte
+  (`pointer-events-none`, semitransparente — prop `inert` do `Dialog`) pro alvo de soltura "mapa"
+  (`document.elementFromPoint`, `lib/dropTargets.ts`) enxergar o mapa por baixo dele. O alvo "mapa"
+  aceita **os dois arrastos ao mesmo tempo** no mesmo elemento — criatura do compêndio e handout
+  registram cada um o seu `accepts`/`onDrop` sob o mesmo id "map"; o primeiro cujo `accepts` topa o
+  que está sendo arrastado ganha (o `DropTarget` virou genérico em `T`, um id pode ter mais de um
+  registro). Cabeçalho: "Enviar imagem" (upload) / "Novo texto" (nome + tags + textarea, cada um
+  num `Dialog` próprio aninhado, mesmo padrão de `RoomEntryEditor`/`CreatureFullSheet`).
   **Ferramenta "Pino" na barra** (atalho **P**, só GM): clique no mapa abre um formulário
   (`PinCreatePopover`) com título, nota, ícone/cor e visibilidade; confirmar chama `pin:create` no
   ponto clicado. `HandoutOverlay` (handout) é tela cheia (`position: fixed`, por cima de tudo):
