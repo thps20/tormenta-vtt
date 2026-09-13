@@ -214,7 +214,9 @@ export type TargetSetPayload = z.infer<typeof TargetSetSchema>;
 /** Ponto em pixels do mapa. */
 const MapPointSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
 
-export const RulerSchema = z.object({ start: MapPointSchema, end: MapPointSchema });
+/** Caminho de medição: 2+ pontos (início + fim de hoje, ou mais vértices travados no meio —
+ *  docs/SPEC.md §3.2, Ctrl+clique trava um vértice). Sempre em pixels do mapa. */
+export const RulerSchema = z.object({ points: z.array(MapPointSchema).min(2) });
 export type Ruler = z.infer<typeof RulerSchema>;
 
 /** Régua que o participante está desenhando; null = soltou (apagar). Nada é persistido. */

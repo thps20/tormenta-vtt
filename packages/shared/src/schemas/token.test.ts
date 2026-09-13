@@ -1,5 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { TokenConditionEntrySchema } from "./token.js";
+import { TokenConditionEntrySchema, TokenSchema } from "./token.js";
+
+const baseToken = {
+  id: "t1",
+  sceneId: "s1",
+  name: "Goblin",
+  imageUrl: null,
+  x: 0,
+  y: 0,
+  ownerId: null,
+};
+
+describe("TokenSchema.cells (docs/plano-grid.md — meia célula do Minúsculo)", () => {
+  it("aceita inteiro >= 1 (padrão de sempre)", () => {
+    expect(TokenSchema.parse({ ...baseToken, cells: 1 }).cells).toBe(1);
+    expect(TokenSchema.parse({ ...baseToken, cells: 2 }).cells).toBe(2);
+    expect(TokenSchema.parse(baseToken).cells).toBe(1); // default
+  });
+
+  it("aceita exatamente 0.5 (meia célula)", () => {
+    expect(TokenSchema.parse({ ...baseToken, cells: 0.5 }).cells).toBe(0.5);
+  });
+
+  it("rejeita fração diferente de 0.5, zero e negativo", () => {
+    expect(() => TokenSchema.parse({ ...baseToken, cells: 1.5 })).toThrow();
+    expect(() => TokenSchema.parse({ ...baseToken, cells: 0.25 })).toThrow();
+    expect(() => TokenSchema.parse({ ...baseToken, cells: 0 })).toThrow();
+    expect(() => TokenSchema.parse({ ...baseToken, cells: -1 })).toThrow();
+  });
+});
 
 describe("TokenConditionEntrySchema (preprocess de Token.conditions)", () => {
   it("normaliza a forma antiga (string) pra { key }, sem expiresRound (permanente)", () => {

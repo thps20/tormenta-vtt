@@ -52,9 +52,22 @@ export function sceneGeometry(scene: Pick<Scene, "grid" | "fog">): SceneGeometry
   return { fog: scene.fog, cellSizePx: effectiveCellSize(scene.grid) };
 }
 
+/**
+ * Célula (linha/coluna) de um TOKEN — não de um ponto qualquer (diferente de `cellAt`, que floora):
+ * a posição de um token já é sempre um múltiplo exato da sua própria granularidade de snap (célula
+ * inteira, ou meia célula pra `cells === 0.5`), então dividir direto preserva o ".5" de um
+ * Minúsculo — flooring arredondaria ele pra baixo e quebraria a checagem de sobreposição
+ * (docs/plano-grid.md).
+ */
+function tokenCellFraction(token: { x: number; y: number }, grid: GridConfig): { col: number; row: number } {
+  const size = effectiveCellSize(grid);
+  const { ox, oy } = effectiveOffset(grid, size);
+  return { col: (token.x - ox) / size, row: (token.y - oy) / size };
+}
+
 /** Retângulo em células ocupado por um token existente (pra findFreeCells não empilhar em cima). */
 export function cellRect(token: { x: number; y: number; cells: number }, grid: GridConfig): CellRect {
-  return { ...cellAt(token, grid), cells: token.cells };
+  return { ...tokenCellFraction(token, grid), cells: token.cells };
 }
 
 /** Prende o canto superior esquerdo dentro do mapa (mesma conta de `apps/web/src/lib/grid.ts#clampToMap`,
@@ -87,7 +100,7 @@ export function resnapTokenPosition<T extends { x: number; y: number; cells: num
   map: { width: number; height: number },
 ): T {
   const side = token.cells * effectiveCellSize(toGrid);
-  const point = clampToMap(cellToPoint(cellAt(token, fromGrid), toGrid), { width: side, height: side }, map);
+  const point = clampToMap(cellToPoint(tokenCellFraction(token, fromGrid), toGrid), { width: side, height: side }, map);
   if (point.x === token.x && point.y === token.y) return token;
   return { ...token, ...point };
 }

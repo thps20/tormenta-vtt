@@ -4,14 +4,17 @@ import Konva from "konva";
 import { ZoomIn, ZoomOut, Maximize2, Magnet, Info, Plus, Blend, X } from "lucide-react";
 import {
   applyResourceDelta,
+  applyStep,
   cellsFromPixels,
   computeCharacter,
   conditionIconDataUrl,
   creatureColor,
   DEFAULT_MAP_SIZE,
   findFreeCells,
+  fitsInBudget,
   hitTestDrawing,
-  measureDistance,
+  measurePath,
+  normalizeTokenCells,
   pointInTemplate,
   smoothPenPoints,
   tokensInTemplate,
@@ -45,6 +48,7 @@ import { isTyping } from "../lib/isTyping";
 import { getSavedView, setSavedView } from "../lib/session";
 import { cellAt, cellCenter, cellRect, cellToPoint, clampToMap, effectiveCellSize, sizeTokens, snapToCellCenter, snapToGrid, snapToVertexOrCenter, tokensInBox, type Box, type SizedToken } from "../lib/grid";
 import { conditionLayout, conditionSlotAtPoint, isOverflowSlot, CONDITION_COUNTER_RADIUS } from "../lib/conditionLayout";
+import { fmtUnit } from "../lib/format";
 import { loadGridAppearancePrefs, saveGridAppearancePrefs, resolveGridAppearance, type GridAppearancePrefs } from "../lib/gridAppearance";
 import { DEFAULT_IMMERSIVE_BG_COLOR } from "../lib/immersiveMode";
 import { GridLayer } from "./GridLayer";
@@ -321,7 +325,7 @@ export interface TokenBar {
 const MODE_HINTS: Record<ToolMode, string> = {
   select: "Arraste tokens para mover • Duplo clique = ficha • Espaço + arrastar = navegar • Scroll = zoom",
   pan: "Arraste para navegar pelo mapa • Scroll = zoom",
-  ruler: "Clique e arraste para medir • Scroll = zoom",
+  ruler: "Clique e arraste para medir • Ctrl+solte trava um vértice e continua • Backspace remove o último • Esc limpa • Scroll = zoom",
   fog: "Névoa: escolha Revelar/Ocultar e uma forma no painel • Scroll = zoom",
   template: "Clique e arraste para definir tamanho/direção (Alt/Shift soltam o snap) • Clique parado usa o tamanho da barra • Scroll = zoom",
   pin: "Clique no mapa para fixar um pino de nota • Scroll = zoom",
@@ -534,8 +538,11 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     leaderOrigin: { x: number; y: number };
     others: Array<{ token: SizedToken; x: number; y: number }>;
   } | null>(null);
-  /** Ponto inicial da régua em andamento (pixels do mapa). */
-  const rulerStartRef = useRef<{ x: number; y: number } | null>(null);
+  /** Régua "viva": true do primeiro clique até soltar sem Ctrl (ou Esc) — enquanto viva, o
+   *  mousemove atualiza o último ponto do caminho mesmo sem o botão pressionado (depois de travar
+   *  um vértice com Ctrl, docs/SPEC.md §3.2). Uma régua finalizada com vértices (Ctrl usado) some
+   *  dessa flag mas continua visível/sincronizada — só `ruler === null` (prop) representa "nada".*/
+  const rulerLiveRef = useRef<boolean>(false);
 
   /** Último mousedown num token (id + instante), pro duplo clique por geometria (ver registerTokenClick). */
   const lastTokenMouseDownRef = useRef<{ tokenId: string; time: number } | null>(null);
@@ -604,8 +611,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   const cancelGestures = () => {
     boxStartRef.current = null;
     setSelectionBox(null);
-    if (rulerStartRef.current) {
-      rulerStartRef.current = null;
+    // Limpa tanto uma régua ainda viva (arrastando) quanto uma já finalizada com vértices (que
+    // continua visível até Esc ou trocar de ferramenta, docs/SPEC.md §3.2) — não só `rulerLiveRef`.
+    if (rulerLiveRef.current || ruler) {
+      rulerLiveRef.current = false;
       onRulerClear();
     }
     brushPointsRef.current = null;
@@ -890,7 +899,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   const creatureGhost = useMemo(() => {
     if (!dragOverMap || !dragPoint || !dragEntry || dragEntry.type !== "creature" || !systemDef) return null;
     const cellSize = effectiveCellSize(scene.grid);
-    const cellsPerSide = Math.max(1, Math.round(systemDef.sizes.find((s) => s.key === dragEntry.sheet.size)?.tokenCells ?? 1));
+    const cellsPerSide = normalizeTokenCells(systemDef.sizes.find((s) => s.key === dragEntry.sheet.size)?.tokenCells ?? 1);
     const bounds = { cols: Math.max(1, Math.ceil(map.width / cellSize)), rows: Math.max(1, Math.ceil(map.height / cellSize)) };
     const occupied = tokens.map((t) => cellRect(t, scene.grid));
     const start = cellAt(mapPointFromClient(dragPoint), scene.grid);
@@ -972,6 +981,28 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, tokens]);
+
+  // Backspace no modo Régua remove o último vértice travado (docs/SPEC.md §3.2); com o caminho
+  // ainda "cru" (2 pontos, nenhum vértice travado com Ctrl) limpa a régua inteira — não há mais o
+  // que desfazer sem perder a âncora. `useDeleteSelectionShortcut` também escuta Backspace (apaga
+  // token/gabarito/pino/traço selecionado), mas nada fica selecionado enquanto se mede: os dois
+  // listeners nunca competem pelo mesmo Backspace.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (mode !== "ruler" || isTyping(e.target) || e.key !== "Backspace" || !ruler) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      e.preventDefault();
+      if (ruler.points.length > 2) {
+        onRulerUpdate({ points: [...ruler.points.slice(0, -2), ruler.points[ruler.points.length - 1]!] });
+      } else {
+        rulerLiveRef.current = false;
+        onRulerClear();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, ruler]);
 
   /**
    * Alça de redimensionar (`Konva.Transformer`) sob o ponteiro, por GEOMETRIA — mesmo motivo de
@@ -1352,9 +1383,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     }
     if (mode === "ruler") {
       setCursor("crosshair");
-      const start = rulerStartRef.current;
+      // Enquanto viva (mesmo sem o botão apertado, depois de travar um vértice com Ctrl), o
+      // mousemove sempre atualiza o ÚLTIMO ponto do caminho — os vértices travados antes ficam.
       const p = pointerMapPos();
-      if (start && p) onRulerUpdate({ start, end: rulerPoint(p) });
+      if (rulerLiveRef.current && ruler && p) onRulerUpdate({ points: [...ruler.points.slice(0, -1), rulerPoint(p)] });
       return;
     }
     if (templateActive) {
@@ -1530,11 +1562,14 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       return;
     }
     if (mode === "ruler") {
+      // Já viva (retomando depois de travar um vértice com Ctrl, sem soltar o botão de novo): não
+      // reseta o caminho, o mousemove já está cuidando da ponta ao vivo.
+      if (rulerLiveRef.current) return;
       const p = pointerMapPos();
       if (!p) return;
       const start = rulerPoint(p);
-      rulerStartRef.current = start;
-      onRulerUpdate({ start, end: start });
+      rulerLiveRef.current = true;
+      onRulerUpdate({ points: [start, start] });
       return;
     }
     if (templateActive && templateTool && mapSystemDef) {
@@ -1663,8 +1698,12 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     boxStartRef.current = pointerMapPos();
   };
 
-  /** Soltou o mouse: fecha a régua (some) ou a caixa de seleção (seleciona o que está dentro). */
-  const handleStageMouseUp = () => {
+  /**
+   * Soltou o mouse: fecha a régua (ou trava um vértice, com Ctrl) ou a caixa de seleção (seleciona
+   * o que está dentro). `ctrlKey` vem do evento nativo — `onMouseLeave` chama sem evento (sempre
+   * `false`, mesmo sentido de "soltou fora do mapa" de sempre).
+   */
+  const handleStageMouseUp = (ctrlKey = false) => {
     if (templateCreateRef.current && templateTool && mapSystemDef) {
       const gesture = templateCreateRef.current;
       const draft = templateDraftLive;
@@ -1759,9 +1798,22 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       return;
     }
     if (fogActive) return fogMouseUp();
-    if (rulerStartRef.current) {
-      rulerStartRef.current = null;
-      onRulerClear();
+    if (rulerLiveRef.current && ruler) {
+      const p = pointerMapPos();
+      const vertex = p ? rulerPoint(p) : ruler.points[ruler.points.length - 1]!;
+      if (ctrlKey) {
+        // Trava este vértice e continua medindo a partir dele — sem soltar, sem limpar.
+        onRulerUpdate({ points: [...ruler.points.slice(0, -1), vertex, vertex] });
+        return;
+      }
+      rulerLiveRef.current = false;
+      if (ruler.points.length === 2) {
+        // Nenhum vértice travado ainda: comportamento de sempre — mede e some ao soltar.
+        onRulerClear();
+      } else {
+        // Já existe um caminho com vértices: finaliza, mas mantém visível/sincronizado (não limpa).
+        onRulerUpdate({ points: [...ruler.points.slice(0, -1), vertex] });
+      }
       return;
     }
     finishSelectionBox();
@@ -1854,10 +1906,13 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     else onSelectToken(tokenId);
   };
 
-  /** Snap (se ligado) + limites do mapa para uma posição final de token. */
-  const settle = (x: number, y: number, size: { width: number; height: number }) => {
+  /** Snap (se ligado, e não solto pra livre) + limites do mapa para uma posição final de token.
+   *  `cells` decide o passo do snap (célula inteira, ou meia célula pra um Minúsculo — `snapToGrid`);
+   *  `free` (Shift durante o arraste) ignora o snap pra QUALQUER token, mesmo com a preferência da
+   *  sala ligada — mesmo padrão de "solta o snap" que os gabaritos já têm com Alt. */
+  const settle = (x: number, y: number, size: { width: number; height: number }, cells: number, free: boolean) => {
     let pos = { x, y };
-    if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
+    if (snapEnabled && !free) pos = snapToGrid(pos.x, pos.y, scene.grid, cells);
     return clampToMap(pos.x, pos.y, size, map);
   };
 
@@ -1916,17 +1971,17 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     return { x: fallback.x, y: fallback.y };
   };
 
-  const handleTokenDragEnd = (token: SizedToken, node: Konva.Node) => {
+  const handleTokenDragEnd = (token: SizedToken, node: Konva.Node, free: boolean) => {
     const g = groupDragRef.current;
     groupDragRef.current = null;
     const dx = node.x() - (g?.leader.x ?? node.x());
     const dy = node.y() - (g?.leader.y ?? node.y());
     const warnRef = { warned: false };
-    const pos = clampToMovementBudget(token, settle(node.x(), node.y(), token), warnRef);
+    const pos = clampToMovementBudget(token, settle(node.x(), node.y(), token, token.cells, free), warnRef);
     node.position(pos);
     const patches: TokenPatch[] = [{ id: token.id, x: pos.x, y: pos.y, dragFrom: g?.leaderOrigin ?? { x: token.x, y: token.y } }];
     for (const o of g?.others ?? []) {
-      const p = clampToMovementBudget(o.token, settle(o.x + dx, o.y + dy, o.token), warnRef);
+      const p = clampToMovementBudget(o.token, settle(o.x + dx, o.y + dy, o.token, o.token.cells, free), warnRef);
       tokenGroup(o.token.id)?.position(p);
       patches.push({ id: o.token.id, x: p.x, y: p.y, dragFrom: { x: o.x, y: o.y } });
     }
@@ -1971,6 +2026,32 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [combat, tokens, mapSystemDef, scene.grid, movementLimitEnabled]);
+
+  // --- "Cabe no deslocamento?" na régua (docs/SPEC.md §9.11): só quando o token da vez está entre
+  // os selecionados — a régua não é do combatente, é MINHA, então isto some se eu selecionar outra
+  // coisa. Reaproveita literalmente as MESMAS funções puras do orçamento (`applyStep`/
+  // `fitsInBudget`, packages/shared/src/rules/movement.ts) que `MovementLayer`/
+  // `clampToMovementBudget` já usam — nunca uma conta paralela. Só leitura: não gasta orçamento de
+  // verdade nem toca `Combatant.movementPath`.
+  const rulerMovementInfo = useMemo((): RulerMovementInfo | null => {
+    if (!ruler || !mapSystemDef?.movement || !mapSystemDef.grid || combat?.status !== "active" || !combat.activeCombatantId) return null;
+    if (!activeTurnTokenId || !selectedIds.includes(activeTurnTokenId)) return null;
+    const active = combat.combatants.find((c) => c.id === combat.activeCombatantId);
+    if (!active || active.movementBudget === null) return null;
+    const cellSizePx = effectiveCellSize(scene.grid);
+    let state = { used: active.movementUsed, diagonals: active.movementDiagonals };
+    let fits = true;
+    for (let i = 1; i < ruler.points.length; i++) {
+      const a = ruler.points[i - 1]!;
+      const b = ruler.points[i]!;
+      const dxCells = (b.x - a.x) / cellSizePx;
+      const dyCells = (b.y - a.y) / cellSizePx;
+      if (movementLimitEnabled) fits = fits && fitsInBudget(mapSystemDef, active.movementBudget, state, dxCells, dyCells);
+      state = applyStep(mapSystemDef, state, dxCells, dyCells);
+    }
+    return { used: state.used, budget: active.movementBudget, unit: mapSystemDef.grid.unit, limitEnabled: movementLimitEnabled, fits };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ruler, combat, mapSystemDef, activeTurnTokenId, selectedIds, scene.grid, movementLimitEnabled]);
 
   // --- Gabaritos de área de efeito: preview durante a colocação, contagem/destaque de alvos e a
   // alça de rotação do selecionado (docs/plano-gabaritos.md).
@@ -2062,8 +2143,8 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       onCursor={setCursor}
       onDragStart={(node, additive) => handleTokenDragStart(token, node, additive)}
       onDragMove={(node) => handleTokenDragMove(token, node)}
-      onDragEnd={(node) => handleTokenDragEnd(token, node)}
-      onTransformEnd={(node) => {
+      onDragEnd={(node, free) => handleTokenDragEnd(token, node, free)}
+      onTransformEnd={(node, free) => {
         // O Transformer altera scaleX/scaleY do Group; convertemos em CÉLULAS (sempre inteiro — o
         // tamanho do token nunca fica livre, docs/plano-grid.md D1) e zeramos a escala, porque o
         // token é desenhado a partir de width/height (derivados de cells × cellSize do grid).
@@ -2074,10 +2155,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         const rawSide = Math.max(token.width * scaleX, token.height * scaleY);
         const cells = cellsFromPixels(rawSide, cellSizePx);
         const side = cells * cellSizePx;
-        // Snap continua sendo só da POSIÇÃO (preferência do mapa); o tamanho em células é sempre
-        // arredondado, com ou sem snap.
+        // Snap continua sendo só da POSIÇÃO (preferência do mapa, ou Shift pra soltar); o tamanho em
+        // células é sempre arredondado, com ou sem snap.
         let pos = { x: node.x(), y: node.y() };
-        if (snapEnabled) pos = snapToGrid(pos.x, pos.y, scene.grid);
+        if (snapEnabled && !free) pos = snapToGrid(pos.x, pos.y, scene.grid, cells);
         pos = clampToMap(pos.x, pos.y, { width: side, height: side }, map);
         node.position(pos);
         onTokenPatch({ id: token.id, x: pos.x, y: pos.y, cells });
@@ -2125,7 +2206,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         }}
         onMouseMove={handleStageMouseMove}
         onMouseDown={handleStageMouseDown}
-        onMouseUp={handleStageMouseUp}
+        onMouseUp={(e) => handleStageMouseUp(e.evt.ctrlKey)}
         onMouseLeave={() => {
           handleStageMouseUp();
           setFogPointer(null);
@@ -2205,9 +2286,11 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         {/* Camada 3: réguas e caixa de seleção (só desenho) */}
         <Layer listening={false}>
           {remoteRulers.map((r) => (
-            <RulerShape key={r.participantId} ruler={r.ruler} grid={scene.grid} systemDef={mapSystemDef} stageScale={stageScale} color="#60a5fa" author={r.nickname} />
+            <RulerShape key={r.participantId} ruler={r.ruler} grid={scene.grid} systemDef={mapSystemDef} stageScale={stageScale} color="#60a5fa" author={r.nickname} movement={null} />
           ))}
-          {ruler && <RulerShape ruler={ruler} grid={scene.grid} systemDef={mapSystemDef} stageScale={stageScale} color="#d4af37" author={null} />}
+          {ruler && (
+            <RulerShape ruler={ruler} grid={scene.grid} systemDef={mapSystemDef} stageScale={stageScale} color="#d4af37" author={null} movement={rulerMovementInfo} />
+          )}
           {fogActive && fogTool && (
             <FogGestureOverlay tool={fogTool} pointer={fogPointer} polygonPoints={polygonPoints} draft={fogDraft} stageScale={stageScale} />
           )}
@@ -2467,8 +2550,10 @@ interface TokenNodeProps {
   /** additive = Shift pressionado no início do arraste (mesmo sentido de onSelect). */
   onDragStart: (node: Konva.Node, additive: boolean) => void;
   onDragMove: (node: Konva.Node) => void;
-  onDragEnd: (node: Konva.Node) => void;
-  onTransformEnd: (node: Konva.Node) => void;
+  /** free = Shift pressionado ao soltar: ignora o snap pra esta posição, qualquer token
+   *  (docs/plano-grid.md — mesmo padrão de Alt soltando o snap dos gabaritos). */
+  onDragEnd: (node: Konva.Node, free: boolean) => void;
+  onTransformEnd: (node: Konva.Node, free: boolean) => void;
   /** Botão direito no token: abre o ConditionMenu ancorado ao lado do token (ver openConditionMenuAt). */
   onContextMenu: () => void;
   /** Zoom atual do Stage: os badges de condição precisam saber pra manter o tamanho em px de tela. */
@@ -2544,9 +2629,9 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, comba
         }
         e.cancelBubble = true;
         onCursor("grab");
-        onDragEnd(e.target);
+        onDragEnd(e.target, e.evt.shiftKey);
       }}
-      onTransformEnd={(e) => onTransformEnd(e.target)}
+      onTransformEnd={(e) => onTransformEnd(e.target, "shiftKey" in e.evt && (e.evt as MouseEvent).shiftKey)}
     >
       {/*
         Tudo abaixo é só desenho (listening={false}). Quem recebe o mouse é o círculo de hit
@@ -2879,6 +2964,19 @@ export function formatDistance(d: { cells: number; value: number | null; unit: s
   return d.value !== null && d.unit !== null ? `${distanceFormat.format(d.value)} ${d.unit} · ${cells}` : cells;
 }
 
+/** "Cabe no deslocamento?" do combatente da vez (docs/SPEC.md §9.11) — só a régua LOCAL calcula
+ *  isso (é sobre a MINHA seleção), e só quando o token da vez está selecionado; null do contrário
+ *  (fora de combate, sem `movement` no sistema, réguas de outros participantes...). */
+interface RulerMovementInfo {
+  /** Gasto acumulado do turno + o caminho inteiro da régua, na unidade do grid. */
+  used: number;
+  budget: number;
+  unit: string;
+  /** Trava de deslocamento desligada na sala: mostra só o gasto, sem "/ orçamento" nem vermelho. */
+  limitEnabled: boolean;
+  fits: boolean;
+}
+
 interface RulerShapeProps {
   ruler: Ruler;
   grid: Scene["grid"];
@@ -2888,24 +2986,55 @@ interface RulerShapeProps {
   color: string;
   /** Nickname de quem mede (réguas remotas); null na minha. */
   author: string | null;
+  movement: RulerMovementInfo | null;
 }
 
-/** Linha da régua com o rótulo da distância. O deslocamento em células vem do cellSize da CENA; a regra, do sistema. */
-const RulerShape: React.FC<RulerShapeProps> = ({ ruler, grid, systemDef, stageScale, color, author }) => {
-  const { start, end } = ruler;
-  const dxCells = (end.x - start.x) / grid.cellSize;
-  const dyCells = (end.y - start.y) / grid.cellSize;
-  const label = formatDistance(measureDistance(systemDef ?? { grid: undefined }, dxCells, dyCells));
+const RULER_BLOCKED = "#ef4444";
+
+/**
+ * Caminho da régua (1+ trechos, docs/SPEC.md §3.2): polyline com um círculo por vértice, um rótulo
+ * pequeno de distância no meio de cada trecho (só com mais de um trecho — com um só, o total já
+ * basta) e o rótulo do total na ponta, como sempre. A distância acumula diagonais entre trechos
+ * (`measurePath`, mesma regra 1-2-1 do orçamento de deslocamento) — nunca reseta a cada vértice.
+ */
+const RulerShape: React.FC<RulerShapeProps> = ({ ruler, grid, systemDef, stageScale, color, author, movement }) => {
+  const { points } = ruler;
+  const cellSizePx = effectiveCellSize(grid);
+  const pointsCells = points.map((p) => ({ x: p.x / cellSizePx, y: p.y / cellSizePx }));
+  const { segments, total } = measurePath(systemDef ?? { grid: undefined }, pointsCells);
+  const totalLabel = formatDistance(total);
   const k = 1 / stageScale;
+  const last = points[points.length - 1]!;
+  const flat = points.flatMap((p) => [p.x, p.y]);
+  const blocked = !!movement && movement.limitEnabled && !movement.fits;
+  const labelColor = blocked ? RULER_BLOCKED : color;
+  const movementLine = movement
+    ? movement.limitEnabled
+      ? `${fmtUnit(movement.used)} / ${fmtUnit(movement.budget)} ${movement.unit}`
+      : `${fmtUnit(movement.used)} ${movement.unit}`
+    : null;
+  const labelText = [author ? `${author}: ${totalLabel}` : totalLabel, movementLine].filter((s): s is string => s !== null).join("\n");
   return (
     <Group>
-      <Line points={[start.x, start.y, end.x, end.y]} stroke="#000" strokeWidth={4 * k} opacity={0.5} lineCap="round" />
-      <Line points={[start.x, start.y, end.x, end.y]} stroke={color} strokeWidth={2 * k} dash={[8 * k, 6 * k]} lineCap="round" />
-      <Circle x={start.x} y={start.y} radius={4 * k} fill={color} stroke="#000" strokeWidth={k} />
-      <Circle x={end.x} y={end.y} radius={4 * k} fill={color} stroke="#000" strokeWidth={k} />
-      <Label x={end.x} y={end.y - 14 * k} scaleX={k} scaleY={k}>
-        <Tag fill="#1a1a1a" stroke={color} strokeWidth={1} cornerRadius={3} pointerDirection="down" pointerWidth={8} pointerHeight={6} opacity={0.95} />
-        <Text text={author ? `${author}: ${label}` : label} fontSize={12} fontFamily="monospace" fontStyle="bold" fill={color} padding={5} />
+      <Line points={flat} stroke="#000" strokeWidth={4 * k} opacity={0.5} lineCap="round" lineJoin="round" />
+      <Line points={flat} stroke={color} strokeWidth={2 * k} dash={[8 * k, 6 * k]} lineCap="round" lineJoin="round" />
+      {points.map((p, i) => (
+        <Circle key={i} x={p.x} y={p.y} radius={4 * k} fill={color} stroke="#000" strokeWidth={k} />
+      ))}
+      {segments.length > 1 &&
+        segments.map((seg, i) => {
+          const a = points[i]!;
+          const b = points[i + 1]!;
+          return (
+            <Label key={i} x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 12 * k} scaleX={k} scaleY={k}>
+              <Tag fill="#1a1a1a" stroke={color} strokeWidth={1} cornerRadius={3} opacity={0.85} />
+              <Text text={formatDistance(seg)} fontSize={10} fontFamily="monospace" fill={color} padding={3} />
+            </Label>
+          );
+        })}
+      <Label x={last.x} y={last.y - 14 * k} scaleX={k} scaleY={k}>
+        <Tag fill="#1a1a1a" stroke={labelColor} strokeWidth={1} cornerRadius={3} pointerDirection="down" pointerWidth={8} pointerHeight={6} opacity={0.95} />
+        <Text text={labelText} fontSize={12} fontFamily="monospace" fontStyle="bold" fill={labelColor} padding={5} />
       </Label>
     </Group>
   );

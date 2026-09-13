@@ -1,15 +1,10 @@
 import React from "react";
 import { Group, Label, Line, Tag, Text } from "react-konva";
 import { budgetBelowOneCell, fitsInBudget, stepCost, type SystemDefinition } from "@tormenta-vtt/shared";
+import { fmtUnit as fmt } from "../lib/format";
 
 const GOLD = "#d4af37";
 const RED = "#ef4444";
-
-/** "4,5" em vez de "4.500000000001" (soma de floats) — 1 casa, sem zero à toa quando é inteiro. */
-function fmt(n: number): string {
-  const r = Math.round(n * 10) / 10;
-  return (Number.isInteger(r) ? String(r) : r.toFixed(1)).replace(".", ",");
-}
 
 export interface MovementLayerProps {
   /** Já com a escala do MAPA aplicada por cima da do sistema (`withMapScale`, docs/SPEC.md §3.2) —

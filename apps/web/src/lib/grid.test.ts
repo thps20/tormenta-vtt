@@ -19,6 +19,17 @@ describe("grid", () => {
     expect(snapToGrid(72, 26, { ...grid, type: "none" })).toEqual({ x: 72, y: 26 });
   });
 
+  it("snap com cells >= 1 sempre alinha à célula CHEIA (o próprio tamanho não muda o passo)", () => {
+    expect(snapToGrid(72, 26, grid, 1)).toEqual(snapToGrid(72, 26, grid));
+    expect(snapToGrid(72, 26, grid, 2)).toEqual(snapToGrid(72, 26, grid));
+  });
+
+  it("snap com cells 0.5 (Minúsculo, docs/plano-grid.md) alinha a meia célula", () => {
+    // offsetX 10, cellSize 50: meia célula = 25px, meios-passos em 10, 35, 60, 85...
+    expect(snapToGrid(34, 5, grid, 0.5)).toEqual({ x: 35, y: 0 });
+    expect(snapToGrid(20, 5, grid, 0.5)).toEqual({ x: 10, y: 0 });
+  });
+
   it("snapToCellCenter vai ao centro da célula que contém o ponto", () => {
     // offsetX 10: células em [10,60), [60,110)... centros em 35, 85...
     expect(snapToCellCenter(12, 49, grid)).toEqual({ x: 35, y: 25 });
@@ -84,6 +95,11 @@ describe("grid", () => {
   it("cellRect lê cells direto (fonte da verdade, docs/plano-grid.md)", () => {
     expect(cellRect({ x: 60, y: 50, cells: 2 }, grid)).toEqual({ col: 1, row: 1, cells: 2 });
     expect(cellRect({ x: 10, y: 0, cells: 1 }, grid)).toEqual({ col: 0, row: 0, cells: 1 });
+  });
+
+  it("cellRect preserva meia célula de um Minúsculo (sem floorar, docs/plano-grid.md)", () => {
+    // x=35 = meio caminho da célula 0 pra 1 (offsetX 10, cellSize 50) → col 0.5, não 0.
+    expect(cellRect({ x: 35, y: 0, cells: 0.5 }, grid)).toEqual({ col: 0.5, row: 0, cells: 0.5 });
   });
 
   it("sizeTokens deriva width/height de cells × cellSize do grid (nunca gravado)", () => {

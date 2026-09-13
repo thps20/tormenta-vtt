@@ -63,3 +63,35 @@ export function measureDistance(def: Pick<SystemDefinition, "grid">, dx: number,
   if (!grid) return { cells, value: null, unit: null };
   return { cells, value: cells * grid.cellSize, unit: grid.unit };
 }
+
+/** Distância de `cells` (número de células) já pronto, na unidade do `grid` — mesma conversão de
+ *  `measureDistance`, mas a partir de um total já medido (usada por `measurePath` abaixo). */
+function distanceFromCells(def: Pick<SystemDefinition, "grid">, cells: number): Distance {
+  const grid = def.grid;
+  if (!grid) return { cells, value: null, unit: null };
+  return { cells, value: cells * grid.cellSize, unit: grid.unit };
+}
+
+/**
+ * Distância de um CAMINHO com vários trechos (régua com vértices, docs/SPEC.md §3.2): cada trecho
+ * `points[i] -> points[i+1]`, em células. As diagonais acumulam entre trechos (mesma regra 1-2-1 que
+ * `rules/movement.ts#applyStep` usa turno afora) — sem isso, um caminho em zigue-zague de vários
+ * trechos diagonais de 1 célula cada contaria barato demais (cada trecho resetando a contagem,
+ * como se fosse uma régua nova a cada vértice). `points` tem pelo menos 1 ponto; com só 1, não há
+ * trecho nenhum (`segments` vazio, `total` zero).
+ */
+export function measurePath(def: Pick<SystemDefinition, "grid">, points: { x: number; y: number }[]): { segments: Distance[]; total: Distance } {
+  const rule = def.grid?.diagonals ?? "chebyshev";
+  const segments: Distance[] = [];
+  let diagonalsBefore = 0;
+  let totalCells = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!;
+    const b = points[i]!;
+    const measured = measureCellsFrom(b.x - a.x, b.y - a.y, rule, diagonalsBefore);
+    diagonalsBefore = measured.diagonals;
+    totalCells += measured.cells;
+    segments.push(distanceFromCells(def, measured.cells));
+  }
+  return { segments, total: distanceFromCells(def, totalCells) };
+}

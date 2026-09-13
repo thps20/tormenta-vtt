@@ -44,9 +44,22 @@ export function cellCenter(cell: { col: number; row: number }, grid: GridConfig)
   return { x: corner.x + size / 2, y: corner.y + size / 2 };
 }
 
+/**
+ * Célula (linha/coluna) de um TOKEN — não de um ponto qualquer (diferente de `cellAt`, que floora):
+ * a posição de um token já é sempre um múltiplo exato da sua própria granularidade de snap (célula
+ * inteira, ou meia célula pra `cells === 0.5`), então dividir direto preserva o ".5" de um
+ * Minúsculo — flooring arredondaria ele pra baixo e quebraria a checagem de sobreposição
+ * (docs/plano-grid.md).
+ */
+function tokenCellFraction(token: { x: number; y: number }, grid: GridConfig): { col: number; row: number } {
+  const size = effectiveCellSize(grid);
+  const { ox, oy } = effectiveOffset(grid, size);
+  return { col: (token.x - ox) / size, row: (token.y - oy) / size };
+}
+
 /** Retângulo em células ocupado por um token (`token.cells`, docs/plano-grid.md — fonte da verdade). */
 export function cellRect(token: { x: number; y: number; cells: number }, grid: GridConfig): CellRect {
-  return { ...cellAt(token, grid), cells: token.cells };
+  return { ...tokenCellFraction(token, grid), cells: token.cells };
 }
 
 /** Token + tamanho em pixels do mapa, derivado de `cells × cellSize do grid` (docs/plano-grid.md).
@@ -61,14 +74,21 @@ export function sizeTokens(tokens: Token[], grid: GridConfig): SizedToken[] {
   return tokens.map((t) => ({ ...t, ...tokenPixelSize(t.cells, cellSizePx) }));
 }
 
-/** Alinha o canto superior esquerdo de um token à célula mais próxima. */
-export function snapToGrid(x: number, y: number, grid: GridConfig): { x: number; y: number } {
+/**
+ * Alinha o canto superior esquerdo de um token à célula mais próxima. `cells` é o tamanho do
+ * TOKEN sendo alinhado (não da célula): tokens de célula inteira (`cells >= 1`, o padrão) sempre
+ * alinham ao canto de célula CHEIA, não ao próprio tamanho — um token 2×2 não passa a andar em
+ * passos de 2 células. Só o Minúsculo (`cells: 0.5`, docs/plano-grid.md) usa um passo menor —
+ * meia célula — pra poder dividir a célula com outro.
+ */
+export function snapToGrid(x: number, y: number, grid: GridConfig, cells = 1): { x: number; y: number } {
   if (grid.type === "none") return { x, y };
-  const ox = normalizeOffset(grid.offsetX, grid.cellSize);
-  const oy = normalizeOffset(grid.offsetY, grid.cellSize);
+  const step = cells < 1 ? grid.cellSize * cells : grid.cellSize;
+  const ox = normalizeOffset(grid.offsetX, step);
+  const oy = normalizeOffset(grid.offsetY, step);
   return {
-    x: Math.round((x - ox) / grid.cellSize) * grid.cellSize + ox,
-    y: Math.round((y - oy) / grid.cellSize) * grid.cellSize + oy,
+    x: Math.round((x - ox) / step) * step + ox,
+    y: Math.round((y - oy) / step) * step + oy,
   };
 }
 

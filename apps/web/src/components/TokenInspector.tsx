@@ -3,6 +3,7 @@ import { BookOpen, Eye, EyeOff, Heart, ImagePlus, NotebookText, Sparkles, Trash2
 import type { Character, ConditionDef, Participant, TokenPatch } from "@tormenta-vtt/shared";
 import { uploadImage } from "../lib/api";
 import type { SizedToken } from "../lib/grid";
+import { fmtUnit } from "../lib/format";
 import { toast } from "../store/ui";
 
 /** Paleta de cores para tokens (só visual, não é regra de sistema). */
@@ -126,7 +127,7 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({
       <div className="space-y-2.5 text-xs">
         <Row label="Posição">
           <span className="font-mono text-zinc-300 text-[11px]">
-            {Math.round(token.x)}, {Math.round(token.y)} • {token.cells}×{token.cells} células ({Math.round(token.width)}×{Math.round(token.height)} px)
+            {Math.round(token.x)}, {Math.round(token.y)} • {fmtUnit(token.cells)}×{fmtUnit(token.cells)} células ({Math.round(token.width)}×{Math.round(token.height)} px)
           </span>
         </Row>
 

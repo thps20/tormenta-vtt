@@ -108,13 +108,6 @@ comprometido — só um lugar para não perder a ideia até o dono do projeto pr
   tem isso hoje, então mudar só pra alvos criaria uma assimetria entre os dois cards). Achado na
   revisão de 10/09/2026 (`docs/revisao-alvos.md` §5.3); não corrigido — comportamento consistente
   com o que já existia, não uma regressão.
-- **Tokens de meia célula (Minúsculo 0,5 em T20).** `Token.cells` (docs/plano-grid.md) é inteiro
-  ≥ 1: um token cuja criatura tem `tokenCells: 0.5` no sistema (Minúsculo) arredonda pra 1 célula
-  cheia ao soltar do compêndio, igual ao comportamento de antes da migration — só que agora não tem
-  mais como um dia render "meia célula" sem o schema aprender fração. Suportar de verdade exigiria
-  `Token.cells` fracionário (ex.: `0.5`), o que muda a espiral de posicionamento (`findFreeCells`,
-  hoje em células inteiras) e o snap do Transformer (§ do plano) pra aceitar meio passo. Anotado em
-  11/09/2026, ao trocar `Token.width/height` por `Token.cells`.
 - **Gabaritos não acompanham recalibração do grid (efêmeros; limitação aceita).** `scene:updateGrid`
   (inclusive via "Calibrar pela imagem", docs/plano-grid.md) reencaixa a posição de cada TOKEN da
   cena (`resnapTokenPosition`), mas não toca em `Template` nenhum: um gabarito criado antes de

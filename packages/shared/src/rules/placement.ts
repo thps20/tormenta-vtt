@@ -30,15 +30,34 @@ function spiralOffsets(maxRadius: number): Array<[number, number]> {
 }
 
 /**
+ * Posições (em CÉLULAS inteiras, offsets dentro de uma célula cheia) que um token de `cells < 1`
+ * pode ocupar sem sair dela — 0.5 dá um grid 2×2 de meias-células ((0,0), (0.5,0), (0,0.5),
+ * (0.5,0.5)): até 4 Minúsculos dividindo a mesma célula (docs/plano-grid.md). `cells >= 1` nunca
+ * chama isto (`findFreeCells` só usa um único offset [0,0] nesse caso — token normal não subdivide
+ * célula nenhuma).
+ */
+function subCellSlots(cells: number): Array<[number, number]> {
+  const slots: Array<[number, number]> = [];
+  for (let row = 0; row < 1; row += cells) {
+    for (let col = 0; col < 1; col += cells) slots.push([col, row]);
+  }
+  return slots;
+}
+
+/**
  * `count` posições livres a partir da célula `start`, andando em espiral (anéis de raio Chebyshev
  * crescente) e pulando células ocupadas por `occupied` — inclusive as já escolhidas nesta mesma
- * chamada, então duas cópias nunca caem uma sobre a outra. Cada candidata é grudada dentro de
- * `bounds` antes de checar ocupação (mesmo comportamento de "não deixar o token sair do mapa" que
- * o botão de novo token já tinha). Devolve menos que `count` só se estourar `maxRadius` (padrão 12).
+ * chamada, então duas cópias nunca caem uma sobre a outra. Cada CÉLULA candidata é grudada dentro
+ * de `bounds` antes de checar ocupação (mesmo comportamento de "não deixar o token sair do mapa"
+ * que o botão de novo token já tinha). Token de meia célula (`cells: 0.5`, Minúsculo): antes de
+ * passar pra próxima célula do anel, tenta as 4 meias-células DENTRO da célula candidata
+ * (`subCellSlots`) — sem isso, duas cópias soltas juntas cairiam uma na célula do lado em vez de
+ * dividir a mesma, o que era o objetivo de suportar `cells` fracionário. Devolve menos que `count`
+ * só se estourar `maxRadius` (padrão 12).
  */
 export function findFreeCells(opts: {
   start: { col: number; row: number };
-  /** Lado do token em células (>= 1; ex.: Grande em T20 = 2). */
+  /** Lado do token em células: inteiro >= 1 (ex.: Grande em T20 = 2), ou 0.5 (Minúsculo, meia célula). */
   cells: number;
   count: number;
   occupied: CellRect[];
@@ -46,22 +65,30 @@ export function findFreeCells(opts: {
   maxRadius?: number;
 }): { col: number; row: number }[] {
   const { start, cells, count, bounds } = opts;
-  const maxCol = Math.max(0, bounds.cols - cells);
-  const maxRow = Math.max(0, bounds.rows - cells);
+  // Pra célula fracionária, a espiral ainda anda em células INTEIRAS (maxCol reserva 1 célula
+  // cheia); os slots de meia-célula ficam por conta de `subCellSlots` dentro de cada candidata.
+  const cellStep = cells < 1 ? 1 : cells;
+  const maxCol = Math.max(0, bounds.cols - cellStep);
+  const maxRow = Math.max(0, bounds.rows - cellStep);
   const clamp = (col: number, row: number) => ({
     col: Math.min(Math.max(0, col), maxCol),
     row: Math.min(Math.max(0, row), maxRow),
   });
+  const slots = cells < 1 ? subCellSlots(cells) : ([[0, 0]] as Array<[number, number]>);
 
   const taken = [...opts.occupied];
   const result: { col: number; row: number }[] = [];
   for (const [dCol, dRow] of spiralOffsets(opts.maxRadius ?? 12)) {
     if (result.length >= count) break;
-    const point = clamp(start.col + dCol, start.row + dRow);
-    const rect: CellRect = { ...point, cells };
-    if (taken.some((t) => overlaps(t, rect))) continue;
-    result.push(point);
-    taken.push(rect);
+    const cellPoint = clamp(start.col + dCol, start.row + dRow);
+    for (const [sCol, sRow] of slots) {
+      if (result.length >= count) break;
+      const point = { col: cellPoint.col + sCol, row: cellPoint.row + sRow };
+      const rect: CellRect = { ...point, cells };
+      if (taken.some((t) => overlaps(t, rect))) continue;
+      result.push(point);
+      taken.push(rect);
+    }
   }
   return result;
 }
@@ -119,4 +146,16 @@ export function tokenPixelSize(cells: number, cellSizePx: number): { width: numb
  */
 export function cellsFromPixels(px: number, cellSizePx: number): number {
   return Math.max(1, Math.round(px / cellSizePx));
+}
+
+/**
+ * Normaliza um `tokenCells` de sistema (pode ser fracionário, ex.: Minúsculo = 0,5) para um
+ * `Token.cells` válido (`TokenSchema`: inteiro >= 1, ou exatamente 0.5) — usada ao soltar uma
+ * criatura do compêndio (servidor e fantasma no cliente, mesma regra nos dois pra cair igual).
+ * Valores de até meia célula viram meia célula (o único tamanho fracionário suportado hoje); os
+ * demais arredondam pro inteiro mais próximo, mínimo 1.
+ */
+export function normalizeTokenCells(raw: number): number {
+  if (raw <= 0.75) return 0.5;
+  return Math.max(1, Math.round(raw));
 }

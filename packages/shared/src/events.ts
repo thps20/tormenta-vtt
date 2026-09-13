@@ -348,7 +348,9 @@ export interface ClientToServerEvents {
   "encounter:spawn": (payload: EncounterSpawnPayload, ack: Ack<{ tokens: Token[]; skippedEntryIds: string[] }>) => void;
 
   // Régua (efêmera: só broadcast, nada vai ao banco)
-  /** Enviado com throttle enquanto o participante arrasta a régua; `ruler: null` ao soltar. */
+  /** Enviado com throttle enquanto o participante mede (`ruler.points` cresce a cada vértice
+   *  travado com Ctrl+clique, docs/SPEC.md §3.2); `ruler: null` ao soltar sem nenhum vértice travado
+   *  ou ao limpar (Esc). */
   "ruler:update": (payload: RulerUpdatePayload, ack: Ack) => void;
 
   // Gabaritos de área de efeito (docs/plano-gabaritos.md): efêmeros por sessão, guardados em
@@ -540,7 +542,8 @@ export interface ServerToClientEvents {
    *  combate" da SALA, para todos. */
   "combat:autoRollNpcInitiativeChanged": (p: { enabled: boolean }) => void;
 
-  /** Régua de outro participante (o autor não recebe eco: já desenha a própria). ruler null = apagar. */
+  /** Régua de outro participante (o autor não recebe eco: já desenha a própria), com o caminho
+   *  completo até agora (`ruler.points`). ruler null = apagar. */
   "ruler:updated": (p: { participantId: string; nickname: string; sceneId: string; ruler: Ruler | null }) => void;
 
   /** Gabarito criado ou editado (mover/girar) — o cliente faz upsert por id, igual a token:updated. */

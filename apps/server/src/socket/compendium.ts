@@ -12,6 +12,7 @@ import {
   entryToCharacter,
   findFreeCells,
   getSystemDefinition,
+  normalizeTokenCells,
   numberedNames,
   type CellRect,
   type Character,
@@ -108,10 +109,10 @@ export function registerCompendiumHandlers(io: TypedServer, socket: TypedSocket)
 
         const existingTokens = await prisma.token.findMany({ where: { sceneId: data.sceneId, deletedAt: null } });
         const occupied: CellRect[] = existingTokens.map((t) => cellRect(t, scene.grid));
-        // Lado em células: arredonda (tokenCells pode ser fracionário, ex.: Minúsculo = 0,5) —
-        // vira o `Token.cells` gravado (docs/plano-grid.md), mínimo 1 (docs/backlog.md).
+        // Lado em células: normaliza (tokenCells pode ser fracionário, ex.: Minúsculo = 0,5, que
+        // vira meia célula de verdade — docs/plano-grid.md) pro `Token.cells` gravado.
         const sizeDef = def.sizes.find((s) => s.key === entry.sheet.size);
-        const cellsPerSide = Math.max(1, Math.round(sizeDef?.tokenCells ?? 1));
+        const cellsPerSide = normalizeTokenCells(sizeDef?.tokenCells ?? 1);
 
         const start = cellAt({ x: data.x, y: data.y }, scene.grid);
         const positions = findFreeCells({ start, cells: cellsPerSide, count: data.count, occupied, bounds });

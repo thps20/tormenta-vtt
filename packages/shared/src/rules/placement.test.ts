@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cellsFromPixels, findFreeCells, numberedNames, tokenPixelSize } from "./placement.js";
+import { cellsFromPixels, findFreeCells, normalizeTokenCells, numberedNames, tokenPixelSize } from "./placement.js";
 
 const bounds = { cols: 20, rows: 20 };
 
@@ -60,6 +60,44 @@ describe("findFreeCells", () => {
     const occupied = [{ col: 5, row: 5, cells: 1 }];
     const result = findFreeCells({ start: { col: 5, row: 5 }, cells: 1, count: 3, occupied, bounds, maxRadius: 0 });
     expect(result).toEqual([]);
+  });
+
+  it("token de meia célula (Minúsculo, docs/plano-grid.md): duas cópias cabem na MESMA célula cheia", () => {
+    const result = findFreeCells({ start: { col: 5, row: 5 }, cells: 0.5, count: 2, occupied: [], bounds });
+    expect(result).toHaveLength(2);
+    // Nenhuma das duas saiu da célula cheia (5,5)-(6,6): ambas ficam com col/row entre 5 e 5.5.
+    for (const p of result) {
+      expect(p.col).toBeGreaterThanOrEqual(5);
+      expect(p.col).toBeLessThanOrEqual(5.5);
+      expect(p.row).toBeGreaterThanOrEqual(5);
+      expect(p.row).toBeLessThanOrEqual(5.5);
+    }
+    // E não caem uma em cima da outra.
+    expect(result[0]).not.toEqual(result[1]);
+  });
+
+  it("token de meia célula desvia de outro Minúsculo em passos de MEIA célula, não de célula inteira", () => {
+    const occupied = [{ col: 5, row: 5, cells: 0.5 }];
+    const [halfResult] = findFreeCells({ start: { col: 5, row: 5 }, cells: 0.5, count: 1, occupied, bounds });
+    expect(halfResult).toBeDefined();
+    expect(halfResult).not.toEqual({ col: 5, row: 5 });
+    // Primeiro anel da espiral em passo 0.5: a candidata livre mais próxima fica a só meia célula
+    // de distância — bem mais perto do que o passo de 1 célula inteira que um token normal usaria.
+    expect(Math.max(Math.abs(halfResult!.col - 5), Math.abs(halfResult!.row - 5))).toBeLessThanOrEqual(0.5);
+  });
+});
+
+describe("normalizeTokenCells (docs/plano-grid.md — meia célula do Minúsculo)", () => {
+  it("0,5 (ou menos) vira meia célula", () => {
+    expect(normalizeTokenCells(0.5)).toBe(0.5);
+    expect(normalizeTokenCells(0.25)).toBe(0.5);
+  });
+
+  it("os demais arredondam pro inteiro mais próximo, mínimo 1", () => {
+    expect(normalizeTokenCells(1)).toBe(1);
+    expect(normalizeTokenCells(0.9)).toBe(1);
+    expect(normalizeTokenCells(2)).toBe(2);
+    expect(normalizeTokenCells(2.6)).toBe(3);
   });
 });
 

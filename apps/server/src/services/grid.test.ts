@@ -23,6 +23,11 @@ describe("grid (servidor)", () => {
     expect(cellRect({ x: 60, y: 50, cells: 2 }, grid)).toEqual({ col: 1, row: 1, cells: 2 });
     expect(cellRect({ x: 10, y: 0, cells: 1 }, grid)).toEqual({ col: 0, row: 0, cells: 1 });
   });
+
+  it("cellRect preserva meia célula de um Minúsculo (sem floorar, docs/plano-grid.md)", () => {
+    // x=35 = meio caminho da célula 0 pra 1 (offsetX 10, cellSize 50) → col 0.5, não 0.
+    expect(cellRect({ x: 35, y: 0, cells: 0.5 }, grid)).toEqual({ col: 0.5, row: 0, cells: 0.5 });
+  });
 });
 
 describe("resnapTokenPosition (scene:updateGrid reencaixa a posição dos tokens ao trocar cellSize/offset, docs/plano-mapas.md/docs/plano-grid.md)", () => {
@@ -84,5 +89,11 @@ describe("resnapTokenPosition (scene:updateGrid reencaixa a posição dos tokens
       const token = { x: 0, y: 0, cells: 1 };
       expect(resnapTokenPosition(token, grid70, grid70, map)).toBe(token);
     });
+  });
+
+  it("token de meia célula (Minúsculo) mantém a fração ao reencaixar, sem floorar pra célula cheia", () => {
+    // x=35 no grid70 é meia célula (célula 0, metade); no grid100 essa mesma fração vira x=50.
+    const token = { x: 35, y: 35, cells: 0.5 };
+    expect(resnapTokenPosition(token, grid70, grid100, bigMap)).toEqual({ x: 50, y: 50, cells: 0.5 });
   });
 });
