@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Image as ImageIcon } from "lucide-react";
+import type { HandoutShowTarget } from "@tormenta-vtt/shared";
 import { HandoutGallery, type HandoutGalleryProps } from "./HandoutGallery";
+import { useHandouts } from "../store/handouts";
 import { isTyping } from "../lib/isTyping";
 
 interface HandoutSelectorProps {
@@ -16,13 +18,36 @@ interface HandoutSelectorProps {
  * (fora de campo de texto — H já é "Mover mapa", §3.2) abrem/fecham; Esc e clique fora fecham —
  * o `Dialog` de dentro da galeria já cuida disso (diferente do dropdown antigo, este componente
  * não precisa mais de listener próprio pra isso).
+ *
+ * **Mostrar fecha a galeria sozinha**: ao "Mostrar para todos"/"Mostrar para...", a galeria fecha
+ * na hora (`handleShow`) pra o overlay do handout (`store/handouts.ts#open`, aberto pro GM pelo
+ * broadcast ao vivo — ele também recebe a própria mensagem) ficar visível sozinho, sem o diálogo
+ * por cima. Reabre sozinha quando esse overlay fecha de novo (`Fechar para todos` ou o fechar
+ * local do próprio GM) — o `HandoutGallery` continua montado o tempo todo (só `isOpen=false`
+ * some da tela), então busca/filtro/seleção de antes continuam lá quando reabre.
  */
 export const HandoutSelector: React.FC<HandoutSelectorProps> = ({ gallery, onOpen }) => {
   const [open, setOpen] = useState(false);
+  const overlayOpen = useHandouts((s) => s.open !== null);
+  /** true entre "fechei a galeria pra mostrar" e "o overlay fechou de novo" — só aí reabre sozinha. */
+  const reopenAfterOverlay = useRef(false);
+
+  useEffect(() => {
+    if (!overlayOpen && reopenAfterOverlay.current) {
+      reopenAfterOverlay.current = false;
+      setOpen(true);
+    }
+  }, [overlayOpen]);
 
   const openGallery = () => {
     onOpen();
     setOpen(true);
+  };
+
+  const handleShow = (id: string, target: HandoutShowTarget) => {
+    reopenAfterOverlay.current = true;
+    setOpen(false);
+    gallery.onShow(id, target);
   };
 
   useEffect(() => {
@@ -51,7 +76,7 @@ export const HandoutSelector: React.FC<HandoutSelectorProps> = ({ gallery, onOpe
         <span>Handouts</span>
       </button>
 
-      <HandoutGallery isOpen={open} onClose={() => setOpen(false)} {...gallery} />
+      <HandoutGallery isOpen={open} onClose={() => setOpen(false)} {...gallery} onShow={handleShow} />
     </>
   );
 };
