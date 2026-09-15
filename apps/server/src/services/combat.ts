@@ -94,21 +94,34 @@ export function canControlCombatant(viewer: Viewer, token: Pick<DbToken, "ownerI
 }
 
 /**
+ * O que um destinatário vê dos números de UM combatente (docs/plano-combate.md §4). GM vê tudo.
+ * Jogador vê a iniciativa do PRÓPRIO combatente (token que possui), menos quando a última rolagem
+ * foi às cegas (`"gm"` — quem rolou não vê o próprio resultado, igual ao chat); e a de QUALQUER
+ * combatente cuja última rolagem foi pública (`"all"`, nascida assim ou revelada depois): o painel
+ * mostra o que o chat já mostrou. O `bonus` de desempate nunca vem de rolagem pública: só do próprio.
+ */
+export function combatantValuesVisibleTo(
+  viewer: Viewer,
+  ownerId: string | null,
+  lastRollVisibility: string | null,
+): { initiative: boolean; bonus: boolean } {
+  if (viewer.role === "gm") return { initiative: true, bonus: true };
+  const ownSeen = ownerId === viewer.participantId && lastRollVisibility !== "gm";
+  return { initiative: ownSeen || lastRollVisibility === "all", bonus: ownSeen };
+}
+
+/**
  * Combate pronto para UM destinatário: já ordenado (sortCombatants) e filtrado pela
  * visibilidade (jogador só recebe combatentes cujo token pode ver — mesmo filtro de
- * token/névoa de sempre). Jogador vê o valor numérico (`initiative`/`bonus`) só do PRÓPRIO
- * combatente (token que possui), e mesmo assim não quando a última rolagem foi às cegas
- * (`lastRollVisibility === "gm"` — mesma regra de "rolagem às cegas" do chat: quem rolou não
- * vê o próprio resultado). Dos demais combatentes, só a ORDEM (nome, `rolled`). GM vê tudo
- * sempre. Ver docs/plano-combate.md §4 e docs/revisao-combate.md §1.
+ * token/névoa de sempre). Os números de cada combatente seguem `combatantValuesVisibleTo`;
+ * sem eles, o jogador vê só a ORDEM (nome, `rolled`). Ver docs/plano-combate.md §4 e
+ * docs/revisao-combate.md §1.
  */
 export function toCombat(row: CombatRow, def: SystemDefinition, viewer: Viewer, geom: SceneGeometry): Combat {
   const sorted = sortCombatants(def, row.combatants);
   const visible = viewer.role === "gm" ? sorted : sorted.filter((cr) => tokenVisibleTo(toToken(cr.token), viewer, geom));
-  const isGm = viewer.role === "gm";
   const combatants: Combatant[] = visible.map((cr) => {
-    const mine = !isGm && cr.token.ownerId === viewer.participantId;
-    const showValue = isGm || (mine && cr.lastRollVisibility !== "gm");
+    const show = combatantValuesVisibleTo(viewer, cr.token.ownerId, cr.lastRollVisibility);
     const isActive = row.activeCombatantId === cr.id;
     const path = Array.isArray(cr.movementPath) ? (cr.movementPath as { x: number; y: number }[]) : [];
     return {
@@ -118,9 +131,9 @@ export function toCombat(row: CombatRow, def: SystemDefinition, viewer: Viewer, 
       name: cr.token.name,
       color: cr.token.color,
       ownerId: cr.token.ownerId,
-      initiative: showValue ? cr.initiative : null,
+      initiative: show.initiative ? cr.initiative : null,
       rolled: cr.initiative !== null,
-      bonus: showValue ? cr.bonus : null,
+      bonus: show.bonus ? cr.bonus : null,
       delayed: cr.delayed,
       surprised: cr.surprised,
       order: cr.order,
@@ -169,6 +182,23 @@ export async function emitCombat(io: TypedServer, roomId: string, sceneId: strin
 
   if (caller.role === "gm") return gmView;
   return row ? toCombat(row, def, caller, geom) : null;
+}
+
+/**
+ * `chat:reveal` de uma rolagem de iniciativa (card normal ou em lote): os combatentes cujo valor
+ * ATUAL saiu dessa mensagem (`lastRollMessageId`) passam a ter rolagem pública, e o combate de cada
+ * mapa afetado é reemitido. Quem rolou de novo, teve o valor digitado ou "entrou agora" depois
+ * aponta pra outra mensagem (ou null) e não é tocado. Não-op quando a mensagem não é de iniciativa.
+ */
+export async function revealCombatantRolls(io: TypedServer, roomId: string, messageId: string): Promise<void> {
+  const rows = await prisma.combatant.findMany({
+    where: { lastRollMessageId: messageId, lastRollVisibility: { not: "all" }, combat: { roomId } },
+    select: { id: true, combat: { select: { sceneId: true } } },
+  });
+  if (rows.length === 0) return;
+  await prisma.combatant.updateMany({ where: { id: { in: rows.map((r) => r.id) } }, data: { lastRollVisibility: "all" } });
+  const sceneIds = [...new Set(rows.map((r) => r.combat.sceneId))];
+  for (const sceneId of sceneIds) await emitCombat(io, roomId, sceneId, { role: "gm", participantId: "" });
 }
 
 /** Fórmula + rótulo da iniciativa de um combatente: pela ficha vinculada (token atual), ou sem ficha (bônus manual). */

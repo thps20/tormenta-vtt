@@ -3,6 +3,7 @@ import { prisma } from "../db.js";
 import { parseChatCommand } from "../services/chatCommands.js";
 import { toCharacter } from "../services/characters.js";
 import { emitChatMessage } from "../services/chatVisibility.js";
+import { revealCombatantRolls } from "../services/combat.js";
 import { createRollMessage } from "../services/rolls.js";
 import { toChatMessage } from "../services/serialize.js";
 import { guarded, HandlerError } from "./ack.js";
@@ -108,6 +109,8 @@ export function registerChatHandlers(io: TypedServer, socket: TypedSocket): void
         // Mesmo id, visibility nova: quem já tinha a mensagem atualiza; quem não tinha, recebe agora.
         const msg = toChatMessage(await prisma.chatMessage.update({ where: { id: messageId }, data: { visibility: "all" } }));
         await emitChatMessage(io, ctx.roomId, msg);
+        // Rolagem de iniciativa revelada: o valor aparece também na lista do combate (§3.5).
+        await revealCombatantRolls(io, ctx.roomId, messageId);
         return msg;
       },
       { gmOnly: true },

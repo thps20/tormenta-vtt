@@ -232,10 +232,15 @@ model Combatant {
   characterId        String?
   /// null = ainda não rolou: fica no fim da lista, cinza, sem turno.
   initiative         Float?
-  /// Visibilidade (RollVisibility) da ÚLTIMA rolagem que gravou `initiative`: "gm" (rolagem às
-  /// cegas de um combatente de jogador) esconde o valor até do dono na lista (toCombat). null =
-  /// visível ao dono (nunca rolou às cegas, ou o GM digitou o valor à mão em combat:set-initiative).
+  /// Visibilidade (RollVisibility) da ÚLTIMA rolagem que gravou `initiative`: "all" (pública)
+  /// mostra o valor a todo jogador que vê o token; "gm" (rolagem às cegas de um combatente de
+  /// jogador) esconde o valor até do dono na lista (toCombat). null = visível só ao dono (nunca
+  /// rolou às cegas, ou o GM digitou o valor à mão em combat:set-initiative).
   lastRollVisibility String?
+  /// ChatMessage (card normal ou `initiative-batch`) da rolagem que gravou `initiative`. `chat:reveal`
+  /// dessa mensagem torna `lastRollVisibility` "all". null = valor que não saiu de uma rolagem
+  /// (digitado pelo GM, ou copiado ao "entrar agora"). Sem FK: só um ponteiro pro Revelar.
+  lastRollMessageId  String?
   bonus              Float   @default(0)
   delayed            Boolean @default(false)
   surprised          Boolean @default(false)

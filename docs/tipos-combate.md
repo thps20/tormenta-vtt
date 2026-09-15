@@ -20,11 +20,11 @@ interface Combatant {
   color: string;
   /** Dono do token. null = NPC sem dono. */
   ownerId: string | null;
-  /** null = não rolou ainda, OU você não pode ver o valor (não é seu combatente, ou rolou às cegas). */
+  /** null = não rolou ainda, OU você não pode ver o valor (combatente alheio com rolagem não pública, ou o seu às cegas). */
   initiative: number | null;
   /** Já rolou (mesmo que você não veja o valor)? Separado de `initiative` pra não vazar número. */
   rolled: boolean;
-  /** Mesma regra de visibilidade de `initiative`. */
+  /** Só do seu combatente (fora às cegas); rolagem pública não revela o bônus. */
   bonus: number | null;
   delayed: boolean;
   surprised: boolean;

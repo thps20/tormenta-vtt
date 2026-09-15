@@ -247,7 +247,7 @@ export async function createInitiativeBatchRoll(
   roomId: string,
   me: DbParticipant,
   input: InitiativeBatchRollInput,
-): Promise<{ results: Map<string, number> }> {
+): Promise<{ results: Map<string, number>; messageId: string }> {
   let rolled: { entry: InitiativeBatchEntryInput; total: number }[];
   try {
     rolled = input.entries.map((entry) => ({ entry, total: rollParsed(parseFormula(entry.formula, { requireDice: false })).total }));
@@ -276,5 +276,5 @@ export async function createInitiativeBatchRoll(
   );
 
   await emitChatMessage(io, roomId, msg);
-  return { results: new Map(rolled.map(({ entry, total }) => [entry.combatantId, total])) };
+  return { results: new Map(rolled.map(({ entry, total }) => [entry.combatantId, total])), messageId: msg.id };
 }

@@ -15,9 +15,10 @@ export type CombatStatus = z.infer<typeof CombatStatusSchema>;
 
 /**
  * Combatente, já preparado para o fio: nome/cor vêm do token no momento do envio
- * (nunca ficam desatualizados, nada extra vai pro banco). `initiative` e `bonus`
- * só vêm preenchidos para o GM — jogador vê apenas a ORDEM (nome, `rolled`),
- * nunca o valor numérico, nem do próprio combatente (ver docs/plano-combate.md §4).
+ * (nunca ficam desatualizados, nada extra vai pro banco). GM recebe `initiative` e
+ * `bonus` sempre; jogador recebe `initiative` do próprio combatente (menos às cegas) e
+ * de qualquer um cuja rolagem foi pública, e `bonus` só do próprio. Sem valor, vê só a
+ * ORDEM (nome, `rolled`). Ver docs/plano-combate.md §4.
  */
 export const CombatantSchema = z.object({
   id: IdSchema,
@@ -31,7 +32,7 @@ export const CombatantSchema = z.object({
   initiative: z.number().nullable(),
   /** Já rolou (mesmo que o viewer não veja o valor)? Separado de `initiative` para não vazar número. */
   rolled: z.boolean(),
-  /** Bônus de desempate (fórmula combat.tiebreakBonus, ou digitado pelo GM). Só o GM recebe. */
+  /** Bônus de desempate (fórmula combat.tiebreakBonus, ou digitado pelo GM). GM e o dono (fora às cegas) recebem. */
   bonus: z.number().nullable(),
   delayed: z.boolean(),
   surprised: z.boolean(),

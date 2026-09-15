@@ -74,22 +74,26 @@ async function rollCombatantsInitiative(
   if (targets.length === 0) return;
   if (targets.length > 1) {
     const built = await Promise.all(targets.map((row) => buildCombatantInitiativeRoll(def, row)));
-    const { results } = await createInitiativeBatchRoll(io, roomId, me, {
+    const { results, messageId } = await createInitiativeBatchRoll(io, roomId, me, {
       round,
       visibility,
       entries: targets.map((row, i) => ({ combatantId: row.id, tokenId: row.tokenId, name: row.token.name, formula: built[i]!.formula })),
     });
-    // lastRollVisibility: "gm" (rolagem às cegas) esconde o valor até do próprio dono na lista
-    // (toCombat) — mesma regra do chat: quem rolou não vê o próprio resultado.
+    // lastRollVisibility decide quem vê o valor na lista (toCombat): "all" mostra a todos, "gm"
+    // (às cegas) esconde até do dono — mesma regra do chat. lastRollMessageId deixa o Revelar
+    // desse card liberar o valor depois (chat:reveal).
     await Promise.all(
       targets.map((row) =>
-        prisma.combatant.update({ where: { id: row.id }, data: { initiative: results.get(row.id)!, lastRollVisibility: visibility } }),
+        prisma.combatant.update({
+          where: { id: row.id },
+          data: { initiative: results.get(row.id)!, lastRollVisibility: visibility, lastRollMessageId: messageId },
+        }),
       ),
     );
   } else {
     for (const row of targets) {
       const built = await buildCombatantInitiativeRoll(def, row);
-      const { total } = await createRollMessage(io, roomId, me, {
+      const { total, message } = await createRollMessage(io, roomId, me, {
         formula: built.formula,
         label: built.label,
         visibility,
@@ -97,7 +101,10 @@ async function rollCombatantsInitiative(
         tokenId: row.tokenId,
         allowNoDice: true,
       });
-      await prisma.combatant.update({ where: { id: row.id }, data: { initiative: total, lastRollVisibility: visibility } });
+      await prisma.combatant.update({
+        where: { id: row.id },
+        data: { initiative: total, lastRollVisibility: visibility, lastRollMessageId: message.id },
+      });
     }
   }
 }
@@ -277,10 +284,11 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
       async ({ sceneId, combatantId, initiative, bonus }, ctx) => {
         const combat = await requireCombat(sceneId, ctx.roomId);
         await requireCombatant(combat, combatantId);
-        // Valor digitado à mão não é "rolagem às cegas": fica visível ao dono na lista.
+        // Valor digitado à mão não é "rolagem às cegas": fica visível ao dono na lista (e só a ele).
+        // Sem mensagem de origem: revelar a rolagem antiga não pode vazar o valor novo.
         await prisma.combatant.update({
           where: { id: combatantId },
-          data: { initiative, lastRollVisibility: null, ...(bonus !== undefined ? { bonus } : {}) },
+          data: { initiative, lastRollVisibility: null, lastRollMessageId: null, ...(bonus !== undefined ? { bonus } : {}) },
         });
         return sendCombat(io, ctx.roomId, sceneId, viewerOf(ctx));
       },
@@ -420,7 +428,12 @@ export function registerCombatHandlers(io: TypedServer, socket: TypedSocket): vo
             // O valor copiado do combatente ativo não é uma rolagem do dono deste combatente (pode
             // até ser de outro jogador, ou de um NPC secreto do GM): fica marcado como "às cegas"
             // pra não vazar pra ele na lista, mesmo que a rolagem original fosse pública.
-            data: { order: c.order, ...(c.id === combatantId ? { initiative: c.initiative, bonus: c.bonus, delayed: false, lastRollVisibility: "gm" } : {}) },
+            data: {
+              order: c.order,
+              ...(c.id === combatantId
+                ? { initiative: c.initiative, bonus: c.bonus, delayed: false, lastRollVisibility: "gm", lastRollMessageId: null }
+                : {}),
+            },
           }),
         ),
       );

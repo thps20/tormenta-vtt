@@ -191,9 +191,13 @@ Regra única, em `apps/server/src/services/combat.ts`, usada no broadcast **e** 
   combatente simplesmente não vem na lista, então nome e existência não vazam. Ao revelar o token, o
   combatente reaparece **na posição que já tinha** (a ordem é calculada sobre a lista completa, no
   servidor, e só depois filtrada).
-- Campos escondidos do jogador: `bonus` sempre `null`; `initiative` só vem quando o combatente é dele
-  (token que ele possui) **e** a rolagem não foi às cegas. Dos outros — jogadores inclusive — ele vê só a
-  ordem, o nome e o `rolled`.
+- Campos escondidos do jogador (`combatantValuesVisibleTo`): `initiative` vem quando o combatente é dele
+  (token que ele possui) e a rolagem não foi às cegas, **ou** quando a última rolagem daquele combatente
+  foi pública (`lastRollVisibility = "all"`, nascida assim ou revelada pelo GM depois): o painel mostra o
+  que o chat já mostrou. `bonus` só do próprio combatente. Sem valor, ele vê só a ordem, o nome e o `rolled`.
+- `Combatant.lastRollMessageId` aponta a mensagem da rolagem que gravou o valor atual; `chat:reveal` dessa
+  mensagem vira `lastRollVisibility` para `"all"` e reemite o combate. Valor digitado pelo GM ou copiado ao
+  "entrar agora" zera o ponteiro, então revelar a rolagem antiga não vaza o valor novo.
 
 **Quando reemitir para os jogadores** (a visibilidade depende do estado do token):
 - todo evento `combat:*` (óbvio);
