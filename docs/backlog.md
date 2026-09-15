@@ -120,3 +120,45 @@ comprometido — só um lugar para não perder a ideia até o dono do projeto pr
   reescalar geometria dentro do handler de `scene:updateGrid` — escopo bem maior que "reencaixar
   posição de token". Achado na revisão do plano do grid (`docs/revisao-grid.md` §2, "Colocar área
   de magia com cone antes e depois de recalibrar"); não corrigido — limitação aceita.
+- **Mesa: o mapa não é o herói, principalmente na TV/projetor (crítica de design, P1).** O mapa abre
+  com zoom de ~46% no canto superior esquerdo ("Ajustar mapa à tela" leva a ~66%), e nem
+  redimensionar a janela nem entrar no modo imersivo reenquadram: em 1920×1080 imersivo ele ocupa um
+  terço da tela. A faixa de dica ("Arraste tokens para mover • …") nunca some e colide com o banner
+  de iniciativa na vista do jogador. Proposta: enquadrar na carga inicial, reenquadrar ao entrar no
+  imersivo e em redimensionamentos grandes, dica que some depois de algumas sessões (vira um ⓘ), e
+  de quem é o turno legível sobre o mapa no imersivo. Anotado em 14/09/2026
+  (`.impeccable/critique/2026-09-15T01-09-49Z__apps-web-src-components-roompage-tsx.md`).
+- **Mesa: atrito no combate do Mestre (crítica de design, P1).** Sem atalho de teclado para
+  Próximo/Anterior (a ação mais repetida da sessão); cinco checkboxes de preferência ficam acima da
+  lista e empurram os botões de turno; "Rolar que faltam" aparece cortado em 1500px; "Apagar
+  combate" é um clique sem confirmação, colado em "Manter visível"; o jogador vê Anterior/Próximo
+  (`CombatPanel.tsx` ~444-466) mas o servidor só aceita esses eventos do GM. Proposta: preferências
+  num popover (ou em Configurar), atalho `N`/`Shift+N` com `kbd` no botão, esconder a navegação de
+  turno para jogadores, confirmação ou desfazer em "Apagar combate". **A conferir:** na crítica, a
+  iniciativa dos NPCs apareceu com valores no card público do chat enquanto o painel do jogador
+  mostrava só "Rolado" (o card segue o modo de rolagem atual do GM); ver se é o comportamento
+  desejado ou vazamento. Anotado em 14/09/2026 (mesma crítica).
+- **Mesa: queda de conexão invisível (crítica de design, P1).** `useConnection.status` não é
+  renderizado em nenhum componente: com o socket caído a tela fica idêntica, os avatares seguem
+  verdes e mudanças otimistas se perdem sem aviso — ruim para quem entra pelo túnel Cloudflare.
+  Proposta: faixa fina sobre o mapa "Sem conexão, tentando reconectar…" em `--danger`, avatares
+  offline em cinza, bloquear emits enquanto offline. Anotado em 14/09/2026 (mesma crítica).
+- **Mesa: legibilidade e acessibilidade básica (crítica de design, P2).** Muito texto abaixo da escala
+  do DESIGN.md (12/13/14): ~204 usos de `text-[10px]`, 59 de 9px, 6 de 8px; `zinc-600` sobre
+  `#1a1a1a` ≈ 2,25:1 (horários do chat) e `zinc-500` ≈ 3,6:1; badges das abas a 3,1:1; aba
+  "Iniciativa" truncada em "INICIA…"; anel de foco padrão quase invisível no fundo escuro (só 0–1
+  elementos têm `focus-visible` próprio); tooltips só no hover; 16 alvos de clique < 24px ("Salvar
+  como macro" 12×12, menu do modo de rolagem 21×18, d4–d100 com 21px de altura); `h1` pula para
+  `h3`. Proposta: escala do DESIGN.md, `focus-visible` com anel em `--accent`, tooltip também no foco,
+  alvos ≥ 24px. Anotado em 14/09/2026 (mesma crítica).
+- **Mesa: migrar o painel lateral e a visão de grupo para o grimório.** Em 14/09/2026 só a camada
+  sobre o mapa (barra superior e seus dropdowns, barra de ferramentas, HUD inferior e menus, barras
+  de névoa/desenho/área, barra de macros, banner de combate, faixa de dica, toasts) migrou para os
+  tokens do `docs/design/DESIGN.md`, com as peças em `apps/web/src/components/MapBar.tsx`. Falta: o
+  painel lateral com abas (chat, iniciativa, fichas) e a visão de grupo; os cartões/popovers sobre o
+  mapa (`NpcQuickCard`, `TokenInspector`, `ConditionMenu`, `MacroFormPopover`, `PinCreatePopover`,
+  `NotePinCard`); o conteúdo dos dropdowns (`MapsPanel`, `HandoutGallery`); diálogos
+  (`MapConfigModal`, `CarryTokensDialog`); e as cores desenhadas no canvas Konva (anel de turno com
+  brilho, halos de seleção, régua, rótulos de token em `VttCanvas.tsx`). Ainda usam `#d4af37`, Cinzel
+  em rótulos pequenos/números, Inter (o `body` só troca para Plex quando a última tela migrar),
+  brilhos dourados e cartão dentro de cartão. Anotado em 14/09/2026 (mesma crítica).

@@ -117,8 +117,8 @@ export function RoomPage({ inviteCode, gmSecret }: { inviteCode: string; gmSecre
   if (status.kind === "error") {
     return (
       <Centered>
-        <p className="text-red-400 text-sm">{status.message}</p>
-        <button onClick={() => navigate("/")} className="text-xs text-[#d4af37] underline cursor-pointer">
+        <p className="font-ui text-14 text-text">{status.message}</p>
+        <button onClick={() => navigate("/")} className="focus-ring font-ui text-13 text-accent underline underline-offset-2 cursor-pointer">
           Voltar ao lobby
         </button>
       </Centered>
@@ -128,7 +128,7 @@ export function RoomPage({ inviteCode, gmSecret }: { inviteCode: string; gmSecre
   if (status.kind !== "joined") {
     return (
       <Centered>
-        <p className="text-zinc-400 text-sm font-serif">Entrando na sala…</p>
+        <p className="font-ui text-14 text-text-muted">Entrando na sala…</p>
       </Centered>
     );
   }
@@ -860,14 +860,14 @@ function Table() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0c0c0c] text-zinc-100 antialiased">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-bg text-zinc-100 antialiased">
       {/* Modo imersivo (docs/SPEC.md §9.22): a TopBar deixa de ocupar altura no layout e vira um
        *  overlay flutuante por cima do mapa (mapa ocupa a área toda) que some de vez por ociosidade,
        *  igual às outras barras — fora do modo é o cabeçalho fixo de sempre. */}
       <div
         className={
           immersiveMode
-            ? `absolute top-0 left-0 right-0 z-40 transition-opacity duration-300 ${immersiveBarsHidden ? "opacity-0 pointer-events-none" : "opacity-100"}`
+            ? `absolute top-0 left-0 right-0 z-40 shadow-float transition-opacity duration-150 ease-out ${immersiveBarsHidden ? "opacity-0 pointer-events-none" : "opacity-100"}`
             : "shrink-0"
         }
       >
@@ -1088,7 +1088,7 @@ function Table() {
             </>
           ) : (
             <Centered>
-              <p className="text-zinc-500 text-sm">Nenhum mapa ativo.</p>
+              <p className="font-ui text-14 text-text-muted">Nenhum mapa ativo.</p>
             </Centered>
           )}
 
@@ -1232,5 +1232,5 @@ function Table() {
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
-  return <div className="h-full w-full min-h-screen flex flex-col items-center justify-center gap-3 bg-[#0c0c0c]">{children}</div>;
+  return <div className="h-full w-full min-h-screen flex flex-col items-center justify-center gap-3 bg-bg">{children}</div>;
 }

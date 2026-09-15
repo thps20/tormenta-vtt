@@ -4,6 +4,7 @@ import type { HandoutShowTarget } from "@tormenta-vtt/shared";
 import { HandoutGallery, type HandoutGalleryProps } from "./HandoutGallery";
 import { useHandouts } from "../store/handouts";
 import { isTyping } from "../lib/isTyping";
+import { MOTION } from "./MapBar";
 
 interface HandoutSelectorProps {
   /** Repassadas direto pro `HandoutGallery`, exceto `isOpen`/`onClose` (este componente decide). */
@@ -70,9 +71,9 @@ export const HandoutSelector: React.FC<HandoutSelectorProps> = ({ gallery, onOpe
         id="btn-handout-selector"
         onClick={() => (open ? setOpen(false) : openGallery())}
         title="Handouts da sala (J)"
-        className="flex items-center gap-1.5 px-2 py-1 rounded border border-transparent text-xs font-serif text-zinc-300 hover:text-[#d4af37] transition-colors cursor-pointer"
+        className={`focus-ring flex items-center gap-1.5 h-7 px-2 rounded-ui text-13 text-text hover:bg-surface-2 cursor-pointer ${MOTION}`}
       >
-        <ImageIcon className="w-3.5 h-3.5 shrink-0 text-[#d4af37]" />
+        <ImageIcon className="w-3.5 h-3.5 shrink-0 text-text-muted" />
         <span>Handouts</span>
       </button>
 

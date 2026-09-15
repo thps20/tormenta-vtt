@@ -6,6 +6,7 @@ import { decodeMacroDrag, describeCharacterAction, MACRO_DRAG_MIME, resolveMacro
 import { sortedCharacters, useCharacters } from "../store/characters";
 import { orderedMacros, useMacros } from "../store/macros";
 import { MacroFormPopover, summarizeMacroAction, type MacroFormValue } from "./MacroFormPopover";
+import { FLOAT_SURFACE, MOTION } from "./MapBar";
 
 /**
  * Barra de macros (docs/SPEC.md §9.20): botões pessoais, um por macro, na ordem salva — clique
@@ -92,8 +93,8 @@ export const MacroBar: React.FC<{ controller: MacroBarController; immersiveHidde
         onDragLeave={() => setDragOverBar(false)}
         onDrop={handleBarDrop}
         style={{ opacity: immersiveHidden ? 0 : 1, pointerEvents: immersiveHidden ? "none" : undefined }}
-        className={`fixed bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-1.5 py-1.5 rounded-lg border shadow-xl transition-all duration-300 ${
-          dragOverBar ? "bg-[#2d2417] border-[#d4af37]" : "bg-[#161513]/95 border-[#2d2417]"
+        className={`fixed bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 p-1.5 transition-[opacity,background-color,border-color] duration-150 ease-out ${FLOAT_SURFACE} ${
+          dragOverBar ? "bg-surface-2 border-accent/60" : ""
         }`}
       >
         {macros.map((macro, index) => (
@@ -125,7 +126,8 @@ export const MacroBar: React.FC<{ controller: MacroBarController; immersiveHidde
           id="btn-macro-new"
           onClick={() => setCreating(true)}
           title="Nova macro"
-          className="w-9 h-9 flex items-center justify-center rounded border border-dashed border-[#3d3d3d] text-zinc-500 hover:text-[#d4af37] hover:border-[#d4af37] transition-colors cursor-pointer shrink-0"
+          aria-label="Nova macro"
+          className={`focus-ring w-9 h-9 flex items-center justify-center rounded-ui border border-dashed border-border text-text-muted hover:text-text hover:border-text-muted cursor-pointer shrink-0 ${MOTION}`}
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -197,7 +199,7 @@ const MacroButton: React.FC<MacroButtonProps> = ({ macro, shortcutKey, beingDrag
 
   return (
     <div
-      className={`relative group w-9 h-9 shrink-0 transition-opacity ${beingDragged ? "opacity-30" : "opacity-100"} ${isDropTarget ? "ring-2 ring-[#d4af37] rounded" : ""}`}
+      className={`relative group w-9 h-9 shrink-0 transition-opacity ${beingDragged ? "opacity-30" : "opacity-100"} ${isDropTarget ? "ring-2 ring-text rounded-ui" : ""}`}
       draggable
       onDragStart={onDragStart}
       onDragOver={(e) => {
@@ -214,31 +216,37 @@ const MacroButton: React.FC<MacroButtonProps> = ({ macro, shortcutKey, beingDrag
         onClick={onRun}
         disabled={broken}
         title={broken ? `${macro.label} — referência não encontrada (ficha/item apagado)` : `${macro.label}${shortcutKey ? ` (tecla ${shortcutKey})` : ""}`}
-        className={`w-9 h-9 flex items-center justify-center rounded border cursor-pointer transition-all active:scale-95 disabled:cursor-not-allowed ${
-          broken ? "opacity-40 grayscale border-[#3d3d3d] bg-[#1a1a1a]" : "border-[#3d3d3d] bg-[#1f1d19] hover:border-current"
+        aria-label={broken ? `${macro.label} — referência não encontrada` : macro.label}
+        className={`focus-ring w-9 h-9 flex items-center justify-center rounded-ui border cursor-pointer transition-[border-color,transform] duration-150 ease-out active:scale-95 disabled:cursor-not-allowed ${
+          broken ? "opacity-40 grayscale border-border bg-surface-1" : "border-border bg-surface-2 hover:border-current"
         }`}
         style={broken ? undefined : { color: macro.color }}
       >
         {broken ? (
-          <AlertTriangle className="w-4 h-4 text-red-400" />
+          <AlertTriangle className="w-4 h-4 text-danger" />
         ) : icon ? (
           <span className="[&>svg]:w-4 [&>svg]:h-4" dangerouslySetInnerHTML={{ __html: icon.icon }} />
         ) : (
-          <span className="text-[10px] font-serif font-bold">{macro.label.charAt(0).toUpperCase()}</span>
+          <span className="text-13 font-semibold">{macro.label.charAt(0).toUpperCase()}</span>
         )}
       </button>
-      {shortcutKey && <span className="absolute -top-1 -left-1 text-[8px] font-mono text-zinc-500 bg-[#0c0c0c] border border-[#2d2417] rounded px-0.5 pointer-events-none">{shortcutKey}</span>}
+      {shortcutKey && (
+        <span className="absolute -top-1.5 -left-1.5 min-w-4 text-center font-data text-12 leading-4 text-text-muted bg-bg border border-border rounded-sm px-0.5 pointer-events-none">
+          {shortcutKey}
+        </span>
+      )}
 
-      <div className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center gap-0.5">
+      <div className="absolute -top-2 -right-2 hidden group-hover:flex group-focus-within:flex items-center gap-0.5">
         <button
           onClick={(e) => {
             e.stopPropagation();
             onEdit();
           }}
           title="Editar"
-          className="w-4 h-4 flex items-center justify-center rounded-full bg-[#252525] border border-[#3d3d3d] text-zinc-400 hover:text-[#d4af37] cursor-pointer"
+          aria-label={`Editar ${macro.label}`}
+          className={`focus-ring w-5 h-5 flex items-center justify-center rounded-full bg-surface-2 border border-border text-text-muted hover:text-text cursor-pointer ${MOTION}`}
         >
-          <Pencil className="w-2.5 h-2.5" />
+          <Pencil className="w-3 h-3" />
         </button>
         <button
           onClick={(e) => {
@@ -246,9 +254,10 @@ const MacroButton: React.FC<MacroButtonProps> = ({ macro, shortcutKey, beingDrag
             onRemove();
           }}
           title="Apagar"
-          className="w-4 h-4 flex items-center justify-center rounded-full bg-[#252525] border border-[#3d3d3d] text-zinc-400 hover:text-red-400 cursor-pointer"
+          aria-label={`Apagar ${macro.label}`}
+          className={`focus-ring w-5 h-5 flex items-center justify-center rounded-full bg-surface-2 border border-border text-text-muted hover:text-danger cursor-pointer ${MOTION}`}
         >
-          <Trash2 className="w-2.5 h-2.5" />
+          <Trash2 className="w-3 h-3" />
         </button>
       </div>
     </div>

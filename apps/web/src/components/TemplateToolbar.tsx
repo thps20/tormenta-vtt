@@ -1,6 +1,7 @@
 import React from "react";
 import { Circle, Square, Slice, Triangle } from "lucide-react";
 import type { TemplatePreset, TemplateShape } from "@tormenta-vtt/shared";
+import { BarDivider, BarSegmented, FLOAT_SURFACE, MOTION } from "./MapBar";
 
 interface TemplateToolbarProps {
   shape: TemplateShape;
@@ -24,35 +25,18 @@ const SHAPES: Array<{ value: TemplateShape; label: string; Icon: React.Component
  * Painel secundário do modo Área (docs/plano-gabaritos.md), à direita da barra de ferramentas:
  * forma, tamanho (ângulo do cone e largura da linha vêm do padrão do sistema, ou do preset
  * escolhido — não são campos aqui, ver SystemDefinition.templates) e presets prontos do JSON.
- * Padrão visual de FogToolbar.tsx: só chama ações, o estado vem das stores.
+ * Mesmas peças visuais de `MapBar.tsx` que a FogToolbar.tsx: só chama ações, o estado vem das stores.
  */
 export const TemplateToolbar: React.FC<TemplateToolbarProps> = ({ shape, size, unit, presets, onShape, onSize, onPreset }) => (
   <div
     id="template-toolbar"
     role="toolbar"
     aria-label="Ferramentas de área"
-    className="absolute top-4 left-[4.25rem] z-10 flex items-center gap-1.5 p-1.5 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl text-zinc-300"
+    className={`absolute top-4 left-[4.25rem] z-10 flex flex-wrap items-center gap-1 p-1 max-w-[calc(100%-5.25rem)] ${FLOAT_SURFACE}`}
   >
-    <div className="flex items-center gap-0.5">
-      {SHAPES.map(({ value, label, Icon }) => (
-        <button
-          key={value}
-          id={`template-shape-${value}`}
-          type="button"
-          aria-pressed={shape === value}
-          title={label}
-          onClick={() => onShape(value)}
-          className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-serif font-bold uppercase tracking-wider cursor-pointer transition-colors ${
-            shape === value ? "bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/50" : "text-zinc-400 border border-transparent hover:bg-[#252525] hover:text-[#d4af37]"
-          }`}
-        >
-          <Icon className="w-3.5 h-3.5" />
-          <span className="hidden lg:inline">{label}</span>
-        </button>
-      ))}
-    </div>
-    <div className="w-[1px] h-5 bg-[#2d2417] mx-0.5" />
-    <label className="flex items-center gap-1.5 px-1.5 text-[10px] font-mono text-zinc-400" title="Tamanho (raio/comprimento/lado)">
+    <BarSegmented items={SHAPES} value={shape} onChange={onShape} idPrefix="template-shape" />
+    <BarDivider />
+    <label className="flex items-center gap-1.5 px-1.5 text-12 text-text-muted" title="Tamanho (raio/comprimento/lado)">
       <input
         id="template-size"
         type="number"
@@ -60,13 +44,13 @@ export const TemplateToolbar: React.FC<TemplateToolbarProps> = ({ shape, size, u
         step={0.5}
         value={size}
         onChange={(e) => onSize(Number(e.target.value))}
-        className="w-14 rounded bg-[#101010] border border-[#2d2417] px-1.5 py-0.5 text-zinc-200"
+        className={`focus-ring w-16 h-7 rounded-ui bg-bg border border-border hover:border-text-muted px-1.5 font-data text-13 tabular-nums text-text ${MOTION}`}
       />
       <span>{unit}</span>
     </label>
     {presets.length > 0 && (
       <>
-        <div className="w-[1px] h-5 bg-[#2d2417] mx-0.5" />
+        <BarDivider />
         <select
           id="template-preset"
           aria-label="Preset de área"
@@ -76,7 +60,7 @@ export const TemplateToolbar: React.FC<TemplateToolbarProps> = ({ shape, size, u
             if (preset) onPreset(preset);
             e.target.value = "";
           }}
-          className="rounded bg-[#101010] border border-[#2d2417] px-1.5 py-1 text-[10px] text-zinc-300"
+          className={`focus-ring h-7 max-w-40 rounded-ui bg-bg border border-border hover:border-text-muted px-1.5 text-13 text-text cursor-pointer ${MOTION}`}
         >
           <option value="" disabled>
             Presets…

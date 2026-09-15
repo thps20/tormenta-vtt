@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ChevronDown, MapPin } from "lucide-react";
+import { ArrowLeft, ChevronDown, MapPin } from "lucide-react";
 import type { Scene } from "@tormenta-vtt/shared";
 import { MapsPanel, type MapsPanelProps } from "./MapsPanel";
 import { isTyping } from "../lib/isTyping";
+import { FLOAT_MENU, MOTION } from "./MapBar";
 
 interface MapSelectorProps {
   /** Mapa que ESTE GM está vendo. */
@@ -65,37 +66,45 @@ export const MapSelector: React.FC<MapSelectorProps> = ({ viewingScene, activeSc
         id="btn-map-selector"
         onClick={() => (open ? setOpen(false) : openDropdown())}
         title="Mapas da sala (M)"
-        className={`flex items-center gap-1.5 px-2 py-1 rounded border text-xs font-serif transition-colors cursor-pointer max-w-[280px] ${
-          diverging
-            ? "bg-[#2a2215] border-amber-500/60 text-amber-300 hover:border-amber-400"
-            : "bg-transparent border-transparent text-zinc-300 hover:text-[#d4af37]"
+        aria-expanded={open}
+        // Vendo um mapa que não é o ativo da mesa: o único aviso disso na tela, então é o único
+        // ponto dourado da barra superior.
+        className={`focus-ring flex items-center gap-1.5 h-7 px-2 rounded-ui border text-13 cursor-pointer max-w-[320px] ${MOTION} ${
+          diverging ? "bg-surface-2 border-accent/60 text-accent" : "border-transparent text-text hover:bg-surface-2"
         }`}
       >
-        <MapPin className={`w-3.5 h-3.5 shrink-0 ${diverging ? "text-amber-400" : "text-[#d4af37]"}`} />
-        <span className="truncate">
-          {diverging
-            ? `Vendo ${viewingScene?.name} · ativo: ${activeScene?.name}`
-            : `Mapa: ${viewingScene?.name ?? "Sem mapa"}`}
-        </span>
-        <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+        <MapPin className={`w-3.5 h-3.5 shrink-0 ${diverging ? "" : "text-text-muted"}`} />
+        {diverging ? (
+          <span className="truncate">
+            Vendo <span className="font-title font-semibold uppercase tracking-[0.06em]">{viewingScene?.name}</span> · ativo:{" "}
+            <span className="font-title font-semibold uppercase tracking-[0.06em]">{activeScene?.name}</span>
+          </span>
+        ) : (
+          <span className="truncate">
+            <span className="text-text-muted">Mapa </span>
+            <span className="font-title font-semibold uppercase tracking-[0.06em]">{viewingScene?.name ?? "Sem mapa"}</span>
+          </span>
+        )}
+        <ChevronDown className={`w-3.5 h-3.5 shrink-0 text-text-muted transition-transform duration-150 ease-out ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
         <div
           id="map-selector-dropdown"
-          className="absolute left-0 top-full mt-1 w-[420px] max-h-[70vh] flex flex-col rounded bg-[#181614] border border-[#2d2417] shadow-2xl z-50 overflow-hidden"
+          className={`absolute left-0 top-full mt-1 w-[420px] max-h-[70vh] flex flex-col z-50 overflow-hidden ${FLOAT_MENU}`}
         >
           {diverging && activeScene && viewingScene && (
-            <div className="flex items-center gap-1.5 p-2 border-b border-[#2d2417] bg-[#14120e] shrink-0">
+            <div className="flex items-center gap-2 p-2 border-b border-border shrink-0">
               <button
                 id="btn-map-selector-go-active"
                 onClick={() => {
                   maps.onEnter(activeScene.id);
                   setOpen(false);
                 }}
-                className="flex-1 px-2.5 py-1 rounded bg-[#2d2417] hover:bg-[#3d311f] border border-amber-500/50 text-amber-200 text-[11px] font-serif font-bold cursor-pointer"
+                className={`focus-ring flex-1 flex items-center justify-center gap-1.5 h-8 px-2.5 rounded-ui border border-border hover:bg-surface-2 text-13 font-medium text-text cursor-pointer ${MOTION}`}
               >
-                ← Ir para o ativo
+                <ArrowLeft className="w-3.5 h-3.5 text-text-muted" />
+                Ir para o ativo
               </button>
               <button
                 id="btn-map-selector-activate-this"
@@ -103,7 +112,7 @@ export const MapSelector: React.FC<MapSelectorProps> = ({ viewingScene, activeSc
                   maps.onActivateRequest(viewingScene.id);
                   setOpen(false);
                 }}
-                className="flex-1 px-2.5 py-1 rounded bg-[#2a2215] hover:bg-[#382c1b] border border-[#d4af37] text-[#d4af37] text-[11px] font-serif font-bold cursor-pointer"
+                className={`focus-ring flex-1 h-8 px-2.5 rounded-ui border border-border hover:bg-surface-2 text-13 font-medium text-text cursor-pointer ${MOTION}`}
               >
                 Ativar este
               </button>

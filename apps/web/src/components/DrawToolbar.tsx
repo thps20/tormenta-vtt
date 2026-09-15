@@ -2,6 +2,7 @@ import React from "react";
 import { ArrowRight, Circle, Eye, EyeOff, Minus, Pencil, Square, Trash2, Type, Users } from "lucide-react";
 import { DRAWING_MAX_STROKE_WIDTH, DRAWING_MIN_STROKE_WIDTH, DRAWING_WARN_PER_SCENE, type DrawingKind } from "@tormenta-vtt/shared";
 import { DRAWING_COLORS } from "../store/tools";
+import { BarCount, BarDivider, BarSegmented, BarTextButton, BarToggle, FLOAT_SURFACE } from "./MapBar";
 
 interface DrawToolbarProps {
   isGm: boolean;
@@ -36,8 +37,8 @@ const KINDS: Array<{ value: DrawingKind; label: string; Icon: React.ComponentTyp
 ];
 
 /**
- * Painel secundário do modo Desenho (SPEC §9.17), à direita da barra de ferramentas — mesmo
- * molde visual de `FogToolbar.tsx`: forma do traço, paleta de cor, espessura, preenchimento (só
+ * Painel secundário do modo Desenho (SPEC §9.17), à direita da barra de ferramentas — mesmas
+ * peças visuais de `MapBar.tsx` que a `FogToolbar.tsx`: forma do traço, paleta de cor, espessura, preenchimento (só
  * formas fechadas), "Limpar meus"/"Limpar tudo" (GM) e o toggle "jogadores podem desenhar" (GM).
  * Jogador vê um aviso somente-leitura quando o GM desligou o toggle (não trava a ferramenta em si,
  * só a criação de traço novo — mover/apagar os que ele já tinha continua liberado).
@@ -68,25 +69,33 @@ export const DrawToolbar: React.FC<DrawToolbarProps> = ({
       id="draw-toolbar"
       role="toolbar"
       aria-label="Ferramentas de desenho"
-      className="absolute top-4 left-[4.25rem] z-10 flex items-center gap-1.5 p-1.5 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl text-zinc-300"
+      // Quebra em duas linhas em vez de passar por baixo do painel lateral (são até ~20 controles).
+      className={`absolute top-4 left-[4.25rem] z-10 flex flex-wrap items-center gap-1 p-1 max-w-[calc(100%-5.25rem)] ${FLOAT_SURFACE}`}
     >
-      <Segmented items={KINDS} value={drawKind} onChange={onDrawKind} idPrefix="draw-kind" />
-      <Divider />
-      <div className="flex items-center gap-1 px-0.5" role="group" aria-label="Cor do traço">
+      <BarSegmented items={KINDS} value={drawKind} onChange={onDrawKind} idPrefix="draw-kind" />
+      <BarDivider />
+      <div className="flex items-center gap-0.5 px-0.5" role="group" aria-label="Cor do traço">
         {DRAWING_COLORS.map((c) => (
           <button
             key={c}
             type="button"
             title={c}
+            aria-label={`Cor ${c}`}
             aria-pressed={drawColor === c}
             onClick={() => onDrawColor(c)}
-            style={{ backgroundColor: c }}
-            className={`w-4 h-4 rounded-full cursor-pointer transition-transform ${drawColor === c ? "ring-2 ring-[#d4af37] ring-offset-1 ring-offset-[#1a1a1a] scale-110" : "hover:scale-110"}`}
-          />
+            className="focus-ring group grid place-items-center w-6 h-6 rounded-full cursor-pointer"
+          >
+            <span
+              style={{ backgroundColor: c }}
+              className={`block w-4 h-4 rounded-full transition-shadow duration-150 ease-out ${
+                drawColor === c ? "ring-2 ring-text ring-offset-2 ring-offset-surface-1" : "ring-1 ring-black/40 group-hover:ring-text-muted"
+              }`}
+            />
+          </button>
         ))}
       </div>
-      <Divider />
-      <label className="flex items-center gap-1.5 px-1.5 text-[10px] font-mono text-zinc-400" title={isText ? "Tamanho do texto" : "Espessura do traço"}>
+      <BarDivider />
+      <label className="flex items-center gap-1.5 px-1.5 font-data text-12 text-text-muted" title={isText ? "Tamanho do texto" : "Espessura do traço"}>
         <input
           id="draw-stroke-width"
           type="range"
@@ -95,130 +104,63 @@ export const DrawToolbar: React.FC<DrawToolbarProps> = ({
           step={1}
           value={strokeWidth}
           onChange={(e) => onStrokeWidth(Number(e.target.value))}
-          className="w-16 accent-[#d4af37]"
+          className="focus-ring w-16 accent-text cursor-pointer"
         />
         <span className="w-6 text-right tabular-nums">{strokeWidth}</span>
       </label>
       {isClosedShape && (
         <>
-          <Divider />
-          <label className="flex items-center gap-1 px-1 text-[10px] font-serif font-bold uppercase tracking-wider text-zinc-400 cursor-pointer" title="Preencher a forma com a cor escolhida">
-            <input id="draw-filled" type="checkbox" checked={filled} onChange={(e) => onFilled(e.target.checked)} className="accent-[#d4af37]" />
+          <BarDivider />
+          <label className="flex items-center gap-1.5 h-7 px-1.5 text-12 font-medium text-text-muted hover:text-text cursor-pointer" title="Preencher a forma com a cor escolhida">
+            <input id="draw-filled" type="checkbox" checked={filled} onChange={(e) => onFilled(e.target.checked)} className="focus-ring w-3.5 h-3.5 accent-text cursor-pointer" />
             Preencher
           </label>
         </>
       )}
       {isGm && (
         <>
-          <Divider />
-          <button
-            id="draw-visible"
-            type="button"
-            aria-pressed={visible}
-            title="Visibilidade do PRÓXIMO traço que você desenhar"
-            onClick={() => onVisible(!visible)}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-serif font-bold uppercase tracking-wider cursor-pointer transition-colors ${
-              visible ? "bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/50" : "bg-[#252525] text-zinc-400 border border-[#3d3d3d]"
-            }`}
-          >
+          <BarDivider />
+          <BarToggle id="draw-visible" pressed={visible} title="Visibilidade do PRÓXIMO traço que você desenhar" onClick={() => onVisible(!visible)}>
             {visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
             {visible ? "Todos veem" : "Só o GM"}
-          </button>
+          </BarToggle>
         </>
       )}
-      <Divider />
-      <TextButton id="draw-clear-mine" title="Apaga só os traços que você desenhou neste mapa" onClick={onClearMine}>
+      <BarDivider />
+      <BarTextButton id="draw-clear-mine" title="Apaga só os traços que você desenhou neste mapa" onClick={onClearMine}>
         <Trash2 className="w-3.5 h-3.5" />
         Limpar meus
-      </TextButton>
+      </BarTextButton>
       {isGm && (
-        <TextButton id="draw-clear-all" title="Apaga todos os traços deste mapa, de qualquer dono" onClick={onClearAll}>
+        <BarTextButton id="draw-clear-all" title="Apaga todos os traços deste mapa, de qualquer dono" onClick={onClearAll}>
           <Trash2 className="w-3.5 h-3.5" />
           Limpar tudo
-        </TextButton>
+        </BarTextButton>
       )}
       {isGm ? (
         <>
-          <Divider />
-          <button
+          <BarDivider />
+          <BarToggle
             id="draw-player-permission"
-            type="button"
-            aria-pressed={playerDrawingEnabled}
+            pressed={playerDrawingEnabled}
             title={playerDrawingEnabled ? "Jogadores podem desenhar (clique para desligar)" : "Jogadores NÃO podem desenhar (clique para ligar)"}
             onClick={onTogglePlayerDrawing}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-serif font-bold uppercase tracking-wider cursor-pointer transition-colors ${
-              playerDrawingEnabled ? "bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/50" : "text-zinc-400 border border-transparent hover:bg-[#252525]"
-            }`}
           >
             <Users className="w-3.5 h-3.5" />
             Jogadores {playerDrawingEnabled ? "podem" : "não podem"} desenhar
-          </button>
+          </BarToggle>
         </>
       ) : (
         !playerDrawingEnabled && (
           <>
-            <Divider />
-            <span className="text-[10px] font-serif uppercase tracking-wider text-amber-400 px-1.5">O Mestre desativou o desenho para jogadores</span>
+            <BarDivider />
+            <span className="text-12 text-text px-1.5">O Mestre desativou o desenho para jogadores</span>
           </>
         )
       )}
-      <span
-        className={`text-[10px] font-mono px-1.5 tabular-nums ${drawingCount > DRAWING_WARN_PER_SCENE ? "text-amber-400" : "text-zinc-500"}`}
-        title="Traços neste mapa"
-      >
+      <BarCount warn={drawingCount > DRAWING_WARN_PER_SCENE} title="Traços neste mapa">
         {drawingCount} {drawingCount === 1 ? "traço" : "traços"}
-      </span>
+      </BarCount>
     </div>
   );
 };
-
-function Divider() {
-  return <div className="w-[1px] h-5 bg-[#2d2417] mx-0.5" />;
-}
-
-function Segmented<T extends string>({
-  items,
-  value,
-  onChange,
-  idPrefix,
-}: {
-  items: Array<{ value: T; label: string; Icon: React.ComponentType<{ className?: string }> }>;
-  value: T;
-  onChange: (v: T) => void;
-  idPrefix: string;
-}) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {items.map(({ value: v, label, Icon }) => (
-        <button
-          key={v}
-          id={`${idPrefix}-${v}`}
-          type="button"
-          aria-pressed={value === v}
-          title={label}
-          onClick={() => onChange(v)}
-          className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-serif font-bold uppercase tracking-wider cursor-pointer transition-colors ${
-            value === v ? "bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/50" : "text-zinc-400 border border-transparent hover:bg-[#252525] hover:text-[#d4af37]"
-          }`}
-        >
-          <Icon className="w-3.5 h-3.5" />
-          <span className="hidden lg:inline">{label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function TextButton({ id, title, onClick, children }: { id: string; title: string; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      id={id}
-      type="button"
-      title={title}
-      onClick={onClick}
-      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-serif font-bold uppercase tracking-wider text-zinc-400 hover:bg-[#252525] hover:text-[#d4af37] cursor-pointer transition-colors"
-    >
-      {children}
-    </button>
-  );
-}

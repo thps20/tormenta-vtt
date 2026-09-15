@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronUp, Expand, Maximize, Minimize, RotateCcw, Shrink } from "lucide-react";
 import { DEFAULT_IMMERSIVE_BG_COLOR } from "../lib/immersiveMode";
+import { FLOAT_MENU, MOTION, pressedClass } from "./MapBar";
 
 const MENU_WIDTH = 250;
 
@@ -72,12 +73,10 @@ export const ImmersiveModeMenu: React.FC<ImmersiveModeMenuProps> = ({
         onClick={onToggle}
         title={`Modo imersivo (Shift+F): ${active ? "sair" : "entrar"}`}
         aria-pressed={active}
-        className={`p-1.5 rounded-l transition-colors cursor-pointer flex items-center gap-1 text-xs border border-r-0 ${
-          active ? "bg-[#2d2417] text-[#d4af37] border-[#d4af37]/50" : "hover:bg-[#252525] text-zinc-400 border-transparent"
-        }`}
+        className={`focus-ring flex items-center gap-1.5 h-7 pl-2 pr-1.5 rounded-l-ui border border-r-0 text-12 font-medium cursor-pointer ${MOTION} ${pressedClass(active)}`}
       >
         {active ? <Shrink className="w-3.5 h-3.5" /> : <Expand className="w-3.5 h-3.5" />}
-        <span className="hidden sm:inline text-[10px] font-serif font-bold uppercase tracking-wider">Imersivo</span>
+        <span className="hidden sm:inline">Imersivo</span>
       </button>
       <button
         id="immersive-mode-menu-btn"
@@ -85,9 +84,8 @@ export const ImmersiveModeMenu: React.FC<ImmersiveModeMenuProps> = ({
         onClick={toggleMenu}
         title="Opções do modo imersivo"
         aria-expanded={open}
-        className={`p-1.5 rounded-r border border-l-0 transition-colors cursor-pointer ${
-          active ? "border-[#d4af37]/50 text-[#d4af37] hover:bg-[#252525]" : "border-transparent text-zinc-500 hover:bg-[#252525] hover:text-zinc-300"
-        }`}
+        aria-label="Opções do modo imersivo"
+        className={`focus-ring grid place-items-center h-7 w-5 rounded-r-ui border border-l-0 cursor-pointer ${MOTION} ${pressedClass(active)}`}
       >
         <ChevronUp className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -99,27 +97,27 @@ export const ImmersiveModeMenu: React.FC<ImmersiveModeMenuProps> = ({
             ref={menuRef}
             role="menu"
             style={{ position: "fixed", left: menuPos.left, bottom: menuPos.bottom, width: MENU_WIDTH }}
-            className="z-50 rounded border border-[#3d3d3d] bg-[#121212] shadow-xl p-2.5 space-y-2.5 text-zinc-300"
+            className={`z-50 p-3 space-y-3 ${FLOAT_MENU}`}
           >
             <label className="flex items-center justify-between cursor-pointer gap-2">
-              <span className="text-xs font-serif font-medium flex items-center gap-1.5">
+              <span className="text-13 font-medium flex items-center gap-1.5">
                 {isFullscreen ? <Minimize className="w-3.5 h-3.5 shrink-0" /> : <Maximize className="w-3.5 h-3.5 shrink-0" />}
                 Tela cheia do navegador
               </span>
-              <input type="checkbox" checked={isFullscreen} onChange={onToggleFullscreen} className="w-4 h-4 accent-[#d4af37] cursor-pointer shrink-0" />
+              <input type="checkbox" checked={isFullscreen} onChange={onToggleFullscreen} className="focus-ring w-4 h-4 accent-text cursor-pointer shrink-0" />
             </label>
-            <p className="text-[10px] text-zinc-500 leading-snug -mt-1.5">Combina com o modo imersivo. F11 ou o Esc do navegador também saem.</p>
+            <p className="text-12 text-text-muted leading-snug -mt-2">Combina com o modo imersivo. F11 ou o Esc do navegador também saem.</p>
 
-            <div className="pt-1.5 border-t border-[#2d2417] flex items-center justify-between">
-              <span className="text-xs font-serif font-medium">Fundo fora do mapa</span>
+            <div className="pt-2.5 border-t border-border flex items-center justify-between">
+              <span className="text-13 font-medium">Fundo fora do mapa</span>
               <div className="flex items-center gap-1.5">
                 <input
                   type="color"
                   value={current}
                   onChange={(e) => onBackgroundColorChange(e.target.value)}
-                  className="w-6 h-6 rounded border border-[#2d2417] cursor-pointer bg-transparent"
+                  className="focus-ring w-6 h-6 rounded-sm border border-border cursor-pointer bg-transparent"
                 />
-                <span className="font-mono text-[10px] text-zinc-500 uppercase">{current}</span>
+                <span className="font-data text-12 text-text-muted uppercase">{current}</span>
               </div>
             </div>
 
@@ -128,13 +126,13 @@ export const ImmersiveModeMenu: React.FC<ImmersiveModeMenuProps> = ({
               type="button"
               disabled={backgroundColor === null}
               onClick={() => onBackgroundColorChange(null)}
-              className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded border text-[11px] font-serif font-semibold transition-colors border-[#3d3d3d] text-zinc-300 disabled:opacity-40 disabled:cursor-default enabled:cursor-pointer enabled:hover:bg-[#1f1f1f]"
+              className="w-full flex items-center justify-center gap-1.5 h-8 px-2 rounded-ui border text-13 font-medium border-border text-text disabled:opacity-40 disabled:cursor-default enabled:cursor-pointer enabled:hover:bg-surface-2 focus-ring"
             >
               <RotateCcw className="w-3 h-3" />
               Usar o padrão (quase preto)
             </button>
 
-            <p className="text-[10px] text-zinc-500 leading-snug pt-1.5 border-t border-[#2d2417]">
+            <p className="text-12 text-text-muted leading-snug pt-2.5 border-t border-border">
               Shift+F entra e sai do modo a qualquer momento; Esc também sai.
             </p>
           </div>,

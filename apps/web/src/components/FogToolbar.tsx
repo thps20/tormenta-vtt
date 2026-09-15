@@ -1,5 +1,6 @@
 import React from "react";
 import { CloudFog, Eye, EyeOff, Hexagon, Paintbrush, Power, Square, SunMedium, Undo2 } from "lucide-react";
+import { BarCount, BarDivider, BarIconButton, BarSegmented, BarTextButton, BarToggle, FLOAT_SURFACE } from "./MapBar";
 import { FOG_SHAPES_WARN, type FogConfig, type FogOp, type GridConfig } from "@tormenta-vtt/shared";
 import { FOG_BRUSH_MAX, FOG_BRUSH_MIN, type FogToolMode, type FogToolShape } from "../store/tools";
 
@@ -32,7 +33,8 @@ const cellsFormat = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 })
 /**
  * Painel secundário do modo Névoa (só GM), à direita da barra de ferramentas:
  * revelar/ocultar, forma, tamanho do pincel, desfazer, revelar/ocultar tudo e o
- * toggle "Fog ativo" da cena. Só chama ações; o estado vem das stores.
+ * toggle "Fog ativo" da cena. Só chama ações; o estado vem das stores. Visual nas peças
+ * compartilhadas de `MapBar.tsx`.
  */
 export const FogToolbar: React.FC<FogToolbarProps> = ({ fog, grid, fogMode, fogShape, brushSize, onFogMode, onFogShape, onBrushSize, onOp }) => {
   const shapeCount = fog.shapes.length;
@@ -44,13 +46,13 @@ export const FogToolbar: React.FC<FogToolbarProps> = ({ fog, grid, fogMode, fogS
       id="fog-toolbar"
       role="toolbar"
       aria-label="Ferramentas de névoa"
-      className="absolute top-4 left-[4.25rem] z-10 flex items-center gap-1.5 p-1.5 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl text-zinc-300"
+      className={`absolute top-4 left-[4.25rem] z-10 flex flex-wrap items-center gap-1 p-1 max-w-[calc(100%-5.25rem)] ${FLOAT_SURFACE}`}
     >
-      <Segmented items={MODES} value={fogMode} onChange={onFogMode} idPrefix="fog-mode" />
-      <Divider />
-      <Segmented items={SHAPES} value={fogShape} onChange={onFogShape} idPrefix="fog-shape" />
+      <BarSegmented items={MODES} value={fogMode} onChange={onFogMode} idPrefix="fog-mode" />
+      <BarDivider />
+      <BarSegmented items={SHAPES} value={fogShape} onChange={onFogShape} idPrefix="fog-shape" />
       {fogShape === "brush" && (
-        <label className="flex items-center gap-1.5 px-1.5 text-[10px] font-mono text-zinc-400" title="Tamanho do pincel">
+        <label className="flex items-center gap-1.5 px-1.5 font-data text-12 text-text-muted" title="Tamanho do pincel">
           <input
             id="fog-brush-size"
             type="range"
@@ -59,109 +61,36 @@ export const FogToolbar: React.FC<FogToolbarProps> = ({ fog, grid, fogMode, fogS
             step={10}
             value={brushSize}
             onChange={(e) => onBrushSize(Number(e.target.value))}
-            className="w-20 accent-[#d4af37]"
+            className="focus-ring w-16 accent-text cursor-pointer"
           />
-          <span className="w-12 text-right tabular-nums">{brushLabel}</span>
+          <span className="min-w-10 text-right tabular-nums whitespace-nowrap">{brushLabel}</span>
         </label>
       )}
-      <Divider />
-      <IconButton id="fog-undo" title="Desfazer último (Ctrl+Z)" disabled={shapeCount === 0} onClick={() => onOp({ type: "removeLast" })}>
+      <BarDivider />
+      <BarIconButton id="fog-undo" title="Desfazer último (Ctrl+Z)" disabled={shapeCount === 0} onClick={() => onOp({ type: "removeLast" })}>
         <Undo2 className="w-4 h-4" />
-      </IconButton>
-      <TextButton id="fog-reveal-all" title="Limpa todas as formas e deixa o mapa inteiro visível" onClick={() => onOp({ type: "revealAll" })}>
+      </BarIconButton>
+      <BarTextButton id="fog-reveal-all" title="Limpa todas as formas e deixa o mapa inteiro visível" onClick={() => onOp({ type: "revealAll" })}>
         <SunMedium className="w-3.5 h-3.5" />
         Revelar tudo
-      </TextButton>
-      <TextButton id="fog-hide-all" title="Limpa todas as formas e cobre o mapa inteiro" onClick={() => onOp({ type: "hideAll" })}>
+      </BarTextButton>
+      <BarTextButton id="fog-hide-all" title="Limpa todas as formas e cobre o mapa inteiro" onClick={() => onOp({ type: "hideAll" })}>
         <CloudFog className="w-3.5 h-3.5" />
         Ocultar tudo
-      </TextButton>
-      <Divider />
-      <button
+      </BarTextButton>
+      <BarDivider />
+      <BarToggle
         id="fog-enabled"
-        type="button"
-        aria-pressed={fog.enabled}
+        pressed={fog.enabled}
         title={fog.enabled ? "Névoa ativa neste mapa (clique para desligar)" : "Névoa desligada neste mapa (clique para ligar)"}
         onClick={() => onOp({ type: "setEnabled", enabled: !fog.enabled })}
-        className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-serif font-bold uppercase tracking-wider cursor-pointer transition-colors ${
-          fog.enabled ? "bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/50" : "text-zinc-400 border border-transparent hover:bg-[#252525]"
-        }`}
       >
         <Power className="w-3.5 h-3.5" />
         Fog {fog.enabled ? "ativo" : "inativo"}
-      </button>
-      <span
-        className={`text-[10px] font-mono px-1.5 tabular-nums ${shapeCount > FOG_SHAPES_WARN ? "text-amber-400" : "text-zinc-500"}`}
-        title="Formas de névoa neste mapa"
-      >
+      </BarToggle>
+      <BarCount warn={shapeCount > FOG_SHAPES_WARN} title="Formas de névoa neste mapa">
         {shapeCount} {shapeCount === 1 ? "forma" : "formas"}
-      </span>
+      </BarCount>
     </div>
   );
 };
-
-function Divider() {
-  return <div className="w-[1px] h-5 bg-[#2d2417] mx-0.5" />;
-}
-
-function Segmented<T extends string>({
-  items,
-  value,
-  onChange,
-  idPrefix,
-}: {
-  items: Array<{ value: T; label: string; Icon: React.ComponentType<{ className?: string }> }>;
-  value: T;
-  onChange: (v: T) => void;
-  idPrefix: string;
-}) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {items.map(({ value: v, label, Icon }) => (
-        <button
-          key={v}
-          id={`${idPrefix}-${v}`}
-          type="button"
-          aria-pressed={value === v}
-          title={label}
-          onClick={() => onChange(v)}
-          className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-serif font-bold uppercase tracking-wider cursor-pointer transition-colors ${
-            value === v ? "bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/50" : "text-zinc-400 border border-transparent hover:bg-[#252525] hover:text-[#d4af37]"
-          }`}
-        >
-          <Icon className="w-3.5 h-3.5" />
-          <span className="hidden lg:inline">{label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function IconButton({ id, title, disabled, onClick, children }: { id: string; title: string; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      id={id}
-      type="button"
-      title={title}
-      disabled={disabled}
-      onClick={onClick}
-      className="p-1.5 rounded transition-colors hover:bg-[#252525] hover:text-[#d4af37] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-inherit disabled:cursor-not-allowed cursor-pointer"
-    >
-      {children}
-    </button>
-  );
-}
-
-function TextButton({ id, title, onClick, children }: { id: string; title: string; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      id={id}
-      type="button"
-      title={title}
-      onClick={onClick}
-      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-serif font-bold uppercase tracking-wider text-zinc-400 hover:bg-[#252525] hover:text-[#d4af37] cursor-pointer transition-colors"
-    >
-      {children}
-    </button>
-  );
-}

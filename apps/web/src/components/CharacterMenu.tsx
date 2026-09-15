@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { BookOpen, ChevronDown, Plus, User } from "lucide-react";
 import type { Character, Participant } from "@tormenta-vtt/shared";
+import { FLOAT_MENU, MOTION, TOP_BAR_BUTTON } from "./MapBar";
 
 interface CharacterMenuProps {
   me: Participant;
@@ -14,8 +15,7 @@ interface CharacterMenuProps {
   onNewCharacter: () => void;
 }
 
-const btnClass =
-  "flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#252525] hover:bg-[#2d2417] border border-[#3d3d3d] hover:border-[#d4af37] text-zinc-200 hover:text-[#d4af37] text-xs font-serif font-bold transition-colors cursor-pointer shadow-sm";
+const btnClass = TOP_BAR_BUTTON;
 
 /**
  * Botão de ficha na barra superior.
@@ -48,17 +48,17 @@ export const CharacterMenu: React.FC<CharacterMenuProps> = ({ me, participants, 
 
   return (
     <div ref={ref} className="relative">
-      <button id="btn-characters-menu" onClick={() => setOpen((v) => !v)} title="Fichas da sala" className={btnClass}>
-        <BookOpen className="w-3.5 h-3.5 text-[#d4af37]" />
+      <button id="btn-characters-menu" onClick={() => setOpen((v) => !v)} title="Fichas da sala" aria-expanded={open} className={btnClass}>
+        <BookOpen className="w-3.5 h-3.5 text-text-muted" />
         <span className="hidden md:inline">Fichas</span>
-        <span className="text-[10px] font-mono px-1 rounded bg-[#141414] text-zinc-400">{characters.length}</span>
-        <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
+        <span className="font-data text-12 tabular-nums text-text-muted">{characters.length}</span>
+        <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform duration-150 ease-out ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
-        <div id="characters-menu" className="absolute right-0 top-full mt-1 w-72 max-h-96 overflow-y-auto rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl z-40 text-zinc-200">
+        <div id="characters-menu" className={`absolute right-0 top-full mt-1 w-72 max-h-96 overflow-y-auto z-40 ${FLOAT_MENU}`}>
           {characters.length === 0 ? (
-            <div className="p-4 text-center text-xs text-zinc-500 font-serif">Nenhuma ficha na sala.</div>
+            <div className="p-4 text-center text-13 text-text-muted">Nenhuma ficha na sala.</div>
           ) : (
             <ul className="py-1">
               {characters.map((c) => {
@@ -71,16 +71,16 @@ export const CharacterMenu: React.FC<CharacterMenuProps> = ({ me, participants, 
                         setOpen(false);
                         onOpenCharacter(c.id);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#252525] text-left cursor-pointer"
+                      className={`focus-ring w-full flex items-center gap-2.5 px-3 py-2 hover:bg-surface-2 text-left cursor-pointer ${MOTION}`}
                     >
                       <Avatar character={c} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-zinc-100 truncate">{c.name}</div>
-                        <div className="text-[10px] text-zinc-500 truncate">
+                        <div className="text-13 font-medium text-text truncate">{c.name}</div>
+                        <div className="text-12 text-text-muted truncate">
                           Nível {c.level} • {c.kind === "npc" ? "NPC" : (owner ?? "sem dono")}
                         </div>
                       </div>
-                      {c.kind === "npc" && <span className="text-[9px] px-1 rounded bg-zinc-800 text-zinc-400 uppercase">NPC</span>}
+                      {c.kind === "npc" && <span className="text-12 px-1.5 rounded-sm border border-border text-text-muted">NPC</span>}
                     </button>
                   </li>
                 );
@@ -93,7 +93,7 @@ export const CharacterMenu: React.FC<CharacterMenuProps> = ({ me, participants, 
               setOpen(false);
               onNewCharacter();
             }}
-            className="w-full flex items-center justify-center gap-1 px-3 py-2 border-t border-[#2d2417] text-xs text-[#d4af37] hover:bg-[#2d2417] font-serif font-bold cursor-pointer"
+            className={`focus-ring w-full flex items-center justify-center gap-1.5 h-9 px-3 border-t border-border text-13 font-medium text-text hover:bg-surface-2 cursor-pointer ${MOTION}`}
           >
             <Plus className="w-3.5 h-3.5" /> Nova ficha
           </button>
@@ -104,7 +104,7 @@ export const CharacterMenu: React.FC<CharacterMenuProps> = ({ me, participants, 
 };
 
 const Avatar: React.FC<{ character: Character | null }> = ({ character }) => (
-  <div className="w-5 h-5 rounded-full overflow-hidden border border-[#d4af37]/60 bg-zinc-800 flex items-center justify-center shrink-0 text-[9px] font-serif font-bold text-[#d4af37]">
+  <div className="w-6 h-6 rounded-full overflow-hidden border border-border bg-surface-2 flex items-center justify-center shrink-0 text-12 font-semibold text-text-muted">
     {character?.imageUrl ? <img src={character.imageUrl} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" /> : character ? character.name.charAt(0).toUpperCase() : <User className="w-3 h-3" />}
   </div>
 );

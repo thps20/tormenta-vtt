@@ -84,6 +84,7 @@ import { TemplateLayer } from "./TemplateLayer";
 import { PinLayer, PIN_RADIUS } from "./PinLayer";
 import { DrawingLayer } from "./DrawingLayer";
 import { MovementLayer } from "./MovementLayer";
+import { BarDivider, BarIconButton, BarToggle, FLOAT_SURFACE, MOTION } from "./MapBar";
 
 /** Tamanho padrão quando a cena ainda não tem mapa (shared: o servidor usa o mesmo, ver compendium:spawn-creature). */
 export const DEFAULT_MAP = DEFAULT_MAP_SIZE;
@@ -2173,9 +2174,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       id="vtt-canvas-container"
       {...(onSpawnCreature || onHandoutDrop || onSpawnEncounter ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
       // Modo imersivo (docs/SPEC.md §9.22): fundo fora do mapa vira a cor da preferência (padrão
-      // quase preto); fora dele é sempre o mesmo bg-stone-950 de sempre.
+      // quase preto); fora dele é o fundo da aplicação (token --bg).
       style={immersiveMode ? { backgroundColor: immersiveBgColor ?? DEFAULT_IMMERSIVE_BG_COLOR } : undefined}
-      className={`relative flex-1 h-full w-full ${immersiveMode ? "" : "bg-stone-950"} overflow-hidden select-none ${mode === "pan" ? "cursor-grab" : mode === "select" ? "cursor-default" : "cursor-crosshair"}`}
+      className={`relative flex-1 h-full w-full ${immersiveMode ? "" : "bg-bg"} overflow-hidden select-none ${mode === "pan" ? "cursor-grab" : mode === "select" ? "cursor-default" : "cursor-crosshair"}`}
     >
       <Stage
         ref={stageRef}
@@ -2354,7 +2355,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         ref={hudBarRef}
         id="vtt-hud-bottom"
         style={{ opacity: immersiveBarsHidden ? 0 : hudTranslucent ? 0.55 : 1, pointerEvents: immersiveBarsHidden ? "none" : undefined }}
-        className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 p-1.5 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl text-zinc-300 transition-opacity duration-300"
+        className={`absolute bottom-4 left-4 z-10 flex items-center gap-1 p-1 transition-opacity duration-150 ease-out ${FLOAT_SURFACE}`}
       >
         <HudButton title="Aproximar (+)" onClick={() => handleZoom("in")}>
           <ZoomIn className="w-4 h-4" />
@@ -2365,10 +2366,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         <HudButton title="Ajustar mapa à tela" onClick={() => handleZoom("reset")}>
           <Maximize2 className="w-4 h-4" />
         </HudButton>
-        <div className="w-[1px] h-4 bg-[#2d2417] mx-0.5" />
+        <BarDivider />
         <HudToggle active={snapEnabled} title={`Grudar no grid: ${snapEnabled ? "ativado" : "desativado"}`} onClick={() => setSnapEnabled(!snapEnabled)}>
           <Magnet className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline text-[10px] font-serif font-bold uppercase tracking-wider">Snap</span>
+          <span className="hidden sm:inline">Snap</span>
         </HudToggle>
         <GridAppearanceMenu prefs={gridAppearancePrefs} effective={gridAppearance} onChange={setGridAppearancePrefs} />
         <HudToggle
@@ -2386,15 +2387,19 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           backgroundColor={immersiveBgColor}
           onBackgroundColorChange={onImmersiveBgColorChange}
         />
-        <span className="text-[10px] font-mono text-zinc-400 px-1.5 border-l border-[#2d2417]">{Math.round(stageScale * 100)}%</span>
+        <BarDivider />
+        <span className="font-data text-12 tabular-nums text-text-muted w-10 text-center" title="Zoom">
+          {Math.round(stageScale * 100)}%
+        </span>
         {me.role === "gm" && (
           <>
-            <div className="w-[1px] h-4 bg-[#2d2417] mx-0.5" />
+            <BarDivider />
             <button
               id="btn-new-token"
+              type="button"
               onClick={handleCreateToken}
               title="Novo token no centro da tela"
-              className="flex items-center gap-1 px-2 py-1 rounded bg-[#2d2417] border border-[#d4af37]/60 text-[#d4af37] hover:bg-[#3d311f] text-[10px] font-serif font-bold uppercase tracking-wider cursor-pointer"
+              className={`focus-ring flex items-center gap-1.5 h-7 px-2 rounded-ui border border-border bg-surface-2 hover:border-text-muted text-12 font-medium text-text cursor-pointer ${MOTION}`}
             >
               <Plus className="w-3.5 h-3.5" />
               Token
@@ -2412,7 +2417,8 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           onClick={onToggleImmersiveMode}
           title="Sair do modo imersivo (Esc)"
           style={{ opacity: immersiveBarsHidden ? 0.15 : undefined }}
-          className="absolute bottom-4 right-4 z-20 p-2 rounded-full bg-[#1a1a1a]/70 border border-[#2d2417] text-zinc-500 opacity-40 hover:opacity-100 hover:text-[#d4af37] hover:bg-[#1a1a1a] hover:border-[#d4af37]/50 transition-colors cursor-pointer shadow-lg"
+          aria-label="Sair do modo imersivo (Esc)"
+          className={`focus-ring absolute bottom-4 right-4 z-20 p-2 rounded-full bg-surface-1/70 border border-border text-text-muted opacity-40 hover:opacity-100 focus-visible:opacity-100 hover:text-text hover:bg-surface-1 shadow-float cursor-pointer ${MOTION}`}
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -2486,9 +2492,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       {!selectedToken && (
       <div
         style={{ opacity: immersiveBarsHidden ? 0 : 1 }}
-        className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-[#1a1a1a]/95 border border-[#2d2417] text-[11px] text-zinc-400 shadow-xl pointer-events-none transition-opacity duration-300"
+        className={`absolute top-4 right-4 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 pointer-events-none transition-opacity duration-150 ease-out ${FLOAT_SURFACE} bg-surface-1/90 text-12`}
       >
-        <Info className="w-3.5 h-3.5 text-[#d4af37]" />
+        <Info className="w-3.5 h-3.5 shrink-0" />
         {/* "Delete apaga" só pro GM: jogador não apaga token por este atalho (ver useDeleteSelectionShortcut). */}
         <span>
           {arrivalPickMode
@@ -3044,22 +3050,16 @@ const RulerShape: React.FC<RulerShapeProps> = ({ ruler, grid, systemDef, stageSc
 
 function HudButton({ title, onClick, children }: { title: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} title={title} className="p-1.5 rounded hover:bg-[#252525] hover:text-[#d4af37] transition-colors cursor-pointer">
+    <BarIconButton title={title} onClick={onClick}>
       {children}
-    </button>
+    </BarIconButton>
   );
 }
 
 function HudToggle({ active, title, onClick, children }: { active: boolean; title: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      onClick={onClick}
-      title={title}
-      className={`p-1.5 rounded transition-colors cursor-pointer flex items-center gap-1 text-xs ${
-        active ? "bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/50" : "hover:bg-[#252525] text-zinc-400"
-      }`}
-    >
+    <BarToggle pressed={active} title={title} onClick={onClick}>
       {children}
-    </button>
+    </BarToggle>
   );
 }

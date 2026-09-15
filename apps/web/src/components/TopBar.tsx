@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Crown, Copy, Check, Users, MapPin, LogOut, NotebookText, Settings, Zap } from "lucide-react";
 import type { Participant, RoomPublic, Scene } from "@tormenta-vtt/shared";
 import { roomPath } from "../lib/router";
+import { MOTION, TOP_BAR_BUTTON } from "./MapBar";
 
 interface TopBarProps {
   room: RoomPublic;
@@ -56,73 +57,60 @@ export const TopBar: React.FC<TopBarProps> = ({
   return (
     <header
       id="vtt-topbar"
-      className="h-14 bg-[#1a1a1a] border-b border-[#2d2417] px-5 flex items-center justify-between select-none shadow-lg z-20 shrink-0"
+      className="font-ui h-14 bg-surface-1 border-b border-border px-5 flex items-center justify-between gap-4 select-none z-20 shrink-0"
     >
-      <div className="flex items-center gap-4 min-w-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded border border-[#d4af37] flex items-center justify-center bg-[#252525] shadow-inner shrink-0">
-            <span className="text-[#d4af37] text-xs font-serif font-bold tracking-tighter">VTT</span>
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2.5">
-              <h1 className="font-serif text-base md:text-lg font-bold tracking-wide text-[#d4af37] truncate">{room.name}</h1>
-              <span className="px-2 py-0.5 rounded bg-[#252525] border border-[#3d3d3d] text-[10px] uppercase tracking-widest text-zinc-400 font-mono shrink-0">
-                {room.systemId.toUpperCase()}
-              </span>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-zinc-400 mt-0.5">
-              {mapSelector ?? (
-                <span className="flex items-center gap-1 text-zinc-300">
-                  <MapPin className="w-3.5 h-3.5 text-[#d4af37]" />
-                  Mapa: {scene?.name ?? "Sem mapa"}
-                </span>
-              )}
-              {handoutSelector}
-              <span className="text-zinc-600">•</span>
-              <button
-                onClick={handleCopyInvite}
-                title="Copiar link de convite para jogadores"
-                className="group flex items-center gap-1 hover:text-zinc-200 transition-colors cursor-pointer"
-              >
-                <span className="text-zinc-400">CONVITE:</span>
-                <code className="font-mono text-zinc-300 group-hover:text-[#d4af37] bg-[#252525] px-2 py-0.5 rounded text-[10px] border border-[#3d3d3d] uppercase tracking-wider">
-                  {room.inviteCode}
-                </code>
-                {copied ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-400 ml-0.5" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 ml-0.5" />
-                )}
-              </button>
-            </div>
-          </div>
+      <div className="flex flex-col justify-center min-w-0">
+        <div className="flex items-baseline gap-2.5 min-w-0">
+          <h1 className="font-title text-16 font-semibold uppercase tracking-[0.08em] text-text truncate">{room.name}</h1>
+          <span className="text-12 text-text-muted shrink-0">{room.systemId.toUpperCase()}</span>
+        </div>
+        <div className="flex items-center gap-1 -ml-2 text-13 text-text-muted">
+          {mapSelector ?? (
+            <span className="flex items-center gap-1.5 h-7 px-2 text-text">
+              <MapPin className="w-3.5 h-3.5 text-text-muted" />
+              <span className="text-text-muted">Mapa</span>
+              <span className="font-title text-13 font-semibold uppercase tracking-[0.06em]">{scene?.name ?? "Sem mapa"}</span>
+            </span>
+          )}
+          {handoutSelector}
+          <span className="w-px h-4 bg-border mx-1" aria-hidden />
+          <button
+            onClick={handleCopyInvite}
+            title="Copiar link de convite para jogadores"
+            className={`focus-ring group flex items-center gap-1.5 h-7 px-2 rounded-ui hover:bg-surface-2 cursor-pointer ${MOTION}`}
+          >
+            <span className="text-text-muted">Convite</span>
+            <code className="font-data text-13 text-text tracking-wider">{room.inviteCode}</code>
+            {copied ? (
+              <Check className="w-3.5 h-3.5 text-success" aria-label="Copiado" />
+            ) : (
+              <Copy className="w-3.5 h-3.5 text-text-muted group-hover:text-text" />
+            )}
+          </button>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0">
         {gm && (
-          <div
-            id="gm-indicator-badge"
-            className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded bg-[#252525] border border-[#d4af37]/60 text-xs shadow-sm"
-          >
-            <Crown className="w-3.5 h-3.5 text-[#d4af37] shrink-0" />
-            <span className="text-[#d4af37] text-[10px] uppercase tracking-widest font-serif font-bold">GM:</span>
-            <span className="font-medium text-zinc-200">{gm.nickname}</span>
+          <div id="gm-indicator-badge" className="hidden md:flex items-center gap-1.5 text-13" title="Mestre da mesa">
+            <Crown className="w-3.5 h-3.5 text-text-muted shrink-0" />
+            <span className="text-text-muted">GM</span>
+            <span className="font-medium text-text">{gm.nickname}</span>
           </div>
         )}
 
-        <div className="h-6 w-[1px] bg-[#2d2417] mx-1 hidden sm:block"></div>
+        <div className="h-6 w-px bg-border hidden sm:block" aria-hidden />
 
         {/* Lista de participantes (avatares) */}
-        <div className="flex items-center gap-2 pl-1">
-          <div className="items-center gap-1.5 text-xs text-zinc-400 mr-1 hidden sm:flex font-mono">
-            <Users className="w-3.5 h-3.5 text-zinc-500" />
-            <span className="text-[11px]">
+        <div className="flex items-center gap-2">
+          <div className="items-center gap-1 text-text-muted hidden sm:flex" title="Online / participantes">
+            <Users className="w-3.5 h-3.5" />
+            <span className="font-data text-12 tabular-nums">
               {onlineCount}/{participants.length}
             </span>
           </div>
 
-          <div className="flex items-center -space-x-2">
+          <div className="flex items-center gap-1">
             {participants.map((player) => {
               const isGm = player.role === "gm";
               const isCurrent = player.id === me.id;
@@ -131,31 +119,23 @@ export const TopBar: React.FC<TopBarProps> = ({
                   key={player.id}
                   id={`participant-avatar-${player.id}`}
                   title={`${player.nickname} (${isGm ? "GM" : "Jogador"})${player.connected ? " - Online" : " - Offline"}`}
-                  className={`relative group transition-transform hover:scale-110 hover:z-30 ${
-                    player.connected ? "opacity-100" : "opacity-40 grayscale"
-                  }`}
+                  className={`relative group ${player.connected ? "" : "opacity-45"}`}
                 >
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shadow-lg ${
-                      isGm
-                        ? "border-2 border-[#d4af37] bg-zinc-800 text-[#d4af37] font-serif z-20"
-                        : isCurrent
-                          ? "border-2 border-blue-500 bg-zinc-700 text-blue-200"
-                          : "border border-[#3d3d3d] bg-zinc-700 text-zinc-300"
+                    className={`w-8 h-8 rounded-full flex items-center justify-center bg-surface-2 text-12 font-semibold ${
+                      isCurrent ? "border-2 border-text text-text" : "border border-border text-text-muted"
                     }`}
                   >
                     {isGm ? "GM" : player.nickname.charAt(0).toUpperCase()}
                   </div>
                   <span
-                    className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-[#1a1a1a] ${
-                      player.connected ? "bg-green-500" : "bg-zinc-600"
-                    }`}
+                    className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-surface-1 ${player.connected ? "bg-success" : "bg-border"}`}
                   />
                   <div className="absolute right-0 top-10 pointer-events-none hidden group-hover:flex flex-col items-center z-40">
-                    <div className="bg-[#0c0c0c] border border-[#2d2417] text-[11px] text-zinc-200 px-2 py-1 rounded shadow-xl whitespace-nowrap">
+                    <div className="bg-surface-2 border border-border text-12 text-text px-2 py-1 rounded-ui shadow-float whitespace-nowrap">
                       <span className="font-semibold">{player.nickname}</span>
-                      {isGm && <span className="ml-1 text-[#d4af37] text-[10px] font-serif font-bold">[GM]</span>}
-                      {isCurrent && <span className="ml-1 text-blue-400 text-[10px]">(Você)</span>}
+                      {isGm && <span className="ml-1 text-text-muted">[GM]</span>}
+                      {isCurrent && <span className="ml-1 text-text-muted">(Você)</span>}
                     </div>
                   </div>
                 </div>
@@ -164,16 +144,16 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 ml-2">
+        <div className="flex items-center gap-2 ml-1">
           {characterMenu}
           {onOpenMacros && (
             <button
               id="btn-topbar-macros"
               onClick={onOpenMacros}
               title="Nova macro (barra na parte de baixo da tela, teclas 1-9 disparam as suas)"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#252525] hover:bg-[#2d2417] border border-[#3d3d3d] hover:border-[#d4af37] text-zinc-200 hover:text-[#d4af37] text-xs font-serif font-bold transition-colors cursor-pointer shadow-sm"
+              className={TOP_BAR_BUTTON}
             >
-              <Zap className="w-3.5 h-3.5 text-[#d4af37]" />
+              <Zap className="w-3.5 h-3.5 text-text-muted" />
               <span className="hidden md:inline">Macros</span>
             </button>
           )}
@@ -181,15 +161,13 @@ export const TopBar: React.FC<TopBarProps> = ({
             <button
               id="btn-topbar-map-notes"
               onClick={onOpenMapNotes}
-              title="Notas do Mestre sobre este mapa (só você vê)"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-serif font-bold transition-colors cursor-pointer shadow-sm ${
-                scene.hasNotes
-                  ? "bg-[#2d2417] border-[#d4af37]/60 text-[#d4af37]"
-                  : "bg-[#252525] hover:bg-[#2d2417] border-[#3d3d3d] hover:border-[#d4af37] text-zinc-200 hover:text-[#d4af37]"
-              }`}
+              title={scene.hasNotes ? "Notas do Mestre sobre este mapa (há notas; só você vê)" : "Notas do Mestre sobre este mapa (só você vê)"}
+              className={`${TOP_BAR_BUTTON} relative`}
             >
-              <NotebookText className="w-3.5 h-3.5" />
+              <NotebookText className="w-3.5 h-3.5 text-text-muted" />
               <span className="hidden md:inline">Notas</span>
+              {/* Mapa com notas: ponto discreto no canto (antes o botão inteiro ficava dourado). */}
+              {scene.hasNotes && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-text" aria-hidden />}
             </button>
           )}
 
@@ -198,9 +176,9 @@ export const TopBar: React.FC<TopBarProps> = ({
               id="btn-topbar-map-config"
               onClick={onOpenMapConfig}
               title="Configurar imagem do mapa e grid (apenas GM)"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#252525] hover:bg-[#2d2417] border border-[#3d3d3d] hover:border-[#d4af37] text-zinc-200 hover:text-[#d4af37] text-xs font-serif font-bold transition-colors cursor-pointer shadow-sm"
+              className={TOP_BAR_BUTTON}
             >
-              <Settings className="w-3.5 h-3.5 text-[#d4af37]" />
+              <Settings className="w-3.5 h-3.5 text-text-muted" />
               <span className="hidden md:inline">Configurar Mapa</span>
             </button>
           )}
@@ -209,7 +187,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             id="btn-topbar-leave-lobby"
             onClick={onLeaveToLobby}
             title="Voltar ao Lobby"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#1f1f1f] hover:bg-[#2a2a2a] border border-[#3d3d3d] hover:border-[#d4af37] text-zinc-300 hover:text-[#d4af37] text-xs font-serif font-semibold transition-colors cursor-pointer shadow-sm"
+            className={`focus-ring flex items-center gap-1.5 h-8 px-2.5 rounded-ui text-13 text-text-muted hover:text-text hover:bg-surface-2 cursor-pointer ${MOTION}`}
           >
             <LogOut className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Lobby</span>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Swords, Dices, Clock, Play } from 'lucide-react';
 import type { Combat } from '@tormenta-vtt/shared';
+import { FLOAT_SURFACE, MOTION } from './MapBar';
 
 interface CombatBannerProps {
   combat: Combat | null;
@@ -13,7 +14,8 @@ interface CombatBannerProps {
 
 /**
  * Faixa discreta sobre o mapa: um dos três estados abaixo, nunca mais de um ao mesmo tempo
- * (precisa rolar > é o meu turno > estou adiado), ver docs/plano-combate.md.
+ * (precisa rolar > é o meu turno > estou adiado), ver docs/plano-combate.md. Cada estado tem um
+ * só elemento dourado: a ação principal (Rolar, Entrar agora) ou o marcador do turno.
  */
 export const CombatBanner: React.FC<CombatBannerProps> = ({
   combat,
@@ -46,61 +48,60 @@ export const CombatBanner: React.FC<CombatBannerProps> = ({
     return null;
   }
 
+  // Ação principal do estado (dourado cheio, o único da faixa) e ação secundária (neutra).
+  const primaryBtn = `focus-ring flex items-center gap-1.5 h-8 px-3 rounded-ui bg-accent hover:bg-accent/90 text-bg text-13 font-semibold cursor-pointer ${MOTION}`;
+  const secondaryBtn = `focus-ring flex items-center gap-1.5 h-8 px-3 rounded-ui border border-border bg-surface-2 hover:border-text-muted text-13 font-medium text-text cursor-pointer ${MOTION}`;
+
   return (
     <div
       id="combat-top-banner"
-      className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-4 py-2 rounded-lg bg-[#14120e]/95 border border-[#d4af37] text-zinc-100 shadow-[0_8px_24px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all animate-in fade-in slide-in-from-top-2 duration-300"
+      role="status"
+      className={`absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-4 pl-4 pr-2 py-2 ${FLOAT_SURFACE}`}
     >
       {needsRoll ? (
         <>
-          <div className="flex items-center gap-2 text-amber-300 text-xs font-serif font-bold">
-            <Swords className="w-4 h-4 text-[#d4af37] animate-pulse" />
+          <div className="flex items-center gap-2 text-14 text-text">
+            <Swords className="w-4 h-4 text-text-muted" />
             <span>Combate iniciado — role sua iniciativa</span>
           </div>
 
-          <button
-            id="btn-banner-roll-initiative"
-            onClick={() => onRollSelf && onRollSelf(myCombatant.id)}
-            className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#2d2417] hover:bg-[#3d311f] border border-[#d4af37] text-[#d4af37] text-xs font-serif font-bold transition-all shadow hover:shadow-[0_0_10px_rgba(212,175,55,0.4)] cursor-pointer"
-          >
+          <button id="btn-banner-roll-initiative" onClick={() => onRollSelf && onRollSelf(myCombatant.id)} className={primaryBtn}>
             <Dices className="w-3.5 h-3.5" />
             <span>Rolar Iniciativa</span>
           </button>
         </>
       ) : isMyTurn ? (
         <>
-          <div className="flex items-center gap-2 text-amber-200 text-xs font-serif font-bold">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping inline-block" />
-            <span>É o seu turno!</span>
-            <span className="text-zinc-400 text-[11px] font-sans font-normal hidden sm:inline">
-              ({myCombatant.name})
-            </span>
+          <div className="flex items-center gap-2 text-14">
+            <span className="w-2.5 h-2.5 rounded-full bg-accent inline-block" aria-hidden />
+            <span className="font-semibold text-text">É o seu turno!</span>
+            <span className="text-text-muted hidden sm:inline">({myCombatant.name})</span>
           </div>
 
           <button
             id="btn-banner-delay-turn"
             onClick={() => onDelay && onDelay(myCombatant.id)}
-            className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#2a1d1d] hover:bg-[#382323] border border-amber-500/60 text-amber-300 text-xs font-serif font-bold transition-all cursor-pointer shadow hover:border-amber-400"
+            className={secondaryBtn}
             title="Adiar sua ação para o final ou momento oportuno"
           >
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <Clock className="w-3.5 h-3.5 text-text-muted" />
             <span>Adiar</span>
           </button>
         </>
       ) : isDelayed ? (
         <>
-          <div className="flex items-center gap-2 text-zinc-300 text-xs font-serif">
-            <Clock className="w-4 h-4 text-amber-400" />
-            <span>Seu turno está <strong className="text-amber-400">ADIADO</strong>.</span>
+          <div className="flex items-center gap-2 text-14 text-text">
+            <Clock className="w-4 h-4 text-text-muted" />
+            <span>Seu turno está <strong className="font-semibold">ADIADO</strong>.</span>
           </div>
 
           <button
             id="btn-banner-resume-turn"
             onClick={() => onResume && onResume(myCombatant.id)}
-            className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#1e261d] hover:bg-[#283627] border border-emerald-500/70 text-emerald-300 text-xs font-serif font-bold transition-all cursor-pointer shadow"
+            className={primaryBtn}
             title="Intervir e agir agora na ordem de iniciativa"
           >
-            <Play className="w-3.5 h-3.5 text-emerald-400" />
+            <Play className="w-3.5 h-3.5" />
             <span>Entrar agora</span>
           </button>
         </>

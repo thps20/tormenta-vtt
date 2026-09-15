@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Grid as GridIcon, RotateCcw } from "lucide-react";
 import type { GridAppearanceOverride, GridAppearancePrefs, GridLineStyle, ResolvedGridAppearance } from "../lib/gridAppearance";
+import { FLOAT_MENU, MOTION, pressedClass } from "./MapBar";
 
 const MENU_WIDTH = 250;
 
@@ -14,7 +15,7 @@ const STYLE_OPTIONS: { id: GridLineStyle; label: string }[] = [
 /** `<input type="color">` só aceita "#rrggbb" — a cor efetiva pode vir do Mestre com alfa embutido
  *  (ex. "#00000055") ou em qualquer outro formato; nesse caso mostra um acento neutro no seletor. */
 function toColorInputValue(color: string): string {
-  return /^#[0-9a-f]{6}$/i.test(color) ? color : "#d4af37";
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : "#c79c54";
 }
 
 interface GridAppearanceMenuProps {
@@ -82,14 +83,13 @@ export const GridAppearanceMenu: React.FC<GridAppearanceMenuProps> = ({ prefs, e
         onClick={toggleMenu}
         title="Aparência do grid (só pra mim)"
         aria-expanded={open}
-        className={`relative p-1.5 rounded transition-colors cursor-pointer flex items-center gap-1 text-xs ${
-          prefs.visible ? "bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/50" : "hover:bg-[#252525] text-zinc-400"
-        }`}
+        aria-pressed={prefs.visible}
+        className={`focus-ring relative flex items-center gap-1.5 h-7 px-2 rounded-ui border text-12 font-medium cursor-pointer ${MOTION} ${pressedClass(prefs.visible)}`}
       >
         <GridIcon className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline text-[10px] font-serif font-bold uppercase tracking-wider">Grid</span>
+        <span className="hidden sm:inline">Grid</span>
         {/* Indicador discreto: o usuário sobrepôs o padrão do mapa (docs/SPEC.md §9.21). */}
-        {overridden && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-sky-400" />}
+        {overridden && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-text" title="Aparência personalizada" />}
       </button>
 
       {open &&
@@ -99,21 +99,21 @@ export const GridAppearanceMenu: React.FC<GridAppearanceMenuProps> = ({ prefs, e
             ref={menuRef}
             role="menu"
             style={{ position: "fixed", left: menuPos.left, bottom: menuPos.bottom, width: MENU_WIDTH }}
-            className="z-50 rounded border border-[#3d3d3d] bg-[#121212] shadow-xl p-2.5 space-y-2.5 text-zinc-300"
+            className={`z-50 p-3 space-y-3 ${FLOAT_MENU}`}
           >
             <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-xs font-serif font-medium">Exibir grid (só pra mim)</span>
+              <span className="text-13 font-medium">Exibir grid (só pra mim)</span>
               <input
                 type="checkbox"
                 checked={prefs.visible}
                 onChange={(e) => onChange({ ...prefs, visible: e.target.checked })}
-                className="w-4 h-4 accent-[#d4af37] cursor-pointer"
+                className="focus-ring w-4 h-4 accent-text cursor-pointer"
               />
             </label>
-            <p className="text-[10px] text-zinc-500 leading-snug -mt-1.5">Ocultar não desliga snap nem medidas — só não desenha.</p>
+            <p className="text-12 text-text-muted leading-snug -mt-2">Ocultar não desliga snap nem medidas — só não desenha.</p>
 
-            <div className="pt-1.5 border-t border-[#2d2417] space-y-1">
-              <span className="text-xs font-serif font-medium">Estilo</span>
+            <div className="pt-2.5 border-t border-border space-y-1">
+              <span className="text-13 font-medium">Estilo</span>
               <div className="flex flex-col gap-1">
                 {STYLE_OPTIONS.map((opt) => (
                   <button
@@ -122,9 +122,7 @@ export const GridAppearanceMenu: React.FC<GridAppearanceMenuProps> = ({ prefs, e
                     role="menuitemradio"
                     aria-checked={current.style === opt.id}
                     onClick={() => patchOverride({ style: opt.id })}
-                    className={`text-left px-2 py-1 rounded text-[11px] cursor-pointer transition-colors ${
-                      current.style === opt.id ? "bg-[#2d2417] text-[#d4af37]" : "hover:bg-[#1f1f1f]"
-                    }`}
+                    className={`focus-ring text-left h-7 px-2 rounded-ui border text-13 cursor-pointer ${MOTION} ${pressedClass(current.style === opt.id)}`}
                   >
                     {opt.label}
                   </button>
@@ -133,22 +131,22 @@ export const GridAppearanceMenu: React.FC<GridAppearanceMenuProps> = ({ prefs, e
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-xs font-serif font-medium">Cor</span>
+              <span className="text-13 font-medium">Cor</span>
               <div className="flex items-center gap-1.5">
                 <input
                   type="color"
                   value={toColorInputValue(current.color)}
                   onChange={(e) => patchOverride({ color: e.target.value })}
-                  className="w-6 h-6 rounded border border-[#2d2417] cursor-pointer bg-transparent"
+                  className="focus-ring w-6 h-6 rounded-sm border border-border cursor-pointer bg-transparent"
                 />
-                <span className="font-mono text-[10px] text-zinc-500 uppercase">{toColorInputValue(current.color)}</span>
+                <span className="font-data text-12 text-text-muted uppercase">{toColorInputValue(current.color)}</span>
               </div>
             </div>
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-serif font-medium">Opacidade</span>
-                <span className="font-mono text-[11px] font-bold text-[#d4af37]">{Math.round(current.opacity * 100)}%</span>
+                <span className="text-13 font-medium">Opacidade</span>
+                <span className="font-data text-12 tabular-nums text-text">{Math.round(current.opacity * 100)}%</span>
               </div>
               <input
                 type="range"
@@ -156,14 +154,14 @@ export const GridAppearanceMenu: React.FC<GridAppearanceMenuProps> = ({ prefs, e
                 max={100}
                 value={Math.round(current.opacity * 100)}
                 onChange={(e) => patchOverride({ opacity: Number(e.target.value) / 100 })}
-                className="w-full accent-[#d4af37] cursor-pointer"
+                className="focus-ring w-full accent-text cursor-pointer"
               />
             </div>
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-serif font-medium">Espessura</span>
-                <span className="font-mono text-[11px] font-bold text-[#d4af37]">{current.thickness}px</span>
+                <span className="text-13 font-medium">Espessura</span>
+                <span className="font-data text-12 tabular-nums text-text">{current.thickness}px</span>
               </div>
               <input
                 type="range"
@@ -172,7 +170,7 @@ export const GridAppearanceMenu: React.FC<GridAppearanceMenuProps> = ({ prefs, e
                 step={1}
                 value={current.thickness}
                 onChange={(e) => patchOverride({ thickness: Number(e.target.value) })}
-                className="w-full accent-[#d4af37] cursor-pointer"
+                className="focus-ring w-full accent-text cursor-pointer"
               />
             </div>
 
@@ -181,7 +179,7 @@ export const GridAppearanceMenu: React.FC<GridAppearanceMenuProps> = ({ prefs, e
               type="button"
               disabled={!overridden}
               onClick={() => onChange({ ...prefs, override: null })}
-              className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded border text-[11px] font-serif font-semibold transition-colors border-[#3d3d3d] text-zinc-300 disabled:opacity-40 disabled:cursor-default enabled:cursor-pointer enabled:hover:bg-[#1f1f1f]"
+              className="w-full flex items-center justify-center gap-1.5 h-8 px-2 rounded-ui border text-13 font-medium border-border text-text disabled:opacity-40 disabled:cursor-default enabled:cursor-pointer enabled:hover:bg-surface-2 focus-ring"
             >
               <RotateCcw className="w-3 h-3" />
               Usar o padrão do mapa

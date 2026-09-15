@@ -615,7 +615,7 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   dois GMs, ou duas abas, podem olhar mapas diferentes ao mesmo tempo). `selectViewedScene`
   substitui `selectActiveScene` em quase todo lugar do web (canvas, névoa, régua, combate, spawn de
   criatura, `MapConfigModal`); `selectActiveScene` continua valendo pro `MapSelector`. Quando os
-  dois divergem, o botão-seletor da TopBar troca para "Vendo X · ativo: Y" com destaque âmbar — o
+  dois divergem, o botão-seletor da TopBar troca para "Vendo X · ativo: Y" com destaque dourado — o
   aviso que evita o erro mais provável da feature: editar um mapa achando que a mesa está vendo.
 - **Enquadramento (zoom/pan) por mapa e por usuário** (`VttCanvas`, `lib/session.ts#getSavedView`/
   `setSavedView`): cada aba lembra o zoom/pan de cada mapa que já viu nesta sessão, em
@@ -680,7 +680,7 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   (grid + tokens) entra na pilha de desfazer como UMA entrada — reencaixar não é trivial de desfazer
   à mão, diferente de só mudar cor/snap.
 - **Seletor de mapa** (`MapSelector`, na TopBar, só GM): botão "Mapa: <nome visitado> ▾" (ou "Vendo
-  X · ativo: Y" em destaque âmbar quando diverge, ver acima). Clique ou a tecla **M** (fora de campo
+  X · ativo: Y" em destaque dourado quando diverge, ver acima). Clique ou a tecla **M** (fora de campo
   de texto) abrem um dropdown de ~420 px ancorado abaixo do botão; Esc ou clique fora fecham. Quando
   divergente, o topo do dropdown ganha "← Ir para o ativo" e "Ativar este". O corpo é o `MapsPanel`:
   card por mapa com miniatura (gerada no cliente, cacheada em `localStorage` — `lib/thumbnails.ts`),

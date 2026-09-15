@@ -2,6 +2,7 @@ import React, { useRef } from "react";
 import { CloudFog, Hand, MapPin, MousePointer2, Pencil, Redo2, Ruler, Shapes, Undo2 } from "lucide-react";
 import type { ToolMode } from "../store/tools";
 import { useBarTranslucency } from "../lib/useBarTranslucency";
+import { BarDivider, FLOAT_SURFACE, KBD, MOTION } from "./MapBar";
 
 interface ToolbarProps {
   /** GM vê a ferramenta Névoa e os botões de desfazer/refazer; jogador só a lista básica. */
@@ -28,6 +29,10 @@ interface ToolbarProps {
    *  2s sem mouse/tecla — sobrepõe a translucidez normal, que continua valendo fora da ociosidade. */
   immersiveHidden: boolean;
 }
+
+/** Dica à direita do botão: aparece no hover e no foco do teclado. */
+const TOOLTIP =
+  "pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 whitespace-nowrap rounded-ui bg-surface-2 border border-border px-2 py-1 font-ui text-12 text-text shadow-float opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-150 ease-out flex items-center gap-1.5 z-20";
 
 interface ToolDef {
   mode: ToolMode;
@@ -82,7 +87,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       role="toolbar"
       aria-orientation="vertical"
       style={{ opacity: immersiveHidden ? 0 : translucent ? 0.55 : 1, pointerEvents: immersiveHidden ? "none" : undefined }}
-      className="absolute top-4 left-4 z-10 flex flex-col gap-1 p-1.5 rounded bg-[#1a1a1a] border border-[#2d2417] shadow-2xl transition-opacity duration-300"
+      className={`absolute top-4 left-4 z-10 flex flex-col gap-0.5 p-1 transition-opacity duration-150 ease-out ${FLOAT_SURFACE}`}
     >
       {TOOLS.map((t) => (
         <ToolButton key={t.mode} tool={t} active={effectiveMode === t.mode} chosen={mode === t.mode} onClick={() => onChange(t.mode)} />
@@ -91,14 +96,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <ToolButton tool={TEMPLATE_TOOL} active={effectiveMode === TEMPLATE_TOOL.mode} chosen={mode === TEMPLATE_TOOL.mode} onClick={() => onChange(TEMPLATE_TOOL.mode)} />
       )}
       <ToolButton tool={DRAW_TOOL} active={effectiveMode === DRAW_TOOL.mode} chosen={mode === DRAW_TOOL.mode} onClick={() => onChange(DRAW_TOOL.mode)} />
-      <div className="h-[1px] w-full bg-[#2d2417] my-0.5" />
+      <BarDivider orientation="horizontal" />
       {isGm &&
         GM_TOOLS.map((t) => (
           <ToolButton key={t.mode} tool={t} active={effectiveMode === t.mode} chosen={mode === t.mode} onClick={() => onChange(t.mode)} />
         ))}
       {isGm && (
         <>
-          <div className="h-[1px] w-full bg-[#2d2417] my-0.5" />
+          <BarDivider orientation="horizontal" />
           <HistoryButton id="history-undo" icon={Undo2} label="Desfazer" shortcut="Ctrl+Z" summary={undoSummary} disabled={!canUndo} onClick={onUndo} />
           <HistoryButton id="history-redo" icon={Redo2} label="Refazer" shortcut="Ctrl+Shift+Z" summary={redoSummary} disabled={!canRedo} onClick={onRedo} />
         </>
@@ -137,14 +142,14 @@ function HistoryButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={tip}
-      className={`group relative w-9 h-9 flex items-center justify-center rounded transition-colors ${
-        disabled ? "text-zinc-700 cursor-not-allowed" : "text-zinc-400 hover:bg-[#252525] hover:text-[#d4af37] cursor-pointer"
+      className={`focus-ring group relative w-9 h-9 flex items-center justify-center rounded-ui ${MOTION} ${
+        disabled ? "text-text-muted/35 cursor-not-allowed" : "text-text-muted hover:bg-surface-2 hover:text-text cursor-pointer"
       }`}
     >
       <Icon className="w-4 h-4" />
-      <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 whitespace-nowrap rounded bg-[#1a1a1a] border border-[#2d2417] px-2 py-1 text-[11px] text-zinc-200 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
+      <span className={TOOLTIP}>
         {tip}
-        <kbd className="px-1 rounded bg-[#252525] border border-[#3d3d3d] font-mono text-[10px] text-zinc-400">{shortcut}</kbd>
+        <kbd className={KBD}>{shortcut}</kbd>
       </span>
     </button>
   );
@@ -161,23 +166,23 @@ function ToolButton({ tool, active, chosen, onClick }: { tool: ToolDef; active: 
       disabled={tool.soon}
       aria-label={tip}
       aria-pressed={chosen}
-      className={`group relative w-9 h-9 flex items-center justify-center rounded transition-colors ${
+      className={`focus-ring group relative w-9 h-9 flex items-center justify-center rounded-ui ${MOTION} ${
         tool.soon
-          ? "text-zinc-600 cursor-not-allowed"
+          ? "text-text-muted/35 cursor-not-allowed"
           : active
-            ? "bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/50 cursor-pointer"
-            : "text-zinc-400 hover:bg-[#252525] hover:text-[#d4af37] cursor-pointer"
+            ? "bg-surface-2 text-accent cursor-pointer"
+            : "text-text-muted hover:bg-surface-2 hover:text-text cursor-pointer"
       }`}
     >
       <Icon className="w-4 h-4" />
-      {/* Tooltip à direita, só no hover (title nativo demora a aparecer). */}
-      <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 whitespace-nowrap rounded bg-[#1a1a1a] border border-[#2d2417] px-2 py-1 text-[11px] text-zinc-200 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
+      {/* Tooltip à direita, no hover e no foco do teclado (title nativo demora a aparecer). */}
+      <span className={TOOLTIP}>
         {tool.label}
         {tool.soon ? (
-          <span className="text-zinc-500">em breve</span>
+          <span className="text-text-muted">em breve</span>
         ) : (
           tool.shortcut && (
-            <kbd className="px-1 rounded bg-[#252525] border border-[#3d3d3d] font-mono text-[10px] text-zinc-400">{tool.shortcut}</kbd>
+            <kbd className={KBD}>{tool.shortcut}</kbd>
           )
         )}
       </span>

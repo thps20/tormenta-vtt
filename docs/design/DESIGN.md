@@ -31,7 +31,8 @@ Escala: 12 / 13 / 14 / 16 / 20 / 28. Corpo 13–14 nos painéis.
 
 ## Espaço e forma
 Grade de 4px. Raio 6px (8px em diálogos). Sombra só em camadas flutuantes (diálogo, dropdown,
-overlay); nunca em cartão dentro de painel.
+overlay, barra sobre o mapa); nunca em cartão dentro de painel. A sombra é `--shadow-float`
+(com deslocamento e desfoque suave), nunca halo sem offset.
 Cartão só quando o conteúdo é uma unidade selecionável ou clicável. Nunca cartão dentro de
 cartão — use filete e espaço para separar.
 
@@ -39,6 +40,14 @@ cartão — use filete e espaço para separar.
 Mapa: silêncio. Barras translúcidas, nada fixo que roube atenção.
 Painéis (chat, iniciativa, fichas): densidade alta, ritmo regular, tudo escaneável.
 Diálogos: respiro maior, uma ação principal em dourado, as demais neutras.
+
+## Estados de controle
+Ligado/escolhido (toggle, segmento, opção de menu): pressionado neutro — surface-2 com texto
+pergaminho. Hover: surface-2 e texto sobe de muted para text. O dourado não marca estado genérico:
+só a ferramenta ativa do mapa (ícone), o turno e a ação principal.
+Foco do teclado: anel de 2px em --accent só em :focus-visible (classe `focus-ring`).
+Controles de formulário (checkbox, range) usam accent-color pergaminho, não dourado.
+Na Mesa, as peças prontas destas regras estão em `apps/web/src/components/MapBar.tsx`.
 
 ## Movimento
 Só funcional: 120–180ms, ease-out. Transição de estado, aparecer/sumir, hover das barras.

@@ -2,8 +2,9 @@
 
 /*
  * Tokens da identidade "grimório" (docs/design/DESIGN.md).
- * Por enquanto só ficam DISPONÍVEIS: as telas ainda usam o tema antigo abaixo
- * e migram uma por vez. Nomes das variáveis = nomes do DESIGN.md.
+ * As telas migram uma por vez: a camada sobre o mapa da Mesa (barra superior, barras
+ * flutuantes, faixas de aviso) já usa estes tokens; o resto ainda usa o tema antigo abaixo.
+ * Nomes das variáveis = nomes do DESIGN.md.
  */
 @layer base {
   :root {
@@ -59,6 +60,10 @@
   --radius-ui: 6px;
   --radius-dialog: 8px;
 
+  /* Sombra só de camada flutuante (barra sobre o mapa, dropdown, diálogo): com deslocamento,
+   * nunca halo sem offset. Classe: shadow-float. */
+  --shadow-float: 0 6px 20px rgb(0 0 0 / 0.45), 0 1px 3px rgb(0 0 0 / 0.35);
+
   /* 12 / 13 / 14 / 16 / 20 / 28, em rem para respeitar o zoom do navegador */
   --text-12: 0.75rem;
   --text-13: 0.8125rem;
@@ -66,6 +71,17 @@
   --text-16: 1rem;
   --text-20: 1.25rem;
   --text-28: 1.75rem;
+}
+
+/*
+ * Anel de foco do teclado: o outline padrão do navegador some no fundo carvão.
+ * Só aparece com :focus-visible (Tab), nunca no clique do mouse.
+ */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
 }
 
 /* Tema "fantasia medieval sóbria" vindo das telas do AI Studio. */
