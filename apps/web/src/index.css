@@ -1,5 +1,73 @@
 @import "tailwindcss";
 
+/*
+ * Tokens da identidade "grimório" (docs/design/DESIGN.md).
+ * Por enquanto só ficam DISPONÍVEIS: as telas ainda usam o tema antigo abaixo
+ * e migram uma por vez. Nomes das variáveis = nomes do DESIGN.md.
+ */
+@layer base {
+  :root {
+    /* Cor */
+    --bg: #121212;
+    --surface-1: #1d1d1d;
+    --surface-2: #2c2c2c;
+    --border: #3a3a38;
+    --text: #dcd8cc;
+    --text-muted: #a6a29c;
+    --accent: #c79c54;
+    --danger: #bf4040;
+    --success: #709970;
+
+    /* Movimento: só funcional, 120–180ms, ease-out */
+    --motion-fast: 120ms;
+    --motion-base: 180ms;
+    --motion-ease: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+/*
+ * Utilitários Tailwind para as cores (Tailwind v4 não tem tailwind.config: o tema
+ * mora no CSS). "inline" faz a classe usar var(--bg) direto, então trocar o token
+ * no :root muda tudo. Ex.: bg-bg, bg-surface-1, border-border, text-text,
+ * text-text-muted, text-accent, bg-danger.
+ */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+}
+
+/*
+ * Fontes, raios e escala tipográfica: definidos direto no tema. "static" garante que
+ * as variáveis (--font-ui, --radius-ui...) existam no :root mesmo sem nenhuma classe
+ * usando ainda, para CSS e style={} poderem ler. Classes: font-title, font-ui,
+ * font-data, rounded-ui, rounded-dialog, text-12 … text-28.
+ * Nomes novos de propósito: font-sans, font-mono, text-sm etc. continuam com o valor
+ * padrão, senão as telas antigas mudariam antes da migração.
+ */
+@theme static {
+  --font-title: "Cinzel", Georgia, serif;
+  --font-ui: "IBM Plex Sans", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --radius-ui: 6px;
+  --radius-dialog: 8px;
+
+  /* 12 / 13 / 14 / 16 / 20 / 28, em rem para respeitar o zoom do navegador */
+  --text-12: 0.75rem;
+  --text-13: 0.8125rem;
+  --text-14: 0.875rem;
+  --text-16: 1rem;
+  --text-20: 1.25rem;
+  --text-28: 1.75rem;
+}
+
 /* Tema "fantasia medieval sóbria" vindo das telas do AI Studio. */
 @layer base {
   :root {
