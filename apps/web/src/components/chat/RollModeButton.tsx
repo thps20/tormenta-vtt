@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { ChevronUp } from 'lucide-react';
 import type { RollVisibility } from '@tormenta-vtt/shared';
 import { ROLL_MODES, nextRollMode, rollModeInfo } from '../../lib/rollMode';
+import { pressedClass } from '../MapBar';
 
 interface RollModeButtonProps {
   mode: RollVisibility;
@@ -11,13 +12,6 @@ interface RollModeButtonProps {
 
 const LONG_PRESS_MS = 450;
 const MENU_WIDTH = 240;
-
-/** Cor do botão por modo: público neutro, secreto âmbar, próprio azul. */
-const MODE_CLASS: Record<RollVisibility, string> = {
-  all: 'text-zinc-400 border-[#3d3d3d] hover:text-[#d4af37] hover:border-[#d4af37]/50',
-  gm: 'text-amber-300 border-amber-500/60 bg-amber-950/30 hover:bg-amber-950/50',
-  self: 'text-sky-300 border-sky-500/60 bg-sky-950/30 hover:bg-sky-950/50',
-};
 
 /**
  * Botão do modo de rolagem na faixa "Rolar": mostra o modo atual (ícone + rótulo).
@@ -101,7 +95,7 @@ export const RollModeButton: React.FC<RollModeButtonProps> = ({ mode, onChange }
           openMenu();
         }}
         title={`Modo de rolagem: ${info.label}. Clique para alternar; segure para escolher.`}
-        className={`flex items-center gap-1 px-1.5 py-0.5 rounded-l border bg-[#1a1a1a] font-mono text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${MODE_CLASS[mode]}`}
+        className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-l-ui border font-ui text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${pressedClass(mode !== 'all')}`}
       >
         <Icon className="w-3 h-3" />
         <span>{info.label}</span>
@@ -112,7 +106,7 @@ export const RollModeButton: React.FC<RollModeButtonProps> = ({ mode, onChange }
         onClick={() => (open ? setOpen(false) : openMenu())}
         title="Escolher modo de rolagem"
         aria-expanded={open}
-        className={`flex items-center px-1 py-0.5 rounded-r border border-l-0 bg-[#1a1a1a] transition-colors cursor-pointer ${MODE_CLASS[mode]}`}
+        className={`focus-ring flex items-center px-1 py-0.5 rounded-r-ui border border-l-0 transition-colors cursor-pointer ${pressedClass(mode !== 'all')}`}
       >
         <ChevronUp className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -124,7 +118,7 @@ export const RollModeButton: React.FC<RollModeButtonProps> = ({ mode, onChange }
           ref={menuRef}
           role="menu"
           style={{ position: 'fixed', left: menuPos.left, bottom: menuPos.bottom, width: MENU_WIDTH }}
-          className="z-50 rounded border border-[#3d3d3d] bg-[#121212] shadow-xl p-1 space-y-0.5"
+          className="font-ui z-50 rounded-ui border border-border bg-surface-1 shadow-float p-1 space-y-0.5"
         >
           {ROLL_MODES.map((m) => {
             const MIcon = m.icon;
@@ -140,14 +134,14 @@ export const RollModeButton: React.FC<RollModeButtonProps> = ({ mode, onChange }
                   onChange(m.id);
                   setOpen(false);
                 }}
-                className={`w-full text-left flex items-start gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
-                  active ? 'bg-[#2d2417] text-[#d4af37]' : 'text-zinc-300 hover:bg-[#1f1f1f]'
+                className={`focus-ring w-full text-left flex items-start gap-2 px-2 py-1.5 rounded-ui cursor-pointer transition-colors ${
+                  active ? 'bg-surface-2 text-text' : 'text-text-muted hover:bg-surface-2 hover:text-text'
                 }`}
               >
                 <MIcon className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                 <span className="flex flex-col">
                   <span className="text-[11px] font-bold uppercase tracking-wide">{m.label}</span>
-                  <span className="text-[10px] text-zinc-500 leading-snug normal-case">{m.description}</span>
+                  <span className="text-[10px] text-text-muted leading-snug normal-case">{m.description}</span>
                 </span>
               </button>
             );

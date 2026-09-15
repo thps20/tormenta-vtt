@@ -101,14 +101,14 @@ export const PartyView: React.FC<PartyViewProps> = ({
   if (entries.length === 0 && missingPcs.length === 0) return null;
 
   return (
-    <div id="party-view" className="shrink-0 border-b border-[#2d2417] bg-[#141414]">
+    <div id="party-view" className="font-ui shrink-0 border-b border-border bg-surface-1">
       <button
         id="btn-party-view-toggle"
         onClick={onToggleExpanded}
         title={expanded ? "Recolher visão de grupo" : "Mostrar visão de grupo"}
-        className="w-full flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-serif font-bold tracking-widest uppercase text-zinc-500 hover:text-zinc-300 cursor-pointer"
+        className="focus-ring w-full flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-title font-bold tracking-widest uppercase text-text-muted hover:text-text cursor-pointer"
       >
-        <Users className="w-3 h-3 text-[#d4af37]" />
+        <Users className="w-3 h-3" />
         Grupo
         <span className="ml-auto">{expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}</span>
       </button>
@@ -170,7 +170,7 @@ const PartyChip: React.FC<{
 }> = ({ isGm, entry, character, token, def, conditionByKey, isActiveTurn, isDragTarget, onOpen, onDragStart, onDragOver, onDrop, onDragEnd, onHide, onShow, onRemove }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const computed = useMemo(() => computeCharacter(def, character), [def, character]);
-  const ringColor = token?.color ?? "#3d3d3d";
+  const ringColor = token?.color ?? "#3a3a38"; // --border (docs/design/DESIGN.md)
   const conditions = (token?.conditions ?? [])
     .map((cond) => conditionByKey.get(cond.key))
     .filter((c): c is ConditionDef => c !== undefined);
@@ -201,13 +201,13 @@ const PartyChip: React.FC<{
       onDragEnd={onDragEnd}
       onClick={onOpen}
       title={character.name}
-      className={`w-[104px] shrink-0 flex flex-col gap-1 p-1.5 rounded border cursor-pointer text-left ${
-        isDragTarget ? "border-[#d4af37] bg-[#1e1a15]" : "border-[#2d2417] bg-black/20 hover:bg-[#1e1a15] hover:border-[#d4af37]/50"
+      className={`focus-ring w-[104px] shrink-0 flex flex-col gap-1 p-1.5 rounded-ui border cursor-pointer text-left ${
+        isDragTarget ? "border-accent bg-surface-2" : "border-border bg-bg/40 hover:bg-surface-2"
       } ${entry.hidden ? "opacity-45" : ""}`}
     >
       <div className="flex items-center gap-1.5 min-w-0">
         <div
-          className="relative w-6 h-6 rounded-full bg-[#252525] flex items-center justify-center text-[10px] font-serif font-bold text-[#d4af37] shrink-0"
+          className="relative w-6 h-6 rounded-full bg-surface-2 flex items-center justify-center text-[10px] font-title font-bold text-text shrink-0"
           style={{ boxShadow: `0 0 0 1.5px ${ringColor}` }}
         >
           {character.imageUrl ? (
@@ -218,11 +218,11 @@ const PartyChip: React.FC<{
           {isActiveTurn && (
             <span
               title="Na vez"
-              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#d4af37] border border-black animate-pulse"
+              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent border border-bg animate-pulse"
             />
           )}
         </div>
-        <span className="flex-1 min-w-0 text-[10px] font-semibold text-zinc-200 truncate">{character.name}</span>
+        <span className="flex-1 min-w-0 text-[10px] font-semibold text-text truncate">{character.name}</span>
         {isGm && (
           <ChipMenuButton
             open={menuOpen}
@@ -243,11 +243,11 @@ const PartyChip: React.FC<{
 
       {(shownConditions.length > 0 || entry.hidden) && (
         <div className="flex items-center gap-1">
-          {entry.hidden && <EyeOff className="w-3 h-3 text-zinc-500 shrink-0" />}
+          {entry.hidden && <EyeOff className="w-3 h-3 text-text-muted shrink-0" />}
           {shownConditions.map((c) => (
             <span key={c.key} title={c.description || c.label} className="w-3 h-3 shrink-0 [&>svg]:w-full [&>svg]:h-full" style={{ color: c.color }} dangerouslySetInnerHTML={{ __html: c.icon }} />
           ))}
-          {extraConditions > 0 && <span className="text-[8px] text-zinc-500 font-mono">+{extraConditions}</span>}
+          {extraConditions > 0 && <span className="text-[8px] text-text-muted font-data tabular-nums">+{extraConditions}</span>}
         </div>
       )}
     </div>
@@ -305,7 +305,7 @@ const ChipMenuButton: React.FC<{
         ref={btnRef}
         onClick={onToggle}
         title="Opções do grupo"
-        className="p-0.5 rounded text-zinc-500 hover:text-[#d4af37] hover:bg-[#2c2419] cursor-pointer"
+        className="focus-ring p-0.5 rounded-ui text-text-muted hover:text-text hover:bg-surface-2 cursor-pointer"
       >
         <MoreVertical className="w-3 h-3" />
       </button>
@@ -315,7 +315,7 @@ const ChipMenuButton: React.FC<{
             ref={menuRef}
             role="menu"
             style={{ position: "fixed", left: pos?.left ?? -9999, top: pos?.top ?? -9999, width: MENU_WIDTH, visibility: pos ? "visible" : "hidden" }}
-            className="z-50 bg-[#1e1a15] border border-[#d4af37]/70 rounded shadow-2xl p-1 flex flex-col gap-0.5"
+            className="font-ui z-50 bg-surface-1 border border-border rounded-ui shadow-float p-1 flex flex-col gap-0.5"
           >
             {hidden ? (
               <MenuItem
@@ -336,7 +336,7 @@ const ChipMenuButton: React.FC<{
                 }}
               />
             )}
-            <div className="h-px bg-[#2d2417] my-0.5" />
+            <div className="h-px bg-border my-0.5" />
             <MenuItem
               icon={X}
               label="Remover do grupo"
@@ -394,10 +394,10 @@ const AddToPartyButton: React.FC<{ candidates: Character[]; onAdd: (characterId:
         ref={btnRef}
         onClick={() => setOpen((v) => !v)}
         title="Adicionar personagem ao grupo"
-        className="w-[104px] h-full min-h-[64px] flex flex-col items-center justify-center gap-1 rounded border border-dashed border-[#3d3d3d] text-zinc-500 hover:text-[#d4af37] hover:border-[#d4af37]/50 cursor-pointer"
+        className="focus-ring w-[104px] h-full min-h-[64px] flex flex-col items-center justify-center gap-1 rounded-ui border border-dashed border-border text-text-muted hover:text-text hover:border-text-muted cursor-pointer"
       >
         <Plus className="w-4 h-4" />
-        <span className="text-[9px] font-serif">Adicionar</span>
+        <span className="text-[9px] font-title">Adicionar</span>
       </button>
       {open &&
         createPortal(
@@ -405,7 +405,7 @@ const AddToPartyButton: React.FC<{ candidates: Character[]; onAdd: (characterId:
             ref={menuRef}
             role="menu"
             style={{ position: "fixed", left: pos?.left ?? -9999, top: pos?.top ?? -9999, width: MENU_WIDTH, visibility: pos ? "visible" : "hidden" }}
-            className="z-50 max-h-64 overflow-y-auto bg-[#1e1a15] border border-[#d4af37]/70 rounded shadow-2xl p-1 flex flex-col gap-0.5"
+            className="font-ui z-50 max-h-64 overflow-y-auto bg-surface-1 border border-border rounded-ui shadow-float p-1 flex flex-col gap-0.5"
           >
             {candidates.map((c) => (
               <MenuItem
@@ -439,11 +439,11 @@ function MenuItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left px-2 py-1.5 rounded text-xs font-serif transition-colors cursor-pointer flex items-center gap-2 truncate ${
-        danger ? "text-red-300 hover:bg-red-950/60" : "text-zinc-200 hover:bg-[#2d2417] hover:text-amber-200"
+      className={`focus-ring w-full text-left px-2 py-1.5 rounded-ui text-xs font-ui transition-colors cursor-pointer flex items-center gap-2 truncate ${
+        danger ? "text-danger hover:bg-danger/15" : "text-text hover:bg-surface-2"
       }`}
     >
-      <Icon className={`w-3 h-3 shrink-0 ${danger ? "text-red-400" : "text-[#d4af37]"}`} />
+      <Icon className={`w-3 h-3 shrink-0 ${danger ? "text-danger" : "text-text-muted"}`} />
       <span className="truncate">{label}</span>
     </button>
   );
@@ -488,9 +488,9 @@ const ResourceBar: React.FC<ResourceValues> = ({ abbr, current, max, temp }) => 
   const color = rampColor(current, max);
   const text = `${abbr} ${current}/${max}${temp > 0 ? ` +${temp}` : ""}`;
   return (
-    <div title={text} className="relative w-full h-3 rounded bg-[#0c0c0c] border border-[#2d2417] overflow-hidden">
+    <div title={text} className="relative w-full h-3 rounded-ui bg-bg border border-border overflow-hidden">
       <div className="absolute inset-y-0 left-0 rounded-sm" style={{ width: `${(max > 0 ? Math.min(100, Math.max(0, (current / max) * 100)) : 0)}%`, backgroundColor: color }} />
-      <span className="relative z-10 flex items-center justify-center h-full text-[8px] font-mono font-bold text-zinc-100">{text}</span>
+      <span className="relative z-10 flex items-center justify-center h-full text-[8px] font-data tabular-nums font-bold text-text">{text}</span>
     </div>
   );
 };
@@ -506,7 +506,7 @@ const SecondaryResourceBar: React.FC<ResourceValues> = ({ abbr, current, max, te
   const percent = max > 0 ? Math.min(100, Math.max(0, (current / max) * 100)) : 0;
   const text = `${abbr} ${current}/${max}${temp > 0 ? ` +${temp}` : ""}`;
   return (
-    <div title={text} className="w-full h-1 rounded-sm bg-[#0c0c0c] border border-[#2d2417] overflow-hidden">
+    <div title={text} className="w-full h-1 rounded-sm bg-bg border border-border overflow-hidden">
       <div className="h-full rounded-sm" style={{ width: `${percent}%`, backgroundColor: barColor }} />
     </div>
   );

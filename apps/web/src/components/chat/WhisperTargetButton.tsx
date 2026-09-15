@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronUp, MessageCircle, Users } from 'lucide-react';
 import type { Participant } from '@tormenta-vtt/shared';
+import { pressedClass } from '../MapBar';
 
 interface WhisperTargetButtonProps {
   /** Todos os participantes da sala, menos eu (a lista já vem filtrada por quem chama). */
@@ -60,9 +61,7 @@ export const WhisperTargetButton: React.FC<WhisperTargetButtonProps> = ({ partic
         onClick={() => (open ? setOpen(false) : openMenu())}
         title={whispering ? `Sussurrando para ${label} — clique para trocar` : 'Sussurrar para alguém (seletor "para")'}
         aria-expanded={open}
-        className={`flex items-center gap-1 px-1.5 py-0.5 rounded border font-mono text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${
-          whispering ? 'text-purple-300 border-purple-500/60 bg-purple-950/30 hover:bg-purple-950/50' : 'text-zinc-400 border-[#3d3d3d] hover:text-[#d4af37] hover:border-[#d4af37]/50'
-        }`}
+        className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border font-ui text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${pressedClass(whispering)}`}
       >
         {whispering ? <MessageCircle className="w-3 h-3" /> : <Users className="w-3 h-3" />}
         <span className="max-w-[64px] truncate">{label}</span>
@@ -76,7 +75,7 @@ export const WhisperTargetButton: React.FC<WhisperTargetButtonProps> = ({ partic
             ref={menuRef}
             role="menu"
             style={{ position: 'fixed', left: menuPos.left, bottom: menuPos.bottom, width: MENU_WIDTH }}
-            className="z-50 rounded border border-[#3d3d3d] bg-[#121212] shadow-xl p-1 space-y-0.5 max-h-56 overflow-y-auto"
+            className="font-ui z-50 rounded-ui border border-border bg-surface-1 shadow-float p-1 space-y-0.5 max-h-56 overflow-y-auto"
           >
             <button
               type="button"
@@ -86,8 +85,8 @@ export const WhisperTargetButton: React.FC<WhisperTargetButtonProps> = ({ partic
                 onChange(null);
                 setOpen(false);
               }}
-              className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors text-[11px] ${
-                target === null ? 'bg-[#2d2417] text-[#d4af37]' : 'text-zinc-300 hover:bg-[#1f1f1f]'
+              className={`focus-ring w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-ui cursor-pointer transition-colors text-[11px] ${
+                target === null ? 'bg-surface-2 text-text' : 'text-text-muted hover:bg-surface-2 hover:text-text'
               }`}
             >
               <Users className="w-3.5 h-3.5 shrink-0" />
@@ -103,13 +102,13 @@ export const WhisperTargetButton: React.FC<WhisperTargetButtonProps> = ({ partic
                   onChange(p.id);
                   setOpen(false);
                 }}
-                className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors text-[11px] truncate ${
-                  target === p.id ? 'bg-purple-950/40 text-purple-300' : 'text-zinc-300 hover:bg-[#1f1f1f]'
+                className={`focus-ring w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-ui cursor-pointer transition-colors text-[11px] truncate ${
+                  target === p.id ? 'bg-surface-2 text-text' : 'text-text-muted hover:bg-surface-2 hover:text-text'
                 }`}
               >
                 <MessageCircle className="w-3.5 h-3.5 shrink-0" />
                 {p.nickname}
-                {p.role === 'gm' && <span className="text-[9px] text-[#d4af37]">(GM)</span>}
+                {p.role === 'gm' && <span className="text-[9px] text-text-muted">(GM)</span>}
               </button>
             ))}
           </div>,

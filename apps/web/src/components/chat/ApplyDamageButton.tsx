@@ -11,6 +11,7 @@ import {
   type SystemDefinition,
   type Token,
 } from '@tormenta-vtt/shared';
+import { pressedClass } from '../MapBar';
 
 /** Um alvo a enviar em token:apply-damage. */
 export interface ApplyDamageTarget {
@@ -186,7 +187,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
   };
 
   return (
-    <div className="relative inline-block">
+    <div className="font-ui relative inline-block">
       <button
         type="button"
         onClick={() => {
@@ -195,7 +196,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
           didPreselectRef.current = true;
           for (const id of preselectTokenIds) if (rows.some((r) => r.token.id === id)) toggle(id);
         }}
-        className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-emerald-800/60 text-emerald-400 hover:bg-emerald-950/40 text-[10px] font-serif font-bold cursor-pointer"
+        className="focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border border-accent text-accent hover:bg-surface-1 text-[10px] font-bold cursor-pointer"
         title={isHeal ? 'Aplicar cura em tokens' : 'Aplicar dano em tokens'}
       >
         {isHeal ? <Heart className="w-3 h-3" /> : <Swords className="w-3 h-3" />}
@@ -205,44 +206,44 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
       {open && (
         <div
           ref={ref}
-          className="absolute left-0 top-full mt-1 z-30 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-emerald-800/60 bg-[#141414] shadow-[0_8px_30px_rgba(0,0,0,0.7)] text-xs"
+          className="absolute left-0 top-full mt-1 z-30 w-72 max-w-[calc(100vw-2rem)] rounded-ui border border-border bg-surface-1 shadow-float text-xs"
         >
-          <div className="flex items-center justify-between px-2.5 py-2 border-b border-[#2d2417]">
-            <span className="font-serif font-bold text-emerald-400">{isHeal ? 'Aplicar cura' : 'Aplicar dano'}</span>
-            <button type="button" onClick={() => setOpen(false)} className="text-zinc-500 hover:text-zinc-200 cursor-pointer">
+          <div className="flex items-center justify-between px-2.5 py-2 border-b border-border">
+            <span className="font-title font-bold text-text">{isHeal ? 'Aplicar cura' : 'Aplicar dano'}</span>
+            <button type="button" onClick={() => setOpen(false)} className="focus-ring text-text-muted hover:text-text cursor-pointer">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="p-2 border-b border-[#2d2417]">
+          <div className="p-2 border-b border-border">
             <div className="relative">
-              <Search className="w-3 h-3 text-zinc-500 absolute left-1.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-3 h-3 text-text-muted absolute left-1.5 top-1/2 -translate-y-1/2" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar token..."
-                className="w-full bg-[#0d0d0d] border border-[#2d2417] rounded px-1.5 py-1 pl-5 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-700"
+                className="focus-ring w-full bg-bg border border-border rounded-ui px-1.5 py-1 pl-5 text-[11px] text-text placeholder:text-text-muted"
               />
             </div>
           </div>
 
           <div className="max-h-56 overflow-y-auto scrollbar-thin">
-            {filteredRows.length === 0 && <div className="p-3 text-center text-zinc-500 text-[11px]">Nenhum token</div>}
+            {filteredRows.length === 0 && <div className="p-3 text-center text-text-muted text-[11px]">Nenhum token</div>}
             {filteredRows.map(({ token, current, max, ownerLabel, suggestion }) => {
               const selected = token.id in amounts;
               const amount = amounts[token.id] ?? 0;
               const mult = multipliers[token.id];
               return (
-                <div key={token.id} className={`px-2.5 py-1.5 border-b border-[#1f1f1f] ${selected ? 'bg-emerald-950/20' : ''}`}>
+                <div key={token.id} className={`px-2.5 py-1.5 border-b border-border ${selected ? 'bg-surface-2' : ''}`}>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={selected} onChange={() => toggle(token.id)} className="accent-emerald-600" />
-                    <span className="flex-1 min-w-0 truncate text-zinc-200">{token.name}</span>
-                    <span className="text-[10px] font-mono text-zinc-500 shrink-0">
+                    <input type="checkbox" checked={selected} onChange={() => toggle(token.id)} className="accent-text" />
+                    <span className="flex-1 min-w-0 truncate text-text">{token.name}</span>
+                    <span className="text-[10px] font-data tabular-nums text-text-muted shrink-0">
                       {current}/{max} · {ownerLabel}
                     </span>
                   </label>
                   {suggestion.note && (
-                    <div className="pl-6 -mt-0.5 text-[10px] text-amber-400">
+                    <div className="pl-6 -mt-0.5 text-[10px] text-text-muted italic">
                       sugerido {suggestion.raw} → {suggestion.amount} · {suggestion.note}
                     </div>
                   )}
@@ -253,11 +254,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
                           key={m}
                           type="button"
                           onClick={() => setMultiplier(token.id, m)}
-                          className={`px-1.5 py-0.5 rounded border text-[10px] font-mono cursor-pointer ${
-                            mult === m
-                              ? 'bg-emerald-900/50 border-emerald-600 text-emerald-300'
-                              : 'border-zinc-700 text-zinc-400 hover:border-emerald-700'
-                          }`}
+                          className={`focus-ring px-1.5 py-0.5 rounded-ui border text-[10px] font-data cursor-pointer ${pressedClass(mult === m)}`}
                         >
                           ×{m === '0.5' ? '½' : m}
                         </button>
@@ -266,7 +263,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
                         type="number"
                         value={amount}
                         onChange={(e) => setManualAmount(token.id, Math.trunc(Number(e.target.value) || 0))}
-                        className="w-16 ml-1 bg-[#0d0d0d] border border-[#2d2417] rounded px-1 py-0.5 text-[11px] font-mono text-zinc-200 focus:outline-none focus:border-emerald-700"
+                        className="focus-ring w-16 ml-1 bg-bg border border-border rounded-ui px-1 py-0.5 text-[11px] font-data tabular-nums text-text"
                         title="Ajuste manual"
                       />
                     </div>
@@ -281,7 +278,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
               type="button"
               onClick={() => void confirm()}
               disabled={selectedCount === 0 || submitting}
-              className="w-full py-1.5 rounded bg-emerald-900/60 border border-emerald-600 text-emerald-300 font-serif font-bold text-[11px] hover:bg-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="focus-ring w-full py-1.5 rounded-ui bg-surface-2 border border-accent text-accent font-bold text-[11px] hover:bg-surface-2/80 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               {submitting ? 'Aplicando…' : selectedCount > 0 ? `Confirmar (${selectedCount})` : 'Confirmar'}
             </button>

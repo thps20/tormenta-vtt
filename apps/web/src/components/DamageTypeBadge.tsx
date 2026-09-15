@@ -3,8 +3,8 @@ import { damageTypeInfo, type DamageComponent, type EnhancementEffect, type Syst
 
 type DefLike = Pick<SystemDefinition, "damageTypes" | "damageTypeGroups"> | null;
 
-/** Cor do selo quando o sistema não define uma (zinc-400). */
-const NEUTRAL = "#a1a1aa";
+/** Cor do selo quando o sistema não define uma (--text-muted, docs/design/DESIGN.md). */
+const NEUTRAL = "#a6a29c";
 
 interface DamageTypeBadgeProps {
   /** Definição do sistema (null fora de uma sala: o selo sai neutro com a chave como texto). */
@@ -25,7 +25,7 @@ export const DamageTypeBadge: React.FC<DamageTypeBadgeProps> = ({ def, type, cla
   const color = info.color ?? NEUTRAL;
   return (
     <span
-      className={`inline-flex items-center px-1.5 py-px rounded text-[10px] font-serif font-semibold leading-tight whitespace-nowrap align-middle ${className ?? ""}`}
+      className={`inline-flex items-center px-1.5 py-px rounded-ui text-[10px] font-ui font-semibold leading-tight whitespace-nowrap align-middle ${className ?? ""}`}
       // Hex de 8 dígitos: "33" = ~20% de opacidade.
       style={{ backgroundColor: `${color}33`, color }}
       data-damage-type={type}

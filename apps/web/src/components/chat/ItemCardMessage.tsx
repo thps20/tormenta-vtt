@@ -20,7 +20,7 @@ interface ItemCardMessageProps {
 }
 
 /** Marca de campo alterado por aprimoramento nesta conjuração. */
-const Enhanced: React.FC = () => <span className="ml-1 text-[9px] text-emerald-400/80 font-serif italic">(aprimorado)</span>;
+const Enhanced: React.FC = () => <span className="ml-1 text-[9px] text-success font-ui italic">(aprimorado)</span>;
 
 /**
  * Card de item usado (character:use-item). Tudo que aparece já veio pronto do
@@ -50,49 +50,47 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
   };
 
   return (
-    <div id={`chat-msg-${msg.id}`} className="p-3 rounded border bg-[#101418]/80 border-sky-900/50 shadow-inner">
+    <div id={`chat-msg-${msg.id}`} className="font-ui p-3 rounded-ui border border-border bg-surface-2">
       {/* Cabeçalho: quem usou */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`text-[11px] font-bold uppercase tracking-tight truncate ${isGm ? "text-[#d4af37] font-serif" : isMe ? "text-blue-400" : "text-zinc-300"}`}>
-            {msg.nickname}
-          </span>
-          {isGm && <span className="text-[9px] px-1.5 rounded bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40 font-serif font-bold">GM</span>}
-          <span className="text-[10px] text-zinc-500 font-serif truncate">• {card.characterName}</span>
+          <span className="text-[11px] font-bold uppercase tracking-tight truncate text-text">{msg.nickname}</span>
+          {isGm && <span className="text-[9px] px-1.5 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
+          <span className="text-[10px] text-text-muted truncate">• {card.characterName}</span>
         </div>
-        <span className="text-[9px] font-mono text-zinc-600 shrink-0">{time}</span>
+        <span className="text-[9px] font-data tabular-nums text-text-muted shrink-0">{time}</span>
       </div>
 
       {/* Nome + tipo + custo */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-sky-300 shrink-0" />
-            <span className="text-sm font-serif font-bold text-sky-100 truncate">{card.itemName}</span>
+            <Sparkles className="w-3.5 h-3.5 text-text-muted shrink-0" />
+            <span className="text-sm font-title font-bold text-text truncate">{card.itemName}</span>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[10px] font-serif">
-            <span className="bg-[#1a2028] border border-sky-900/60 px-1.5 py-0.5 rounded text-sky-200">{card.kindLabel}</span>
+          <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[10px]">
+            <span className="bg-bg/40 border border-border px-1.5 py-0.5 rounded-ui text-text">{card.kindLabel}</span>
             {card.fields.map((f) => (
-              <span key={f.label} className="bg-[#1f1d19] border border-[#332b20] px-1.5 py-0.5 rounded text-zinc-300">
-                <span className="text-zinc-500">{f.label}:</span> {f.value}
+              <span key={f.label} className="bg-bg/40 border border-border px-1.5 py-0.5 rounded-ui text-text">
+                <span className="text-text-muted">{f.label}:</span> {f.value}
               </span>
             ))}
           </div>
         </div>
         {card.cost && (
-          <div className="shrink-0 flex flex-col items-center px-2 py-1 rounded border border-sky-700/60 bg-sky-950/40" title="Custo já descontado da ficha">
-            <span className="text-base font-serif font-bold text-sky-200 leading-none">{card.cost.amount}</span>
-            <span className="text-[9px] font-mono text-sky-400 uppercase">{card.cost.abbr}</span>
+          <div className="shrink-0 flex flex-col items-center px-2 py-1 rounded-ui border border-border bg-bg/40" title="Custo já descontado da ficha">
+            <span className="text-base font-data tabular-nums font-bold text-text leading-none">{card.cost.amount}</span>
+            <span className="text-[9px] font-data text-text-muted uppercase">{card.cost.abbr}</span>
           </div>
         )}
       </div>
 
       {/* Execução, alcance, duração, alvo, área */}
       {meta.length > 0 && (
-        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] font-mono text-zinc-400">
+        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] font-ui text-text-muted">
           {meta.map((m) => (
             <div key={m.label} className="truncate" title={`${m.label}: ${m.value}${m.enhanced ? " (aprimorado)" : ""}`}>
-              <span className="text-zinc-600">{m.label}:</span> {m.value}
+              <span className="text-text-muted">{m.label}:</span> {m.value}
               {m.enhanced && <Enhanced />}
             </div>
           ))}
@@ -103,7 +101,7 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
         <button
           type="button"
           onClick={placeArea}
-          className="mt-1.5 flex items-center gap-1 text-[10px] font-serif font-bold uppercase tracking-wider text-[#d4af37] hover:text-[#e8c766] cursor-pointer"
+          className="focus-ring mt-1.5 flex items-center gap-1 text-[10px] font-ui font-bold uppercase tracking-wider text-accent hover:text-text cursor-pointer"
           title="Abre a ferramenta Área (T) já com a forma e o tamanho, quando o texto casar"
         >
           <Shapes className="w-3 h-3" />
@@ -113,11 +111,11 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
 
       {/* Aprimoramentos usados (cards antigos no banco não têm o campo). */}
       {enhancements.length > 0 && (
-        <div className="mt-2 flex items-center gap-1.5 flex-wrap text-[10px] font-serif" data-card-enhancements>
-          <span className="text-zinc-500 uppercase tracking-wider text-[9px]">Aprimoramentos</span>
+        <div className="mt-2 flex items-center gap-1.5 flex-wrap text-[10px] font-ui" data-card-enhancements>
+          <span className="text-text-muted uppercase tracking-wider text-[9px]">Aprimoramentos</span>
           {enhancements.map((e) => (
-            <span key={e.id} className="bg-sky-950/40 border border-sky-800/60 px-1.5 py-0.5 rounded text-sky-100" title={e.label}>
-              <span className="font-mono font-bold text-sky-300">
+            <span key={e.id} className="bg-bg/40 border border-border px-1.5 py-0.5 rounded-ui text-text" title={e.label}>
+              <span className="font-data tabular-nums font-bold text-text-muted">
                 +{e.cost}
                 {e.times > 1 ? ` ×${e.times}` : ""}
               </span>{" "}
@@ -129,51 +127,51 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
 
       {/* Efeitos descritivos dos aprimoramentos (sem automação): em destaque, para o jogador aplicar à mão. */}
       {notes.length > 0 && (
-        <div className="mt-2 rounded border border-amber-800/60 bg-amber-950/30 px-2 py-1.5 text-xs text-amber-100 font-serif leading-relaxed space-y-0.5" data-card-notes>
+        <div className="mt-2 rounded-ui border border-border bg-bg/40 px-2 py-1.5 text-xs text-text font-ui leading-relaxed space-y-0.5" data-card-notes>
           {notes.map((e) => (
             <div key={e.id} className="whitespace-pre-wrap break-words">
-              <span className="font-bold text-amber-300">{e.label || e.id}:</span> {e.note}
+              <span className="font-bold text-text">{e.label || e.id}:</span> {e.note}
             </div>
           ))}
         </div>
       )}
 
-      {card.effect && <div className="mt-2 text-xs text-zinc-200 font-serif leading-relaxed whitespace-pre-wrap break-words">{card.effect}</div>}
+      {card.effect && <div className="mt-2 text-xs text-text font-ui leading-relaxed whitespace-pre-wrap break-words">{card.effect}</div>}
 
       {/* CD de resistência */}
       {card.save && (
-        <div className="mt-2 flex items-center gap-2 text-[11px] font-mono">
-          <span className="px-1.5 py-0.5 rounded bg-[#2d2417] border border-[#d4af37]/40 text-[#d4af37] font-bold">
+        <div className="mt-2 flex items-center gap-2 text-[11px] font-ui">
+          <span className="px-1.5 py-0.5 rounded-ui bg-bg/40 border border-accent/40 text-accent font-data font-bold">
             {card.save.dc !== null ? `CD ${card.save.dc}` : "CD —"}
           </span>
-          <span className="text-zinc-300">{card.save.skillLabel}</span>
+          <span className="text-text">{card.save.skillLabel}</span>
           {enhanced.has("dc") && <Enhanced />}
-          {card.save.text && <span className="text-zinc-500 font-serif truncate">({card.save.text})</span>}
+          {card.save.text && <span className="text-text-muted truncate">({card.save.text})</span>}
         </div>
       )}
 
       {/* Botões de ação: rolam pela ficha de origem */}
       {card.actions.length > 0 && (
-        <div className="mt-2.5 pt-2 border-t border-sky-900/40 flex items-center gap-2 flex-wrap">
+        <div className="mt-2.5 pt-2 border-t border-border flex items-center gap-2 flex-wrap">
           {card.actions.map((a) => (
             <div key={a.id} className="relative group/action flex items-center">
               <button
                 onClick={() => onRoll(a.id)}
                 disabled={!canAct}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#221c14] hover:bg-[#33281b] border border-[#d4af37]/50 hover:border-[#d4af37] text-amber-100 text-xs font-serif font-semibold transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="focus-ring flex items-center gap-1.5 px-2.5 py-1 rounded-ui bg-surface-1 hover:bg-surface-1/70 border border-accent text-accent text-xs font-ui font-semibold transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 title={canAct ? `Rolar ${a.label}${a.formula ? `: ${a.formula}` : ""}${a.breakdown ? ` (${a.breakdown})` : ""}` : "Só o GM ou o dono da ficha pode rolar"}
               >
-                <Dices className="w-3.5 h-3.5 text-[#d4af37]" />
+                <Dices className="w-3.5 h-3.5" />
                 <span>{a.label}</span>
                 {a.kind === "attack" && enhanced.has("attack") && <Enhanced />}
                 {/* Dano: parcelas com o selo do tipo; cards antigos não têm `damage` e mostram só a fórmula. */}
-                {a.formula && <span className="font-mono font-bold text-amber-300 ml-0.5">({(a.damage ?? []).length > 0 ? <DamageFormula def={def} components={a.damage} /> : a.formula})</span>}
+                {a.formula && <span className="font-data tabular-nums font-bold ml-0.5">({(a.damage ?? []).length > 0 ? <DamageFormula def={def} components={a.damage} /> : a.formula})</span>}
               </button>
               {canAct && onSaveAsMacro && (
                 <button
                   onClick={() => onSaveAsMacro(a.id)}
                   title="Salvar como macro"
-                  className="ml-1 opacity-0 group-hover/action:opacity-100 text-zinc-500 hover:text-[#d4af37] transition-all cursor-pointer"
+                  className="focus-ring ml-1 opacity-0 group-hover/action:opacity-100 text-text-muted hover:text-text transition-all cursor-pointer"
                 >
                   <BookmarkPlus className="w-3.5 h-3.5" />
                 </button>
@@ -182,10 +180,10 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
           ))}
           {/* Decomposição do dano com os aprimoramentos (só quando algum efeito mudou a fórmula). */}
           {card.actions.some((a) => a.breakdown) && (
-            <div className="w-full text-[10px] font-mono text-zinc-500" data-card-breakdown>
+            <div className="w-full text-[10px] font-data tabular-nums text-text-muted" data-card-breakdown>
               {card.actions.filter((a) => a.breakdown).map((a) => (
                 <div key={a.id}>
-                  <span className="text-zinc-600">{a.label}:</span> {a.breakdown}
+                  <span className="text-text-muted">{a.label}:</span> {a.breakdown}
                 </div>
               ))}
             </div>

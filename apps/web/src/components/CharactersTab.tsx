@@ -28,10 +28,10 @@ export const CharactersTab: React.FC<Props> = ({ characters, participants, me, o
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#1a1a1a] text-zinc-200">
+    <div className="font-ui flex flex-col h-full bg-surface-1 text-text">
       <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
         {characters.length === 0 ? (
-          <div className="text-center py-10 text-zinc-600 text-xs font-serif">Nenhuma ficha ainda.</div>
+          <div className="text-center py-10 text-text-muted text-xs font-ui">Nenhuma ficha ainda.</div>
         ) : (
           characters.map((c) => {
             const owner = c.ownerId ? participants.find((p) => p.id === c.ownerId)?.nickname : null;
@@ -40,27 +40,25 @@ export const CharactersTab: React.FC<Props> = ({ characters, participants, me, o
               <div
                 key={c.id}
                 id={`character-row-${c.id}`}
-                className={`flex items-center gap-2 px-2.5 py-2 rounded border cursor-pointer hover:bg-[#222] ${
-                  mine ? "border-[#d4af37]/40 bg-[#2d2417]/20" : "border-[#2d2417] bg-black/20"
-                }`}
+                className="focus-ring flex items-center gap-2 px-2.5 py-2 rounded-ui border border-border bg-bg/40 cursor-pointer hover:bg-surface-2"
                 onClick={() => onOpen(c.id)}
               >
-                <div className="w-7 h-7 rounded-full bg-[#252525] border border-[#3d3d3d] flex items-center justify-center text-[11px] font-serif font-bold text-[#d4af37] shrink-0">
+                <div className="w-7 h-7 rounded-full bg-surface-2 border border-border flex items-center justify-center text-[11px] font-title font-bold text-text shrink-0">
                   {c.imageUrl ? <img src={c.imageUrl} alt="" className="w-full h-full rounded-full object-cover" /> : c.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-zinc-100 truncate">{c.name}</div>
-                  <div className="text-[10px] text-zinc-500 truncate">
+                  <div className="text-xs font-semibold text-text truncate">{c.name}</div>
+                  <div className="text-[10px] text-text-muted truncate">
                     Nível {c.level} • {c.kind === "npc" ? "NPC" : owner ? owner : "sem dono"}
                   </div>
                 </div>
-                {c.kind === "npc" && <span className="text-[9px] px-1 rounded bg-zinc-800 text-zinc-400 uppercase">NPC</span>}
+                {c.kind === "npc" && <span className="text-[9px] px-1 rounded-ui bg-surface-2 text-text-muted uppercase">NPC</span>}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onOpen(c.id);
                   }}
-                  className="p-1 text-zinc-500 hover:text-[#d4af37] cursor-pointer"
+                  className="focus-ring p-1 rounded-ui text-text-muted hover:text-text cursor-pointer"
                   title="Abrir ficha"
                 >
                   <BookOpen className="w-3.5 h-3.5" />
@@ -71,7 +69,7 @@ export const CharactersTab: React.FC<Props> = ({ characters, participants, me, o
                       e.stopPropagation();
                       if (window.confirm(`Apagar a ficha "${c.name}"?`)) onDelete(c.id);
                     }}
-                    className="p-1 text-zinc-600 hover:text-red-400 cursor-pointer"
+                    className="focus-ring p-1 rounded-ui text-text-muted hover:text-danger cursor-pointer"
                     title="Apagar ficha"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -83,9 +81,9 @@ export const CharactersTab: React.FC<Props> = ({ characters, participants, me, o
         )}
       </div>
 
-      <form onSubmit={submit} className="p-3 bg-[#121212] border-t border-[#2d2417] space-y-2">
-        <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 uppercase tracking-widest font-serif font-bold">
-          <Users className="w-3 h-3 text-[#d4af37]" /> Nova ficha
+      <form onSubmit={submit} className="p-3 bg-bg border-t border-border space-y-2">
+        <div className="flex items-center gap-1.5 text-[10px] text-text-muted uppercase tracking-widest font-title font-bold">
+          <Users className="w-3 h-3" /> Nova ficha
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -94,24 +92,32 @@ export const CharactersTab: React.FC<Props> = ({ characters, participants, me, o
             onChange={(e) => setName(e.target.value)}
             placeholder="Nome do personagem"
             maxLength={80}
-            className="flex-1 min-w-0 bg-[#1a1a1a] border border-[#3d3d3d] rounded-md px-3 py-1.5 text-xs focus:outline-none focus:border-[#d4af37] text-zinc-200 placeholder:text-zinc-600"
+            className="focus-ring flex-1 min-w-0 bg-surface-1 border border-border rounded-ui px-3 py-1.5 text-xs text-text placeholder:text-text-muted"
           />
           <button
             id="btn-create-character"
             type="submit"
             disabled={!name.trim()}
-            className="bg-[#2d2417] border border-[#d4af37] px-3 py-1.5 rounded-md text-xs text-[#d4af37] font-serif font-bold hover:bg-[#3d311f] disabled:opacity-40 cursor-pointer flex items-center gap-1"
+            className="focus-ring bg-surface-2 border border-accent px-3 py-1.5 rounded-ui text-xs text-accent font-ui font-bold hover:bg-surface-2/80 disabled:opacity-40 cursor-pointer flex items-center gap-1"
           >
             <Plus className="w-3.5 h-3.5" /> Criar
           </button>
         </div>
         {isGm && (
           <div className="flex items-center gap-2 text-[11px]">
-            <select value={kind} onChange={(e) => setKind(e.target.value === "npc" ? "npc" : "pc")} className="bg-[#1a1a1a] border border-[#3d3d3d] rounded px-1.5 py-1 text-zinc-200 focus:outline-none focus:border-[#d4af37]">
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value === "npc" ? "npc" : "pc")}
+              className="focus-ring bg-surface-1 border border-border rounded-ui px-1.5 py-1 text-text"
+            >
               <option value="pc">Personagem</option>
               <option value="npc">NPC (só GM vê)</option>
             </select>
-            <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="bg-[#1a1a1a] border border-[#3d3d3d] rounded px-1.5 py-1 text-zinc-200 focus:outline-none focus:border-[#d4af37] flex-1 min-w-0">
+            <select
+              value={ownerId}
+              onChange={(e) => setOwnerId(e.target.value)}
+              className="focus-ring bg-surface-1 border border-border rounded-ui px-1.5 py-1 text-text flex-1 min-w-0"
+            >
               <option value="">Dono: apenas GM</option>
               {participants
                 .filter((p) => p.role === "player")

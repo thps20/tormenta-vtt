@@ -20,17 +20,20 @@ interface InitiativeBatchMessageProps {
 export const InitiativeBatchMessage: React.FC<InitiativeBatchMessageProps> = ({ msg, time, isGm, onReveal }) => {
   const batch = msg.initiativeBatch;
   if (!batch) return null;
+  // Acionável (fica cartão) só quando o Revelar aparece (GM, rolagem não pública); pros demais é
+  // uma linha de log, igual a uma rolagem simples (docs/design/DESIGN.md).
+  const revealable = isGm && msg.visibility !== "all";
 
   return (
-    <div id={`chat-msg-${msg.id}`} className="p-3 rounded border border-zinc-800/60 bg-black/35 shadow-inner">
+    <div id={`chat-msg-${msg.id}`} className={revealable ? "font-ui p-3 rounded-ui border border-border bg-surface-2" : "font-ui py-1.5 border-b border-border"}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
-          <Swords className="w-3.5 h-3.5 text-[#d4af37]" />
-          <span className="text-[11px] font-serif font-bold uppercase tracking-tight text-[#d4af37]">
+          <Swords className="w-3.5 h-3.5 text-text-muted" />
+          <span className="text-[11px] font-title font-bold uppercase tracking-tight text-text">
             Iniciativa (rodada {batch.round})
           </span>
         </div>
-        <span className="text-[9px] font-mono text-zinc-600">{time}</span>
+        <span className="text-[9px] font-data tabular-nums text-text-muted">{time}</span>
       </div>
 
       <div data-batch-entries>
@@ -38,16 +41,16 @@ export const InitiativeBatchMessage: React.FC<InitiativeBatchMessageProps> = ({ 
           <div
             key={e.combatantId}
             data-combatant-id={e.combatantId}
-            className="flex items-center justify-between gap-2 py-1 border-b border-zinc-800/40 last:border-0"
+            className="flex items-center justify-between gap-2 py-1 border-b border-border last:border-0"
           >
-            <span className="text-xs text-zinc-200 font-serif truncate">{e.name}</span>
+            <span className="text-xs text-text truncate">{e.name}</span>
             {e.result !== undefined ? (
               <span className="flex items-baseline gap-2">
-                {e.formula && <span className="text-[10px] font-mono text-zinc-500">{e.formula}</span>}
-                <span className="text-sm font-serif font-bold text-[#d4af37]">{e.result}</span>
+                {e.formula && <span className="text-[10px] font-data text-text-muted">{e.formula}</span>}
+                <span className="text-sm font-data tabular-nums font-bold text-text">{e.result}</span>
               </span>
             ) : (
-              <span className="text-[10px] text-zinc-500 italic">rolou</span>
+              <span className="text-[10px] text-text-muted italic">rolou</span>
             )}
           </div>
         ))}
@@ -59,10 +62,10 @@ export const InitiativeBatchMessage: React.FC<InitiativeBatchMessageProps> = ({ 
           const VisIcon = vis.icon;
           return (
             <div
-              className="mt-2 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between gap-2 text-[10px] font-mono"
+              className="mt-2 pt-1.5 border-t border-border flex items-center justify-between gap-2 text-[10px] font-ui"
               data-visibility={msg.visibility}
             >
-              <span className="flex items-center gap-1 text-[#d4af37]/80">
+              <span className="flex items-center gap-1 text-text-muted">
                 <VisIcon className="w-3 h-3" />
                 <span>{msg.visibility === "gm" ? "Rolagem secreta: só o GM vê os valores" : "Rolagem própria: só você vê os valores"}</span>
               </span>
@@ -72,7 +75,7 @@ export const InitiativeBatchMessage: React.FC<InitiativeBatchMessageProps> = ({ 
                   id={`reveal-${msg.id}`}
                   onClick={() => onReveal(msg.id)}
                   title="Tornar pública para todos"
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#d4af37]/40 text-[#d4af37] hover:bg-[#2d2417] transition-colors cursor-pointer"
+                  className="focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border border-accent text-accent hover:bg-surface-1 transition-colors cursor-pointer"
                 >
                   <Eye className="w-3 h-3" />
                   Revelar

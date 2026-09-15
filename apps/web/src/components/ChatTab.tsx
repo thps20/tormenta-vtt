@@ -26,6 +26,7 @@ import { RollModeButton } from './chat/RollModeButton';
 import { WhisperTargetButton } from './chat/WhisperTargetButton';
 import { DamageFormula, DamageTypeBadge } from './DamageTypeBadge';
 import { useHandouts } from '../store/handouts';
+import { pressedClass } from './MapBar';
 
 /** Soma dos totais das parcelas de dano — usado no bloco de dano de uma rolagem combinada (§9.13),
  *  onde `roll.total` é o total do ATAQUE, não do dano (que fica só em `roll.damage[]`). */
@@ -41,13 +42,13 @@ function sumDamage(damage: NonNullable<DiceRoll['damage']>): number {
  */
 function targetLineText(def: ReturnType<typeof useSystemDef>, roll: DiceRoll, target: RollTarget): { text: string; color: string } {
   const name = target.name;
-  if (target.reason === 'auto-hit') return { text: `Acertou ${name} (${roll.natural} natural)`, color: 'text-emerald-400' };
-  if (target.reason === 'auto-miss') return { text: `Errou ${name} (${roll.natural} natural)`, color: 'text-red-400' };
-  if (target.hit === null) return { text: `→ ${name}`, color: 'text-zinc-400' };
+  if (target.reason === 'auto-hit') return { text: `Acertou ${name} (${roll.natural} natural)`, color: 'text-success' };
+  if (target.reason === 'auto-miss') return { text: `Errou ${name} (${roll.natural} natural)`, color: 'text-danger' };
+  if (target.hit === null) return { text: `→ ${name}`, color: 'text-text-muted' };
   const verb = target.hit ? 'Acertou' : 'Errou';
-  if (target.targetValue === undefined) return { text: `${verb} ${name}`, color: target.hit ? 'text-emerald-400' : 'text-red-400' };
+  if (target.targetValue === undefined) return { text: `${verb} ${name}`, color: target.hit ? 'text-success' : 'text-danger' };
   const label = def?.rolls.attackHit ? hitRuleTargetLabel(def, def.rolls.attackHit) : 'alvo';
-  return { text: `${verb} ${name} (${roll.total} vs ${label} ${target.targetValue})`, color: target.hit ? 'text-emerald-400' : 'text-red-400' };
+  return { text: `${verb} ${name} (${roll.total} vs ${label} ${target.targetValue})`, color: target.hit ? 'text-success' : 'text-danger' };
 }
 
 /**
@@ -174,32 +175,29 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#1a1a1a] text-zinc-200">
-      {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
+    <div className="font-ui flex flex-col h-full bg-surface-1 text-text">
+      {/* Messages Stream: rolagens/mensagens simples viram linha de log (só filete); cartão fica
+          reservado pro que pede uma ação (Aplicar, Revelar, usar item — docs/design/DESIGN.md). */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-1 scrollbar-thin">
         {messages.map((msg) => {
           const participant = getParticipant(msg.participantId);
           const isGm = participant?.role === 'gm';
           const isMe = msg.participantId === currentUserId;
 
-          // 1. SYSTEM MESSAGE - Elegant Dark
+          // 1. SYSTEM MESSAGE — nunca acionável: linha de log.
           if (msg.kind === 'system') {
             return (
-              <div
-                key={msg.id}
-                id={`chat-msg-${msg.id}`}
-                className="my-1.5 p-2.5 rounded bg-black/30 border border-zinc-800/60 shadow-inner"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-serif font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <Scroll className="w-3 h-3 text-[#d4af37]" />
+              <div key={msg.id} id={`chat-msg-${msg.id}`} className="py-1.5 border-b border-border">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-[10px] font-title font-bold text-text-muted uppercase tracking-widest flex items-center gap-1.5">
+                    <Scroll className="w-3 h-3" />
                     SISTEMA
                   </span>
-                  <span className="text-[9px] font-mono text-zinc-600">
+                  <span className="text-[9px] font-data tabular-nums text-text-muted">
                     {formatTime(msg.createdAt)}
                   </span>
                 </div>
-                <div className="text-xs text-zinc-400 italic leading-relaxed">
+                <div className="text-xs text-text-muted italic leading-relaxed">
                   {msg.text}
                 </div>
               </div>
@@ -259,32 +257,24 @@ export const ChatTab: React.FC<ChatTabProps> = ({
           if (msg.kind === 'roll' && !msg.roll) {
             const vis = rollModeInfo(msg.visibility);
             const VisIcon = vis.icon;
+            // Acionável só pra quem vê o botão Revelar (GM); pros demais é só uma linha de log.
+            const revealable = me.role === 'gm';
             return (
               <div
                 key={msg.id}
                 id={`chat-msg-${msg.id}`}
-                className="p-2.5 rounded border border-zinc-800/60 bg-black/25"
+                className={revealable ? 'p-2.5 rounded-ui border border-border bg-surface-2' : 'py-1.5 border-b border-border'}
                 data-visibility={msg.visibility}
               >
                 <div className="flex items-center justify-between text-xs mb-1">
                   <div className="flex items-center gap-1.5">
-                    <span
-                      className={`text-[11px] font-bold uppercase tracking-tight ${
-                        isGm ? 'text-[#d4af37] font-serif' : isMe ? 'text-blue-400' : 'text-zinc-300'
-                      }`}
-                    >
-                      {msg.nickname}
-                    </span>
-                    {isGm && (
-                      <span className="text-[9px] px-1 rounded bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40 font-serif font-bold">
-                        GM
-                      </span>
-                    )}
+                    <span className="text-[11px] font-bold uppercase tracking-tight text-text">{msg.nickname}</span>
+                    {isGm && <span className="text-[9px] px-1 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
                   </div>
-                  <span className="text-[9px] font-mono text-zinc-600">{formatTime(msg.createdAt)}</span>
+                  <span className="text-[9px] font-data tabular-nums text-text-muted">{formatTime(msg.createdAt)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 text-xs text-zinc-500 italic">
+                  <span className="flex items-center gap-1.5 text-xs text-text-muted italic">
                     <VisIcon className="w-3 h-3 shrink-0" />
                     {msg.visibility === 'gm' ? `${msg.nickname} fez uma rolagem secreta` : `${msg.nickname} fez uma rolagem própria`}
                   </span>
@@ -294,7 +284,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                       id={`reveal-${msg.id}`}
                       onClick={() => void revealMessage(msg.id)}
                       title="Tornar pública para todos"
-                      className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#d4af37]/40 text-[#d4af37] hover:bg-[#2d2417] transition-colors cursor-pointer shrink-0"
+                      className="focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border border-accent text-accent hover:bg-surface-1 transition-colors cursor-pointer shrink-0"
                     >
                       <Eye className="w-3 h-3" />
                       Revelar
@@ -320,43 +310,26 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             // dano embaixo, num bloco à parte — não misturado no número do header como o dano avulso.
             const combined = isCombinedAttackRoll(roll);
             const rollWhisper = whisperLabel(msg, me, participants);
+            // Acionável (fica cartão) quando tem Aplicar (dano) ou Revelar (segredo, só o GM);
+            // rolagem simples (teste, ataque sem dano, já pública) é só uma linha de log.
+            const hasApply = !!damage || roll.applied.length > 0;
+            const hasReveal = msg.visibility !== 'all' && me.role === 'gm';
+            const actionable = hasApply || hasReveal;
 
             return (
               <div
                 key={msg.id}
                 id={`chat-msg-${msg.id}`}
                 data-whisper-to={msg.whisperTo ?? undefined}
-                className={`p-3 rounded border shadow-inner transition-all ${
-                  rollWhisper
-                    ? 'bg-purple-950/20 border-purple-700/50'
-                    : isCritical
-                      ? 'bg-[#2d2417]/40 border-[#d4af37] shadow-[#d4af37]/10'
-                      : isFumble
-                        ? 'bg-red-950/20 border-red-900/50'
-                        : 'bg-black/35 border-zinc-800/60'
-                }`}
+                className={actionable ? 'p-3 rounded-ui border border-border bg-surface-2' : 'py-1.5 border-b border-border'}
               >
                 {/* Roll Header */}
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5">
-                    <span
-                      className={`text-[11px] font-bold uppercase tracking-tight ${
-                        isGm
-                          ? 'text-[#d4af37] font-serif'
-                          : isMe
-                          ? 'text-blue-400'
-                          : 'text-zinc-300'
-                      }`}
-                    >
-                      {msg.nickname}
-                    </span>
-                    {isGm && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40 font-serif font-bold">
-                        GM
-                      </span>
-                    )}
+                    <span className="text-[11px] font-bold uppercase tracking-tight text-text">{msg.nickname}</span>
+                    {isGm && <span className="text-[9px] px-1.5 py-0.2 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
                     {rollWhisper && (
-                      <span className="flex items-center gap-1 text-[9px] px-1 rounded bg-purple-950/50 text-purple-300 border border-purple-700/50 font-mono lowercase">
+                      <span className="flex items-center gap-1 text-[9px] px-1 rounded-ui bg-bg/40 border border-border text-text-muted lowercase">
                         <MessageCircle className="w-2.5 h-2.5" />
                         {rollWhisper}
                       </span>
@@ -370,12 +343,12 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                         type="button"
                         onClick={() => onSaveMacro({ type: 'roll', formula: roll.formula, label: roll.label }, roll.label || 'Rolagem')}
                         title="Salvar como macro"
-                        className="text-zinc-600 hover:text-[#d4af37] transition-colors cursor-pointer"
+                        className="focus-ring text-text-muted hover:text-text transition-colors cursor-pointer"
                       >
                         <BookmarkPlus className="w-3 h-3" />
                       </button>
                     )}
-                    <span className="text-[9px] font-mono text-zinc-600">
+                    <span className="text-[9px] font-data tabular-nums text-text-muted">
                       {formatTime(msg.createdAt)}
                     </span>
                   </div>
@@ -384,17 +357,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                 {/* Roll Content Layout */}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex flex-col flex-1 min-w-0">
-                    <span className="text-[11px] text-zinc-400 italic mb-1 truncate">
+                    <span className="text-[11px] text-text-muted italic mb-1 truncate">
                       {roll.label ? roll.label : 'Rolagem de dados'}
                     </span>
                     <div className="flex items-baseline gap-2">
                       <span
-                        className={`text-2xl font-serif font-bold tracking-tight ${
-                          isCritical
-                            ? 'text-[#d4af37] drop-shadow-[0_0_10px_rgba(212,175,55,0.4)]'
-                            : isFumble
-                            ? 'text-red-400'
-                            : 'text-[#d4af37]'
+                        className={`text-2xl font-data tabular-nums font-bold tracking-tight ${
+                          isCritical ? 'text-accent' : isFumble ? 'text-danger' : 'text-text'
                         }`}
                       >
                         {roll.total}
@@ -403,19 +372,19 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                           Combinado (§9.13) não mistura aqui: o dano tem bloco próprio, embaixo. */}
                       {damage && !combined && damage.length === 1 && damage[0] && <DamageTypeBadge def={def} type={damage[0].damageType} />}
                       {damage && !combined && damage.length > 1 && (
-                        <span className="text-[11px] font-mono text-zinc-300 flex items-center gap-1 flex-wrap" data-damage-breakdown>
+                        <span className="text-[11px] font-data tabular-nums text-text flex items-center gap-1 flex-wrap" data-damage-breakdown>
                           (
                           {damage.map((d, i) => (
                             <React.Fragment key={i}>
-                              {i > 0 && <span className="text-zinc-500">+</span>}
-                              <span className="font-bold text-amber-200">{d.total}</span>
+                              {i > 0 && <span className="text-text-muted">+</span>}
+                              <span className="font-bold text-text">{d.total}</span>
                               <DamageTypeBadge def={def} type={d.damageType} />
                             </React.Fragment>
                           ))}
                           )
                         </span>
                       )}
-                      <span className="text-[11px] font-mono text-zinc-500">
+                      <span className="text-[11px] font-data tabular-nums text-text-muted">
                         {roll.groups.map((g) => `[${g.rolls.join(', ')}]`).join(' ')}
                         {roll.modifier !== 0 && (
                           <span>
@@ -427,27 +396,25 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                     </div>
                     {/* Fórmula do dano com o selo de cada parcela: "6d6 + 1 [Fogo] + 4d6 [Frio]". */}
                     {damage && !combined && (
-                      <div className="mt-1 text-[10px] font-mono text-zinc-500" data-damage-formula>
+                      <div className="mt-1 text-[10px] font-data text-text-muted" data-damage-formula>
                         <DamageFormula def={def} components={damage} />
                       </div>
                     )}
                   </div>
 
-                  {/* Elegant Rhombus Dice Badge */}
-                  <div className="w-10 h-10 border border-[#d4af37]/40 bg-[#2d2417]/40 flex items-center justify-center rounded transform rotate-45 shrink-0 shadow-sm">
-                    <span className="-rotate-45 text-[11px] text-[#d4af37] font-serif font-bold tracking-tighter">
-                      {roll.groups[0] ? `${roll.groups[0].count}d${roll.groups[0].sides}` : 'd20'}
-                    </span>
-                  </div>
+                  {/* Notação do dado ("1d20"): rótulo simples, sem moldura decorativa. */}
+                  <span className="font-data text-[11px] text-text-muted shrink-0">
+                    {roll.groups[0] ? `${roll.groups[0].count}d${roll.groups[0].sides}` : 'd20'}
+                  </span>
                 </div>
 
                 {/* Sistema de alvos (docs/plano-alvos.md): uma linha por alvo do ataque. */}
                 {roll.targets.length > 0 && (
-                  <div className="mt-2 pt-1.5 border-t border-zinc-800/60 space-y-0.5" data-roll-targets>
+                  <div className="mt-2 pt-1.5 border-t border-border space-y-0.5" data-roll-targets>
                     {roll.targets.map((t) => {
                       const { text, color } = targetLineText(def, roll, t);
                       return (
-                        <div key={t.tokenId} className={`text-[11px] font-mono ${color}`}>
+                        <div key={t.tokenId} className={`text-[11px] font-data ${color}`}>
                           {text}
                         </div>
                       );
@@ -459,18 +426,18 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                     do dano (roll.total ali em cima é do ATAQUE, não deste dano) e o aviso de
                     crítico — confirmado (dado já multiplicado) ou só "possível" (o Mestre decide). */}
                 {combined && damage && (
-                  <div className="mt-2 pt-1.5 border-t border-zinc-800/60" data-combined-damage>
+                  <div className="mt-2 pt-1.5 border-t border-border" data-combined-damage>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-[11px] text-zinc-400 italic">Dano</span>
-                      <span className="text-xl font-serif font-bold text-amber-200">{sumDamage(damage)}</span>
+                      <span className="text-[11px] text-text-muted italic">Dano</span>
+                      <span className="text-xl font-data tabular-nums font-bold text-text">{sumDamage(damage)}</span>
                       {damage.length === 1 && damage[0] && <DamageTypeBadge def={def} type={damage[0].damageType} />}
                       {damage.length > 1 && (
-                        <span className="text-[11px] font-mono text-zinc-300 flex items-center gap-1 flex-wrap">
+                        <span className="text-[11px] font-data tabular-nums text-text flex items-center gap-1 flex-wrap">
                           (
                           {damage.map((d, i) => (
                             <React.Fragment key={i}>
-                              {i > 0 && <span className="text-zinc-500">+</span>}
-                              <span className="font-bold text-amber-200">{d.total}</span>
+                              {i > 0 && <span className="text-text-muted">+</span>}
+                              <span className="font-bold text-text">{d.total}</span>
                               <DamageTypeBadge def={def} type={d.damageType} />
                             </React.Fragment>
                           ))}
@@ -478,12 +445,12 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 text-[10px] font-mono text-zinc-500" data-damage-formula>
+                    <div className="mt-1 text-[10px] font-data text-text-muted" data-damage-formula>
                       <DamageFormula def={def} components={damage} />
                     </div>
                     {isCritical && (
                       <div
-                        className={`mt-1 flex items-center gap-1 text-[10px] font-mono ${roll.criticalConfirmed ? 'text-[#d4af37]' : 'text-amber-400'}`}
+                        className={`mt-1 flex items-center gap-1 text-[10px] font-ui ${roll.criticalConfirmed ? 'text-accent' : 'text-text'}`}
                         data-critical={roll.criticalConfirmed ? 'confirmed' : 'possible'}
                       >
                         <Flame className="w-3 h-3" />
@@ -494,7 +461,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                 )}
 
                 {(damage || roll.applied.length > 0) && (
-                  <div className="mt-2 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between gap-2 flex-wrap" data-apply-damage>
+                  <div className="mt-2 pt-1.5 border-t border-border flex items-center justify-between gap-2 flex-wrap" data-apply-damage>
                     <ApplyDamageButton
                       messageId={msg.id}
                       roll={roll}
@@ -513,13 +480,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                       }
                     />
                     {roll.applied.length > 0 && (
-                      <span className="text-[10px] font-mono text-zinc-500" data-applied-log>
+                      <span className="text-[10px] font-data tabular-nums text-text-muted" data-applied-log>
                         Aplicado:{' '}
                         {roll.applied.map((a, i) => (
                           <React.Fragment key={i}>
                             {i > 0 && ', '}
                             <span
-                              className={a.amount < 0 ? 'text-red-400' : 'text-emerald-400'}
+                              className={a.amount < 0 ? 'text-danger' : 'text-success'}
                               // Decomposição (§3.3): bruto/ajuste calculados pelo SERVIDOR pela
                               // resposta a dano do alvo — só num tooltip, pra não inchar a linha
                               // (cards de antes desta feature têm os dois em 0: sem tooltip).
@@ -541,10 +508,10 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                   const VisIcon = vis.icon;
                   return (
                     <div
-                      className="mt-2 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between gap-2 text-[10px] font-mono"
+                      className="mt-2 pt-1.5 border-t border-border flex items-center justify-between gap-2 text-[10px] font-ui"
                       data-visibility={msg.visibility}
                     >
-                      <span className="flex items-center gap-1 text-[#d4af37]/80">
+                      <span className="flex items-center gap-1 text-text-muted">
                         <VisIcon className="w-3 h-3" />
                         <span>{msg.visibility === 'gm' ? 'Rolagem secreta: só o GM vê' : 'Rolagem própria: só você vê'}</span>
                       </span>
@@ -554,7 +521,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                           id={`reveal-${msg.id}`}
                           onClick={() => void revealMessage(msg.id)}
                           title="Tornar pública para todos"
-                          className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#d4af37]/40 text-[#d4af37] hover:bg-[#2d2417] transition-colors cursor-pointer"
+                          className="focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border border-accent text-accent hover:bg-surface-1 transition-colors cursor-pointer"
                         >
                           <Eye className="w-3 h-3" />
                           Revelar
@@ -567,51 +534,26 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             );
           }
 
-          // 5. STANDARD TEXT MESSAGE - Elegant Dark
+          // 5. MENSAGEM DE TEXTO — nunca acionável: linha de log.
           const textWhisper = whisperLabel(msg, me, participants);
           return (
-            <div
-              key={msg.id}
-              id={`chat-msg-${msg.id}`}
-              data-whisper-to={msg.whisperTo ?? undefined}
-              className={`p-2.5 rounded border ${
-                textWhisper
-                  ? 'bg-purple-950/20 border-purple-700/50'
-                  : isMe
-                    ? 'bg-black/40 border-[#2d2417] ml-3'
-                    : 'bg-black/25 border-zinc-800/50 mr-3'
-              }`}
-            >
+            <div key={msg.id} id={`chat-msg-${msg.id}`} data-whisper-to={msg.whisperTo ?? undefined} className="py-1.5 border-b border-border">
               <div className="flex items-center justify-between text-xs mb-1">
                 <div className="flex items-center gap-1.5">
-                  <span
-                    className={`text-[11px] font-bold uppercase tracking-tight ${
-                      isGm
-                        ? 'text-[#d4af37] font-serif'
-                        : isMe
-                        ? 'text-blue-400'
-                        : 'text-zinc-300'
-                    }`}
-                  >
-                    {msg.nickname}
-                  </span>
-                  {isGm && (
-                    <span className="text-[9px] px-1 rounded bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40 font-serif font-bold">
-                      GM
-                    </span>
-                  )}
+                  <span className="text-[11px] font-bold uppercase tracking-tight text-text">{msg.nickname}</span>
+                  {isGm && <span className="text-[9px] px-1 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
                   {textWhisper && (
-                    <span className="flex items-center gap-1 text-[9px] px-1 rounded bg-purple-950/50 text-purple-300 border border-purple-700/50 font-mono lowercase">
+                    <span className="flex items-center gap-1 text-[9px] px-1 rounded-ui bg-bg/40 border border-border text-text-muted lowercase">
                       <MessageCircle className="w-2.5 h-2.5" />
                       {textWhisper}
                     </span>
                   )}
                 </div>
-                <span className="text-[9px] font-mono text-zinc-600">
+                <span className="text-[9px] font-data tabular-nums text-text-muted">
                   {formatTime(msg.createdAt)}
                 </span>
               </div>
-              <p className="text-xs text-zinc-300 leading-relaxed break-words whitespace-pre-wrap">
+              <p className="text-xs text-text leading-relaxed break-words whitespace-pre-wrap">
                 {msg.text}
               </p>
             </div>
@@ -620,12 +562,12 @@ export const ChatTab: React.FC<ChatTabProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Dice Bar - Elegant Dark */}
+      {/* Quick Dice Bar */}
       {/* Quebra linha em painéis estreitos (sem overflow: o popover do modo não pode ser recortado). */}
-      <div className="p-2 bg-[#121212] border-t border-[#2d2417] flex items-center justify-between flex-wrap gap-1 text-[11px]">
+      <div className="p-2 bg-bg border-t border-border flex items-center justify-between flex-wrap gap-1 text-[11px]">
         <div className="flex items-center gap-2 pl-1">
-          <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-serif font-bold flex items-center gap-1">
-            <Dices className="w-3 h-3 text-[#d4af37]" />
+          <span className="text-[10px] text-text-muted uppercase tracking-widest font-title font-bold flex items-center gap-1">
+            <Dices className="w-3 h-3" />
             ROLAR:
           </span>
           <RollModeButton mode={rollMode} onChange={setRollMode} />
@@ -636,11 +578,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             onClick={() => setRollDamageWithAttack(!rollDamageWithAttack)}
             aria-pressed={rollDamageWithAttack}
             title="Rolar dano junto com o ataque: o botão de uma ação de ataque com dano no mesmo item rola as duas numa mensagem só."
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded border font-mono text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${
-              rollDamageWithAttack
-                ? 'text-[#d4af37] border-[#d4af37]/60 bg-[#2d2417]/60'
-                : 'text-zinc-500 border-[#3d3d3d] bg-[#1a1a1a] hover:text-zinc-300'
-            }`}
+            className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border font-ui text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${pressedClass(rollDamageWithAttack)}`}
           >
             <Flame className="w-3 h-3" />
             Dano junto
@@ -652,7 +590,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
               key={sides}
               onClick={() => handleQuickDice(sides)}
               title={`Rolar 1d${sides}`}
-              className="px-1.5 py-0.5 rounded bg-[#1a1a1a] hover:bg-[#2d2417] text-zinc-400 hover:text-[#d4af37] border border-[#3d3d3d] hover:border-[#d4af37]/50 font-mono text-[10px] transition-colors cursor-pointer"
+              className="focus-ring px-1.5 py-0.5 rounded-ui bg-surface-1 hover:bg-surface-2 text-text-muted hover:text-text border border-border font-data text-[10px] transition-colors cursor-pointer"
             >
               d{sides}
             </button>
@@ -660,11 +598,8 @@ export const ChatTab: React.FC<ChatTabProps> = ({
         </div>
       </div>
 
-      {/* Chat Input Box - Elegant Dark */}
-      <form
-        onSubmit={handleSubmit}
-        className="p-3 bg-[#121212] border-t border-[#2d2417] flex items-center gap-2"
-      >
+      {/* Chat Input Box */}
+      <form onSubmit={handleSubmit} className="p-3 bg-bg border-t border-border flex items-center gap-2">
         <div className="relative flex-1">
           <input
             id="chat-input-field"
@@ -674,17 +609,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             onKeyDown={handleInputKeyDown}
             placeholder='Mensagem, /r 2d6+3 # rótulo, /gmr (secreta), /pr (pública) ou /w <nickname> (sussurro, aspas se tiver espaço)...'
             data-roll-mode={rollMode}
-            className={`w-full bg-[#1a1a1a] border rounded-md px-3 py-2 text-xs focus:outline-none text-zinc-200 placeholder:text-zinc-600 ${
-              whispering ? 'border-purple-500/70 focus:border-purple-400' : nonPublic ? 'border-amber-500/70 focus:border-amber-400' : 'border-[#3d3d3d] focus:border-[#d4af37]'
+            className={`focus-ring w-full bg-surface-1 border rounded-ui px-3 py-2 text-xs text-text placeholder:text-text-muted ${
+              whispering || nonPublic ? 'border-text-muted' : 'border-border'
             }`}
           />
           {/* Indicador discreto: sussurro ativo, modo fora de "Pública" e/ou comando de dado digitado. */}
           {(isRollCommand || nonPublic || whispering) && (
-            <span
-              className={`absolute right-2.5 top-2 text-[10px] font-mono pointer-events-none uppercase tracking-widest ${
-                whispering ? 'text-purple-400' : nonPublic ? 'text-amber-400' : 'text-[#d4af37]'
-              }`}
-            >
+            <span className="absolute right-2.5 top-2 text-[10px] font-data pointer-events-none uppercase tracking-widest text-text-muted">
               {isRollCommand && 'DADO'}
               {isRollCommand && (nonPublic || whispering) && ' · '}
               {nonPublic && modeInfo.label}
@@ -698,7 +629,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
           id="chat-send-btn"
           type="submit"
           disabled={!inputText.trim()}
-          className="bg-[#2d2417] border border-[#d4af37] px-3 py-2 rounded-md text-xs text-[#d4af37] font-serif font-bold hover:bg-[#3d311f] disabled:opacity-40 disabled:hover:bg-[#2d2417] transition-colors cursor-pointer flex items-center justify-center shrink-0 shadow-sm"
+          className="focus-ring bg-surface-2 border border-accent px-3 py-2 rounded-ui text-xs text-accent font-ui font-bold hover:bg-surface-2/80 disabled:opacity-40 disabled:hover:bg-surface-2 transition-colors cursor-pointer flex items-center justify-center shrink-0"
           title="Enviar (Enter)"
         >
           <Send className="w-3.5 h-3.5" />

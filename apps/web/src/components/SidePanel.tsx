@@ -140,21 +140,21 @@ export const SidePanel: React.FC<SidePanelProps> = ({
     return (
       <aside
         id="vtt-sidepanel-collapsed"
-        className="w-7 shrink-0 h-full bg-[#1a1a1a] border-l border-[#2d2417] flex flex-col items-center py-2 gap-2 select-none z-10"
+        className="font-ui w-7 shrink-0 h-full bg-surface-1 border-l border-border flex flex-col items-center py-2 gap-2 select-none z-10"
       >
         <button
           id="btn-sidepanel-expand"
           onClick={onToggleCollapsed}
           title="Mostrar painel lateral (\ ou Ctrl+B)"
-          className="p-1 rounded text-zinc-500 hover:text-[#d4af37] hover:bg-[#242424] transition-colors cursor-pointer"
+          className="focus-ring p-1 rounded-ui text-text-muted hover:text-text hover:bg-surface-2 transition-colors cursor-pointer"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        {isMyTurn && <span title="É o seu turno" className="w-2.5 h-2.5 rounded-full bg-[#d4af37] animate-pulse shrink-0" />}
+        {isMyTurn && <span title="É o seu turno" className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse shrink-0" />}
         {unreadMessages > 0 && (
           <span
             title={`${unreadMessages} mensagem${unreadMessages === 1 ? '' : 's'} não lida${unreadMessages === 1 ? '' : 's'}`}
-            className="min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-[#d4af37] text-black text-[9px] font-mono font-bold shrink-0"
+            className="min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-accent text-bg text-[9px] font-data tabular-nums font-bold shrink-0"
           >
             {unreadMessages > 99 ? '99+' : unreadMessages}
           </span>
@@ -166,13 +166,13 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   return (
     <aside
       id="vtt-sidepanel"
-      className="relative w-80 md:w-96 bg-[#1a1a1a] border-l border-[#2d2417] flex flex-col h-full shrink-0 select-none z-10 shadow-2xl"
+      className="font-ui relative w-80 md:w-96 bg-surface-1 border-l border-border flex flex-col h-full shrink-0 select-none z-10"
     >
       <button
         id="btn-sidepanel-collapse"
         onClick={onToggleCollapsed}
         title="Recolher painel lateral (\ ou Ctrl+B)"
-        className="absolute -left-3 top-1/2 -translate-y-1/2 z-20 p-1 rounded-full bg-[#1e1a15] border border-[#2d2417] text-zinc-500 hover:text-[#d4af37] hover:border-[#d4af37]/50 transition-colors cursor-pointer shadow"
+        className="focus-ring absolute -left-3 top-1/2 -translate-y-1/2 z-20 p-1 rounded-full bg-surface-1 border border-border text-text-muted hover:text-text hover:bg-surface-2 transition-colors cursor-pointer shadow-float"
       >
         <ChevronRight className="w-3.5 h-3.5" />
       </button>
@@ -200,7 +200,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 
       {/* Tab Navigation Header - Elegant Dark Style. `@container` deixa cada TabButton decidir, pela
           própria largura disponível, entre ícone+rótulo e só ícone (com tooltip e badge no canto). */}
-      <div className="flex h-11 border-b border-[#2d2417] bg-[#141414] shrink-0 @container">
+      <div className="flex h-11 border-b border-border bg-surface-1 shrink-0 @container">
         {tabs.map((tab) => (
           <TabButton key={tab.id} id={`tab-btn-${tab.id}`} tab={tab} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} />
         ))}
@@ -268,24 +268,22 @@ const TabButton: React.FC<{ id: string; tab: TabDef; active: boolean; onClick: (
     id={id}
     onClick={onClick}
     title={`${label} (${badge})`}
-    className={`relative flex-1 min-w-0 flex items-center justify-center gap-2 px-1 text-xs font-serif font-bold tracking-widest uppercase transition-all cursor-pointer ${
-      active
-        ? 'border-b-2 border-[#d4af37] bg-[#222222] text-[#d4af37]'
-        : 'border-b border-[#2d2417] text-zinc-500 hover:text-zinc-300 hover:bg-[#1a1a1a]'
+    className={`focus-ring relative flex-1 min-w-0 flex items-center justify-center gap-2 px-1 text-xs font-title font-bold tracking-widest uppercase transition-all cursor-pointer ${
+      active ? 'border-b-2 border-accent bg-surface-2 text-accent' : 'border-b border-border text-text-muted hover:text-text hover:bg-surface-2'
     }`}
   >
     <Icon className="w-3.5 h-3.5 shrink-0" />
     <span className="hidden @[350px]:inline truncate">{label}</span>
     <span
-      className={`hidden @[350px]:inline-block shrink-0 text-[10px] font-mono px-1.5 py-0.2 rounded ${
-        active ? 'bg-[#2d2417] text-[#d4af37] border border-[#d4af37]/40' : 'bg-zinc-800 text-zinc-500'
+      className={`hidden @[350px]:inline-block shrink-0 text-[10px] font-data tabular-nums px-1.5 py-0.2 rounded-ui ${
+        active ? 'bg-bg text-accent border border-accent/40' : 'bg-surface-2 text-text-muted'
       }`}
     >
       {badge}
     </span>
     <span
-      className={`flex @[350px]:hidden absolute top-0.5 right-1.5 min-w-[15px] h-[15px] px-0.5 items-center justify-center rounded-full text-[8px] font-mono leading-none ${
-        active ? 'bg-[#d4af37] text-black' : 'bg-zinc-700 text-zinc-300'
+      className={`flex @[350px]:hidden absolute top-0.5 right-1.5 min-w-[15px] h-[15px] px-0.5 items-center justify-center rounded-full text-[8px] font-data tabular-nums leading-none ${
+        active ? 'bg-accent text-bg' : 'bg-surface-2 text-text'
       }`}
     >
       {badge}
