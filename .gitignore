@@ -13,7 +13,9 @@ apps/server/uploads/
 # Descrições do compêndio importadas do Foundry (texto do livro, fica fora do repositório)
 *.local.json
 
-# Impeccable (arquivos efêmeros de sessão/hook/live, recomendado pela própria skill)
+# impeccable-ignore-start (arquivos efêmeros de sessão/hook/live, recomendado pela própria skill —
+# o que fica de fora daqui, como .impeccable/config.json, design.json, surfaces/ e critique/, é
+# contexto de projeto e deve ser versionado)
 .impeccable/hook.cache.json
 .impeccable/hook.pending.json
 .impeccable/config.local.json
@@ -34,3 +36,4 @@ apps/server/uploads/
 .impeccable/live/deferred-svelte-component-accepts.json
 .impeccable-live/app/
 .impeccable-live/src/
+# impeccable-ignore-end
