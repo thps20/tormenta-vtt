@@ -213,6 +213,12 @@ export interface RoomSnapshot {
    * sala (nenhum link gerado ainda, ou revogado).
    */
   cast?: CastState;
+  /**
+   * Sons (docs/plano-preparo.md §3): trilha atual + relógio do servidor no instante do envio, pra
+   * quem entra no meio da trilha calcular a posição (`rules/audio.ts#trackPositionMs`). TODO mundo
+   * recebe igual (GM e jogador — diferente de `cast`), inclusive a tela do Cast via `DisplaySnapshot`.
+   */
+  audio: { state: AudioState; serverNow: number };
 }
 
 /** Estado do Cast (docs/plano-cast.md) visível só ao GM. */

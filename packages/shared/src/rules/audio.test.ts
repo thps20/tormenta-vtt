@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { trackPositionMs } from "./audio.js";
+import { toPublicAudioState, trackPositionMs } from "./audio.js";
 import type { AudioTrackState } from "../schemas/audio.js";
 
 const track = (patch: Partial<AudioTrackState> = {}): AudioTrackState => ({
@@ -35,5 +35,18 @@ describe("trackPositionMs", () => {
 
   it("relógio do servidor retrocedendo (skew) nunca deixa a posição andar pra trás", () => {
     expect(trackPositionMs(track({ positionMs: 5000, at: 10_000 }), { now: 9000 })).toBe(5000);
+  });
+});
+
+describe("toPublicAudioState (§3.4: jogador/tela do Cast nunca recebem assetId)", () => {
+  it("remove assetId sem mexer no resto", () => {
+    const state = { track: track({ assetId: "a-secreto" }) };
+    const publicState = toPublicAudioState(state);
+    expect(publicState.track).not.toHaveProperty("assetId");
+    expect(publicState.track).toMatchObject({ url: state.track!.url, loop: true, playing: true });
+  });
+
+  it("sem trilha tocando, devolve o mesmo estado (nada pra redigir)", () => {
+    expect(toPublicAudioState({ track: null })).toEqual({ track: null });
   });
 });

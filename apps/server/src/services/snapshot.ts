@@ -1,4 +1,14 @@
-import { FogConfigSchema, GridConfigSchema, drawingVisibleTo, getSystemDefinition, type Combat, type Drawing, type Pin, type RoomSnapshot } from "@tormenta-vtt/shared";
+import {
+  FogConfigSchema,
+  GridConfigSchema,
+  drawingVisibleTo,
+  getSystemDefinition,
+  toPublicAudioState,
+  type Combat,
+  type Drawing,
+  type Pin,
+  type RoomSnapshot,
+} from "@tormenta-vtt/shared";
 import type { Room as DbRoom } from "@prisma/client";
 import { prisma } from "../db.js";
 import { isConnected } from "./presence.js";
@@ -18,6 +28,7 @@ import { partyFor, partyOf } from "./party.js";
 import { listTargets } from "./targets.js";
 import { listFavoriteEntryIds } from "./compendiumFavorites.js";
 import { listMacros } from "./macros.js";
+import { getAudioState } from "./audio.js";
 
 const CHAT_HISTORY_LIMIT = 100;
 
@@ -154,5 +165,9 @@ export async function buildSnapshot(room: DbRoom, me: SnapshotActor): Promise<Ro
     targets,
     favoriteEntryIds,
     macros,
+    // Sons (docs/plano-preparo.md §3): todo mundo recebe (diferente de `cast`, que socket/room.ts
+    // só preenche pro GM) — mas só o GM recebe `assetId` (§3.4, vazamento); jogador e tela do Cast
+    // (viewer.role "player" pros dois) recebem a versão redigida.
+    audio: { state: viewer.role === "gm" ? getAudioState(room.id) : toPublicAudioState(getAudioState(room.id)), serverNow: Date.now() },
   };
 }

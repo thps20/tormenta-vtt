@@ -93,13 +93,35 @@ model Scene {
   gmNotes   String?
   createdAt DateTime  @default(now())
 
-  room     Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  tokens   Token[]
-  combat   Combat?
-  pins     Pin[]
-  drawings Drawing[]
+  room      Room       @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tokens    Token[]
+  combat    Combat?
+  pins      Pin[]
+  drawings  Drawing[]
+  prepSteps PrepStep[]
 
   @@index([roomId])
+}
+
+/// Passo do preparo de um mapa (docs/plano-preparo.md §2). Só o GM vê — NUNCA sai no Scene
+/// serializado. `items` é Json (lista pequena, sempre reescrita inteira — mesmo raciocínio de
+/// Room.party): passo precisa de soft delete/ordem independentes (por isso é linha, mesmo padrão
+/// de Pin), item não (poucos por passo, sempre editado junto do passo).
+model PrepStep {
+  id        String    @id @default(cuid())
+  sceneId   String
+  order     Int       @default(0)
+  title     String
+  notes     String    @default("")
+  items     Json      @default("[]")
+  used      Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  scene Scene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@index([sceneId])
 }
 
 model Token {

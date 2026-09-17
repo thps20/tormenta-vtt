@@ -42,6 +42,7 @@ import { emitCombat, loadCombatRow, removeTokenFromSceneCombat, toCombat } from 
 import { cellAt, cellRect, cellToPoint, effectiveCellSize, resnapTokenPosition, sceneGeometry } from "../services/grid.js";
 import { reanchorActiveCombatant } from "../services/movement.js";
 import { pushEntry, type HistoryEntry } from "../services/history.js";
+import { copyAllPrepStepsInTx } from "../services/prep.js";
 import { toScene, toToken } from "../services/serialize.js";
 import { clearTemplates, listTemplates } from "../services/templates.js";
 import { redactTokenForViewer, tokenVisibleTo } from "../services/visibility.js";
@@ -376,7 +377,7 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
 
         const createdRow = await prisma.$transaction(async (tx) => {
           await tx.scene.updateMany({ where: { roomId: ctx.roomId, deletedAt: null, order: { gte: insertOrder } }, data: { order: { increment: 1 } } });
-          return tx.scene.create({
+          const created = await tx.scene.create({
             data: {
               roomId: ctx.roomId,
               name: draft.name,
@@ -389,6 +390,9 @@ export function registerSceneHandlers(io: TypedServer, socket: TypedSocket): voi
               order: insertOrder,
             },
           });
+          // Duplicar um mapa copia o preparo junto, tudo como pendente (docs/plano-preparo.md §2.4).
+          await copyAllPrepStepsInTx(tx, sceneId, created.id);
+          return created;
         });
         const scene = toScene(createdRow);
         io.to(rooms.all(ctx.roomId)).emit("scene:created", scene);

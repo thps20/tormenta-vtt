@@ -21,6 +21,8 @@ import { registerEncounterHandlers } from "./encounter.js";
 import { registerPartyHandlers } from "./party.js";
 import { registerMacroHandlers } from "./macros.js";
 import { registerLibraryHandlers } from "./library.js";
+import { registerPrepHandlers } from "./prep.js";
+import { registerAudioHandlers } from "./audio.js";
 import type { TypedServer } from "./types.js";
 
 /** Ponto único que liga todos os handlers de socket. */
@@ -70,6 +72,8 @@ export function registerSocketHandlers(io: TypedServer, log: FastifyBaseLogger):
     registerPartyHandlers(io, socket);
     registerMacroHandlers(io, socket);
     registerLibraryHandlers(io, socket);
+    registerPrepHandlers(io, socket);
+    registerAudioHandlers(io, socket);
 
     socket.on("disconnect", (reason) => {
       log.info({ socketId: socket.id, reason }, "socket desconectado");

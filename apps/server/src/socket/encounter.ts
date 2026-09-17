@@ -184,10 +184,14 @@ export function registerEncounterHandlers(io: TypedServer, socket: TypedSocket):
           bounds,
         });
 
+        // forceHidden (docs/plano-preparo.md §2.2): soltar o encontro inteiro invisível a partir
+        // do preparo — só ESCONDE, nunca revela uma linha salva como visibleOnSpawn:false.
+        const finalPlacements = data.forceHidden ? placements.map((p) => ({ ...p, visible: false })) : placements;
+
         const results: { character: Character; token: Token }[] = await prisma.$transaction(async (tx) => {
           const created: { character: Character; token: Token }[] = [];
-          for (let i = 0; i < placements.length; i++) {
-            const placement = placements[i]!;
+          for (let i = 0; i < finalPlacements.length; i++) {
+            const placement = finalPlacements[i]!;
             const creature = creatureById.get(placement.entryId);
             if (!creature) continue; // expandEncounterEntries só resolve entradas que existem no compêndio (o resto já foi pra missingIds)
             const point = cellToPoint({ col: placement.col, row: placement.row }, scene.grid);

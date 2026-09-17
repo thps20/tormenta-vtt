@@ -8,8 +8,10 @@ import { IdSchema } from "./common.js";
  * a trilha (fogo-e-esquece, nunca entra neste estado nem no snapshot).
  */
 export const AudioTrackStateSchema = z.object({
-  assetId: IdSchema,
-  /** O jogador só recebe a URL (nome aleatório de upload) — nunca `assetId`/nome (§3.4). */
+  /** Opcional: o jogador (e a tela do Cast) só recebe a URL (nome aleatório de upload) — nunca
+   *  `assetId`/nome (§3.4). O servidor omite o campo ao montar o broadcast/snapshot pra quem não é
+   *  GM (`rules/audio.ts#toPublicAudioState`); presente só na resposta (ack) de quem comandou. */
+  assetId: IdSchema.optional(),
   url: z.string().min(1),
   loop: z.boolean(),
   playing: z.boolean(),
