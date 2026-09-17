@@ -1,22 +1,24 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { Image as ImageIcon } from "lucide-react";
 import type { HandoutShowTarget } from "@tormenta-vtt/shared";
 import { HandoutGallery, type HandoutGalleryProps } from "./HandoutGallery";
 import { useHandouts } from "../store/handouts";
-import { isTyping } from "../lib/isTyping";
 import { MOTION } from "./MapBar";
 
 interface HandoutSelectorProps {
   /** Repassadas direto pro `HandoutGallery`, exceto `isOpen`/`onClose` (este componente decide). */
   gallery: Omit<HandoutGalleryProps, "isOpen" | "onClose">;
-  /** Dispara `handout:list` sob demanda, ao abrir (RoomPage decide — só a store conhece o evento). */
-  onOpen: () => void;
+  /** Galeria aberta: controlada pela RoomPage, dona do atalho J (`useGmPanelShortcuts`). */
+  open: boolean;
+  /** Abrir (true) ou fechar (false). Quem abre também dispara `handout:list` sob demanda. */
+  onOpenChange: (open: boolean) => void;
 }
 
 /**
  * Botão de Handouts da TopBar (só GM, docs/SPEC.md §9.10), ao lado do `MapSelector`: abre a
  * biblioteca da sala (`HandoutGallery`) num diálogo padrão do projeto. Clique ou a tecla **J**
- * (fora de campo de texto — H já é "Mover mapa", §3.2) abrem/fecham; Esc e clique fora fecham —
+ * (fora de campo de texto — H já é "Mover mapa", §3.2; listener da página, `useGmPanelShortcuts`)
+ * abrem/fecham; Esc e clique fora fecham —
  * o `Dialog` de dentro da galeria já cuida disso (diferente do dropdown antigo, este componente
  * não precisa mais de listener próprio pra isso).
  *
@@ -27,8 +29,8 @@ interface HandoutSelectorProps {
  * local do próprio GM) — o `HandoutGallery` continua montado o tempo todo (só `isOpen=false`
  * some da tela), então busca/filtro/seleção de antes continuam lá quando reabre.
  */
-export const HandoutSelector: React.FC<HandoutSelectorProps> = ({ gallery, onOpen }) => {
-  const [open, setOpen] = useState(false);
+export const HandoutSelector: React.FC<HandoutSelectorProps> = ({ gallery, open, onOpenChange }) => {
+  const setOpen = onOpenChange;
   const overlayOpen = useHandouts((s) => s.open !== null);
   /** true entre "fechei a galeria pra mostrar" e "o overlay fechou de novo" — só aí reabre sozinha. */
   const reopenAfterOverlay = useRef(false);
@@ -40,36 +42,17 @@ export const HandoutSelector: React.FC<HandoutSelectorProps> = ({ gallery, onOpe
     }
   }, [overlayOpen]);
 
-  const openGallery = () => {
-    onOpen();
-    setOpen(true);
-  };
-
   const handleShow = (id: string, target: HandoutShowTarget) => {
     reopenAfterOverlay.current = true;
     setOpen(false);
     gallery.onShow(id, target);
   };
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key.toLowerCase() === "j") {
-        e.preventDefault();
-        if (open) setOpen(false);
-        else openGallery();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
   return (
     <>
       <button
         id="btn-handout-selector"
-        onClick={() => (open ? setOpen(false) : openGallery())}
+        onClick={() => setOpen(!open)}
         title="Handouts da sala (J)"
         className={`focus-ring flex items-center gap-1.5 h-7 px-2 rounded-ui text-13 text-text hover:bg-surface-2 cursor-pointer ${MOTION}`}
       >

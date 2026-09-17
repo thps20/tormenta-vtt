@@ -100,7 +100,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   // ele tiver (roll.targets, ataque com acerto/erro); sem alvo no card, cai nos meus alvos atuais.
   const myTargetIds = useTargets((s) => s.mine);
   const openHandout = useHandouts((s) => s.openLocal);
-  const [inputText, setInputText] = useState('');
+  // Rascunho na store (não em useState): sobrevive à aba desmontar ao trocar para Iniciativa/Fichas.
+  const inputText = useChat((s) => s.draft);
+  const setInputText = useChat((s) => s.setDraft);
   const isRollCommand = /^\/(r|roll|gmr|gr|pr)\b/i.test(inputText);
   const nonPublic = rollMode !== 'all';
   const whispering = whisperTarget !== null;
@@ -185,7 +187,15 @@ export const ChatTab: React.FC<ChatTabProps> = ({
     <div className="font-ui flex flex-col h-full bg-surface-1 text-text">
       {/* Messages Stream: rolagens/mensagens simples viram linha de log (só filete); cartão fica
           reservado pro que pede uma ação (Aplicar, Revelar, usar item — docs/design/DESIGN.md). */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-1 scrollbar-thin">
+      {/* role="log" (aria-live polite implícito): leitor de tela anuncia só as mensagens novas. */}
+      <div
+        id="chat-log"
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions"
+        aria-label="Mensagens e rolagens"
+        className="flex-1 overflow-y-auto p-4 space-y-1 scrollbar-thin"
+      >
         {messages.map((msg) => {
           const participant = getParticipant(msg.participantId);
           const isGm = participant?.role === 'gm';
@@ -196,11 +206,11 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             return (
               <div key={msg.id} id={`chat-msg-${msg.id}`} className="py-1.5 border-b border-border">
                 <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-[10px] font-title font-bold text-text-muted uppercase tracking-widest flex items-center gap-1.5">
+                  <span className="text-12 font-title font-bold text-text-muted uppercase tracking-widest flex items-center gap-1.5">
                     <Scroll className="w-3 h-3" />
                     SISTEMA
                   </span>
-                  <span className="text-[9px] font-data tabular-nums text-text-muted">
+                  <span className="text-12 font-data tabular-nums text-text-muted">
                     {formatTime(msg.createdAt)}
                   </span>
                 </div>
@@ -276,10 +286,10 @@ export const ChatTab: React.FC<ChatTabProps> = ({
               >
                 <div className="flex items-center justify-between text-xs mb-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-bold uppercase tracking-tight text-text">{msg.nickname}</span>
-                    {isGm && <span className="text-[9px] px-1 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
+                    <span className="text-12 font-bold uppercase tracking-tight text-text">{msg.nickname}</span>
+                    {isGm && <span className="text-12 px-1 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
                   </div>
-                  <span className="text-[9px] font-data tabular-nums text-text-muted">{formatTime(msg.createdAt)}</span>
+                  <span className="text-12 font-data tabular-nums text-text-muted">{formatTime(msg.createdAt)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-xs text-text-muted italic">
@@ -333,16 +343,16 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             <div key={msg.id} id={`chat-msg-${msg.id}`} data-whisper-to={msg.whisperTo ?? undefined} className="py-1.5 border-b border-border">
               <div className="flex items-center justify-between text-xs mb-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-tight text-text">{msg.nickname}</span>
-                  {isGm && <span className="text-[9px] px-1 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
+                  <span className="text-12 font-bold uppercase tracking-tight text-text">{msg.nickname}</span>
+                  {isGm && <span className="text-12 px-1 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
                   {textWhisper && (
-                    <span className="flex items-center gap-1 text-[9px] px-1 rounded-ui bg-bg/40 border border-border text-text-muted lowercase">
+                    <span className="flex items-center gap-1 text-12 px-1 rounded-ui bg-bg/40 border border-border text-text-muted lowercase">
                       <MessageCircle className="w-2.5 h-2.5" />
                       {textWhisper}
                     </span>
                   )}
                 </div>
-                <span className="text-[9px] font-data tabular-nums text-text-muted">
+                <span className="text-12 font-data tabular-nums text-text-muted">
                   {formatTime(msg.createdAt)}
                 </span>
               </div>
@@ -357,9 +367,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({
 
       {/* Quick Dice Bar */}
       {/* Quebra linha em painéis estreitos (sem overflow: o popover do modo não pode ser recortado). */}
-      <div className="p-2 bg-bg border-t border-border flex items-center justify-between flex-wrap gap-1 text-[11px]">
-        <div className="flex items-center gap-2 pl-1">
-          <span className="text-[10px] text-text-muted uppercase tracking-widest font-title font-bold flex items-center gap-1">
+      <div className="p-2 bg-bg border-t border-border flex items-center justify-between flex-wrap gap-1 text-12">
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 pl-1">
+          <span className="text-12 text-text-muted uppercase tracking-widest font-title font-bold flex items-center gap-1">
             <Dices className="w-3 h-3" />
             ROLAR:
           </span>
@@ -371,7 +381,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             onClick={() => setRollDamageWithAttack(!rollDamageWithAttack)}
             aria-pressed={rollDamageWithAttack}
             title="Rolar dano junto com o ataque: o botão de uma ação de ataque com dano no mesmo item rola as duas numa mensagem só."
-            className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border font-ui text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${pressedClass(rollDamageWithAttack)}`}
+            className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border font-ui text-12 uppercase tracking-wide whitespace-nowrap transition-colors cursor-pointer select-none ${pressedClass(rollDamageWithAttack)}`}
           >
             <Flame className="w-3 h-3" />
             Dano junto
@@ -385,7 +395,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             title={`Animação da rolagem: ${
               diceAnimationMode === 'simple' ? 'Simples' : diceAnimationMode === '3d' ? '3D' : 'Desligada'
             }. Clique para alternar.`}
-            className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border font-ui text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${pressedClass(diceAnimationMode !== 'off')}`}
+            className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border font-ui text-12 uppercase tracking-wide whitespace-nowrap transition-colors cursor-pointer select-none ${pressedClass(diceAnimationMode !== 'off')}`}
           >
             <Sparkles className="w-3 h-3" />
             {diceAnimationMode === 'simple' ? 'Simples' : diceAnimationMode === '3d' ? '3D' : 'Desligada'}
@@ -397,7 +407,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
               key={sides}
               onClick={() => handleQuickDice(sides)}
               title={`Rolar 1d${sides}`}
-              className="focus-ring px-1.5 py-0.5 rounded-ui bg-surface-1 hover:bg-surface-2 text-text-muted hover:text-text border border-border font-data text-[10px] transition-colors cursor-pointer"
+              className="focus-ring px-1.5 py-0.5 rounded-ui bg-surface-1 hover:bg-surface-2 text-text-muted hover:text-text border border-border font-data text-12 transition-colors cursor-pointer"
             >
               d{sides}
             </button>
@@ -423,7 +433,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
           />
           {/* Indicador discreto: sussurro ativo, modo fora de "Pública" e/ou comando de dado digitado. */}
           {(isRollCommand || nonPublic || whispering) && (
-            <span className="absolute right-2.5 top-2 text-[10px] font-data pointer-events-none uppercase tracking-widest text-text-muted">
+            <span className="absolute right-2.5 top-2 text-12 font-data pointer-events-none uppercase tracking-widest text-text-muted">
               {isRollCommand && 'DADO'}
               {isRollCommand && (nonPublic || whispering) && ' · '}
               {nonPublic && modeInfo.label}

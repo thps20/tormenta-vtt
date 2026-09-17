@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Swords,
   ChevronLeft,
@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   RotateCcw,
   Crosshair,
+  Settings,
 } from 'lucide-react';
 import type { Combat, Combatant, ConditionDef, RollVisibility, Token, TokenCondition } from '@tormenta-vtt/shared';
 
@@ -178,12 +179,12 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
               </span>
             </button>
             {!sceneId ? (
-              <span className="text-[10px] text-text-muted mt-2 font-ui">
+              <span className="text-12 text-text-muted mt-2 font-ui">
                 Nenhum mapa ativo.
               </span>
             ) : (
               selectedTokenIds.length === 0 && (
-                <span className="text-[10px] text-text-muted mt-2 font-ui">
+                <span className="text-12 text-text-muted mt-2 font-ui">
                   Dica: selecione tokens no mapa para adicioná-los automaticamente.
                 </span>
               )
@@ -304,7 +305,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                   Rodada {combat.round}
                 </span>
                 <span
-                  className={`text-[9px] px-1.5 py-0.5 rounded-ui font-ui font-bold tracking-wide uppercase border ${
+                  className={`text-12 px-1.5 py-0.5 rounded-ui font-ui font-bold tracking-wide uppercase border ${
                     combat.status === 'active'
                       ? 'bg-success/15 border-success/50 text-success'
                       : combat.status === 'rolling'
@@ -320,7 +321,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                 </span>
               </div>
               <div
-                className="text-[11px] text-text-muted truncate max-w-[170px]"
+                className="text-12 text-text-muted truncate max-w-[170px]"
                 title={statusText}
               >
                 {statusText}
@@ -328,6 +329,22 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
             </div>
           </div>
 
+          <div className="flex items-center gap-1.5">
+          {/* Preferências do combate (mexem uma vez por campanha): atrás da engrenagem, fora do
+              caminho do Anterior/Próximo. */}
+          <CombatPreferencesButton
+            viewer={viewer}
+            centerOnActiveTurn={centerOnActiveTurn}
+            onToggleCenterOnActiveTurn={onToggleCenterOnActiveTurn}
+            showOtherTargets={showOtherTargets}
+            onToggleShowOtherTargets={onToggleShowOtherTargets}
+            clearTargetsOnTurnEnd={clearTargetsOnTurnEnd}
+            onToggleClearTargetsOnTurnEnd={onToggleClearTargetsOnTurnEnd}
+            autoRollNpcInitiativeEnabled={autoRollNpcInitiativeEnabled}
+            onToggleAutoRollNpcInitiative={onToggleAutoRollNpcInitiative}
+            movementLimitEnabled={movementLimitEnabled}
+            onToggleMovementLimit={onToggleMovementLimit}
+          />
           {/* GM Encerrar Button with Options */}
           {viewer === 'gm' && (
             <div className="relative">
@@ -337,7 +354,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                   e.stopPropagation();
                   setShowEndOptions(!showEndOptions);
                 }}
-                className="focus-ring px-2.5 py-1 text-[11px] font-ui font-bold rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-danger/50 text-danger transition-colors cursor-pointer"
+                className="focus-ring px-2.5 py-1 text-12 font-ui font-bold rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-danger/50 text-danger transition-colors cursor-pointer"
                 title="Opções de encerramento do combate"
               >
                 Encerrar
@@ -358,7 +375,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                     className="focus-ring w-full text-left px-2.5 py-1.5 rounded-ui text-xs text-text hover:bg-surface-2 transition-colors cursor-pointer flex items-center justify-between"
                   >
                     <span>Manter visível</span>
-                    <span className="text-[10px] text-text-muted">Pausar</span>
+                    <span className="text-12 text-text-muted">Pausar</span>
                   </button>
                   <button
                     id="btn-end-clear"
@@ -375,81 +392,23 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
               )}
             </div>
           )}
+          </div>
         </div>
-
-        {/* Centralizar no token da vez: preferência de cada usuário (GM e jogador). */}
-        <label
-          className="flex items-center gap-1.5 text-[10px] text-text-muted cursor-pointer select-none"
-          title="Centralizar o mapa no token da vez"
-        >
-          <input
-            type="checkbox"
-            checked={centerOnActiveTurn}
-            onChange={onToggleCenterOnActiveTurn}
-            className="cursor-pointer accent-text"
-          />
-          Centralizar no token da vez
-        </label>
-
-        {/* Sistema de alvos (docs/plano-alvos.md): duas preferências por usuário, mesmo padrão de
-         *  "Centralizar no token da vez" acima. */}
-        <label className="flex items-center gap-1.5 text-[10px] text-text-muted cursor-pointer select-none" title="Mostrar quem os outros participantes estão mirando">
-          <input type="checkbox" checked={showOtherTargets} onChange={onToggleShowOtherTargets} className="cursor-pointer accent-text" />
-          Mostrar alvos dos outros
-        </label>
-        <label className="flex items-center gap-1.5 text-[10px] text-text-muted cursor-pointer select-none" title="Limpar meus alvos quando meu turno terminar">
-          <input type="checkbox" checked={clearTargetsOnTurnEnd} onChange={onToggleClearTargetsOnTurnEnd} className="cursor-pointer accent-text" />
-          Limpar meus alvos ao fim do meu turno
-        </label>
-
-        {/* "Rolar iniciativa dos NPCs ao iniciar o combate" (§3.5): opção da sala, só o GM vê/muda —
-         *  combat:start/combat:add rolam sozinhos, num card em lote, quem entra sem dono. */}
-        {viewer === 'gm' && (
-          <label
-            className="flex items-center gap-1.5 text-[10px] text-text-muted cursor-pointer select-none"
-            title="combat:start e combat:add rolam sozinhos a iniciativa dos combatentes sem dono"
-          >
-            <input
-              type="checkbox"
-              checked={autoRollNpcInitiativeEnabled}
-              onChange={onToggleAutoRollNpcInitiative}
-              className="cursor-pointer accent-text"
-            />
-            Rolar iniciativa dos NPCs ao iniciar o combate
-          </label>
-        )}
-
-        {/* Trava de deslocamento (docs/plano-movimento.md §4.3): GM liga/desliga na sala; jogador
-         *  só vê o estado. "Ignorar" = interruptor LIGADO quando movementLimitEnabled é false. */}
-        {viewer === 'gm' ? (
-          <label
-            className="flex items-center gap-1.5 text-[10px] text-text-muted cursor-pointer select-none"
-            title="Vale para a sala, até reiniciar o servidor"
-          >
-            <input
-              type="checkbox"
-              checked={!movementLimitEnabled}
-              onChange={onToggleMovementLimit}
-              className="cursor-pointer accent-text"
-            />
-            Ignorar limite de movimento
-          </label>
-        ) : (
-          !movementLimitEnabled && (
-            <div className="text-[10px] text-text-muted font-ui italic">Limite de movimento desligado pelo Mestre</div>
-          )
-        )}
 
         {/* Big Turn Navigation Buttons: Anterior & Próximo (grandes, os mais usados). Só "Próximo"
          *  leva o dourado — é a ação principal do combate; "Anterior" fica neutro (secundária,
-         *  docs/design/DESIGN.md: um só destaque por vista). */}
-        <div className="grid grid-cols-2 gap-2 pt-0.5">
+         *  docs/design/DESIGN.md: um só destaque por vista). Logo abaixo da rodada, antes de qualquer
+         *  preferência; só GM (combat:next/prev são gmOnly no servidor). Atalho N / Shift+N
+         *  (lib/useCombatTurnShortcut.ts). */}
+        {viewer === 'gm' && (
+        <div className="grid grid-cols-2 gap-2">
           <button
             id="btn-combat-prev"
             onClick={onPrev}
             disabled={combat.status === 'ended'}
             className="focus-ring flex items-center justify-center gap-1.5 py-2 px-3 rounded-ui bg-surface-2 hover:bg-surface-2/80 disabled:opacity-40 disabled:cursor-not-allowed border border-border text-text-muted hover:text-text text-xs font-ui font-bold uppercase tracking-wider transition-all cursor-pointer"
-            title="Voltar para o combatente anterior"
+            title="Voltar para o combatente anterior (Shift+N)"
+            aria-keyshortcuts="Shift+N"
           >
             <ChevronLeft className="w-4 h-4" />
             <span>Anterior</span>
@@ -460,12 +419,17 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
             onClick={onNext}
             disabled={combat.status === 'ended'}
             className="focus-ring flex items-center justify-center gap-1.5 py-2 px-3 rounded-ui bg-surface-2 hover:bg-surface-2/80 disabled:opacity-40 disabled:cursor-not-allowed border border-accent text-accent text-xs font-ui font-bold uppercase tracking-wider transition-all cursor-pointer"
-            title="Avançar para o próximo combatente"
+            title="Avançar para o próximo combatente (N)"
+            aria-keyshortcuts="N"
           >
             <span>Próximo</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
+        )}
+        {viewer === 'player' && !movementLimitEnabled && (
+          <div className="text-12 text-text-muted font-ui italic">Limite de movimento desligado pelo Mestre</div>
+        )}
       </div>
 
       {/* ------------------------------------------------------------- */}
@@ -477,7 +441,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
             id="btn-gm-add-selected"
             onClick={() => onAdd && onAdd(selectedTokenIds)}
             disabled={selectedTokenIds.length === 0}
-            className="focus-ring flex items-center gap-1 px-2 py-1 rounded-ui bg-surface-2 hover:bg-surface-2/80 disabled:opacity-40 disabled:cursor-not-allowed border border-border text-text text-[11px] font-ui transition-colors whitespace-nowrap cursor-pointer"
+            className="focus-ring flex items-center gap-1 px-2 py-1 rounded-ui bg-surface-2 hover:bg-surface-2/80 disabled:opacity-40 disabled:cursor-not-allowed border border-border text-text text-12 font-ui transition-colors whitespace-nowrap cursor-pointer"
             title="Adicionar tokens selecionados como reforços"
           >
             <UserPlus className="w-3 h-3 text-text-muted" />
@@ -487,7 +451,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
           <button
             id="btn-gm-roll-npcs"
             onClick={() => onRoll && onRoll('npcs')}
-            className="focus-ring flex items-center gap-1 px-2 py-1 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-border text-text text-[11px] font-ui transition-colors whitespace-nowrap cursor-pointer"
+            className="focus-ring flex items-center gap-1 px-2 py-1 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-border text-text text-12 font-ui transition-colors whitespace-nowrap cursor-pointer"
             title="Rolar iniciativa de todos os NPCs sem iniciativa"
           >
             <Dices className="w-3 h-3 text-text-muted" />
@@ -497,7 +461,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
           <button
             id="btn-gm-roll-missing"
             onClick={() => onRoll && onRoll('missing')}
-            className="focus-ring flex items-center gap-1 px-2 py-1 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-border text-text text-[11px] font-ui transition-colors whitespace-nowrap cursor-pointer"
+            className="focus-ring flex items-center gap-1 px-2 py-1 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-border text-text text-12 font-ui transition-colors whitespace-nowrap cursor-pointer"
             title="Rolar iniciativa para todos os combatentes que ainda faltam"
           >
             <Users className="w-3 h-3 text-text-muted" />
@@ -589,7 +553,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
 
                       {/* Turn indicator */}
                       {isActive && (
-                        <span className="text-[9px] font-title font-bold px-1.5 py-0.2 rounded-ui bg-accent text-bg shrink-0 tracking-wider">
+                        <span className="text-12 font-title font-bold px-1.5 py-0.2 rounded-ui bg-accent text-bg shrink-0 tracking-wider">
                           TURNO
                         </span>
                       )}
@@ -597,7 +561,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                       {/* Surpreso Badge */}
                       {combatant.surprised && (
                         <span
-                          className="text-[9px] font-ui font-bold px-1 py-0.2 rounded-ui bg-danger/15 border border-danger/50 text-danger flex items-center gap-0.5 shrink-0"
+                          className="text-12 font-ui font-bold px-1 py-0.2 rounded-ui bg-danger/15 border border-danger/50 text-danger flex items-center gap-0.5 shrink-0"
                           title="Combatente surpreso"
                         >
                           <AlertTriangle className="w-2.5 h-2.5" />
@@ -608,7 +572,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                       {/* Adiado Badge */}
                       {combatant.delayed && (
                         <span
-                          className="text-[9px] font-ui font-bold px-1 py-0.2 rounded-ui bg-surface-2 border border-border text-text flex items-center gap-0.5 shrink-0"
+                          className="text-12 font-ui font-bold px-1 py-0.2 rounded-ui bg-surface-2 border border-border text-text flex items-center gap-0.5 shrink-0"
                           title="Ação adiada"
                         >
                           <Clock className="w-2.5 h-2.5" />
@@ -619,7 +583,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                       {/* Added in a later round */}
                       {combatant.addedRound > 0 && (
                         <span
-                          className="text-[8px] font-data tabular-nums px-1 rounded-ui bg-surface-2 text-text-muted shrink-0"
+                          className="text-12 font-data tabular-nums px-1 rounded-ui bg-surface-2 text-text-muted shrink-0"
                           title={`Entrou na rodada ${combatant.addedRound}`}
                         >
                           +R{combatant.addedRound}
@@ -693,7 +657,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                   ) : combatant.rolled ? (
                     /* Ícone de "já rolou" quando rolled && initiative == null (jogador olhando os outros) */
                     <div
-                      className="flex items-center gap-1 px-1.5 py-0.5 rounded-ui bg-surface-2 border border-border text-text-muted text-[10px] font-ui"
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded-ui bg-surface-2 border border-border text-text-muted text-12 font-ui"
                       title="Já rolou iniciativa (valor oculto)"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5 text-success" />
@@ -711,7 +675,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                         <button
                           id={`btn-player-roll-${combatant.id}`}
                           onClick={() => onRoll && onRoll('self', combatant.id)}
-                          className="focus-ring flex items-center gap-1 px-2 py-1 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-accent text-accent text-[10px] font-ui font-bold transition-all cursor-pointer"
+                          className="focus-ring flex items-center gap-1 px-2 py-1 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-accent text-accent text-12 font-ui font-bold transition-all cursor-pointer"
                           title="Rolar minha iniciativa"
                         >
                           <Dices className="w-3 h-3" />
@@ -724,7 +688,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                         <button
                           id={`btn-player-delay-${combatant.id}`}
                           onClick={() => onDelay && onDelay(combatant.id)}
-                          className="focus-ring flex items-center gap-1 px-2 py-0.5 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-border text-text text-[10px] font-ui transition-colors cursor-pointer"
+                          className="focus-ring flex items-center gap-1 px-2 py-0.5 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-border text-text text-12 font-ui transition-colors cursor-pointer"
                           title="Adiar turno"
                         >
                           <Clock className="w-3 h-3" />
@@ -737,7 +701,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                         <button
                           id={`btn-player-resume-${combatant.id}`}
                           onClick={() => onResume && onResume(combatant.id)}
-                          className="focus-ring flex items-center gap-1 px-2 py-0.5 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-success/60 text-success text-[10px] font-ui transition-colors cursor-pointer"
+                          className="focus-ring flex items-center gap-1 px-2 py-0.5 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-success/60 text-success text-12 font-ui transition-colors cursor-pointer"
                           title="Agir agora"
                         >
                           <Play className="w-3 h-3" />
@@ -891,7 +855,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                       style={{ width: `${combatant.movementBudget > 0 ? Math.min(100, (combatant.movementUsed / combatant.movementBudget) * 100) : 100}%` }}
                     />
                   </div>
-                  <span className="text-[10px] font-data tabular-nums text-text-muted shrink-0">
+                  <span className="text-12 font-data tabular-nums text-text-muted shrink-0">
                     {fmt1(combatant.movementUsed)}/{fmt1(combatant.movementBudget)}
                   </span>
                   {viewer === 'gm' && (
@@ -902,7 +866,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                         defaultValue={combatant.movementBudget}
                         placeholder="ficha"
                         title="Orçamento de deslocamento do turno (vazio = volta a seguir a ficha)"
-                        className="focus-ring w-12 h-5 px-1 text-[10px] font-data tabular-nums bg-bg border border-border text-text rounded-ui text-center"
+                        className="focus-ring w-12 h-5 px-1 text-12 font-data tabular-nums bg-bg border border-border text-text rounded-ui text-center"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                         }}
@@ -933,7 +897,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
           <div className="pt-2">
             <div className="flex items-center gap-2 my-2 px-1">
               <div className="h-px flex-1 bg-border" />
-              <span className="text-[10px] font-title font-bold uppercase tracking-widest text-text-muted">
+              <span className="text-12 font-title font-bold uppercase tracking-widest text-text-muted">
                 SEM INICIATIVA ({withoutInitiative.length})
               </span>
               <div className="h-px flex-1 bg-border" />
@@ -1072,7 +1036,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                             <button
                               id={`btn-gm-roll-single-${combatant.id}`}
                               onClick={() => onRoll && onRoll('one', combatant.id)}
-                              className="focus-ring flex items-center gap-1 px-2 py-0.5 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-border text-text text-[10px] font-ui cursor-pointer"
+                              className="focus-ring flex items-center gap-1 px-2 py-0.5 rounded-ui bg-surface-2 hover:bg-surface-2/80 border border-border text-text text-12 font-ui cursor-pointer"
                               title="Rolar iniciativa"
                             >
                               <Dices className="w-3 h-3 text-text-muted" />
@@ -1121,7 +1085,7 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
                             )}
                           </div>
                         ) : (
-                          <span className="text-[10px] font-ui text-text-muted italic">
+                          <span className="text-12 font-ui text-text-muted italic">
                             Aguardando rolagem
                           </span>
                         )}
@@ -1138,13 +1102,13 @@ export const CombatPanel: React.FC<CombatPanelProps> = ({
       {/* ------------------------------------------------------------- */}
       {/* Footer info: Total combatentes                                */}
       {/* ------------------------------------------------------------- */}
-      <div className="px-3 py-2 bg-surface-1 border-t border-border flex items-center justify-between text-[11px] text-text-muted font-ui shrink-0">
+      <div className="px-3 py-2 bg-surface-1 border-t border-border flex items-center justify-between text-12 text-text-muted font-ui shrink-0">
         <div className="flex items-center gap-1.5">
           <Swords className="w-3.5 h-3.5 text-text-muted" />
           <span>{combat.combatants.length} combatentes</span>
         </div>
 
-        <span className="text-[10px] text-text-muted">
+        <span className="text-12 text-text-muted">
           {viewer === 'gm' ? 'Arraste para reordenar' : 'Visão do Jogador'}
         </span>
       </div>
@@ -1172,16 +1136,117 @@ const ConditionRowIcons: React.FC<{
         const roundsLeft = cond.expiresRound !== undefined && combatRound !== null ? Math.max(0, cond.expiresRound - combatRound) : undefined;
         const title = roundsLeft !== undefined ? `${def.label} · ${roundsLeft} rodada${roundsLeft === 1 ? '' : 's'}` : def.label;
         return (
-          <span key={cond.key} title={title} className="relative inline-flex w-3.5 h-3.5 shrink-0" style={{ color: def.color }}>
-            <span className="w-full h-full [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: def.icon }} />
+          <span key={cond.key} title={title} className="inline-flex items-center gap-0.5 shrink-0" style={{ color: def.color }}>
+            <span className="w-3.5 h-3.5 [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: def.icon }} />
+            {/* Rodadas restantes ao lado do ícone (não mais sobreposto: em 12px não cabe num selo). */}
             {roundsLeft !== undefined && (
-              <span className="absolute -bottom-1 -right-1 min-w-[10px] h-[10px] px-[2px] rounded-full bg-bg border border-border text-[7px] leading-[9px] text-center text-text-muted font-data tabular-nums font-bold">
-                {roundsLeft}
-              </span>
+              <span className="text-12 leading-none text-text-muted font-data tabular-nums font-bold">{roundsLeft}</span>
             )}
           </span>
         );
       })}
+    </div>
+  );
+};
+
+/**
+ * Engrenagem com as preferências do combate: as três por usuário (centralizar, alvos dos outros,
+ * limpar alvos) e, só pro GM, as duas da sala (rolar NPCs ao iniciar, ignorar limite de movimento).
+ * Popover simples: abre no clique, fecha no clique fora ou Esc.
+ */
+const CombatPreferencesButton: React.FC<{
+  viewer: 'gm' | 'player';
+  centerOnActiveTurn: boolean;
+  onToggleCenterOnActiveTurn: () => void;
+  showOtherTargets: boolean;
+  onToggleShowOtherTargets: () => void;
+  clearTargetsOnTurnEnd: boolean;
+  onToggleClearTargetsOnTurnEnd: () => void;
+  autoRollNpcInitiativeEnabled: boolean;
+  onToggleAutoRollNpcInitiative?: () => void;
+  movementLimitEnabled: boolean;
+  onToggleMovementLimit?: () => void;
+}> = (props) => {
+  const { viewer } = props;
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  const row = 'flex items-center gap-2 px-2 py-1.5 rounded-ui text-12 text-text hover:bg-surface-2 cursor-pointer select-none';
+  return (
+    <div ref={rootRef} className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        id="btn-combat-preferences"
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="true"
+        aria-label="Preferências do combate"
+        title="Preferências do combate"
+        className={`focus-ring p-1.5 rounded-ui border transition-colors cursor-pointer ${
+          open ? 'bg-surface-2 border-text-muted text-text' : 'border-border text-text-muted hover:text-text hover:bg-surface-2'
+        }`}
+      >
+        <Settings className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <div
+          id="menu-combat-preferences"
+          className="absolute right-0 top-full mt-1.5 w-72 bg-surface-1 border border-border rounded-ui shadow-float z-50 p-1 flex flex-col gap-0.5"
+        >
+          <div className="px-2 pt-1 pb-0.5 text-12 font-title font-bold uppercase tracking-widest text-text-muted">Só para mim</div>
+          <label className={row} title="Centralizar o mapa no token da vez">
+            <input type="checkbox" checked={props.centerOnActiveTurn} onChange={props.onToggleCenterOnActiveTurn} className="cursor-pointer accent-text" />
+            Centralizar no token da vez
+          </label>
+          <label className={row} title="Mostrar quem os outros participantes estão mirando">
+            <input type="checkbox" checked={props.showOtherTargets} onChange={props.onToggleShowOtherTargets} className="cursor-pointer accent-text" />
+            Mostrar alvos dos outros
+          </label>
+          <label className={row} title="Limpar meus alvos quando meu turno terminar">
+            <input type="checkbox" checked={props.clearTargetsOnTurnEnd} onChange={props.onToggleClearTargetsOnTurnEnd} className="cursor-pointer accent-text" />
+            Limpar meus alvos ao fim do meu turno
+          </label>
+          {viewer === 'gm' && (
+            <>
+              <div className="h-px bg-border my-0.5" />
+              <div className="px-2 pt-1 pb-0.5 text-12 font-title font-bold uppercase tracking-widest text-text-muted">Para a sala</div>
+              {/* "Rolar iniciativa dos NPCs ao iniciar o combate" (§3.5): combat:start/combat:add rolam
+                  sozinhos, num card em lote, quem entra sem dono. */}
+              <label className={row} title="combat:start e combat:add rolam sozinhos a iniciativa dos combatentes sem dono">
+                <input
+                  type="checkbox"
+                  checked={props.autoRollNpcInitiativeEnabled}
+                  onChange={props.onToggleAutoRollNpcInitiative}
+                  className="cursor-pointer accent-text"
+                />
+                Rolar iniciativa dos NPCs ao iniciar o combate
+              </label>
+              {/* Trava de deslocamento (docs/plano-movimento.md §4.3). "Ignorar" = marcado quando
+                  movementLimitEnabled é false. */}
+              <label className={row} title="Vale para a sala, até reiniciar o servidor">
+                <input type="checkbox" checked={!props.movementLimitEnabled} onChange={props.onToggleMovementLimit} className="cursor-pointer accent-text" />
+                Ignorar limite de movimento
+              </label>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };

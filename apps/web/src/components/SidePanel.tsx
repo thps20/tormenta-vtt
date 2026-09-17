@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronLeft, ChevronRight, ClipboardList, MessageSquare, Swords, Users } from 'lucide-react';
 import { ChatTab } from './ChatTab';
 import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
+import { CombatCompact } from './CombatCompact';
 import { CharactersTab } from './CharactersTab';
 import { PartyView } from './PartyView';
 import { PrepPanel, type PrepPanelProps } from './PrepPanel';
@@ -133,10 +134,13 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   prepPanel,
 }) => {
   const setActiveTab = onTabChange;
+  // Combate em andamento no mapa visto: a iniciativa compacta encaixa acima do chat.
+  const combatLive = combat !== null && combat.status !== 'ended';
 
   const tabs: TabDef[] = [
     { id: 'chat', label: 'Chat', Icon: MessageSquare, badge: String(messages.length) },
-    { id: 'initiative', label: 'Iniciativa', Icon: Swords, badge: `R${combat?.round ?? 0}` },
+    // Rodada só com combate em andamento ("R0" sem combate não dizia nada).
+    { id: 'initiative', label: 'Iniciativa', Icon: Swords, badge: combatLive && combat ? `R${combat.round}` : '' },
     { id: 'characters', label: 'Fichas', Icon: Users, badge: String(characters.length) },
     ...(prepPanel ? [{ id: 'prep' as const, label: 'Preparo', Icon: ClipboardList, badge: '' }] : []),
   ];
@@ -161,7 +165,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
         {unreadMessages > 0 && (
           <span
             title={`${unreadMessages} mensagem${unreadMessages === 1 ? '' : 's'} não lida${unreadMessages === 1 ? '' : 's'}`}
-            className="min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-accent text-bg text-[9px] font-data tabular-nums font-bold shrink-0"
+            className="min-w-5 h-5 px-1 flex items-center justify-center rounded-full bg-accent text-bg text-12 leading-none font-data tabular-nums font-bold shrink-0"
           >
             {unreadMessages > 99 ? '99+' : unreadMessages}
           </span>
@@ -207,7 +211,28 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 
       {/* Tab Navigation Header - Elegant Dark Style. `@container` deixa cada TabButton decidir, pela
           própria largura disponível, entre ícone+rótulo e só ícone (com tooltip e badge no canto). */}
-      <div className="flex h-11 border-b border-border bg-surface-1 shrink-0 @container">
+      <div
+        role="tablist"
+        aria-label="Painel lateral"
+        className="flex h-11 border-b border-border bg-surface-1 shrink-0 @container"
+        onKeyDown={(e) => {
+          // Padrão WAI-ARIA de abas: setas/Home/End trocam de aba e levam o foco junto.
+          const index = tabs.findIndex((t) => t.id === activeTab);
+          const last = tabs.length - 1;
+          const next =
+            e.key === 'ArrowRight' ? (index >= last ? 0 : index + 1)
+            : e.key === 'ArrowLeft' ? (index <= 0 ? last : index - 1)
+            : e.key === 'Home' ? 0
+            : e.key === 'End' ? last
+            : null;
+          const tab = next === null ? undefined : tabs[next];
+          if (!tab) return;
+          e.preventDefault();
+          e.stopPropagation(); // setas não podem chegar ao atalho de mover token (listener da janela)
+          setActiveTab(tab.id);
+          document.getElementById(`tab-btn-${tab.id}`)?.focus();
+        }}
+      >
         {tabs.map((tab) => (
           <TabButton key={tab.id} id={`tab-btn-${tab.id}`} tab={tab} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} />
         ))}
@@ -215,9 +240,21 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 
       {/* Tab Content Container. Cada aba tem o próprio TabErrorBoundary (não um só ao redor do
           bloco inteiro): um erro de render numa aba não pode derrubar as outras nem a sala toda. */}
-      <div className="flex-1 overflow-hidden relative">
+      <div id="sidepanel-tabpanel" role="tabpanel" aria-labelledby={`tab-btn-${activeTab}`} className="flex-1 overflow-hidden relative flex flex-col">
         {activeTab === 'chat' ? (
           <TabErrorBoundary label="Chat">
+            {combatLive && combat && (
+              <CombatCompact
+                combat={combat}
+                viewer={isGm ? 'gm' : 'player'}
+                selectedTokenId={selectedTokenId}
+                onSelectToken={onSelectToken}
+                onNext={combatCallbacks.onNext}
+                onPrev={combatCallbacks.onPrev}
+                onOpenManagement={() => setActiveTab('initiative')}
+              />
+            )}
+            <div className="flex-1 min-h-0">
             <ChatTab
               messages={messages}
               participants={participants}
@@ -228,6 +265,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
               onRollCharacter={onRollCharacter}
               onSaveMacro={onSaveMacro}
             />
+            </div>
           </TabErrorBoundary>
         ) : activeTab === 'characters' ? (
           <TabErrorBoundary label="Fichas">
@@ -284,6 +322,11 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 const TabButton: React.FC<{ id: string; tab: TabDef; active: boolean; onClick: () => void }> = ({ id, tab: { label, Icon, badge }, active, onClick }) => (
   <button
     id={id}
+    type="button"
+    role="tab"
+    aria-selected={active}
+    aria-controls="sidepanel-tabpanel"
+    tabIndex={active ? 0 : -1}
     onClick={onClick}
     title={badge ? `${label} (${badge})` : label}
     className={`focus-ring relative flex-1 min-w-0 flex items-center justify-center gap-2 px-1 text-xs font-title font-bold tracking-widest uppercase transition-all cursor-pointer ${
@@ -294,7 +337,7 @@ const TabButton: React.FC<{ id: string; tab: TabDef; active: boolean; onClick: (
     <span className="hidden @[350px]:inline truncate">{label}</span>
     {badge && (
       <span
-        className={`hidden @[350px]:inline-block shrink-0 text-[10px] font-data tabular-nums px-1.5 py-0.2 rounded-ui ${
+        className={`hidden @[350px]:inline-block shrink-0 text-12 font-data tabular-nums px-1.5 py-0.2 rounded-ui ${
           active ? 'bg-bg text-accent border border-accent/40' : 'bg-surface-2 text-text-muted'
         }`}
       >
@@ -303,7 +346,7 @@ const TabButton: React.FC<{ id: string; tab: TabDef; active: boolean; onClick: (
     )}
     {badge && (
       <span
-        className={`flex @[350px]:hidden absolute top-0.5 right-1.5 min-w-[15px] h-[15px] px-0.5 items-center justify-center rounded-full text-[8px] font-data tabular-nums leading-none ${
+        className={`flex @[350px]:hidden absolute top-0.5 right-0.5 min-w-4 h-4 px-1 items-center justify-center rounded-full text-12 font-data tabular-nums leading-none ${
           active ? 'bg-accent text-bg' : 'bg-surface-2 text-text'
         }`}
       >

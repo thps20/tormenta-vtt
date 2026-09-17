@@ -106,7 +106,7 @@ export const PartyView: React.FC<PartyViewProps> = ({
         id="btn-party-view-toggle"
         onClick={onToggleExpanded}
         title={expanded ? "Recolher visão de grupo" : "Mostrar visão de grupo"}
-        className="focus-ring w-full flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-title font-bold tracking-widest uppercase text-text-muted hover:text-text cursor-pointer"
+        className="focus-ring w-full flex items-center gap-1.5 px-2.5 py-1 text-12 font-title font-bold tracking-widest uppercase text-text-muted hover:text-text cursor-pointer"
       >
         <Users className="w-3 h-3" />
         Grupo
@@ -200,6 +200,17 @@ const PartyChip: React.FC<{
       }}
       onDragEnd={onDragEnd}
       onClick={onOpen}
+      // Chip é um div (tem o botão ⋯ dentro, e botão não pode conter botão): role/tabIndex/teclas
+      // dão a ele o comportamento de botão pra quem navega por teclado ou leitor de tela.
+      role="button"
+      tabIndex={0}
+      aria-label={`Abrir ficha de ${character.name}${isActiveTurn ? " (na vez)" : ""}${entry.hidden ? " (oculto do grupo)" : ""}`}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+        e.preventDefault();
+        e.stopPropagation(); // espaço aqui é "abrir", não o "segurar espaço = mover mapa" da janela
+        onOpen();
+      }}
       title={character.name}
       className={`focus-ring w-[104px] shrink-0 flex flex-col gap-1 p-1.5 rounded-ui border cursor-pointer text-left ${
         isDragTarget ? "border-accent bg-surface-2" : "border-border bg-bg/40 hover:bg-surface-2"
@@ -207,7 +218,7 @@ const PartyChip: React.FC<{
     >
       <div className="flex items-center gap-1.5 min-w-0">
         <div
-          className="relative w-6 h-6 rounded-full bg-surface-2 flex items-center justify-center text-[10px] font-title font-bold text-text shrink-0"
+          className="relative w-6 h-6 rounded-full bg-surface-2 flex items-center justify-center text-12 font-title font-bold text-text shrink-0"
           style={{ boxShadow: `0 0 0 1.5px ${ringColor}` }}
         >
           {character.imageUrl ? (
@@ -222,7 +233,7 @@ const PartyChip: React.FC<{
             />
           )}
         </div>
-        <span className="flex-1 min-w-0 text-[10px] font-semibold text-text truncate">{character.name}</span>
+        <span className="flex-1 min-w-0 text-12 font-semibold text-text truncate">{character.name}</span>
         {isGm && (
           <ChipMenuButton
             open={menuOpen}
@@ -247,7 +258,7 @@ const PartyChip: React.FC<{
           {shownConditions.map((c) => (
             <span key={c.key} title={c.description || c.label} className="w-3 h-3 shrink-0 [&>svg]:w-full [&>svg]:h-full" style={{ color: c.color }} dangerouslySetInnerHTML={{ __html: c.icon }} />
           ))}
-          {extraConditions > 0 && <span className="text-[8px] text-text-muted font-data tabular-nums">+{extraConditions}</span>}
+          {extraConditions > 0 && <span className="text-12 text-text-muted font-data tabular-nums">+{extraConditions}</span>}
         </div>
       )}
     </div>
@@ -397,7 +408,7 @@ const AddToPartyButton: React.FC<{ candidates: Character[]; onAdd: (characterId:
         className="focus-ring w-[104px] h-full min-h-[64px] flex flex-col items-center justify-center gap-1 rounded-ui border border-dashed border-border text-text-muted hover:text-text hover:border-text-muted cursor-pointer"
       >
         <Plus className="w-4 h-4" />
-        <span className="text-[9px] font-title">Adicionar</span>
+        <span className="text-12 font-title">Adicionar</span>
       </button>
       {open &&
         createPortal(
@@ -488,9 +499,9 @@ const ResourceBar: React.FC<ResourceValues> = ({ abbr, current, max, temp }) => 
   const color = rampColor(current, max);
   const text = `${abbr} ${current}/${max}${temp > 0 ? ` +${temp}` : ""}`;
   return (
-    <div title={text} className="relative w-full h-3 rounded-ui bg-bg border border-border overflow-hidden">
+    <div title={text} className="relative w-full h-4 rounded-ui bg-bg border border-border overflow-hidden">
       <div className="absolute inset-y-0 left-0 rounded-sm" style={{ width: `${(max > 0 ? Math.min(100, Math.max(0, (current / max) * 100)) : 0)}%`, backgroundColor: color }} />
-      <span className="relative z-10 flex items-center justify-center h-full text-[8px] font-data tabular-nums font-bold text-text">{text}</span>
+      <span className="relative z-10 flex items-center justify-center h-full text-12 leading-none font-data tabular-nums font-bold text-text">{text}</span>
     </div>
   );
 };

@@ -196,7 +196,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
           didPreselectRef.current = true;
           for (const id of preselectTokenIds) if (rows.some((r) => r.token.id === id)) toggle(id);
         }}
-        className="focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border border-accent text-accent hover:bg-surface-1 text-[10px] font-bold cursor-pointer"
+        className="focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border border-accent text-accent hover:bg-surface-1 text-12 font-bold cursor-pointer"
         title={isHeal ? 'Aplicar cura em tokens' : 'Aplicar dano em tokens'}
       >
         {isHeal ? <Heart className="w-3 h-3" /> : <Swords className="w-3 h-3" />}
@@ -222,13 +222,13 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar token..."
-                className="focus-ring w-full bg-bg border border-border rounded-ui px-1.5 py-1 pl-5 text-[11px] text-text placeholder:text-text-muted"
+                className="focus-ring w-full bg-bg border border-border rounded-ui px-1.5 py-1 pl-5 text-12 text-text placeholder:text-text-muted"
               />
             </div>
           </div>
 
           <div className="max-h-56 overflow-y-auto scrollbar-thin">
-            {filteredRows.length === 0 && <div className="p-3 text-center text-text-muted text-[11px]">Nenhum token</div>}
+            {filteredRows.length === 0 && <div className="p-3 text-center text-text-muted text-12">Nenhum token</div>}
             {filteredRows.map(({ token, current, max, ownerLabel, suggestion }) => {
               const selected = token.id in amounts;
               const amount = amounts[token.id] ?? 0;
@@ -238,12 +238,12 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={selected} onChange={() => toggle(token.id)} className="accent-text" />
                     <span className="flex-1 min-w-0 truncate text-text">{token.name}</span>
-                    <span className="text-[10px] font-data tabular-nums text-text-muted shrink-0">
+                    <span className="text-12 font-data tabular-nums text-text-muted shrink-0">
                       {current}/{max} · {ownerLabel}
                     </span>
                   </label>
                   {suggestion.note && (
-                    <div className="pl-6 -mt-0.5 text-[10px] text-text-muted italic">
+                    <div className="pl-6 -mt-0.5 text-12 text-text-muted italic">
                       sugerido {suggestion.raw} → {suggestion.amount} · {suggestion.note}
                     </div>
                   )}
@@ -254,7 +254,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
                           key={m}
                           type="button"
                           onClick={() => setMultiplier(token.id, m)}
-                          className={`focus-ring px-1.5 py-0.5 rounded-ui border text-[10px] font-data cursor-pointer ${pressedClass(mult === m)}`}
+                          className={`focus-ring px-1.5 py-0.5 rounded-ui border text-12 font-data cursor-pointer ${pressedClass(mult === m)}`}
                         >
                           ×{m === '0.5' ? '½' : m}
                         </button>
@@ -263,7 +263,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
                         type="number"
                         value={amount}
                         onChange={(e) => setManualAmount(token.id, Math.trunc(Number(e.target.value) || 0))}
-                        className="focus-ring w-16 ml-1 bg-bg border border-border rounded-ui px-1 py-0.5 text-[11px] font-data tabular-nums text-text"
+                        className="focus-ring w-16 ml-1 bg-bg border border-border rounded-ui px-1 py-0.5 text-12 font-data tabular-nums text-text"
                         title="Ajuste manual"
                       />
                     </div>
@@ -278,7 +278,7 @@ export const ApplyDamageButton: React.FC<ApplyDamageButtonProps> = ({ messageId,
               type="button"
               onClick={() => void confirm()}
               disabled={selectedCount === 0 || submitting}
-              className="focus-ring w-full py-1.5 rounded-ui bg-surface-2 border border-accent text-accent font-bold text-[11px] hover:bg-surface-2/80 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="focus-ring w-full py-1.5 rounded-ui bg-surface-2 border border-accent text-accent font-bold text-12 hover:bg-surface-2/80 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               {submitting ? 'Aplicando…' : selectedCount > 0 ? `Confirmar (${selectedCount})` : 'Confirmar'}
             </button>

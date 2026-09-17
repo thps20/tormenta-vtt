@@ -61,7 +61,7 @@ export const WhisperTargetButton: React.FC<WhisperTargetButtonProps> = ({ partic
         onClick={() => (open ? setOpen(false) : openMenu())}
         title={whispering ? `Sussurrando para ${label} — clique para trocar` : 'Sussurrar para alguém (seletor "para")'}
         aria-expanded={open}
-        className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border font-ui text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${pressedClass(whispering)}`}
+        className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border font-ui text-12 uppercase tracking-wide whitespace-nowrap transition-colors cursor-pointer select-none ${pressedClass(whispering)}`}
       >
         {whispering ? <MessageCircle className="w-3 h-3" /> : <Users className="w-3 h-3" />}
         <span className="max-w-[64px] truncate">{label}</span>
@@ -85,7 +85,7 @@ export const WhisperTargetButton: React.FC<WhisperTargetButtonProps> = ({ partic
                 onChange(null);
                 setOpen(false);
               }}
-              className={`focus-ring w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-ui cursor-pointer transition-colors text-[11px] ${
+              className={`focus-ring w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-ui cursor-pointer transition-colors text-12 ${
                 target === null ? 'bg-surface-2 text-text' : 'text-text-muted hover:bg-surface-2 hover:text-text'
               }`}
             >
@@ -102,13 +102,13 @@ export const WhisperTargetButton: React.FC<WhisperTargetButtonProps> = ({ partic
                   onChange(p.id);
                   setOpen(false);
                 }}
-                className={`focus-ring w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-ui cursor-pointer transition-colors text-[11px] truncate ${
+                className={`focus-ring w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-ui cursor-pointer transition-colors text-12 truncate ${
                   target === p.id ? 'bg-surface-2 text-text' : 'text-text-muted hover:bg-surface-2 hover:text-text'
                 }`}
               >
                 <MessageCircle className="w-3.5 h-3.5 shrink-0" />
                 {p.nickname}
-                {p.role === 'gm' && <span className="text-[9px] text-text-muted">(GM)</span>}
+                {p.role === 'gm' && <span className="text-12 text-text-muted">(GM)</span>}
               </button>
             ))}
           </div>,

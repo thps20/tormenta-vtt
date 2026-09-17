@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { ArrowLeft, ChevronDown, MapPin } from "lucide-react";
 import type { Scene } from "@tormenta-vtt/shared";
 import { MapsPanel, type MapsPanelProps } from "./MapsPanel";
-import { isTyping } from "../lib/isTyping";
 import { FLOAT_MENU, MOTION } from "./MapBar";
 
 interface MapSelectorProps {
@@ -12,8 +11,10 @@ interface MapSelectorProps {
   activeScene: Scene | null;
   /** Repassadas direto pro MapsPanel dentro do dropdown. */
   maps: MapsPanelProps;
-  /** Dispara `scene:list` sob demanda, ao abrir (RoomPage decide — só a store conhece o evento). */
-  onOpen: () => void;
+  /** Dropdown aberto: controlado pela RoomPage, que também é dona do atalho M (`useGmPanelShortcuts`). */
+  open: boolean;
+  /** Abrir (true) ou fechar (false). Quem abre também dispara `scene:list` sob demanda. */
+  onOpenChange: (open: boolean) => void;
 }
 
 /**
@@ -22,16 +23,12 @@ interface MapSelectorProps {
  * um dropdown largo com o mesmo conteúdo de antes (`MapsPanel`); Esc ou clique fora fecham. Quando
  * o GM está vendo um mapa diferente do ativo da mesa, o botão fica em destaque e o topo do dropdown
  * ganha "Ir para o ativo"/"Ativar este" — o aviso que antes era a faixa acima do canvas.
+ * A tecla M é da página (`lib/useGmPanelShortcuts.ts`); o estado aberto/fechado vem por prop.
  */
-export const MapSelector: React.FC<MapSelectorProps> = ({ viewingScene, activeScene, maps, onOpen }) => {
-  const [open, setOpen] = useState(false);
+export const MapSelector: React.FC<MapSelectorProps> = ({ viewingScene, activeScene, maps, open, onOpenChange }) => {
+  const setOpen = onOpenChange;
   const ref = useRef<HTMLDivElement>(null);
   const diverging = viewingScene !== null && activeScene !== null && viewingScene.id !== activeScene.id;
-
-  const openDropdown = () => {
-    onOpen();
-    setOpen(true);
-  };
 
   // Fecha ao clicar fora.
   useEffect(() => {
@@ -41,30 +38,23 @@ export const MapSelector: React.FC<MapSelectorProps> = ({ viewingScene, activeSc
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
+  }, [open, setOpen]);
 
-  // Tecla M (fora de campo de texto) abre/fecha; Esc fecha.
+  // Esc fecha (a tecla M que abre/fecha é da página, ver `useGmPanelShortcuts`).
   useEffect(() => {
+    if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key.toLowerCase() === "m") {
-        e.preventDefault();
-        if (open) setOpen(false);
-        else openDropdown();
-      } else if (e.key === "Escape" && open) {
-        setOpen(false);
-      }
+      if (e.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, setOpen]);
 
   return (
     <div ref={ref} className="relative">
       <button
         id="btn-map-selector"
-        onClick={() => (open ? setOpen(false) : openDropdown())}
+        onClick={() => setOpen(!open)}
         title="Mapas da sala (M)"
         aria-expanded={open}
         // Vendo um mapa que não é o ativo da mesa: o único aviso disso na tela, então é o único

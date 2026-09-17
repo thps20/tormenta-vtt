@@ -20,7 +20,7 @@ interface ItemCardMessageProps {
 }
 
 /** Marca de campo alterado por aprimoramento nesta conjuração. */
-const Enhanced: React.FC = () => <span className="ml-1 text-[9px] text-success font-ui italic">(aprimorado)</span>;
+const Enhanced: React.FC = () => <span className="ml-1 text-12 text-success font-ui italic">(aprimorado)</span>;
 
 /**
  * Card de item usado (character:use-item). Tudo que aparece já veio pronto do
@@ -54,11 +54,11 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
       {/* Cabeçalho: quem usou */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[11px] font-bold uppercase tracking-tight truncate text-text">{msg.nickname}</span>
-          {isGm && <span className="text-[9px] px-1.5 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
-          <span className="text-[10px] text-text-muted truncate">• {card.characterName}</span>
+          <span className="text-12 font-bold uppercase tracking-tight truncate text-text">{msg.nickname}</span>
+          {isGm && <span className="text-12 px-1.5 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
+          <span className="text-12 text-text-muted truncate">• {card.characterName}</span>
         </div>
-        <span className="text-[9px] font-data tabular-nums text-text-muted shrink-0">{time}</span>
+        <span className="text-12 font-data tabular-nums text-text-muted shrink-0">{time}</span>
       </div>
 
       {/* Nome + tipo + custo */}
@@ -68,7 +68,7 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
             <Sparkles className="w-3.5 h-3.5 text-text-muted shrink-0" />
             <span className="text-sm font-title font-bold text-text truncate">{card.itemName}</span>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[10px]">
+          <div className="flex items-center gap-1.5 flex-wrap mt-1 text-12">
             <span className="bg-bg/40 border border-border px-1.5 py-0.5 rounded-ui text-text">{card.kindLabel}</span>
             {card.fields.map((f) => (
               <span key={f.label} className="bg-bg/40 border border-border px-1.5 py-0.5 rounded-ui text-text">
@@ -80,14 +80,14 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
         {card.cost && (
           <div className="shrink-0 flex flex-col items-center px-2 py-1 rounded-ui border border-border bg-bg/40" title="Custo já descontado da ficha">
             <span className="text-base font-data tabular-nums font-bold text-text leading-none">{card.cost.amount}</span>
-            <span className="text-[9px] font-data text-text-muted uppercase">{card.cost.abbr}</span>
+            <span className="text-12 font-data text-text-muted uppercase">{card.cost.abbr}</span>
           </div>
         )}
       </div>
 
       {/* Execução, alcance, duração, alvo, área */}
       {meta.length > 0 && (
-        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] font-ui text-text-muted">
+        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-12 font-ui text-text-muted">
           {meta.map((m) => (
             <div key={m.label} className="truncate" title={`${m.label}: ${m.value}${m.enhanced ? " (aprimorado)" : ""}`}>
               <span className="text-text-muted">{m.label}:</span> {m.value}
@@ -101,7 +101,7 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
         <button
           type="button"
           onClick={placeArea}
-          className="focus-ring mt-1.5 flex items-center gap-1 text-[10px] font-ui font-bold uppercase tracking-wider text-accent hover:text-text cursor-pointer"
+          className="focus-ring mt-1.5 flex items-center gap-1 text-12 font-ui font-bold uppercase tracking-wider text-accent hover:text-text cursor-pointer"
           title="Abre a ferramenta Área (T) já com a forma e o tamanho, quando o texto casar"
         >
           <Shapes className="w-3 h-3" />
@@ -111,8 +111,8 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
 
       {/* Aprimoramentos usados (cards antigos no banco não têm o campo). */}
       {enhancements.length > 0 && (
-        <div className="mt-2 flex items-center gap-1.5 flex-wrap text-[10px] font-ui" data-card-enhancements>
-          <span className="text-text-muted uppercase tracking-wider text-[9px]">Aprimoramentos</span>
+        <div className="mt-2 flex items-center gap-1.5 flex-wrap text-12 font-ui" data-card-enhancements>
+          <span className="text-text-muted uppercase tracking-wider text-12">Aprimoramentos</span>
           {enhancements.map((e) => (
             <span key={e.id} className="bg-bg/40 border border-border px-1.5 py-0.5 rounded-ui text-text" title={e.label}>
               <span className="font-data tabular-nums font-bold text-text-muted">
@@ -140,7 +140,7 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
 
       {/* CD de resistência */}
       {card.save && (
-        <div className="mt-2 flex items-center gap-2 text-[11px] font-ui">
+        <div className="mt-2 flex items-center gap-2 text-12 font-ui">
           <span className="px-1.5 py-0.5 rounded-ui bg-bg/40 border border-accent/40 text-accent font-data font-bold">
             {card.save.dc !== null ? `CD ${card.save.dc}` : "CD —"}
           </span>
@@ -180,7 +180,7 @@ export const ItemCardMessage: React.FC<ItemCardMessageProps> = ({ def, msg, card
           ))}
           {/* Decomposição do dano com os aprimoramentos (só quando algum efeito mudou a fórmula). */}
           {card.actions.some((a) => a.breakdown) && (
-            <div className="w-full text-[10px] font-data tabular-nums text-text-muted" data-card-breakdown>
+            <div className="w-full text-12 font-data tabular-nums text-text-muted" data-card-breakdown>
               {card.actions.filter((a) => a.breakdown).map((a) => (
                 <div key={a.id}>
                   <span className="text-text-muted">{a.label}:</span> {a.breakdown}

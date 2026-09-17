@@ -7,6 +7,7 @@ import { useTokens } from "../store/tokens";
 import { toast } from "../store/ui";
 import { clampToMap, effectiveCellSize, snapToGrid } from "./grid";
 import { isTyping } from "./isTyping";
+import { isToolShortcutKey } from "./useToolShortcuts";
 
 /** `getSystemDefinition` lança se o id não existir; fora de uma sala não há nada pra checar mesmo. */
 function safeSystemDef(systemId: string | undefined): SystemDefinition | null {
@@ -29,6 +30,14 @@ const KEY_TO_DELTA: Record<string, { dx: number; dy: number }> = {
   a: { dx: -1, dy: 0 },
   d: { dx: 1, dy: 0 },
 };
+
+/**
+ * Tecla que move token (setas/WASD)? Usado por `useToolShortcuts`: com token selecionado, WASD tem
+ * prioridade sobre o atalho de ferramenta da mesma letra (D = Desenho).
+ */
+export function isTokenMoveKey(key: string): boolean {
+  return KEY_TO_DELTA[key.toLowerCase()] !== undefined;
+}
 
 /** Depois de tanto tempo sem nova tecla, confirma a rajada — mesmo sem soltar (docs/plano-movimento.md D6). */
 const CONFIRM_DELAY_MS = 250;
@@ -115,7 +124,9 @@ export function useTokenMoveShortcuts(): void {
         // #handleTokenDragStart, padrão Foundry), então isto só dispara sem NENHUMA interação antes
         // (ninguém clicou nem arrastou nada ainda). Sem o aviso, a tecla não fazia nada em silêncio
         // — parecia "o teclado não funciona" (docs/fix-movimento-turno.md).
-        if (!warnedRef.current) {
+        // Letra que também é ferramenta (D = Desenho): sem seleção ela troca a ferramenta, então o
+        // aviso seria falso.
+        if (!warnedRef.current && !isToolShortcutKey(e.key)) {
           toast("Selecione um token para mover com o teclado");
           warnedRef.current = true;
         }

@@ -53,6 +53,8 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - **Névoa (F, só GM)**: fog of war manual, descrita em §9.3. Desenho: botão reservado (desabilitado), fora do MVP.
   - **Pino (P, só GM)**: clique no mapa abre o formulário de um pino de nota (título, texto, ícone/cor, visibilidade) — ver §9.16. Fixar um pino de handout é feito arrastando um card da biblioteca (§9.10), não por esta ferramenta.
   - Esc cancela o gesto em andamento e volta para Selecionar. Scroll = zoom em todos os modos.
+  - **Desenho (D)** só troca a ferramenta **sem token selecionado**; com seleção, D é "mover para a direita" (WASD tem prioridade, §3.3) e a ferramenta não muda.
+  - Teclado na barra (`role="toolbar"`): com o foco num botão, ↑/↓ andam entre os botões habilitados (dando a volta) e Home/End vão às pontas; a seta não chega ao atalho de mover token.
   - **Desfazer/refazer (Ctrl+Z / Ctrl+Shift+Z ou Ctrl+Y, só GM)**: com a ferramenta Névoa ativa, Ctrl+Z desfaz a última forma pintada (§9.3, sem refazer); fora dela é o desfazer geral descrito em §9.6. Fora de campo de texto (`isTyping`), igual aos outros atalhos.
 - Sem mapa (`mapUrl = null`) o canvas desenha um retângulo escuro de `mapWidth × mapHeight` (padrão 1600×1100) só para o grid e os tokens terem onde ficar.
 - Renomear, duplicar, apagar e reordenar mapas, e navegar entre vários da mesma sala: §9.7.
@@ -60,7 +62,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 ### 3.3 Tokens
 - Criar: GM clica "Novo token" → aparece no centro da viewport com `cells: 1`. Opcional: imagem via `/api/upload`.
 - Arrastar: durante o drag o cliente emite `token:update {id, x, y}` com throttle (~30/s). Ao soltar, se `grid.snap`, alinha à célula mais próxima e emite a posição final.
-- **Setas/WASD** movem o(s) token(s) selecionados (Shift = 5 células), com o mesmo snap do arraste; com combate ativo, a trava de turno vale pro teclado igual ao arraste (§9.11).
+- **Setas/WASD** movem o(s) token(s) selecionados (Shift = 5 células), com o mesmo snap do arraste; com combate ativo, a trava de turno vale pro teclado igual ao arraste (§9.11). Com seleção, WASD tem prioridade sobre o atalho de ferramenta da mesma letra (D = Desenho, §3.2).
 - Redimensionar: handles nos cantos (Konva Transformer), sempre em célula inteira — a alça "pula" de célula em célula durante o arrasto (`docs/plano-grid.md`). Emite `token:update {id, cells}`.
 - Permissão: servidor rejeita `token:update`/`token:delete` de jogador que não é `ownerId` do token (ack `{ ok: false }`).
 - Todo `token:*` aceito é persistido e reenviado a todos na sala (inclusive quem enviou, para manter uma única fonte de verdade).
@@ -122,7 +124,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - **GM**: reordenar arrastando (`combat:reorder`, grava `order`), editar valor à mão (`combat:set-initiative`, `null` volta pra "não rolou"), marcar/desmarcar surpresa (`combat:set-surprised`), adicionar/remover, pular turno, encerrar. Jogador: rolar a própria, adiar/retomar a própria. Opção por usuário (checkbox na aba, `localStorage`) de centralizar o mapa no token da vez.
 - **Orçamento de deslocamento** (§9.11): toda vez que o combatente da vez muda (`combat:next`/`prev`/`delay`/`resume`, ou a remoção do ativo), o servidor resolve e grava um orçamento novo pra ele, zerando o gasto do turno anterior.
 - **Mapa**: anel destacado no token da vez (visível para quem vê o token).
-- UI nesta fase: mínima e funcional na aba Iniciativa (renomeada para o modo de combate); o visual definitivo virá do AI Studio depois.
+- UI: aba Iniciativa = gestão completa (reordenar, editar valor, adicionar, encerrar). Cabeçalho: rodada e status, **engrenagem** com as preferências (por usuário: centralizar no token da vez, mostrar alvos dos outros, limpar meus alvos; só GM, da sala: rolar NPCs ao iniciar, ignorar limite de movimento) e Encerrar; logo abaixo, **Anterior/Próximo** (só GM — `combat:next`/`prev` são `gmOnly`). Atalho **N** = Próximo, **Shift+N** = Anterior (GM, fora de campo de texto, combate do mapa visto; `lib/useCombatTurnShortcut.ts`). Com combate em andamento, a **iniciativa compacta** encaixa acima do chat na mesma coluna (§9.27).
 
 ### 3.6 Ficha de personagem
 - Tudo que é regra vem do JSON do sistema (`SystemDefinitionSchema` v2): atributos, perícias (com tags, variantes como "Ofício" e flags de tamanho/armadura), recursos, stats derivados por fórmula (`derived[]`: Defesa, CD, carga...), tamanhos, tipos de dano, moedas, campos de traço, stats de equipamento (`equipStats`) e tipos de item com campos declarados (`itemKinds`).
@@ -726,7 +728,7 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   à mão, diferente de só mudar cor/snap.
 - **Seletor de mapa** (`MapSelector`, na TopBar, só GM): botão "Mapa: <nome visitado> ▾" (ou "Vendo
   X · ativo: Y" em destaque dourado quando diverge, ver acima). Clique ou a tecla **M** (fora de campo
-  de texto) abrem um dropdown de ~420 px ancorado abaixo do botão; Esc ou clique fora fecham. Quando
+  de texto; listener da página, `lib/useGmPanelShortcuts.ts`, não do botão) abrem um dropdown de ~420 px ancorado abaixo do botão; Esc ou clique fora fecham. Quando
   divergente, o topo do dropdown ganha "← Ir para o ativo" e "Ativar este". O corpo é o `MapsPanel`:
   card por mapa com miniatura (gerada no cliente, cacheada em `localStorage` — `lib/thumbnails.ts`),
   contagem de tokens e status de combate (`scene:list`, buscado ao abrir o dropdown — dados que o
@@ -954,7 +956,7 @@ geometria, `visible`, soft delete e desfazer — ver eventos `pin:*` abaixo.
   (`lib/pinIcons.ts`, mesmo espírito de `TOKEN_COLORS`); com a lista, ela entra primeiro no
   seletor. `Pin{kind:"note"}.icon` guarda a CHAVE escolhida (ou ausente = padrão embutido).
 - **UI**: `HandoutSelector` na TopBar, ao lado do `MapSelector` — ícone de imagem, atalho **J**
-  (H já é "Mover mapa", §3.2), abre a `HandoutGallery` (`Dialog` padrão do projeto — portal, Esc,
+  (H já é "Mover mapa", §3.2; listener da página, `lib/useGmPanelShortcuts.ts`), abre a `HandoutGallery` (`Dialog` padrão do projeto — portal, Esc,
   clique fora) com a biblioteca inteira: busca, chips de tag, alternar grade/lista e uma prévia
   grande (imagem com zoom, ou o texto num "manuscrito") do handout selecionado. **Mostrar fecha a
   galeria sozinha**: ao "Mostrar para todos"/"Mostrar para...", `HandoutSelector` fecha o `Dialog`
@@ -1780,7 +1782,7 @@ salvos, criaturas homebrew da sala e macros — tudo numa vista só, sem duplica
   automaticamente (uma linha por URL distinta por sala), sem tocar em nenhum arquivo.
 - **Upload**: `POST /api/upload` aceita agora também MP3/OGG (mesmo limite de 20 MB da imagem),
   conferido pelos BYTES iniciais (ID3/frame MPEG ou "OggS"), não pelo mimetype que o navegador
-  declara. `LibraryDialog` (TopBar, atalho **B**) aceita subir vários arquivos arrastando do
+  declara. `LibraryDialog` (TopBar, atalho **B**, listener da página em `lib/useGmPanelShortcuts.ts`) aceita subir vários arquivos arrastando do
   sistema operacional, com fila de progresso e sugestão automática de tipo (imagem: lado maior ≥
   1000 px → mapa, senão token), editável antes de confirmar.
 - **Sem pastas, só tags** (busca + chips de tipo/tag + "só favoritos" resolvem achar; pasta forçaria
@@ -1873,3 +1875,35 @@ Trilha em loop + efeitos de uma vez, tocando pra todo mundo ao mesmo tempo (docs
 - Todos os comandos `audio:*` (exceto o snapshot/broadcast de leitura) são gmOnly.
 
 Ver `docs/revisao-preparo.md` para as bordas testadas e os casos de borda de entrega.
+
+### 9.27 Mesa: piso comum da reorganização
+
+Primeiro passo da reorganização da Mesa em Bastidores (esquerda) × Mesa (direita), decidida em
+`docs/critique-arquitetura-mesa.md` (caminho C, ordem do §10). Só reorganiza o que existe; nenhuma
+feature nova (setembro/2026).
+
+- **Iniciativa + chat juntos**: com combate em andamento no mapa visto (`status !== "ended"`), a aba
+  Chat mostra um bloco compacto de iniciativa (`CombatCompact.tsx`) acima das mensagens, na mesma
+  coluna: rodada e de quem é a vez, Anterior/Próximo (só GM, atalho N/Shift+N) e a lista na ordem do
+  servidor (cor, nome, surpreso/adiado, valor), que rola sozinha até quem está na vez; clicar numa
+  linha seleciona o token. "Gerenciar" leva à aba Iniciativa, que fica para a gestão completa (§3.5).
+  O selo da aba Iniciativa mostra a rodada só com combate em andamento (antes mostrava "R0" sempre).
+- **Rascunho do chat na store** (`useChat.draft`): o texto digitado sobrevive à troca de aba (a aba
+  desmonta).
+- **Tecla D**: ver §3.2/§3.3 (WASD tem prioridade com token selecionado; sem seleção, D = Desenho e
+  não aparece o aviso "Selecione um token").
+- **Atalhos M/J/B em hook da página** (`lib/useGmPanelShortcuts.ts`): o aberto/fechado de
+  `MapSelector`/`HandoutSelector`/`LibrarySelector` mora na `RoomPage` (componentes controlados),
+  então a tecla continua valendo se o botão sair da barra nos próximos passos.
+- **Acessibilidade**:
+  - Abas do painel lateral com `role="tablist"`/`role="tab"`/`aria-selected`/`aria-controls` e
+    `tabpanel`; ←/→/Home/End trocam de aba (tabindex móvel: só a aba ativa entra no Tab).
+  - Lista de mensagens do chat com `role="log"` + `aria-live="polite"` (anuncia só o que chega); a
+    linha "vez de X" do bloco compacto também é `aria-live`.
+  - Chips da Visão de grupo (§9.15) focáveis (`role="button"`, `tabIndex=0`, Enter/Espaço abrem a
+    ficha, `aria-label` com nome, "na vez" e "oculto").
+  - Barra de ferramentas navegável por setas (§3.2).
+  - Nenhum texto abaixo de 12 px no painel lateral (abas, chat e cards do chat, combate, Visão de
+    grupo, Fichas). As rodadas restantes de condição na linha do combatente passaram a ficar ao lado
+    do ícone (não cabiam num selo sobreposto de 12 px). Fora do painel (ficha, compêndio, card de
+    NPC, inspetor de token, galeria de handouts) ainda há textos de 10 px: não fazem parte deste passo.

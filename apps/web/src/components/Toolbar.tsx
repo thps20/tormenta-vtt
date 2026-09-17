@@ -55,6 +55,7 @@ const TEMPLATE_TOOL: ToolDef = { mode: "template", label: "Área", shortcut: "T"
 /** Desenho livre (SPEC §9.17) — GM sempre; jogador conforme o toggle da sala (ver DrawToolbar,
  *  que mostra o aviso quando está desligado). Não é GM-only na barra. */
 const DRAW_TOOL: ToolDef = { mode: "draw", label: "Desenho", shortcut: "D", Icon: Pencil };
+// D só troca para Desenho sem token selecionado; com seleção, D move o token (WASD, useToolShortcuts).
 
 /** Só o GM: pintar a névoa (ver FogToolbar para os sub-modos) e fixar pinos (docs/plano-narracao.md). */
 const GM_TOOLS: ToolDef[] = [
@@ -80,12 +81,31 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const translucent = useBarTranslucency(rootRef, translucentBarsOverMap);
+
+  /**
+   * Padrão WAI-ARIA de toolbar vertical: com o foco num botão, ↑/↓ andam entre os botões habilitados
+   * (dando a volta) e Home/End vão às pontas. `stopPropagation` impede a seta de chegar ao atalho de
+   * mover token (`useTokenMoveShortcuts`, listener da janela) — a seta aqui é navegação, não movimento.
+   */
+  const handleArrowKeys = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) return;
+    const buttons = Array.from(rootRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []);
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (index === -1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const last = buttons.length - 1;
+    const next = e.key === "Home" ? 0 : e.key === "End" ? last : e.key === "ArrowDown" ? (index >= last ? 0 : index + 1) : index <= 0 ? last : index - 1;
+    buttons[next]?.focus();
+  };
   return (
     <div
       ref={rootRef}
       id="vtt-toolbar"
       role="toolbar"
       aria-orientation="vertical"
+      aria-label="Ferramentas do mapa"
+      onKeyDown={handleArrowKeys}
       style={{ opacity: immersiveHidden ? 0 : translucent ? 0.55 : 1, pointerEvents: immersiveHidden ? "none" : undefined }}
       className={`absolute top-4 left-4 z-10 flex flex-col gap-0.5 p-1 transition-opacity duration-150 ease-out ${FLOAT_SURFACE}`}
     >

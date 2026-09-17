@@ -95,7 +95,7 @@ export const RollModeButton: React.FC<RollModeButtonProps> = ({ mode, onChange }
           openMenu();
         }}
         title={`Modo de rolagem: ${info.label}. Clique para alternar; segure para escolher.`}
-        className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-l-ui border font-ui text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${pressedClass(mode !== 'all')}`}
+        className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-l-ui border font-ui text-12 uppercase tracking-wide whitespace-nowrap transition-colors cursor-pointer select-none ${pressedClass(mode !== 'all')}`}
       >
         <Icon className="w-3 h-3" />
         <span>{info.label}</span>
@@ -140,8 +140,8 @@ export const RollModeButton: React.FC<RollModeButtonProps> = ({ mode, onChange }
               >
                 <MIcon className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                 <span className="flex flex-col">
-                  <span className="text-[11px] font-bold uppercase tracking-wide">{m.label}</span>
-                  <span className="text-[10px] text-text-muted leading-snug normal-case">{m.description}</span>
+                  <span className="text-12 font-bold uppercase tracking-wide">{m.label}</span>
+                  <span className="text-12 text-text-muted leading-snug normal-case">{m.description}</span>
                 </span>
               </button>
             );

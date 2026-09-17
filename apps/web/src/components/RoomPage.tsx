@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { navigate } from "../lib/router";
 import { selectActiveScene, selectViewedScene, useRoom } from "../store/room";
 import { sceneTokens, useTokens } from "../store/tokens";
@@ -25,6 +25,8 @@ import { useTokenMoveShortcuts } from "../lib/useTokenMoveShortcuts";
 import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
 import { useSidePanelShortcut } from "../lib/useSidePanelShortcut";
 import { useImmersiveModeShortcut } from "../lib/useImmersiveModeShortcut";
+import { useGmPanelShortcuts } from "../lib/useGmPanelShortcuts";
+import { useCombatTurnShortcut } from "../lib/useCombatTurnShortcut";
 import { useFullscreen } from "../lib/useFullscreen";
 import { useIdle } from "../lib/useIdle";
 import { useTurnTitle } from "../lib/useTurnTitle";
@@ -316,6 +318,7 @@ function Table() {
   const macroBarController = useMacroBarController();
   useDeleteSelectionShortcut();
   useTokenMoveShortcuts();
+  useCombatTurnShortcut();
 
   // Handouts (docs/SPEC.md §9.10): biblioteca por sala (só GM, carregada sob demanda ao abrir o
   // HandoutSelector) + overlay em tela cheia atualmente aberto.
@@ -644,6 +647,36 @@ function Table() {
   const closeCompendium = useCompendium((s) => s.close);
   const mapPaletteOpen = compendiumOpen && compendiumContext === "map";
   useMapPaletteShortcut((openCharacterId !== null || emptySheetOpen) || isMapConfigOpen, me?.role === "gm" ? CREATURE_FILTER : null);
+
+  // Seletores de Mapas (M), Handouts (J) e Acervo (B) do GM: aberto/fechado mora aqui, não dentro
+  // de cada botão, pra tecla continuar valendo mesmo se o botão sair da barra (lib/useGmPanelShortcuts).
+  // Abrir sempre dispara o carregamento sob demanda da lista (só a store conhece o evento).
+  const [mapSelectorOpen, setMapSelectorOpen] = useState(false);
+  const [handoutSelectorOpen, setHandoutSelectorOpen] = useState(false);
+  const [librarySelectorOpen, setLibrarySelectorOpen] = useState(false);
+  // useCallback: identidade estável. O MapSelector registra o Esc num efeito que depende disto; se
+  // a função mudasse a cada render, o Esc (que também troca a ferramenta e re-renderiza a página no
+  // meio do evento) removeria o listener antes de ele rodar.
+  const setMapSelectorOpenAndLoad = useCallback((open: boolean) => {
+    if (open) void useSceneList.getState().load();
+    setMapSelectorOpen(open);
+  }, []);
+  const setHandoutSelectorOpenAndLoad = useCallback((open: boolean) => {
+    if (open) void useHandouts.getState().loadLibrary();
+    setHandoutSelectorOpen(open);
+  }, []);
+  const setLibrarySelectorOpenAndLoad = useCallback((open: boolean) => {
+    if (open) {
+      void useLibrary.getState().loadAssets();
+      void useLibrary.getState().loadFavorites();
+    }
+    setLibrarySelectorOpen(open);
+  }, []);
+  useGmPanelShortcuts(me?.role === "gm", {
+    onToggleMaps: () => setMapSelectorOpenAndLoad(!mapSelectorOpen),
+    onToggleHandouts: () => setHandoutSelectorOpenAndLoad(!handoutSelectorOpen),
+    onToggleLibrary: () => setLibrarySelectorOpenAndLoad(!librarySelectorOpen),
+  });
 
   // Réguas dos outros só valem na cena que estou vendo.
   const remoteRulers = useMemo(() => Object.values(remoteRulersById).filter((r) => r.sceneId === scene?.id), [remoteRulersById, scene?.id]);
@@ -986,23 +1019,13 @@ function Table() {
             />
           }
           mapSelector={
-            isGm ? (
-              <MapSelector viewingScene={scene} activeScene={activeScene} maps={mapsProps} onOpen={() => void loadSceneList()} />
-            ) : undefined
+            isGm ? <MapSelector viewingScene={scene} activeScene={activeScene} maps={mapsProps} open={mapSelectorOpen} onOpenChange={setMapSelectorOpenAndLoad} /> : undefined
           }
           handoutSelector={
-            isGm ? <HandoutSelector gallery={handoutGalleryProps} onOpen={() => void loadHandoutLibrary()} /> : undefined
+            isGm ? <HandoutSelector gallery={handoutGalleryProps} open={handoutSelectorOpen} onOpenChange={setHandoutSelectorOpenAndLoad} /> : undefined
           }
           librarySelector={
-            isGm ? (
-              <LibrarySelector
-                dialog={libraryDialogProps}
-                onOpen={() => {
-                  void loadLibraryAssets();
-                  void loadLibraryFavorites();
-                }}
-              />
-            ) : undefined
+            isGm ? <LibrarySelector dialog={libraryDialogProps} open={librarySelectorOpen} onOpenChange={setLibrarySelectorOpenAndLoad} /> : undefined
           }
           onOpenMacros={() => macroBarController.setCreating(true)}
           castMenu={

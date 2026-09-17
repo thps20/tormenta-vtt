@@ -43,16 +43,16 @@ export const CharactersTab: React.FC<Props> = ({ characters, participants, me, o
                 className="focus-ring flex items-center gap-2 px-2.5 py-2 rounded-ui border border-border bg-bg/40 cursor-pointer hover:bg-surface-2"
                 onClick={() => onOpen(c.id)}
               >
-                <div className="w-7 h-7 rounded-full bg-surface-2 border border-border flex items-center justify-center text-[11px] font-title font-bold text-text shrink-0">
+                <div className="w-7 h-7 rounded-full bg-surface-2 border border-border flex items-center justify-center text-12 font-title font-bold text-text shrink-0">
                   {c.imageUrl ? <img src={c.imageUrl} alt="" className="w-full h-full rounded-full object-cover" /> : c.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-text truncate">{c.name}</div>
-                  <div className="text-[10px] text-text-muted truncate">
+                  <div className="text-12 text-text-muted truncate">
                     Nível {c.level} • {c.kind === "npc" ? "NPC" : owner ? owner : "sem dono"}
                   </div>
                 </div>
-                {c.kind === "npc" && <span className="text-[9px] px-1 rounded-ui bg-surface-2 text-text-muted uppercase">NPC</span>}
+                {c.kind === "npc" && <span className="text-12 px-1 rounded-ui bg-surface-2 text-text-muted uppercase">NPC</span>}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -82,7 +82,7 @@ export const CharactersTab: React.FC<Props> = ({ characters, participants, me, o
       </div>
 
       <form onSubmit={submit} className="p-3 bg-bg border-t border-border space-y-2">
-        <div className="flex items-center gap-1.5 text-[10px] text-text-muted uppercase tracking-widest font-title font-bold">
+        <div className="flex items-center gap-1.5 text-12 text-text-muted uppercase tracking-widest font-title font-bold">
           <Users className="w-3 h-3" /> Nova ficha
         </div>
         <div className="flex items-center gap-2">
@@ -104,7 +104,7 @@ export const CharactersTab: React.FC<Props> = ({ characters, participants, me, o
           </button>
         </div>
         {isGm && (
-          <div className="flex items-center gap-2 text-[11px]">
+          <div className="flex items-center gap-2 text-12">
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value === "npc" ? "npc" : "pc")}

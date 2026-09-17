@@ -156,10 +156,10 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
       {/* Roll Header */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-bold uppercase tracking-tight text-text">{msg.nickname}</span>
-          {isGm && <span className="text-[9px] px-1.5 py-0.2 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
+          <span className="text-12 font-bold uppercase tracking-tight text-text">{msg.nickname}</span>
+          {isGm && <span className="text-12 px-1.5 py-0.2 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
           {whisperLabel && (
-            <span className="flex items-center gap-1 text-[9px] px-1 rounded-ui bg-bg/40 border border-border text-text-muted lowercase">
+            <span className="flex items-center gap-1 text-12 px-1 rounded-ui bg-bg/40 border border-border text-text-muted lowercase">
               <MessageCircle className="w-2.5 h-2.5" />
               {whisperLabel}
             </span>
@@ -178,7 +178,7 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
               <BookmarkPlus className="w-3 h-3" />
             </button>
           )}
-          <span className="text-[9px] font-data tabular-nums text-text-muted">{time}</span>
+          <span className="text-12 font-data tabular-nums text-text-muted">{time}</span>
         </div>
       </div>
 
@@ -189,7 +189,7 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
         onClick={revealing ? () => setRevealing(false) : undefined}
       >
         <div className="flex flex-col flex-1 min-w-0">
-          <span className="text-[11px] text-text-muted italic mb-1 truncate">{roll.label ? roll.label : 'Rolagem de dados'}</span>
+          <span className="text-12 text-text-muted italic mb-1 truncate">{roll.label ? roll.label : 'Rolagem de dados'}</span>
           <div className="flex items-baseline gap-2">
             <span
               className={`text-2xl font-data tabular-nums font-bold tracking-tight ${revealing ? 'dice-reveal-number' : ''} ${
@@ -202,7 +202,7 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
                 Combinado (§9.13) não mistura aqui: o dano tem bloco próprio, embaixo. */}
             {damage && !combined && damage.length === 1 && damage[0] && <DamageTypeBadge def={def} type={damage[0].damageType} />}
             {damage && !combined && damage.length > 1 && (
-              <span className="text-[11px] font-data tabular-nums text-text flex items-center gap-1 flex-wrap" data-damage-breakdown>
+              <span className="text-12 font-data tabular-nums text-text flex items-center gap-1 flex-wrap" data-damage-breakdown>
                 (
                 {damage.map((d, i) => (
                   <React.Fragment key={i}>
@@ -214,7 +214,7 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
                 )
               </span>
             )}
-            <span className="text-[11px] font-data tabular-nums text-text-muted">
+            <span className="text-12 font-data tabular-nums text-text-muted">
               {roll.groups.map((g) => `[${g.rolls.join(', ')}]`).join(' ')}
               {roll.modifier !== 0 && (
                 <span>
@@ -226,7 +226,7 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
           </div>
           {/* Fórmula do dano com o selo de cada parcela: "6d6 + 1 [Fogo] + 4d6 [Frio]". */}
           {damage && !combined && (
-            <div className="mt-1 text-[10px] font-data text-text-muted" data-damage-formula>
+            <div className="mt-1 text-12 font-data text-text-muted" data-damage-formula>
               <DamageFormula def={def} components={damage} />
             </div>
           )}
@@ -239,7 +239,7 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
           {summarizeDiceTypes(roll.groups).map(({ sides, count }) => (
             <span
               key={sides}
-              className={`flex items-center gap-0.5 font-data text-[10px] ${
+              className={`flex items-center gap-0.5 font-data text-12 ${
                 sides === 20 && isCritical ? 'text-accent' : sides === 20 && isFumble ? 'text-danger' : 'text-text-muted'
               }`}
             >
@@ -256,7 +256,7 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
           {roll.targets.map((t) => {
             const { text, color } = targetLineText(def, roll, t);
             return (
-              <div key={t.tokenId} className={`text-[11px] font-data ${color}`}>
+              <div key={t.tokenId} className={`text-12 font-data ${color}`}>
                 {text}
               </div>
             );
@@ -270,11 +270,11 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
       {combined && damage && (
         <div className="mt-2 pt-1.5 border-t border-border" data-combined-damage>
           <div className="flex items-baseline gap-2">
-            <span className="text-[11px] text-text-muted italic">Dano</span>
+            <span className="text-12 text-text-muted italic">Dano</span>
             <span className="text-xl font-data tabular-nums font-bold text-text">{sumDamage(damage)}</span>
             {damage.length === 1 && damage[0] && <DamageTypeBadge def={def} type={damage[0].damageType} />}
             {damage.length > 1 && (
-              <span className="text-[11px] font-data tabular-nums text-text flex items-center gap-1 flex-wrap">
+              <span className="text-12 font-data tabular-nums text-text flex items-center gap-1 flex-wrap">
                 (
                 {damage.map((d, i) => (
                   <React.Fragment key={i}>
@@ -287,12 +287,12 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
               </span>
             )}
           </div>
-          <div className="mt-1 text-[10px] font-data text-text-muted" data-damage-formula>
+          <div className="mt-1 text-12 font-data text-text-muted" data-damage-formula>
             <DamageFormula def={def} components={damage} />
           </div>
           {isCritical && (
             <div
-              className={`mt-1 flex items-center gap-1 text-[10px] font-ui ${roll.criticalConfirmed ? 'text-accent' : 'text-text'}`}
+              className={`mt-1 flex items-center gap-1 text-12 font-ui ${roll.criticalConfirmed ? 'text-accent' : 'text-text'}`}
               data-critical={roll.criticalConfirmed ? 'confirmed' : 'possible'}
             >
               <Flame className="w-3 h-3" />
@@ -322,7 +322,7 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
             }
           />
           {roll.applied.length > 0 && (
-            <span className="text-[10px] font-data tabular-nums text-text-muted" data-applied-log>
+            <span className="text-12 font-data tabular-nums text-text-muted" data-applied-log>
               Aplicado:{' '}
               {roll.applied.map((a, i) => (
                 <React.Fragment key={i}>
@@ -350,7 +350,7 @@ export const RollCardMessage: React.FC<RollCardMessageProps> = ({
           const vis = rollModeInfo(msg.visibility);
           const VisIcon = vis.icon;
           return (
-            <div className="mt-2 pt-1.5 border-t border-border flex items-center justify-between gap-2 text-[10px] font-ui" data-visibility={msg.visibility}>
+            <div className="mt-2 pt-1.5 border-t border-border flex items-center justify-between gap-2 text-12 font-ui" data-visibility={msg.visibility}>
               <span className="flex items-center gap-1 text-text-muted">
                 <VisIcon className="w-3 h-3" />
                 <span>{msg.visibility === 'gm' ? 'Rolagem secreta: só o GM vê' : 'Rolagem própria: só você vê'}</span>

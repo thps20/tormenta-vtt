@@ -52,11 +52,11 @@ export const InitiativeBatchMessage: React.FC<InitiativeBatchMessageProps> = ({ 
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
           <Swords className="w-3.5 h-3.5 text-text-muted" />
-          <span className="text-[11px] font-title font-bold uppercase tracking-tight text-text">
+          <span className="text-12 font-title font-bold uppercase tracking-tight text-text">
             Iniciativa (rodada {batch.round})
           </span>
         </div>
-        <span className="text-[9px] font-data tabular-nums text-text-muted">{time}</span>
+        <span className="text-12 font-data tabular-nums text-text-muted">{time}</span>
       </div>
 
       <div
@@ -74,11 +74,11 @@ export const InitiativeBatchMessage: React.FC<InitiativeBatchMessageProps> = ({ 
             <span className="text-xs text-text truncate">{e.name}</span>
             {e.result !== undefined ? (
               <span className="flex items-baseline gap-2">
-                {e.formula && <span className="text-[10px] font-data text-text-muted">{e.formula}</span>}
+                {e.formula && <span className="text-12 font-data text-text-muted">{e.formula}</span>}
                 <span className="text-sm font-data tabular-nums font-bold text-text">{e.result}</span>
               </span>
             ) : (
-              <span className="text-[10px] text-text-muted italic">rolou</span>
+              <span className="text-12 text-text-muted italic">rolou</span>
             )}
           </div>
         ))}
@@ -90,7 +90,7 @@ export const InitiativeBatchMessage: React.FC<InitiativeBatchMessageProps> = ({ 
           const VisIcon = vis.icon;
           return (
             <div
-              className="mt-2 pt-1.5 border-t border-border flex items-center justify-between gap-2 text-[10px] font-ui"
+              className="mt-2 pt-1.5 border-t border-border flex items-center justify-between gap-2 text-12 font-ui"
               data-visibility={msg.visibility}
             >
               <span className="flex items-center gap-1 text-text-muted">

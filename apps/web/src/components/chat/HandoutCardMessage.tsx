@@ -35,11 +35,11 @@ export const HandoutCardMessage: React.FC<HandoutCardMessageProps> = ({ msg, tim
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <ImageIcon className="w-3 h-3 text-text-muted shrink-0" />
-          <span className="text-[10px] font-title font-bold text-text-muted uppercase tracking-wide">Handout</span>
+          <span className="text-12 font-title font-bold text-text-muted uppercase tracking-wide">Handout</span>
         </div>
         <p className="text-xs text-text truncate">{card.name}</p>
       </div>
-      <span className="text-[9px] font-data tabular-nums text-text-muted shrink-0">{time}</span>
+      <span className="text-12 font-data tabular-nums text-text-muted shrink-0">{time}</span>
     </button>
   );
 };

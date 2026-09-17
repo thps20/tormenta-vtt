@@ -16,6 +16,12 @@ interface ChatState {
    */
   whisperTarget: string | null;
   /**
+   * Rascunho do campo do chat. Vive aqui, e não no estado local do `ChatTab`, porque a aba desmonta
+   * ao trocar para Iniciativa/Fichas — o texto digitado não pode se perder nessa troca.
+   */
+  draft: string;
+  setDraft: (text: string) => void;
+  /**
    * Ids de rolagem (`roll` ou `initiative-batch`) que acabaram de "nascer" — mensagem nova com
    * resultado, ou placeholder secreto que só agora ganhou `roll` (revelação). O cartão
    * (`RollCardMessage`/`InitiativeBatchMessage`) lê e consome via `consumeRollAnimation` ao
@@ -55,6 +61,8 @@ export const useChat = create<ChatState>((set, get) => ({
   messages: [],
   rollMode: loadRollMode(),
   whisperTarget: null,
+  draft: "",
+  setDraft: (draft) => set({ draft }),
   pendingRollAnimations: new Set(),
   consumeRollAnimation: (id) => {
     const has = get().pendingRollAnimations.has(id);
