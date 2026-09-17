@@ -24,3 +24,4 @@ export * from "./encounter.js";
 export * from "./party.js";
 export * from "./drawing.js";
 export * from "./macros.js";
+export * from "./tabletop.js";

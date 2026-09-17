@@ -16,3 +16,4 @@ export * from "./drawing.js";
 export * from "./encounter.js";
 export * from "./party.js";
 export * from "./macro.js";
+export * from "./display.js";

@@ -37,6 +37,15 @@ import type {
   CompendiumEntry,
   CompendiumFavoriteTogglePayload,
   CompendiumSpawnCreaturePayload,
+  DisplayCameraMode,
+  DisplayFramePayload,
+  DisplayHandoutViewPayload,
+  DisplayJoinPayload,
+  DisplaySetBlackoutPayload,
+  DisplaySetCameraModePayload,
+  DisplaySetPreviewPayload,
+  DisplaySetTabletopHintPayload,
+  DisplayViewPayload,
   Drawing,
   DrawingClearAllPayload,
   DrawingClearMinePayload,
@@ -52,6 +61,7 @@ import type {
   FogConfig,
   FogUpdatePayload,
   Handout,
+  HandoutCard,
   HandoutClosePayload,
   HandoutCreatePayload,
   HandoutDeletePayload,
@@ -175,7 +185,33 @@ export interface RoomSnapshot {
    * nunca pra sala toda: é preferência pessoal, não conteúdo de jogo.
    */
   macros: Macro[];
+  /**
+   * Cast (docs/plano-cast.md), só pro GM (`undefined` pra qualquer outro viewer, inclusive a
+   * própria tela de exibição — ver `DisplaySnapshot`). `displayToken` nulo = Cast desligado nesta
+   * sala (nenhum link gerado ainda, ou revogado).
+   */
+  cast?: CastState;
 }
+
+/** Estado do Cast (docs/plano-cast.md) visível só ao GM. */
+export interface CastState {
+  displayToken: string | null;
+  cameraMode: DisplayCameraMode;
+  blackout: boolean;
+  /** Quantas telas de exibição estão conectadas agora (não sobrevive a restart do servidor). */
+  displayCount: number;
+}
+
+/**
+ * Estado completo enviado à TELA DE EXIBIÇÃO no `display:join` (docs/plano-cast.md §1.6): mesmo
+ * formato de `RoomSnapshot` (as stores do web hidratam sem código novo) menos `cast` (a tela nunca
+ * vê o token nem administra o Cast) mais o modo de câmera e o blackout atuais, que ela precisa
+ * saber já na entrada.
+ */
+export type DisplaySnapshot = Omit<RoomSnapshot, "cast"> & {
+  cameraMode: DisplayCameraMode;
+  blackout: boolean;
+};
 
 /**
  * Resultado de `history:undo`/`history:redo` (docs/plano-desfazer.md). `null` = pilha vazia (nada
@@ -485,6 +521,29 @@ export interface ClientToServerEvents {
   "history:undo": (payload: Record<string, never>, ack: Ack<HistoryActionResult | null>) => void;
   /** Refaz o topo da pilha de redo (esvaziada por qualquer ação nova desde o último undo). */
   "history:redo": (payload: Record<string, never>, ack: Ack<HistoryActionResult | null>) => void;
+
+  // Cast — tela de exibição (docs/plano-cast.md). A tela NUNCA é um Participant: entra por
+  // `display:join`, não por `room:join`. Todo o resto (criar/revogar link, modo de câmera,
+  // blackout, enquadramento) é GM only; um middleware no servidor (`socket/index.ts`) garante que
+  // um socket de tela só consegue chamar `display:join`/`display:frame`/`scene:enter`.
+  /** A tela entra com o token gerado pelo GM. Ack `{ok:false}` (token errado/revogado) → tela mostra erro e não tenta de novo sozinha. */
+  "display:join": (payload: DisplayJoinPayload, ack: Ack<DisplaySnapshot>) => void;
+  /** A tela reporta se a calibração de mesa física está ligada — só decide o PADRÃO do modo de câmera (§9 decisão 1). */
+  "display:set-tabletop-hint": (payload: DisplaySetTabletopHintPayload, ack: Ack) => void;
+  /** Gera um token novo (substitui o anterior, se houver) — qualquer tela conectada com o antigo é desconectada. */
+  "display:create-token": (payload: Record<string, never>, ack: Ack<{ displayToken: string }>) => void;
+  /** Desliga o Cast desta sala: token vira null, telas conectadas são desconectadas. */
+  "display:revoke-token": (payload: Record<string, never>, ack: Ack) => void;
+  "display:set-camera-mode": (payload: DisplaySetCameraModePayload, ack: Ack) => void;
+  "display:set-blackout": (payload: DisplaySetBlackoutPayload, ack: Ack) => void;
+  /** Enquadramento do Mestre (só repassado às telas quando o modo é "follow", ou sempre com reason "center"). */
+  "display:view": (payload: DisplayViewPayload, ack: Ack) => void;
+  /** Zoom/pan do Mestre no handout aberto "para todos" (docs/revisao-cast.md) — repassado à tela tal e qual. */
+  "display:handout-view": (payload: DisplayHandoutViewPayload, ack: Ack) => void;
+  /** Liga/desliga o envio periódico de miniatura pela tela (só roda enquanto o GM está com o popover Cast aberto). */
+  "display:preview": (payload: DisplaySetPreviewPayload, ack: Ack) => void;
+  /** A tela manda uma miniatura de si mesma (JPEG data URL) — só quando `display:previewDemand.on`. */
+  "display:frame": (payload: DisplayFramePayload, ack: Ack) => void;
 }
 
 export interface ServerToClientEvents {
@@ -600,6 +659,28 @@ export interface ServerToClientEvents {
    * um undo, um redo), pra Toolbar habilitar/desabilitar os botões e mostrar o resumo no tooltip.
    */
   "history:updated": (p: { canUndo: boolean; canRedo: boolean; undoSummary?: string; redoSummary?: string }) => void;
+
+  // Cast — tela de exibição (docs/plano-cast.md).
+  /** Quantas telas estão conectadas agora — só pro GM, pra ele saber que está "no ar". */
+  "display:presence": (p: { count: number }) => void;
+  /** Token gerado/revogado — só pro GM (outras abas dele além da que chamou), nunca às telas. */
+  "display:tokenChanged": (p: { displayToken: string | null }) => void;
+  /** Modo de câmera mudou — GM (confirmação) e todas as telas. */
+  "display:cameraModeChanged": (p: { mode: DisplayCameraMode }) => void;
+  /** Blackout ligou/desligou — GM (confirmação) e todas as telas. */
+  "display:blackoutChanged": (p: { blackout: boolean }) => void;
+  /** Enquadramento do Mestre repassado às telas (docs/plano-cast.md §4.1). */
+  "display:view": (p: DisplayViewPayload) => void;
+  /** Pro GM: enviada quando o popover Cast pede miniatura (`display:preview {on:true}`). */
+  "display:previewDemand": (p: { on: boolean }) => void;
+  /** Miniatura da tela, repassada ao GM. */
+  "display:frame": (p: DisplayFramePayload) => void;
+  /** Handout mostrado/fechado "para todos" (§9.10) — só chega às telas; sussurros nunca chegam. */
+  "display:handout": (p: { handout: HandoutCard | null }) => void;
+  /** Zoom/pan do handout aberto, repassado à tela (docs/revisao-cast.md) — mesma regra de sussurro. */
+  "display:handout-view": (p: DisplayHandoutViewPayload) => void;
+  /** Enviado à tela antes de desconectá-la (token revogado/rotacionado) — mostra "Link revogado". */
+  "display:revoked": () => void;
 }
 
 /** Dados guardados no socket no servidor (socket.data). */
@@ -609,4 +690,11 @@ export interface SocketData {
   role: "gm" | "player";
   /** Guardado no join para eventos frequentes (régua) não consultarem o banco. */
   nickname: string;
+  /**
+   * Socket de tela de exibição (docs/plano-cast.md), entrado por `display:join` — nunca por
+   * `room:join`. `participantId` é o pseudo-id `DISPLAY_VIEWER_ID` ("display"), `role` é sempre
+   * "player". Um middleware em `socket/index.ts` usa esta flag pra recusar qualquer evento fora da
+   * lista permitida (somente leitura).
+   */
+  isDisplay: boolean;
 }
