@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CastIcon } from "lucide-react";
-import { TabletopPrefsSchema, computeCharacter, isPointRevealed, tokenCenter } from "@tormenta-vtt/shared";
+import { computeCharacter, isPointRevealed, tokenCenter } from "@tormenta-vtt/shared";
 import { effectiveCellSize, sizeTokens } from "../lib/grid";
 import { selectActiveScene, useRoom } from "../store/room";
 import { sceneTokens, useTokens } from "../store/tokens";
@@ -11,14 +11,17 @@ import { sceneTemplates, useTemplates } from "../store/templates";
 import { useCharacters } from "../store/characters";
 import { useTools, type RemoteRuler } from "../store/tools";
 import { useCast } from "../store/cast";
+import { emitAck } from "../store/connection";
 import { setDisplayMode } from "../store/ui";
 import { useSystemDef } from "../lib/system";
 import { resolvePinIcons } from "../lib/pinIcons";
+import { loadTabletopPrefs, saveTabletopPrefs } from "../lib/tabletopPrefs";
 import { useCastCamera } from "../lib/castCamera";
 import { useFullscreen } from "../lib/useFullscreen";
 import { DEFAULT_IMMERSIVE_BG_COLOR } from "../lib/immersiveMode";
 import { VttCanvas, type TokenBar, type VttCanvasHandle } from "./VttCanvas";
 import { HandoutOverlay } from "./HandoutOverlay";
+import { CalibrationPanel } from "./cast/CalibrationPanel";
 import { FLOAT_SURFACE } from "./MapBar";
 
 interface DisplayPageProps {
@@ -111,8 +114,12 @@ export const DisplayPage: React.FC<DisplayPageProps> = ({ inviteCode, displayTok
   const handoutView = useCast((s) => s.handoutView);
   const revoked = useCast((s) => s.revoked);
 
-  // Mesa física ainda sem calibração nesta etapa: preferências padrão (desligada, sem rotação).
-  const tabletop = useMemo(() => TabletopPrefsSchema.parse({}), []);
+  // Calibração de mesa física (docs/plano-cast.md §3.3): 100% local a esta tela.
+  const [tabletop, setTabletop] = useState(() => loadTabletopPrefs());
+  useEffect(() => saveTabletopPrefs(tabletop), [tabletop]);
+  useEffect(() => {
+    void emitAck("display:set-tabletop-hint", { tabletop: tabletop.enabled });
+  }, [tabletop.enabled]);
 
   const [screenSize, setScreenSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   useEffect(() => {
@@ -126,6 +133,7 @@ export const DisplayPage: React.FC<DisplayPageProps> = ({ inviteCode, displayTok
   const canvasRef = useRef<VttCanvasHandle>(null);
 
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
+  const [calibrationOpen, setCalibrationOpen] = useState(false);
   const [hintVisible, setHintVisible] = useState(true);
   useEffect(() => {
     const t = setTimeout(() => setHintVisible(false), 5000);
@@ -135,7 +143,9 @@ export const DisplayPage: React.FC<DisplayPageProps> = ({ inviteCode, displayTok
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const key = e.key.toLowerCase();
-      if (key === "f") toggleFullscreen();
+      if (key === "c") setCalibrationOpen((v) => !v);
+      else if (key === "f") toggleFullscreen();
+      else if (key === "escape") setCalibrationOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -271,10 +281,21 @@ export const DisplayPage: React.FC<DisplayPageProps> = ({ inviteCode, displayTok
 
       {hintVisible && (
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-zinc-700 text-xs font-ui pointer-events-none">
-          F: tela cheia
+          F: tela cheia · C: calibrar
         </div>
       )}
 
+      {/* Canto discreto que abre a calibração (docs/plano-cast.md §3.3) — invisível, só a tecla C
+       *  costuma ser usada; a área existe pra telas sem teclado por perto. */}
+      <button
+        type="button"
+        aria-label="Calibração da mesa física"
+        onClick={() => setCalibrationOpen(true)}
+        className="absolute bottom-0 right-0 w-12 h-12"
+        style={{ cursor: "auto" }}
+      />
+
+      {calibrationOpen && <CalibrationPanel prefs={tabletop} onChange={setTabletop} onClose={() => setCalibrationOpen(false)} screenSize={screenSize} />}
     </div>
   );
 };
