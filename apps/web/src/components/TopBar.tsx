@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Crown, Copy, Check, Users, MapPin, LogOut, NotebookText, Settings, Zap } from "lucide-react";
+import { Crown, Copy, Check, Users, MapPin, NotebookText, Settings, Zap } from "lucide-react";
 import type { Participant, RoomPublic, Scene } from "@tormenta-vtt/shared";
 import { roomPath } from "../lib/router";
 import { MOTION, TOP_BAR_BUTTON } from "./MapBar";
@@ -9,8 +9,8 @@ interface TopBarProps {
   scene: Scene | null;
   participants: Participant[];
   me: Participant;
-  onLeaveToLobby: () => void;
-  /** Só o GM recebe este handler (botão "Configurar Mapa"). */
+  /** "Sair para o Lobby" mora no menu ⋯ (montado pela página) — a barra não tem mais o botão. */
+  /** Só o GM: engrenagem ao lado do nome do mapa (era o botão "Configurar Mapa" do lado direito). */
   onOpenMapConfig?: () => void;
   /** Só o GM, e só quando há mapa sendo visto (docs/plano-narracao.md, botão "Notas"). */
   onOpenMapNotes?: () => void;
@@ -18,12 +18,14 @@ interface TopBarProps {
   characterMenu?: React.ReactNode;
   /** Seletor de mapa (`MapSelector`), montado pela página — só GM. Sem ele, mostra só o nome do mapa ativo. */
   mapSelector?: React.ReactNode;
-  /** Seletor de handouts (`HandoutSelector`, docs/SPEC.md §9.10), ao lado do de mapa — só GM. */
-  handoutSelector?: React.ReactNode;
-  /** Seletor do Acervo (`LibrarySelector`, docs/plano-preparo.md §1.5), ao lado do de handouts — só GM. */
-  librarySelector?: React.ReactNode;
+  /** Menu "⋯" do fim da barra (`TopBarOverflowMenu`): preparar (Handouts, Acervo, Preparo) e sistema
+   *  (Lobby). Os diálogos de Handouts/Acervo continuam montados pela página, fora daqui. */
+  overflowMenu?: React.ReactNode;
   /** Abre o criador de macro (docs/SPEC.md §9.20) — GM e jogador, é preferência pessoal. */
   onOpenMacros?: () => void;
+  /** Botões de Handouts/Acervo viraram itens do ⋯; os componentes (diálogos) são montados pela
+   *  página e entram aqui só pra continuarem no DOM enquanto abertos. */
+  hiddenSelectors?: React.ReactNode;
   /** Botão "Cast" (`CastMenu`, docs/plano-cast.md §5), montado pela página — só GM. */
   castMenu?: React.ReactNode;
   /** Player da trilha tocando agora (`AudioPlayer`, docs/plano-preparo.md §3.3) — só GM, só
@@ -38,13 +40,12 @@ export const TopBar: React.FC<TopBarProps> = ({
   scene,
   participants,
   me,
-  onLeaveToLobby,
   onOpenMapConfig,
   onOpenMapNotes,
   characterMenu,
   mapSelector,
-  handoutSelector,
-  librarySelector,
+  overflowMenu,
+  hiddenSelectors,
   onOpenMacros,
   castMenu,
   audioPlayer,
@@ -85,8 +86,18 @@ export const TopBar: React.FC<TopBarProps> = ({
               <span className="font-title text-13 font-semibold uppercase tracking-[0.06em]">{scene?.name ?? "Sem mapa"}</span>
             </span>
           )}
-          {handoutSelector}
-          {librarySelector}
+          {/* Configurar Mapa mora onde o mapa está: engrenagem colada no nome (docs/SPEC.md §9.28). */}
+          {isGM && onOpenMapConfig && (
+            <button
+              id="btn-topbar-map-config"
+              onClick={onOpenMapConfig}
+              title="Configurar imagem do mapa e grid (apenas GM)"
+              aria-label="Configurar mapa"
+              className={`focus-ring flex items-center justify-center h-7 w-7 rounded-ui text-text-muted hover:text-text hover:bg-surface-2 cursor-pointer ${MOTION}`}
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          )}
           <span className="w-px h-4 bg-border mx-1" aria-hidden />
           <button
             onClick={handleCopyInvite}
@@ -188,27 +199,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             </button>
           )}
 
-          {isGM && onOpenMapConfig && (
-            <button
-              id="btn-topbar-map-config"
-              onClick={onOpenMapConfig}
-              title="Configurar imagem do mapa e grid (apenas GM)"
-              className={TOP_BAR_BUTTON}
-            >
-              <Settings className="w-3.5 h-3.5 text-text-muted" />
-              <span className="hidden md:inline">Configurar Mapa</span>
-            </button>
-          )}
-
-          <button
-            id="btn-topbar-leave-lobby"
-            onClick={onLeaveToLobby}
-            title="Voltar ao Lobby"
-            className={`focus-ring flex items-center gap-1.5 h-8 px-2.5 rounded-ui text-13 text-text-muted hover:text-text hover:bg-surface-2 cursor-pointer ${MOTION}`}
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Lobby</span>
-          </button>
+          {overflowMenu}
+          {hiddenSelectors}
         </div>
       </div>
     </header>

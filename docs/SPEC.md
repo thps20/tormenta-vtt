@@ -1805,11 +1805,15 @@ Lista ordenada de passos por mapa, só o GM vê (docs/plano-preparo.md §2): cad
 markdown leve) e itens que **apontam** pro acervo/handout/encontro/criatura/macro/pino/NPC, ou um
 lembrete solto sem referência (`note`) — nunca reimplementa a ação em si.
 
-- **Aba "Preparo"** no painel lateral, só GM (jogador não vê a aba). Mostra o preparo do mapa que o
-  GM está vendo agora; trocar de mapa troca a lista. Ao montar, garante o carregamento das quatro
-  bibliotecas de que depende pra resolver referência (acervo, handouts, encontros salvos, compêndio
-  homebrew) — elas são carregadas sob demanda em outro lugar (o próprio diálogo de cada uma), e a
-  aba Preparo é uma consumidora nova que não pode presumir que o GM já abriu esses diálogos antes.
+- **Gaveta "Preparo"** (`PrepDrawer`, §9.28 — era uma aba do painel lateral até setembro/2026), só
+  GM. Coluna à ESQUERDA do mapa, que empurra o canvas em vez de cobrir (a barra de ferramentas
+  continua visível); abre por **Shift+P** ou pelo ⋯ da barra, fecha por Shift+P, Esc ou pelo X.
+  Mostra o preparo do mapa que o GM está vendo agora; trocar de mapa troca a lista. Ao montar,
+  garante o carregamento das quatro bibliotecas de que depende pra resolver referência (acervo,
+  handouts, encontros salvos, compêndio homebrew) — elas são carregadas sob demanda em outro lugar
+  (o próprio diálogo de cada uma), e quem lê preparo é uma consumidora nova que não pode presumir
+  que o GM já abriu esses diálogos antes. Resolução e execução vivem em `lib/usePrepRunner.ts`,
+  fora da UI, porque o card "Próximo passo" (§9.28) executa exatamente do mesmo jeito.
 - **Ação principal por tipo, um clique**, sempre reaproveitando a MESMA ação de store que o botão
   manual chamaria: mapa → `scene:setMap`; token → `token:create`; áudio → `audio:play` (§9.26);
   handout → mostrar para todos; encontro → soltar (visível ou invisível, `encounter:spawn.
@@ -1911,3 +1915,33 @@ feature nova (setembro/2026).
     grupo, Fichas). As rodadas restantes de condição na linha do combatente passaram a ficar ao lado
     do ícone (não cabiam num selo sobreposto de 12 px). Fora do painel (ficha, compêndio, card de
     NPC, inspetor de token, galeria de handouts) ainda há textos de 10 px: não fazem parte deste passo.
+
+### 9.28 Mesa: barra superior de estado e Preparo fora do painel
+
+Passo 2 do caminho C (`docs/critique-arquitetura-mesa.md`), setembro/2026. Continua sem feature
+nova: só muda onde as coisas moram.
+
+- **Barra superior = estado + o que é de jogar.** À esquerda, nome da sala/sistema e o bloco do
+  mapa: `MapSelector` (com o aviso dourado de mapa divergente) + **engrenagem** que abre "Configurar
+  Mapa" (era um botão solto do lado direito, longe do mapa) + convite. À direita: selo do GM,
+  participantes, Fichas, **Macros** e **Notas** (são de JOGAR — ficam na barra, não no ⋯), Cast,
+  player da trilha tocando, volume e, no fim, o menu **⋯** (`TopBarOverflowMenu`).
+- **Menu ⋯**: Handouts (J), Acervo (B), Preparo (Shift+P) — o que é de PREPARAR — e "Sair para o
+  Lobby" (separado, em vermelho). Jogador só vê o Lobby. `HandoutSelector`/`LibrarySelector` ganharam
+  `hideTrigger`: continuam montados (o diálogo é deles), só sem o botão próprio na barra. No passo 3
+  as entradas de preparar migram para os Bastidores e o ⋯ fica só com sistema.
+- **Painel lateral sem a aba Preparo**: sobram Chat, Iniciativa e Fichas, e com três os rótulos já
+  cabem inteiros (medido em 1366 px: nenhum `span` de aba com texto cortado) — o "CH…"/"IN…" era
+  efeito das QUATRO abas em 384 px. A aba Iniciativa continua existindo só para a gestão do combate
+  (§3.5); o que o Mestre olha a cada turno é o bloco compacto acima do chat (§9.27).
+- **Card "Próximo passo"** (`PrepNextStepCard`), no topo do painel, acima das abas (vale em qualquer
+  uma), só GM: primeiro passo ainda não usado do mapa visto, com **Iniciar** — mesmo `PrepRunDialog`
+  e mesmo hook da gaveta, e marca o passo como usado igual. Sem passo pendente (ou sem preparo), o
+  card não aparece. O título abre a gaveta de Preparo. As bibliotecas de resolução só são carregadas
+  no clique de Iniciar (`ensurePrepLibraries`), pra um card que monta em toda sessão de GM não puxar
+  quatro listas à toa.
+- **Atalho Shift+P** para a gaveta de Preparo (`lib/useGmPanelShortcuts.ts`, junto de M/J/B): P
+  sozinho já é a ferramenta Pino (§3.2). É o único atalho com Shift ali; as letras soltas continuam
+  ignorando Shift.
+- **1366×768**: com 4 participantes e trilha tocando, os dois lados da barra não se sobrepõem (era
+  o aperto relatado na crítica, ~16 px sobrando antes).

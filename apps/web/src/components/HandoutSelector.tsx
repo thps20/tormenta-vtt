@@ -10,6 +10,8 @@ interface HandoutSelectorProps {
   gallery: Omit<HandoutGalleryProps, "isOpen" | "onClose">;
   /** Galeria aberta: controlada pela RoomPage, dona do atalho J (`useGmPanelShortcuts`). */
   open: boolean;
+  /** `true` monta só o diálogo, sem o botão: o gatilho virou item do menu ⋯ da barra (§9.28). */
+  hideTrigger?: boolean;
   /** Abrir (true) ou fechar (false). Quem abre também dispara `handout:list` sob demanda. */
   onOpenChange: (open: boolean) => void;
 }
@@ -29,7 +31,7 @@ interface HandoutSelectorProps {
  * local do próprio GM) — o `HandoutGallery` continua montado o tempo todo (só `isOpen=false`
  * some da tela), então busca/filtro/seleção de antes continuam lá quando reabre.
  */
-export const HandoutSelector: React.FC<HandoutSelectorProps> = ({ gallery, open, onOpenChange }) => {
+export const HandoutSelector: React.FC<HandoutSelectorProps> = ({ gallery, open, onOpenChange, hideTrigger }) => {
   const setOpen = onOpenChange;
   const overlayOpen = useHandouts((s) => s.open !== null);
   /** true entre "fechei a galeria pra mostrar" e "o overlay fechou de novo" — só aí reabre sozinha. */
@@ -50,6 +52,7 @@ export const HandoutSelector: React.FC<HandoutSelectorProps> = ({ gallery, open,
 
   return (
     <>
+      {!hideTrigger && (
       <button
         id="btn-handout-selector"
         onClick={() => setOpen(!open)}
@@ -59,6 +62,7 @@ export const HandoutSelector: React.FC<HandoutSelectorProps> = ({ gallery, open,
         <ImageIcon className="w-3.5 h-3.5 shrink-0 text-text-muted" />
         <span>Handouts</span>
       </button>
+      )}
 
       <HandoutGallery isOpen={open} onClose={() => setOpen(false)} {...gallery} onShow={handleShow} />
     </>

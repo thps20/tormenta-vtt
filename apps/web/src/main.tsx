@@ -25,7 +25,9 @@ if (import.meta.env.DEV) {
     import("./store/encounters"),
     import("./store/ui"),
     import("./store/diceOverlay3d"),
-  ]).then(([c, r, t, ch, cb, ca, tl, co, h, sl, en, ui, d3d]) => {
+    import("./store/prep"),
+    import("./store/audio"),
+  ]).then(([c, r, t, ch, cb, ca, tl, co, h, sl, en, ui, d3d, pr, au]) => {
     Object.assign(window, {
       __vtt: {
         useConnection: c.useConnection,
@@ -41,6 +43,8 @@ if (import.meta.env.DEV) {
         useEncounters: en.useEncounters,
         useUi: ui.useUi,
         useDiceOverlay3D: d3d.useDiceOverlay3D,
+        usePrep: pr.usePrep,
+        useAudio: au.useAudio,
       },
     });
   });

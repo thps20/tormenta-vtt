@@ -72,7 +72,12 @@ import { TemplateToolbar } from "./TemplateToolbar";
 import { VttCanvas, type TokenBar, type VttCanvasHandle } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
 import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
+import { ClipboardList, Image as ImageIcon, Library, LogOut } from "lucide-react";
 import { SidePanel, type SidePanelTab } from "./SidePanel";
+import { PrepDrawer } from "./PrepDrawer";
+import type { PrepPanelProps } from "./PrepPanel";
+import { PrepNextStepCard } from "./PrepNextStepCard";
+import { TopBarOverflowMenu, type OverflowAction } from "./TopBarOverflowMenu";
 import { CharacterMenu } from "./CharacterMenu";
 import { CastMenu } from "./cast/CastMenu";
 import { useCast } from "../store/cast";
@@ -672,10 +677,14 @@ function Table() {
     }
     setLibrarySelectorOpen(open);
   }, []);
+  // Gaveta de Preparo (§9.28): coluna à esquerda do mapa, atalho Shift+P (P sozinho é a ferramenta
+  // Pino). No passo 3 ela vira a seção "Preparo" dos Bastidores.
+  const [prepDrawerOpen, setPrepDrawerOpen] = useState(false);
   useGmPanelShortcuts(me?.role === "gm", {
     onToggleMaps: () => setMapSelectorOpenAndLoad(!mapSelectorOpen),
     onToggleHandouts: () => setHandoutSelectorOpenAndLoad(!handoutSelectorOpen),
     onToggleLibrary: () => setLibrarySelectorOpenAndLoad(!librarySelectorOpen),
+    onTogglePrep: () => setPrepDrawerOpen((v) => !v),
   });
 
   // Réguas dos outros só valem na cena que estou vendo.
@@ -932,6 +941,47 @@ function Table() {
     onOpenMacro: (macroId: string) => macroBarController.setEditingId(macroId),
   };
 
+  /** Props do Preparo do mapa visto — hoje só a gaveta usa; no passo 3, a seção dos Bastidores. */
+  const prepPanelProps: PrepPanelProps | null =
+    isGm && scene
+      ? {
+          sceneId: scene.id,
+          sceneName: scene.name,
+          scenes: scenes.map((sc) => ({ id: sc.id, name: sc.name })),
+          getViewportCenter: () => vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 },
+          onOpenMapNotes: () => setNotesTarget({ kind: "scene", id: scene.id, name: scene.name }),
+          onOpenNotePin: (pin) => setOpenNotePin(pin),
+        }
+      : null;
+
+  /** Menu "⋯" do fim da barra (§9.28): o que é de PREPARAR (só GM) e o sistema (Lobby, todos). */
+  const overflowActions: OverflowAction[] = [
+    ...(isGm
+      ? [
+          {
+            id: "handouts",
+            label: "Handouts",
+            Icon: ImageIcon,
+            shortcut: "J",
+            onClick: () => setHandoutSelectorOpenAndLoad(true),
+          },
+          { id: "library", label: "Acervo", Icon: Library, shortcut: "B", onClick: () => setLibrarySelectorOpenAndLoad(true) },
+          { id: "prep", label: "Preparo", Icon: ClipboardList, shortcut: "Shift+P", onClick: () => setPrepDrawerOpen((v) => !v) },
+        ]
+      : []),
+    {
+      id: "lobby",
+      label: "Sair para o Lobby",
+      Icon: LogOut,
+      separated: isGm,
+      danger: true,
+      onClick: () => {
+        leave();
+        navigate("/");
+      },
+    },
+  ];
+
   // --- Pinos (docs/plano-narracao.md — unifica handout:pin com pino de nota) ----------------
   /** Card denormalizado a partir de um pino de handout (mesmos campos de HandoutCard, o pino só tem 3 a mais: id/sceneId/visible). */
   const pinToCard = (pin: Pin & { kind: "image" | "text" }): HandoutCard =>
@@ -1002,10 +1052,6 @@ function Table() {
           scene={scene}
           participants={participants}
           me={me}
-          onLeaveToLobby={() => {
-            leave();
-            navigate("/");
-          }}
           onOpenMapConfig={isGm ? () => setMapConfigOpen(true) : undefined}
           onOpenMapNotes={isGm && scene ? () => setNotesTarget({ kind: "scene", id: scene.id, name: scene.name }) : undefined}
           characterMenu={
@@ -1021,11 +1067,14 @@ function Table() {
           mapSelector={
             isGm ? <MapSelector viewingScene={scene} activeScene={activeScene} maps={mapsProps} open={mapSelectorOpen} onOpenChange={setMapSelectorOpenAndLoad} /> : undefined
           }
-          handoutSelector={
-            isGm ? <HandoutSelector gallery={handoutGalleryProps} open={handoutSelectorOpen} onOpenChange={setHandoutSelectorOpenAndLoad} /> : undefined
-          }
-          librarySelector={
-            isGm ? <LibrarySelector dialog={libraryDialogProps} open={librarySelectorOpen} onOpenChange={setLibrarySelectorOpenAndLoad} /> : undefined
+          overflowMenu={<TopBarOverflowMenu actions={overflowActions} />}
+          hiddenSelectors={
+            isGm ? (
+              <>
+                <HandoutSelector gallery={handoutGalleryProps} open={handoutSelectorOpen} onOpenChange={setHandoutSelectorOpenAndLoad} hideTrigger />
+                <LibrarySelector dialog={libraryDialogProps} open={librarySelectorOpen} onOpenChange={setLibrarySelectorOpenAndLoad} hideTrigger />
+              </>
+            ) : undefined
           }
           onOpenMacros={() => macroBarController.setCreating(true)}
           castMenu={
@@ -1048,6 +1097,9 @@ function Table() {
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
+        {/* Bastidores (hoje só Preparo): coluna à ESQUERDA, empurrando o mapa — a barra de
+            ferramentas do canvas continua visível. */}
+        {isGm && prepDrawerOpen && <PrepDrawer panel={prepPanelProps} onClose={() => setPrepDrawerOpen(false)} />}
         <main className="flex-1 h-full relative overflow-hidden">
           <CombatBanner
             combat={combat}
@@ -1302,17 +1354,15 @@ function Table() {
           onToggleCollapsed={toggleSidePanelCollapsed}
           unreadMessages={unreadMessages}
           isMyTurn={myTurn}
-          prepPanel={
-            isGm && scene
-              ? {
-                  sceneId: scene.id,
-                  sceneName: scene.name,
-                  scenes: scenes.map((s) => ({ id: s.id, name: s.name })),
-                  getViewportCenter: () => vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 },
-                  onOpenMapNotes: () => setNotesTarget({ kind: "scene", id: scene.id, name: scene.name }),
-                  onOpenNotePin: (pin) => setOpenNotePin(pin),
-                }
-              : null
+          prepNextStep={
+            isGm && scene ? (
+              <PrepNextStepCard
+                sceneId={scene.id}
+                getViewportCenter={() => vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 }}
+                onOpenNotePin={(pin) => setOpenNotePin(pin)}
+                onOpenPrep={() => setPrepDrawerOpen(true)}
+              />
+            ) : undefined
           }
         />
       </div>

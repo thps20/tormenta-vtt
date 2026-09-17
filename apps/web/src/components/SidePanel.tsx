@@ -1,15 +1,14 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, ClipboardList, MessageSquare, Swords, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageSquare, Swords, Users } from 'lucide-react';
 import { ChatTab } from './ChatTab';
 import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
 import { CombatCompact } from './CombatCompact';
 import { CharactersTab } from './CharactersTab';
 import { PartyView } from './PartyView';
-import { PrepPanel, type PrepPanelProps } from './PrepPanel';
 import { TabErrorBoundary } from './TabErrorBoundary';
 import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, MacroAction, Participant, PartyEntry, SystemDefinition, Token } from '@tormenta-vtt/shared';
 
-export type SidePanelTab = 'chat' | 'initiative' | 'characters' | 'prep';
+export type SidePanelTab = 'chat' | 'initiative' | 'characters';
 
 interface SidePanelProps {
   /** Aba ativa (controlada pela página, para outros botões poderem abrir uma aba). */
@@ -72,9 +71,9 @@ interface SidePanelProps {
   unreadMessages: number;
   /** Badge "é seu turno" na alça recolhida. */
   isMyTurn: boolean;
-  /** Aba "Preparo" (docs/plano-preparo.md §2) — só existe (e só é oferecida na lista de abas)
-   *  quando o mapa visto está carregado E o viewer é GM; jogador nem sabe que ela existe. */
-  prepPanel: PrepPanelProps | null;
+  /** Card "Próximo passo" (docs/SPEC.md §9.28), montado pela página — só GM, e só quando há um
+   *  passo pendente no preparo do mapa visto (o próprio card devolve null quando não há). */
+  prepNextStep?: React.ReactNode;
 }
 
 /** Uma aba, com o rótulo e a contagem já formatados em texto pra virar tooltip/rodapé do ícone. */
@@ -131,7 +130,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   onToggleCollapsed,
   unreadMessages,
   isMyTurn,
-  prepPanel,
+  prepNextStep,
 }) => {
   const setActiveTab = onTabChange;
   // Combate em andamento no mapa visto: a iniciativa compacta encaixa acima do chat.
@@ -142,7 +141,6 @@ export const SidePanel: React.FC<SidePanelProps> = ({
     // Rodada só com combate em andamento ("R0" sem combate não dizia nada).
     { id: 'initiative', label: 'Iniciativa', Icon: Swords, badge: combatLive && combat ? `R${combat.round}` : '' },
     { id: 'characters', label: 'Fichas', Icon: Users, badge: String(characters.length) },
-    ...(prepPanel ? [{ id: 'prep' as const, label: 'Preparo', Icon: ClipboardList, badge: '' }] : []),
   ];
 
   // Recolhido: o canvas ocupa a largura toda e sobra só esta alça fina, com os badges que
@@ -208,6 +206,10 @@ export const SidePanel: React.FC<SidePanelProps> = ({
           onReorder={onReorderParty}
         />
       )}
+
+      {/* "Próximo passo" do preparo: ponte entre preparar e jogar, acima das abas pra valer em
+          qualquer uma delas (docs/SPEC.md §9.28). */}
+      {prepNextStep}
 
       {/* Tab Navigation Header - Elegant Dark Style. `@container` deixa cada TabButton decidir, pela
           própria largura disponível, entre ícone+rótulo e só ícone (com tooltip e badge no canto). */}
@@ -277,10 +279,6 @@ export const SidePanel: React.FC<SidePanelProps> = ({
               onCreate={onCreateCharacter}
               onDelete={onDeleteCharacter}
             />
-          </TabErrorBoundary>
-        ) : activeTab === 'prep' && prepPanel ? (
-          <TabErrorBoundary label="Preparo">
-            <PrepPanel {...prepPanel} />
           </TabErrorBoundary>
         ) : (
           <TabErrorBoundary label="Iniciativa">

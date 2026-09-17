@@ -8,6 +8,8 @@ interface LibrarySelectorProps {
   dialog: Omit<LibraryDialogProps, "isOpen" | "onClose">;
   /** Diálogo aberto: controlado pela RoomPage, dona do atalho B (`useGmPanelShortcuts`). */
   open: boolean;
+  /** `true` monta só o diálogo, sem o botão: o gatilho virou item do menu ⋯ da barra (§9.28). */
+  hideTrigger?: boolean;
   /** Abrir (true) ou fechar (false). Quem abre também dispara `asset:list`/`library:favorites`. */
   onOpenChange: (open: boolean) => void;
 }
@@ -18,7 +20,7 @@ interface LibrarySelectorProps {
  * `useGmPanelShortcuts`) ou clique abrem/fecham
  * o diálogo. Esc e clique fora fecham (o `Dialog` de dentro já cuida disso).
  */
-export const LibrarySelector: React.FC<LibrarySelectorProps> = ({ dialog, open, onOpenChange }) => {
+export const LibrarySelector: React.FC<LibrarySelectorProps> = ({ dialog, open, onOpenChange, hideTrigger }) => {
   const setOpen = onOpenChange;
 
   /** "Editar" de criatura/macro navega pra outra tela — fecha o diálogo primeiro (mesma conta de
@@ -34,6 +36,7 @@ export const LibrarySelector: React.FC<LibrarySelectorProps> = ({ dialog, open, 
 
   return (
     <>
+      {!hideTrigger && (
       <button
         id="btn-library-selector"
         onClick={() => setOpen(!open)}
@@ -43,6 +46,7 @@ export const LibrarySelector: React.FC<LibrarySelectorProps> = ({ dialog, open, 
         <Library className="w-3.5 h-3.5 shrink-0 text-text-muted" />
         <span>Acervo</span>
       </button>
+      )}
 
       <LibraryDialog isOpen={open} onClose={() => setOpen(false)} {...dialog} onOpenCreature={handleOpenCreature} onOpenMacro={handleOpenMacro} />
     </>
