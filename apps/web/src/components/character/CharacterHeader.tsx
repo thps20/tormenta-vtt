@@ -1,7 +1,10 @@
 import React from "react";
 import { Award, Edit3, Eye, Lock, Shield, Unlock, User, X } from "lucide-react";
 import { describeClasses, type Character, type CharacterPatch, type ComputedCharacter, type Participant, type SystemDefinition } from "@tormenta-vtt/shared";
+import type { PlaceOnMapController } from "../../lib/placeOnMap";
 import { NumInput, Select, TextInput, ghostBtn } from "./fields";
+import { PlaceOnMapButton } from "./PlaceOnMapButton";
+import { TokenAppearance } from "./TokenAppearance";
 
 interface CharacterHeaderProps {
   def: SystemDefinition;
@@ -14,6 +17,8 @@ interface CharacterHeaderProps {
   onToggleEditMode: () => void;
   onPatch: (patch: CharacterPatch) => void;
   onClose: () => void;
+  /** "Colocar no mapa"/"Ir para o token" (SPEC §9.30). Ausente = fora da mesa (ex.: testes). */
+  placeOnMap?: PlaceOnMapController;
 }
 
 /**
@@ -31,6 +36,7 @@ export const CharacterHeader: React.FC<CharacterHeaderProps> = ({
   onToggleEditMode,
   onPatch,
   onClose,
+  placeOnMap,
 }) => {
   const isGm = me.role === "gm";
   const ownerName = character.ownerId ? (participants.find((p) => p.id === character.ownerId)?.nickname ?? "Jogador") : "Apenas GM";
@@ -75,6 +81,7 @@ export const CharacterHeader: React.FC<CharacterHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {placeOnMap && canEdit && <PlaceOnMapButton characterId={character.id} placeOnMap={placeOnMap} />}
           {canEdit && (
             <button
               onClick={onToggleEditMode}
@@ -119,6 +126,20 @@ export const CharacterHeader: React.FC<CharacterHeaderProps> = ({
             </div>
           )}
         </div>
+
+        {/* Aparência no mapa (§9.30): é OUTRA imagem — o retrato acima é da ficha, esta é do token. */}
+        {canEdit && (
+          <div className="shrink-0 flex flex-col items-center gap-1">
+            <span className="text-[9px] uppercase font-serif text-zinc-500 font-semibold tracking-wider">No mapa</span>
+            <TokenAppearance
+              def={def}
+              defaults={character.tokenDefaults}
+              name={character.name}
+              isEditMode={isEditMode}
+              onChange={(tokenDefaults) => onPatch({ tokenDefaults })}
+            />
+          </div>
+        )}
 
         <div className="flex-1 min-w-0">
           <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">

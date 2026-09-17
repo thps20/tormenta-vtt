@@ -15,6 +15,7 @@ import { useCompendium } from "../store/compendium";
 import { isOpenPaletteShortcut } from "../lib/compendium";
 import { DROP_TARGET_ATTR, registerDropTarget } from "../lib/dropTargets";
 import { isTyping } from "../lib/isTyping";
+import type { PlaceOnMapController } from "../lib/placeOnMap";
 import { useMediaQuery } from "../lib/useMediaQuery";
 
 /** Id do alvo de soltura da ficha (lib/dropTargets). */
@@ -44,6 +45,8 @@ export interface CharacterSheetDrawerProps {
   /** Estado vazio: cria a ficha do próprio jogador. */
   onCreateMine: () => void;
   onClose: () => void;
+  /** "Colocar no mapa"/"Ir para o token" no cabeçalho (SPEC §9.30). */
+  placeOnMap?: PlaceOnMapController;
 }
 
 /**
@@ -51,7 +54,7 @@ export interface CharacterSheetDrawerProps {
  * sistema; os valores finais vêm de computeCharacter (uma vez por render).
  * Modo visualização = rolagens rápidas; modo edição = inputs.
  */
-export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def, character, participants, me, canEdit, onPatch, onRoll, onUseItem, onInsertFromCompendium, onCreateMine, onClose }) => {
+export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def, character, participants, me, canEdit, onPatch, onRoll, onUseItem, onInsertFromCompendium, onCreateMine, onClose, placeOnMap }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   /** Aba de itens ativa: vive aqui para o atalho da paleta abrir já filtrado por ela. */
   const [activeItemTab, setActiveItemTab] = useState<string>(def.itemKinds[0]?.key ?? "");
@@ -129,6 +132,7 @@ export const CharacterSheetDrawer: React.FC<CharacterSheetDrawerProps> = ({ def,
                 onToggleEditMode={() => setIsEditMode((v) => !v)}
                 onPatch={onPatch}
                 onClose={onClose}
+                placeOnMap={placeOnMap}
               />
 
               {computed.warnings.length > 0 && (

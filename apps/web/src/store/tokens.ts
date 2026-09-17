@@ -49,6 +49,13 @@ interface TokensState {
    * Sem otimismo: character:created/token:created chegam pelo broadcast normal (upsert idempotente).
    */
   spawnFromCompendium: (payload: CompendiumSpawnCreaturePayload) => Promise<Token[] | null>;
+  /**
+   * "Colocar no mapa" a partir de uma FICHA que já existe (SPEC §9.30): cria só o token, já
+   * vinculado e com a aparência de `tokenDefaults`. O servidor escolhe a célula livre (espiral, como
+   * no spawn), então não dá pra ser otimista — o token chega pelo ack e pelo broadcast (upsert é
+   * idempotente). Seleciona o token criado, como o botão de novo token já faz.
+   */
+  placeCharacter: (characterId: string, sceneId: string, point: { x: number; y: number }) => Promise<Token | null>;
   delete: (tokenId: string) => Promise<boolean>;
   /**
    * Apagar em lote (Delete/Backspace com vários selecionados, lixeira do NpcQuickCard): um único
@@ -227,6 +234,17 @@ export const useTokens = create<TokensState>((set, get) => ({
     // Os broadcasts character:created/token:created também chegam; o upsert é idempotente.
     for (const token of res.data) get().upsert(token);
     if (res.data[0]) get().select(res.data[0].id);
+    return res.data;
+  },
+
+  placeCharacter: async (characterId, sceneId, point) => {
+    const res = await emitAck("character:place-token", { characterId, sceneId, x: point.x, y: point.y });
+    if (!res.ok) {
+      toast(res.error);
+      return null;
+    }
+    get().upsert(res.data);
+    get().select(res.data.id);
     return res.data;
   },
 

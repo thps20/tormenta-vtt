@@ -12,6 +12,7 @@ import { useDrawingHistory } from "../store/drawingHistory";
 import { resolvePinIcons } from "../lib/pinIcons";
 import { describeTemplateAreaChange } from "../lib/templates";
 import { effectiveCellSize, sizeTokens } from "../lib/grid";
+import type { PlaceOnMapController } from "../lib/placeOnMap";
 import { useChat } from "../store/chat";
 import { activeCombatant, isMyTurn, sceneCombat, useCombat } from "../store/combat";
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
@@ -469,6 +470,7 @@ function Table() {
   const undoHistory = useHistory((s) => s.undo);
   const redoHistory = useHistory((s) => s.redo);
   const spawnFromCompendium = useTokens((s) => s.spawnFromCompendium);
+  const placeCharacterToken = useTokens((s) => s.placeCharacter);
   const deleteToken = useTokens((s) => s.delete);
   const vttCanvasRef = useRef<VttCanvasHandle>(null);
   // Cast, "seguir o Mestre" (docs/plano-cast.md §4.1): manda o enquadramento pra tela de exibição,
@@ -480,6 +482,26 @@ function Table() {
     const result = await spawnFromCompendium({ sceneId: scene.id, entryId, count: opts.count, visible: opts.visible, x: point.x, y: point.y });
     return result !== null;
   };
+  /**
+   * "Colocar no mapa" (SPEC §9.30): a ficha é a prateleira, o token é a presença dela neste mapa.
+   * Montado aqui porque só o RoomPage conhece as três coisas de que todo botão desses precisa — o
+   * mapa visto, os tokens dele e o centro da área visível do canvas — e desce como uma prop só.
+   */
+  const placeOnMap: PlaceOnMapController = {
+    enabled: scene !== null,
+    tokenOf: (characterId) => tokens.find((t) => t.characterId === characterId) ?? null,
+    place: (characterId, point) => {
+      if (!scene) return;
+      // Sem ponto (botão, não arrasto): no CENTRO da área visível. O x/y do token é o canto
+      // superior esquerdo, então desconta meio token — mesma conta do botão "Novo token".
+      const cells = charById[characterId]?.tokenDefaults?.cells ?? 1;
+      const half = (effectiveCellSize(scene.grid) * cells) / 2;
+      const center = vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 };
+      void placeCharacterToken(characterId, scene.id, point ?? { x: center.x - half, y: center.y - half });
+    },
+    goTo: (tokenId) => focusToken(tokenId),
+  };
+
   const spawnEncounter = useEncounters((s) => s.spawn);
   /** Solta o encontro inteiro na cena ativa (§9.14) — mesma dualidade Enter/arrasto de spawnCreatureAt. */
   const spawnEncounterAt = async (
@@ -1496,6 +1518,7 @@ function Table() {
           onInsertFromCompendium={(entryId, opts) => (openChar ? insertFromCompendium(systemDef, openChar.id, entryId, opts) : Promise.resolve(null))}
           onCreateMine={() => void createCharacter({ name: me.nickname, kind: "pc", ownerId: me.id }).then((c) => c && openCharacter(c.id))}
           onClose={() => openCharacter(null)}
+          placeOnMap={placeOnMap}
         />
       )}
 
