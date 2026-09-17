@@ -10,6 +10,8 @@ export const rooms = {
   all: (roomId: string) => `room:${roomId}`,
   gm: (roomId: string) => `room:${roomId}:gm`,
   players: (roomId: string) => `room:${roomId}:players`,
+  /** Telas de exibição conectadas (docs/plano-cast.md) — sempre um subconjunto de `players`. */
+  display: (roomId: string) => `room:${roomId}:display`,
   /** Todos os sockets (abas) de um mesmo participante. */
   participant: (participantId: string) => `participant:${participantId}`,
 };

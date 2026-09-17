@@ -179,6 +179,10 @@ export function registerHandoutHandlers(io: TypedServer, socket: TypedSocket): v
           }),
         );
         await emitChatMessage(io, ctx.roomId, msg);
+        // Cast (docs/plano-cast.md §9 decisão 2/§10): só "para todos" abre o overlay na tela de
+        // exibição — sussurro ("para X") nunca chega lá, mesmo espírito de nunca vazar pra ninguém
+        // fora do alvo.
+        if (target === "all") io.to(rooms.display(ctx.roomId)).emit("display:handout", { handout: card });
       },
       gmOnly,
     ),
@@ -201,6 +205,8 @@ export function registerHandoutHandlers(io: TypedServer, socket: TypedSocket): v
           : [];
         const target = exceptRooms.length ? io.to(rooms.all(ctx.roomId)).except(exceptRooms) : io.to(rooms.all(ctx.roomId));
         target.emit("handout:closed", { messageId });
+        // Cast: só fecha o overlay da tela se era "para todos" (nunca esteve aberto lá se era sussurro).
+        if (!row.whisperTo) io.to(rooms.display(ctx.roomId)).emit("display:handout", { handout: null });
       },
       gmOnly,
     ),

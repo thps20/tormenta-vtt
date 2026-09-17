@@ -30,6 +30,7 @@ import { HandlerError } from "../socket/ack.js";
 import { rooms, type TypedServer } from "../socket/types.js";
 import { toCharacter } from "./characters.js";
 import { emitChatMessage } from "./chatVisibility.js";
+import { displayViewer } from "./display.js";
 import { sceneGeometry, type SceneGeometry } from "./grid.js";
 import { startTurnMovementIfChanged } from "./movement.js";
 import { toChatMessage, toScene, toToken } from "./serialize.js";
@@ -178,6 +179,10 @@ export async function emitCombat(io: TypedServer, roomId: string, sceneId: strin
       const view = row ? toCombat(row, def, { role: "player", participantId: p.id }, geom) : null;
       io.to(rooms.participant(p.id)).emit("combat:updated", { sceneId, combat: view });
     }
+    // Tela de exibição (docs/plano-cast.md §1.4): não é um Participant, então não está no laço
+    // acima — mesma visão "como jogador sem tokens" (displayViewer), pro indicador "turno de X".
+    const displayView: Combat | null = row ? toCombat(row, def, displayViewer(), geom) : null;
+    io.to(rooms.display(roomId)).emit("combat:updated", { sceneId, combat: displayView });
   }
 
   if (caller.role === "gm") return gmView;

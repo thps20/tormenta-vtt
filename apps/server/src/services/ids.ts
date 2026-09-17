@@ -14,3 +14,8 @@ export function generateInviteCode(length = 6): string {
 export function generateGmSecret(): string {
   return randomBytes(32).toString("hex");
 }
+
+/** Token do link de Cast (docs/plano-cast.md): 24 bytes aleatórios em base64url (32 chars), URL-safe. */
+export function generateDisplayToken(): string {
+  return randomBytes(24).toString("base64url");
+}

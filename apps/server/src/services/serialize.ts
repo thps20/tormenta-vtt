@@ -29,7 +29,7 @@ export function toRoomPublic(room: DbRoom): RoomPublic {
   };
 }
 
-export function toParticipant(p: DbParticipant, connected: boolean): Participant {
+export function toParticipant(p: Pick<DbParticipant, "id" | "nickname" | "role">, connected: boolean): Participant {
   return { id: p.id, nickname: p.nickname, role: p.role, connected };
 }
 

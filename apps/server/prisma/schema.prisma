@@ -28,6 +28,11 @@ model Room {
   /// pelo Mestre. Json (não tabela própria) porque é uma lista pequena, sempre reescrita inteira —
   /// mesmo raciocínio de Scene.grid/fog.
   party         Json     @default("[]")
+  /// Token do link de Cast — tela de exibição (docs/plano-cast.md): `/room/<código>?display=<token>`.
+  /// Um por sala — gerar de novo (display:create-token) substitui o anterior, derrubando qualquer
+  /// tela que ainda usasse o antigo. null = Cast desligado (nunca gerado, ou revogado). NUNCA sai
+  /// em `toRoomPublic`; só vai ao GM, dentro de `RoomSnapshot.cast` (services/display.ts).
+  displayToken  String?  @unique
 
   scenes                Scene[]
   participants          Participant[]

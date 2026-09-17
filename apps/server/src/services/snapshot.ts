@@ -1,5 +1,5 @@
 import { FogConfigSchema, GridConfigSchema, drawingVisibleTo, getSystemDefinition, type Combat, type Drawing, type Pin, type RoomSnapshot } from "@tormenta-vtt/shared";
-import type { Participant as DbParticipant, Room as DbRoom } from "@prisma/client";
+import type { Room as DbRoom } from "@prisma/client";
 import { prisma } from "../db.js";
 import { isConnected } from "./presence.js";
 import { loadCombatRow, toCombat } from "./combat.js";
@@ -21,8 +21,24 @@ import { listMacros } from "./macros.js";
 
 const CHAT_HISTORY_LIMIT = 100;
 
+/**
+ * O que `buildSnapshot` precisa de `me`: qualquer `DbParticipant` satisfaz isto estruturalmente,
+ * então esta função também serve a tela de exibição (docs/plano-cast.md), que NUNCA é um
+ * `Participant` de verdade — `socket/display.ts` monta um `SnapshotActor` sintético
+ * (`id: DISPLAY_VIEWER_ID`) e reaproveita todo o resto: como ela nunca é dona de token, nunca é
+ * autor de mensagem/alvo/macro/favorito, os filtros por `viewer.participantId` que já existem em
+ * cada campo (chat, targets, favoriteEntryIds, macros) naturalmente devolvem "nada meu" pra ela —
+ * sem precisar de nenhum `if` especial aqui.
+ */
+export interface SnapshotActor {
+  id: string;
+  nickname: string;
+  role: "gm" | "player";
+  sessionToken: string;
+}
+
 /** Estado completo da sala do ponto de vista de `me`. */
-export async function buildSnapshot(room: DbRoom, me: DbParticipant): Promise<RoomSnapshot> {
+export async function buildSnapshot(room: DbRoom, me: SnapshotActor): Promise<RoomSnapshot> {
   const [participants, scenes, tokens, messages, combatRow, characters, pinRows, drawingRows, favoriteEntryIds, macros] = await Promise.all([
     prisma.participant.findMany({ where: { roomId: room.id }, orderBy: { createdAt: "asc" } }),
     // Mapas apagados (soft delete, docs/plano-mapas.md §10) nunca vão pro cliente. Ordenados como

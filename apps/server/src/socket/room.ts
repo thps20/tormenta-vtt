@@ -1,6 +1,7 @@
 import { RoomJoinSchema, type Ack, type RoomSnapshot } from "@tormenta-vtt/shared";
 import type { Participant as DbParticipant } from "@prisma/client";
 import { prisma } from "../db.js";
+import { buildCastState } from "../services/display.js";
 import { addSocket, isConnected, removeSocket } from "../services/presence.js";
 import { toParticipant } from "../services/serialize.js";
 import { buildSnapshot } from "../services/snapshot.js";
@@ -20,13 +21,17 @@ export function registerRoomHandlers(io: TypedServer, socket: TypedSocket): void
 
       const me = await resolveParticipant(room.id, room.gmSecret, { nickname, gmSecret, sessionToken });
 
-      // Se este socket já estava em outra sala (ex.: navegou entre salas), sai dela antes.
-      if (socket.data.roomId) leaveCurrentRoom(io, socket);
+      // Se este socket já estava em outra sala (ex.: navegou entre salas), sai dela antes. Um
+      // socket de tela de exibição nunca chega aqui (middleware de somente leitura em
+      // socket/index.ts recusa `room:join` pra ele antes disso), mas o guard é defesa em
+      // profundidade — `leaveCurrentRoom` assume um Participant de verdade.
+      if (socket.data.roomId && !socket.data.isDisplay) leaveCurrentRoom(io, socket);
 
       socket.data.roomId = room.id;
       socket.data.participantId = me.id;
       socket.data.role = me.role;
       socket.data.nickname = me.nickname;
+      socket.data.isDisplay = false;
 
       await socket.join([
         rooms.all(room.id),
@@ -36,6 +41,8 @@ export function registerRoomHandlers(io: TypedServer, socket: TypedSocket): void
       addSocket(room.id, me.id, socket.id);
 
       const snapshot = await buildSnapshot(room, me);
+      // Cast (docs/plano-cast.md) só vai ao GM — nunca em RoomSnapshot pra jogador nem pra tela.
+      if (me.role === "gm") snapshot.cast = buildCastState(io, room);
       // Todos (inclusive o autor) recebem o participante; o cliente faz upsert.
       io.to(rooms.all(room.id)).emit("room:participantJoined", toParticipant(me, true));
       reply({ ok: true, data: snapshot });
@@ -49,7 +56,9 @@ export function registerRoomHandlers(io: TypedServer, socket: TypedSocket): void
   });
 
   socket.on("disconnect", () => {
-    if (socket.data.roomId) leaveCurrentRoom(io, socket);
+    // Tela de exibição: `socket/display.ts` cuida do próprio disconnect (presença/miniatura); esta
+    // limpeza é só pra Participant de verdade.
+    if (socket.data.roomId && !socket.data.isDisplay) leaveCurrentRoom(io, socket);
   });
 }
 
