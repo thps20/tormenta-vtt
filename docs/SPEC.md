@@ -160,7 +160,7 @@ Room 1───* Macro *───1 Participant
 
 | Entidade | Campos principais | Notas |
 |---|---|---|
-| **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId, party(JSON)` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`). `activeSceneId` sempre aponta pra um mapa não apagado da sala (invariante mantida por `scene:activate`/`scene:delete`, §9.7). `party` = `PartyEntry[]` da Visão de grupo (§9.15, `{ characterId, hidden }[]`), não serializado em `RoomPublic`/`Room` do shared — vai à parte, já filtrado por papel, em `RoomSnapshot.party` (§5) |
+| **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId, party(JSON), displayToken?` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`). `activeSceneId` sempre aponta pra um mapa não apagado da sala (invariante mantida por `scene:activate`/`scene:delete`, §9.7). `party` = `PartyEntry[]` da Visão de grupo (§9.15, `{ characterId, hidden }[]`), não serializado em `RoomPublic`/`Room` do shared — vai à parte, já filtrado por papel, em `RoomSnapshot.party` (§5). `displayToken` (Cast, §9.23): token do link da tela de exibição, `null` = Cast desligado — nunca vai em `RoomPublic`; só ao GM, dentro de `RoomSnapshot.cast` |
 | **Participant** | `id, roomId, nickname, role, sessionToken` | `connected` é estado em memória, não persistido |
 | **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON), order, arrival(JSON), gmNotes?, deletedAt?` | Múltiplos mapas por sala (§9.7). `grid` e `fog` são JSON para evoluir sem migration; `fog` segue `FogConfigSchema` (§9.3). `order`: posição no painel "Mapas", renumerada 0..n-1 a cada `scene:reorder`. `arrival` = `{x,y} \| null` (pixels do mapa): onde tokens levados de outro mapa aparecem ao ativar. `gmNotes` (docs/plano-narracao.md, §9.16): nota do Mestre sobre o mapa, markdown leve — coluna só do banco, **nunca** sai no `Scene` do shared (só `hasNotes: boolean`, calculado em `toScene`); o texto só sai por `scene:get-notes` (GM only). `deletedAt` (coluna só do banco, nunca serializada no `Scene` do shared, mesmo padrão de `Token.deletedAt`): soft delete de `scene:delete` — todo lugar que lista "mapas da sala agora" filtra `deletedAt: null`; limpeza definitiva depois de 30 dias (`services/cleanup.ts`) |
 | **Token** | `id, sceneId, name, imageUrl, x, y, cells, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[]), notes?, deletedAt?` | Posição (`x, y`) em **pixels do mapa**, não em células (docs/plano-grid.md). `cells` (inteiro ≥ 1, ou exatamente 0.5 — meia célula, hoje só o Minúsculo de T20, `tokenCells` em `sizes[]`; um token de meia célula pode dividir a célula com outro) é a fonte da verdade do TAMANHO — lado do token em células, sempre quadrado; os pixels (`width`/`height` do `Token` do shared, nunca persistidos nem trafegados no socket) são derivados on-the-fly de `cells × cellSize do grid ATUAL da cena` (`tokenPixelSize`, `packages/shared/src/rules/placement.ts`) em quem precisa (canvas, espiral de posicionamento, névoa) — trocar de mapa ou editar o `cellSize` do mapa (`scene:updateGrid`) nunca precisa "converter" tamanho nenhum. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto). `notes` (docs/plano-narracao.md, §9.16): nota do Mestre sobre o token — coluna só do banco, **nunca** sai no `Token` do shared (só `hasNotes: boolean`); redigido de novo pra jogador mesmo quando `true` (`redactTokenForViewer`, `services/visibility.ts`) — o indicador no token é "só o GM vê" mesmo sendo o dono. Texto só sai por `token:get-notes` (GM only). `deletedAt` (coluna só do banco, nunca serializada no `Token` do shared): soft delete de `token:delete`/`token:delete-many` (§9.6) — todo lugar que lista "tokens da cena agora" filtra `deletedAt: null`; a limpeza definitiva apaga a linha de vez depois de 30 dias (`services/cleanup.ts`). Uma nota sobrevive ao soft delete/desfazer do token normalmente (a coluna não é tocada por `token:delete`), mas `token:get-notes`/`token:set-notes` recusam um token soft-deleted (mesma regra "não encontrado" de qualquer handler normal) |
@@ -272,6 +272,16 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `party:remove` | `{ characterId }` (idempotente) | GM | idem |
 | `party:set-hidden` | `{ characterId, hidden }` | GM | idem |
 | `party:reorder` | `{ characterIds }` (lista completa, permutação do grupo atual) | GM | idem |
+| `display:join` | `{ inviteCode, displayToken }` (§9.23) | tela de exibição (nunca um `Participant`) | ack `DisplaySnapshot` (mesmo formato de `RoomSnapshot`, menos `cast`, mais `cameraMode`/`blackout`) ou erro (token inválido/revogado) |
+| `display:create-token` | `{}` | GM | ack `{ displayToken }`; gera/substitui o token — qualquer tela conectada com o antigo é derrubada (`display:revoked`); `display:tokenChanged` pras outras abas do GM |
+| `display:revoke-token` | `{}` | GM | ack; token vira `null`, mesma derrubada de telas; `display:tokenChanged` |
+| `display:set-camera-mode` | `{ mode: "follow" \| "auto" \| "free" }` | GM | ack; `display:cameraModeChanged` (GM + telas) |
+| `display:set-blackout` | `{ blackout }` | GM | ack; `display:blackoutChanged` (GM + telas) |
+| `display:view` | `{ reason: "follow" \| "center", sceneId, center: {x,y}, viewWidth, viewHeight }` (pixels do MAPA) | GM | `display:view` pras telas — `reason: "follow"` só repassa se o modo da sala é mesmo "follow"; `"center"` (Centralizar aqui) sempre repassa |
+| `display:handout-view` | `{ handoutId, zoom, x, y }` (`x`/`y` = ponto da imagem no centro do enquadramento, em FRAÇÃO do tamanho natural, não pixels de tela) | GM | throttled (~150ms), só enquanto há tela conectada e o handout aberto é "para todos" (sussurro nunca emite); repassa cru `display:handout-view` pras telas |
+| `display:preview` | `{ on }` | GM | liga/desliga o pedido de miniatura; `display:previewDemand` pras telas quando a demanda muda de "ninguém pede" pra "alguém pede" (ou volta) |
+| `display:frame` | `{ dataUrl }` (JPEG, tela → servidor) | tela de exibição | repassa `display:frame` ao GM (`rooms.gm`) |
+| `display:set-tabletop-hint` | `{ tabletop: boolean }` | tela de exibição | sem broadcast — só ajusta o PADRÃO do modo de câmera (§9.23) enquanto o GM não escolheu um |
 
 ### Servidor → Cliente
 
@@ -308,6 +318,16 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `compendium:room-deleted` | `{ entryId }` (só pra `rooms.gm`) |
 | `party:updated` | `{ party: PartyEntry[] }` (§9.15; lista COMPLETA — cliente substitui, não faz merge — já filtrada por papel: jogador nunca recebe entrada oculta nem de ficha que não é mais PC) |
 | `server:error` | `{ message }` |
+| `display:presence` | `{ count }` (§9.23; quantas telas conectadas agora — só pro GM) |
+| `display:tokenChanged` | `{ displayToken }` (§9.23; token gerado/revogado — só pras outras abas do GM, nunca às telas) |
+| `display:cameraModeChanged` | `{ mode }` (§9.23; GM + todas as telas) |
+| `display:blackoutChanged` | `{ blackout }` (§9.23; GM + todas as telas) |
+| `display:view` | `{ reason, sceneId, center, viewWidth, viewHeight }` (§9.23; enquadramento do Mestre, só pras telas) |
+| `display:previewDemand` | `{ on }` (§9.23; só pras telas — liga/desliga o envio periódico de `display:frame`) |
+| `display:frame` | `{ dataUrl }` (§9.23; miniatura da tela, repassada ao GM) |
+| `display:handout` | `{ handout: HandoutCard \| null }` (§9.10/§9.23; handout mostrado/fechado "para todos" — só às telas, sussurro nunca chega) |
+| `display:handout-view` | `{ handoutId, zoom, x, y }` (§9.10/§9.23; zoom/pan do handout aberto, só às telas — fechar/trocar o handout ou ligar o blackout limpa o estado sincronizado no cliente) |
+| `display:revoked` | `{}` (§9.23; enviado à tela antes de derrubá-la — link revogado ou trocado) |
 
 ### HTTP (fora do socket)
 
@@ -431,6 +451,7 @@ Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a fi
 - Movimento e orçamento de deslocamento (§9.11): condições que alterariam o deslocamento (Lento, Imóvel...) não são automatizadas ainda (só a função pura já aceita modificadores); terreno difícil e caminho com desvio não existem (medição sempre em linha reta, como a régua); Ctrl+Z de um movimento não estorna `movementUsed` (D7 do plano — o GM tem o botão de zerar); um `token:update-many` (arraste em grupo) não é atômico no banco — se um patch do meio do lote for recusado por orçamento, os anteriores já foram persistidos (mesma característica pré-existente do handler, não uma regressão desta feature); ver `docs/revisao-movimento.md` para as bordas testadas.
 - Sistema de alvos (§9.12): alvos são efêmeros (memória, como a régua/gabaritos) — se perdem num restart do servidor, não num F5. Sem checagem de alcance ou linha de visão (marcar um alvo do outro lado do mapa funciona igual); sem acerto automático em crítico (20/1 natural) a menos que o sistema declare `attackAutoHit`/`attackAutoMiss` (T20 declara). O selo de "quem mais mira" (`showOtherTargets`) mostra só iniciais/contagem, sem tooltip com os nomes. Ver `docs/revisao-alvos.md` para as bordas testadas.
 - Desenho livre no mapa (§9.17): `pen`/`text` não redimensionam por arrasto (só move/apaga); `rect`/`ellipse` não giram; sem seleção múltipla de traços; sem cascata de soft delete ao apagar o mapa (a linha fica órfã até a limpeza de 30 dias do mapa, mesma situação de `Pin` hoje — sem job de limpeza dedicado pra traço/pino individual). Fica abaixo da névoa (ela continua cobrindo o que está por baixo, ao contrário de régua/gabarito, que ficam numa camada acima, sempre visíveis).
+- Cast (§9.23): câmera automática e mesa física brigam se o GM insistir num modo que não seja Livre — qualquer pan desloca o mapa por baixo de miniaturas físicas já colocadas (o snap por célula ameniza, não resolve; documentado como recomendação de uso, não bug). Sem Presentation API; um link de exibição por sala; sem régua/alvos/pings do PRÓPRIO jogador na tela (só a do Mestre chega, por já estar na sala de broadcast). Miniatura do Mestre falha silenciosamente (console) em mapas de origem externa sem CORS. Modo de câmera, blackout e a dica de mesa física (que decide o padrão do modo) são estado em memória — não sobrevivem a um restart do servidor.
 
 ## 9. Fase 2 (pós-MVP)
 
@@ -1651,3 +1672,70 @@ cada um. Jogador também usa, não é GM-only.
   que zera a preferência, mesmo padrão do "Usar o padrão do mapa" de 9.21.
 - **Shift+F livre**: `useToolShortcuts` (barra de ferramentas) ignora combinações com Shift ao mapear
   tecla → modo — sem isso, Shift+F também cairia em "Névoa" (F sozinho já é o atalho dela).
+
+### 9.23 Cast (tela de exibição)
+
+Uma segunda tela — TV, monitor deitado ou projetor sobre a mesa física — que os jogadores presentes
+olham enquanto o Mestre opera no notebook dele (docs/plano-cast.md, setembro/2026). Rota própria:
+`/room/<código>?display=<token>`, `DisplayPage.tsx`, nunca `RoomPage`.
+
+- **A tela não é um `Participant`**: entra por `display:join`, nunca por `room:join`. Não conta em
+  presença, combate, alvos, visão de grupo — nenhum desses laços tem como enxergá-la, porque
+  nenhum consulta seu participantId (`displayViewer`, um `participantId` sintético que nunca é
+  `ownerId` de token). Um token por sala (`Room.displayToken`); gerar de novo ou revogar
+  (`display:create-token`/`display:revoke-token`) derruba qualquer tela conectada com o link antigo
+  (`display:revoked`).
+- **Enxerga como um jogador sem tokens**: entra nas mesmas salas de broadcast de sempre
+  (`rooms.players`, `rooms.display`), então todo o filtro que já existia por lá — névoa, token
+  invisível/oculto, pino "só GM", traço "só GM", rolagem `gm`/`self` — se aplica sem nenhum código
+  novo. `combat:updated` ganha uma linha a mais (a visão "como jogador" pra `rooms.display`, já que
+  hoje esse evento é mandado por participante, não por sala). Somente leitura garantida no
+  SERVIDOR: um middleware (`socket/index.ts`) recusa qualquer evento de um socket de tela fora de
+  uma lista curta (`display:join`, `display:frame`, `display:set-tabletop-hint`, `scene:enter`).
+- **Modo mesa física** (o pedido principal): um painel de calibração na própria tela (tecla C, ou o
+  canto inferior direito) informa a largura física projetada em cm (digitada, ou medida arrastando
+  duas alças sobre uma fita métrica real) e o tamanho físico da célula (padrão 2,5 cm). O app trava
+  o zoom em `pxPerCm × cellCm / cellSizePx do mapa ATUAL` (`rules/tabletop.ts#tabletopZoom`,
+  recalculado sozinho a cada troca de mapa) — só o PAN acompanha a câmera, nunca o zoom. Rotação
+  0/90/180/270 (a imagem gira por CSS; o container do canvas já nasce nas dimensões trocadas,
+  `rotatedViewport`) e ajuste fino de offset (px de tela, na orientação já girada). Tudo local a
+  ESTA tela (`localStorage`, chave `tvtt:cast:tabletop`, não por sala).
+- **Câmera**: três modos por SALA, escolhidos pelo Mestre (`display:set-camera-mode`) — **Seguir o
+  Mestre** (mesmo centro que ele está olhando; zoom que contém a área dele fora da mesa física, ou
+  o zoom travado nela), **Automático** (enquadra os tokens de jogador; em combate, o combatente da
+  vez é o foco obrigatório, tokens de jogador e gabaritos ativos entram como contexto best-effort;
+  zona morta central evita recalcular à toa) e **Livre** (nada se move sozinho). Botão "Centralizar
+  aqui" no Mestre funciona em qualquer modo (`display:view{reason:"center"}`), com uma pausa de 10s
+  do automático pra não desfazer o comando na hora. Padrão da sala: mesa física ligada → "Livre"
+  (câmera automática e miniaturas de verdade sobre a mesa brigam); desligada (TV comum) →
+  "Seguir o Mestre" — só até o Mestre escolher um modo explicitamente, depois fica travado nele
+  (`display:set-tabletop-hint` é só essa dica de padrão, nunca trava nada).
+- **Handout "para todos"** (§9.10) abre o mesmo overlay em tela cheia na tela de exibição
+  (`display:handout`); "mostrar para X" (sussurro) nunca chega lá; "fechar para todos" fecha nela
+  também. Continua aberto se o mapa ativo trocar no meio (mesmo comportamento do overlay de
+  qualquer jogador). Zoom/pan do Mestre na imagem acompanha a tela ao vivo
+  (`display:handout-view{handoutId,zoom,x,y}`, throttled ~150ms, só enquanto há tela conectada;
+  `x`/`y` são o ponto da imagem no centro do enquadramento, em fração do tamanho natural — não
+  pixels de tela, já que as duas telas têm tamanhos diferentes; a mesma transição curta da câmera
+  do mapa, §9.23 acima). Sussurro nunca sincroniza (mesma regra de nunca chegar à tela). Fechar o
+  handout, trocar de handout ou ligar o Blackout limpa o enquadramento sincronizado — o próximo
+  handout aberto começa centralizado. Vale só pra tela de exibição: o overlay do jogador mantém
+  zoom próprio.
+- **Régua do Mestre** (§3.2) chega à tela do mesmo jeito que chega a qualquer jogador
+  (`ruler:updated`, `rooms.players`) — sem filtro extra.
+- **Conforto de mesa**: multiplicador de tamanho (1×–4×) pro nome e PV do token; indicador "Turno
+  de X" num canto configurável (ou desligado); sem cursor, sem toasts (erro só no console).
+- **Blackout**: botão no menu Cast do Mestre que escurece a tela na hora — sem mapa, tokens nem
+  handout (cobre tudo, inclusive um handout aberto — "apagar a mesa" não deveria vazar nada por
+  baixo). Estado em memória por sala (como o modo de câmera), broadcast pro GM e pras telas.
+- **Barra do Mestre**: botão "Cast" na `TopBar` (`CastMenu.tsx`) com Copiar link/Abrir em nova
+  janela, seletor de modo de câmera, Centralizar aqui, Blackout, quantas telas conectadas e uma
+  miniatura do que a tela está mostrando — a própria tela manda essa miniatura
+  (`stage.toDataURL(...)`, JPEG, a cada 2s), só enquanto o popover Cast está aberto pedindo
+  (`display:preview`/`display:previewDemand`). Mapa de origem externa sem CORS "contamina" o canvas
+  e a miniatura fica indisponível (aviso só no console da tela); mapas enviados pelo próprio app
+  (mesma origem) funcionam normalmente.
+- **Fora do escopo**: Presentation API, mais de um link de exibição por sala, alvos/pings/dados 3D/
+  chat na tela de exibição, interação por toque, modo de câmera diferente por tela.
+
+Ver `docs/revisao-cast.md` para as bordas testadas e os casos de borda de entrega.
