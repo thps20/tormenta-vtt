@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Character, CharacterCreatePayload, CharacterPatch, CharacterRollRequest, EnhancementUse, SystemDefinition } from "@tormenta-vtt/shared";
 import { buildInsertPatch, checkInsert } from "../lib/compendium";
+import { dropTargetAt, type DropPoint } from "../lib/dropTargets";
 import { newId } from "../lib/ids";
 import { loadRollDamageWithAttack } from "../lib/rollPreferences";
 import { emitAck } from "./connection";
@@ -34,6 +35,17 @@ interface CharactersState {
   openId: string | null;
   /** Gaveta aberta no estado vazio ("crie seu personagem"), sem ficha. */
   emptyOpen: boolean;
+  /**
+   * Arrasto de uma linha da aba Fichas até o mapa (SPEC §9.30), por pointer events — mesmo
+   * mecanismo do compêndio/handouts/acervo (Konva não participa do drag nativo do navegador).
+   * `targetId` é o alvo registrado sob o cursor (lib/dropTargets), pro feedback do fantasma.
+   */
+  drag: { characterId: string; point: DropPoint; targetId: string | null } | null;
+  startDrag: (characterId: string, point: DropPoint) => void;
+  moveDrag: (point: DropPoint) => void;
+  /** Solta: chama onDrop do alvo sob o cursor (se houver) e devolve se caiu em algum. */
+  endDrag: () => boolean;
+  cancelDrag: () => void;
 
   setAll: (characters: Character[]) => void;
   upsert: (character: Character) => void;
@@ -66,6 +78,7 @@ export const useCharacters = create<CharactersState>((set, get) => ({
   byId: {},
   openId: null,
   emptyOpen: false,
+  drag: null,
 
   setAll: (characters) => set({ byId: Object.fromEntries(characters.map((c) => [c.id, c])) }),
   upsert: (character) => set((s) => ({ byId: { ...s.byId, [character.id]: character } })),
@@ -76,6 +89,24 @@ export const useCharacters = create<CharactersState>((set, get) => ({
     }),
   open: (characterId) => set({ openId: characterId, emptyOpen: false }),
   openEmpty: () => set({ openId: null, emptyOpen: true }),
+
+  startDrag: (characterId, point) => set({ drag: { characterId, point, targetId: null } }),
+  moveDrag: (point) => {
+    const { drag, byId } = get();
+    const character = drag ? byId[drag.characterId] : undefined;
+    if (!drag || !character) return;
+    set({ drag: { ...drag, point, targetId: dropTargetAt(point, character)?.id ?? null } });
+  },
+  endDrag: () => {
+    const { drag, byId } = get();
+    const character = drag ? byId[drag.characterId] : undefined;
+    const target = drag && character ? dropTargetAt(drag.point, character) : null;
+    set({ drag: null });
+    if (!drag || !character || !target) return false;
+    target.onDrop(character, drag.point);
+    return true;
+  },
+  cancelDrag: () => set({ drag: null }),
 
   create: async (payload) => {
     const res = await emitAck("character:create", payload);

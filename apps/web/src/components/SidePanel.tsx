@@ -4,6 +4,7 @@ import { ChatTab } from './ChatTab';
 import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
 import { CombatCompact } from './CombatCompact';
 import { CharactersTab } from './CharactersTab';
+import type { PlaceOnMapController } from '../lib/placeOnMap';
 import { PartyView } from './PartyView';
 import { TabErrorBoundary } from './TabErrorBoundary';
 import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, MacroAction, Participant, PartyEntry, SystemDefinition, Token } from '@tormenta-vtt/shared';
@@ -60,6 +61,8 @@ interface SidePanelProps {
   onOpenCharacter: (characterId: string) => void;
   onCreateCharacter: (payload: CharacterCreatePayload) => void;
   onDeleteCharacter: (characterId: string) => void;
+  /** "Colocar no mapa" a partir da lista de fichas (SPEC §9.30). */
+  placeOnMap?: PlaceOnMapController;
   /** Botões de ação nos cards de item do chat (dano, cura) rolam pela ficha. */
   onRollCharacter: (characterId: string, request: CharacterRollRequest) => void;
   /** "Salvar como macro" (docs/SPEC.md §9.20): abre o criador de macro já com a ação travada. */
@@ -125,6 +128,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   onOpenCharacter,
   onCreateCharacter,
   onDeleteCharacter,
+  placeOnMap,
   onRollCharacter,
   collapsed,
   onToggleCollapsed,
@@ -272,6 +276,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
         ) : activeTab === 'characters' ? (
           <TabErrorBoundary label="Fichas">
             <CharactersTab
+              placeOnMap={placeOnMap}
               characters={characters}
               participants={participants}
               me={me}

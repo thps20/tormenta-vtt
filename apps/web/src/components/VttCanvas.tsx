@@ -241,6 +241,12 @@ interface VttCanvasProps {
    * ausente = o mapa não aceita o drop.
    */
   onAssetDrop?: (asset: Asset, point: { x: number; y: number }) => void;
+  /**
+   * Arrastar uma linha da aba Fichas até o mapa (SPEC §9.30): coloca um token daquela ficha no
+   * ponto solto. Mesmo alvo "mapa" dos outros arrastos — `accepts` distingue pela forma (só
+   * `Character` tem `kind` "pc"/"npc"). Ausente = o mapa não aceita este drop.
+   */
+  onPlaceCharacter?: (characterId: string, point: { x: number; y: number }) => void;
   /** Ferramenta "Pino" (atalho P, docs/plano-narracao.md): clique no mapa abre o formulário de nota
    *  no ponto clicado (RoomPage guarda x/y e chama `pin:create` ao confirmar). GM only. */
   onPinToolClick?: (point: { x: number; y: number }) => void;
@@ -472,6 +478,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   onMovePin,
   onHandoutDrop,
   onAssetDrop,
+  onPlaceCharacter,
   onPinToolClick,
   drawings,
   drawTool,
@@ -951,6 +958,16 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       onDrop: (asset, point) => onAssetDrop(asset, mapPointFromClient(point)),
     });
   }, [onAssetDrop]);
+
+  // Quinto alvo no MESMO id "map" (§9.30): arrastar uma ficha coloca o token dela no ponto.
+  useEffect(() => {
+    if (!onPlaceCharacter) return;
+    return registerDropTarget<Character>({
+      id: MAP_DROP_TARGET,
+      accepts: (entry) => typeof entry === "object" && entry !== null && "kind" in entry && (entry.kind === "pc" || entry.kind === "npc"),
+      onDrop: (character, point) => onPlaceCharacter(character.id, mapPointFromClient(point)),
+    });
+  }, [onPlaceCharacter]);
 
   // Terceiro alvo no MESMO id "map" (§9.14): arrastar um encontro salvo solta ele inteiro no ponto.
   // `accepts` distingue pela forma (SavedEncounter tem `entries`, que nem CompendiumEntry nem Handout têm).
@@ -2250,7 +2267,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     <div
       ref={containerRef}
       id="vtt-canvas-container"
-      {...(onSpawnCreature || onHandoutDrop || onSpawnEncounter || onAssetDrop ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
+      {...(onSpawnCreature || onHandoutDrop || onSpawnEncounter || onAssetDrop || onPlaceCharacter ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
       // Modo imersivo (docs/SPEC.md §9.22): fundo fora do mapa vira a cor da preferência (padrão
       // quase preto); fora dele é o fundo da aplicação (token --bg).
       style={immersiveMode ? { backgroundColor: immersiveBgColor ?? DEFAULT_IMMERSIVE_BG_COLOR } : undefined}

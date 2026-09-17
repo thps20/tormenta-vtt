@@ -64,7 +64,9 @@ export const PlaceOnMapButton: React.FC<Props> = ({ characterId, placeOnMap, com
     "focus-ring flex items-center gap-1 rounded border border-[#3d3d3d] text-[10px] text-zinc-300 hover:border-[#d4af37] hover:text-[#d4af37] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
 
   return (
-    <div className={`flex items-center ${className ?? ""}`} onClick={(e) => e.stopPropagation()}>
+    // `stopPropagation` nos dois: a linha da lista abre a ficha no clique e começa o arrasto no
+    // pointerdown — nenhum dos dois deve disparar quando o alvo é este botão.
+    <div className={`flex items-center ${className ?? ""}`} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
       <button
         type="button"
         id={`btn-place-on-map-${characterId}`}

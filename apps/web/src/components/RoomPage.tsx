@@ -60,6 +60,7 @@ import { CarryTokensDialog, type CarryTokenRow } from "./CarryTokensDialog";
 import { MapSelector } from "./MapSelector";
 import { HandoutSelector } from "./HandoutSelector";
 import { HandoutOverlay } from "./HandoutOverlay";
+import { CharacterDragGhost } from "./CharacterDragGhost";
 import { HandoutDragGhost } from "./HandoutDragGhost";
 import { DiceOverlay3D } from "./DiceOverlay3D";
 import { NotePinCard } from "./NotePinCard";
@@ -1312,6 +1313,7 @@ function Table() {
                   if (!scene.fog.enabled) void fogOp({ type: "setEnabled", enabled: true });
                   void fogOp({ type: "add", shape });
                 }}
+                onPlaceCharacter={(characterId, point) => placeOnMap.place(characterId, point)}
                 onSpawnCreature={isGm ? (entryId, point, opts) => void spawnCreatureAt(entryId, point, opts) : undefined}
                 onSpawnEncounter={isGm ? (encounterId, point, opts) => void spawnEncounterAt(encounterId, point, opts) : undefined}
                 arrivalPickMode={isGm && settingArrivalSceneId === scene.id}
@@ -1485,6 +1487,7 @@ function Table() {
           onOpenCharacter={openCharacter}
           onCreateCharacter={(payload) => void createCharacter(payload).then((c) => c && openCharacter(c.id))}
           onDeleteCharacter={(id) => void deleteCharacter(id)}
+          placeOnMap={placeOnMap}
           collapsed={effectiveSidePanelCollapsed}
           onToggleCollapsed={toggleSidePanelCollapsed}
           unreadMessages={unreadMessages}
@@ -1546,6 +1549,7 @@ function Table() {
           syncToDisplay={isGm && !!openHandout.messageId && openHandout.whisperTo === null}
         />
       )}
+      <CharacterDragGhost />
       {isGm && <HandoutDragGhost />}
       {isGm && <LibraryDragGhost />}
 

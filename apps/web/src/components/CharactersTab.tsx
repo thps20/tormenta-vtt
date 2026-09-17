@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import { BookOpen, Plus, Trash2, Users } from "lucide-react";
 import type { Character, CharacterCreatePayload, Participant } from "@tormenta-vtt/shared";
 import { canEditCharacter } from "../store/characters";
+import { useCharacterDrag } from "../lib/useCharacterDrag";
+import type { PlaceOnMapController } from "../lib/placeOnMap";
+import { PlaceOnMapButton } from "./character/PlaceOnMapButton";
 
 interface Props {
   characters: Character[];
@@ -10,11 +13,15 @@ interface Props {
   onOpen: (characterId: string) => void;
   onCreate: (payload: CharacterCreatePayload) => void;
   onDelete: (characterId: string) => void;
+  /** "Colocar no mapa"/"Ir para o token" e arrastar a linha pro mapa (SPEC §9.30). */
+  placeOnMap?: PlaceOnMapController;
 }
 
 /** Aba "Fichas": lista + criação. GM vê todas; jogador vê as de personagem-jogador. */
-export const CharactersTab: React.FC<Props> = ({ characters, participants, me, onOpen, onCreate, onDelete }) => {
+export const CharactersTab: React.FC<Props> = ({ characters, participants, me, onOpen, onCreate, onDelete, placeOnMap }) => {
   const isGm = me.role === "gm";
+  // Arrastar a linha até o mapa coloca o token da ficha ali (o fantasma é montado no RoomPage).
+  const { onRowPointerDown } = useCharacterDrag();
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"pc" | "npc">("pc");
   const [ownerId, setOwnerId] = useState<string>(isGm ? "" : me.id);
@@ -36,12 +43,17 @@ export const CharactersTab: React.FC<Props> = ({ characters, participants, me, o
           characters.map((c) => {
             const owner = c.ownerId ? participants.find((p) => p.id === c.ownerId)?.nickname : null;
             const mine = canEditCharacter(me, c);
+            const draggable = mine && placeOnMap?.enabled === true;
             return (
               <div
                 key={c.id}
                 id={`character-row-${c.id}`}
-                className="focus-ring flex items-center gap-2 px-2.5 py-2 rounded-ui border border-border bg-bg/40 cursor-pointer hover:bg-surface-2"
+                className={`focus-ring flex items-center gap-2 px-2.5 py-2 rounded-ui border border-border bg-bg/40 hover:bg-surface-2 select-none ${
+                  draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+                }`}
+                title={draggable ? "Clique para abrir a ficha; arraste até o mapa para colocar o token" : undefined}
                 onClick={() => onOpen(c.id)}
+                onPointerDown={draggable ? (e) => onRowPointerDown(e, c.id) : undefined}
               >
                 <div className="w-7 h-7 rounded-full bg-surface-2 border border-border flex items-center justify-center text-12 font-title font-bold text-text shrink-0">
                   {c.imageUrl ? <img src={c.imageUrl} alt="" className="w-full h-full rounded-full object-cover" /> : c.name.charAt(0).toUpperCase()}
@@ -53,6 +65,7 @@ export const CharactersTab: React.FC<Props> = ({ characters, participants, me, o
                   </div>
                 </div>
                 {c.kind === "npc" && <span className="text-12 px-1 rounded-ui bg-surface-2 text-text-muted uppercase">NPC</span>}
+                {placeOnMap && mine && <PlaceOnMapButton characterId={c.id} placeOnMap={placeOnMap} compact />}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
