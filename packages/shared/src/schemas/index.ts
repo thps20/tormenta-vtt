@@ -17,3 +17,6 @@ export * from "./encounter.js";
 export * from "./party.js";
 export * from "./macro.js";
 export * from "./display.js";
+export * from "./library.js";
+export * from "./prep.js";
+export * from "./audio.js";

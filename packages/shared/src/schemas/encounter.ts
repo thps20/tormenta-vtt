@@ -72,11 +72,14 @@ export type EncounterUpdatePayload = z.infer<typeof EncounterUpdateSchema>;
 export const EncounterDeleteSchema = z.object({ id: IdSchema });
 export type EncounterDeletePayload = z.infer<typeof EncounterDeleteSchema>;
 
-/** `encounter:spawn` (GM): mesmo formato de ponto de soltura de `compendium:spawn-creature`. */
+/** `encounter:spawn` (GM): mesmo formato de ponto de soltura de `compendium:spawn-creature`.
+ *  `forceHidden` (docs/plano-preparo.md §2.2): soltar o encontro inteiro invisível a partir do
+ *  preparo — só ESCONDE, nunca revela uma linha salva como `visibleOnSpawn: false`. */
 export const EncounterSpawnSchema = z.object({
   id: IdSchema,
   sceneId: IdSchema,
   x: z.number().finite(),
   y: z.number().finite(),
+  forceHidden: z.boolean().optional(),
 });
 export type EncounterSpawnPayload = z.infer<typeof EncounterSpawnSchema>;

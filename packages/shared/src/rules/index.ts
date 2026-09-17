@@ -25,3 +25,7 @@ export * from "./party.js";
 export * from "./drawing.js";
 export * from "./macros.js";
 export * from "./tabletop.js";
+export * from "./library.js";
+export * from "./prep.js";
+export * from "./audio.js";
+export * from "./lightMarkdown.js";

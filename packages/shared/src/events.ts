@@ -11,6 +11,14 @@
  * então tipo e validação nunca divergem.
  */
 import type {
+  Asset,
+  AssetCreatePayload,
+  AssetDeletePayload,
+  AssetUpdatePayload,
+  AudioEffectPayload,
+  AudioPlayPayload,
+  AudioSeekPayload,
+  AudioState,
   Character,
   CharacterCreatePayload,
   CharacterRollPayload,
@@ -67,6 +75,8 @@ import type {
   HandoutDeletePayload,
   HandoutShowPayload,
   HandoutUpdatePayload,
+  LibraryFavorite,
+  LibraryFavoriteSetPayload,
   Macro,
   MacroCreatePayload,
   MacroRemovePayload,
@@ -84,6 +94,18 @@ import type {
   PinCreatePayload,
   PinRemovePayload,
   PinUpdatePayload,
+  PrepItemAddPayload,
+  PrepItemMovePayload,
+  PrepItemRemovePayload,
+  PrepItemUpdatePayload,
+  PrepListPayload,
+  PrepResetPayload,
+  PrepStep,
+  PrepStepCopyPayload,
+  PrepStepCreatePayload,
+  PrepStepDeletePayload,
+  PrepStepReorderPayload,
+  PrepStepUpdatePayload,
   RoomCompendiumCreatePayload,
   RoomCompendiumDeletePayload,
   RoomCompendiumImportPayload,
@@ -516,6 +538,65 @@ export interface ClientToServerEvents {
   /** Nova ordem completa das PRÓPRIAS macros (arrastar na barra); renumera 0..n-1. */
   "macro:reorder": (payload: MacroReorderPayload, ack: Ack<{ order: { id: string; order: number }[] }>) => void;
 
+  // Acervo da sala (docs/plano-preparo.md §1): arquivos novos (mapa/token/áudio) que ainda não
+  // tinham tabela própria — handout/encontro/criatura/macro continuam nos eventos deles, o acervo
+  // só os referencia (ver rules/library.ts#buildLibraryItems). Tudo gmOnly, broadcast pra rooms.gm.
+  "asset:list": (payload: Record<string, never>, ack: Ack<Asset[]>) => void;
+  "asset:create": (payload: AssetCreatePayload, ack: Ack<Asset>) => void;
+  /** Nome/tags sempre; `kind` só troca entre "map"↔"token" — trocar o arquivo é apagar e criar de novo. */
+  "asset:update": (payload: AssetUpdatePayload, ack: Ack<Asset>) => void;
+  /** Soft delete + entrada no desfazer do GM (mesmo padrão de handout:delete). */
+  "asset:delete": (payload: AssetDeletePayload, ack: Ack) => void;
+
+  // Favoritos do acervo (§1.1): funciona igual em asset/handout/encontro/criatura/macro, do GM da
+  // sala (diferente de compendium:favorite-* que é por participante). Sem broadcast dedicado de
+  // criação: o ack já devolve a lista completa; broadcast avisa outras abas do GM.
+  "library:favorites": (payload: Record<string, never>, ack: Ack<LibraryFavorite[]>) => void;
+  "library:favorite-set": (payload: LibraryFavoriteSetPayload, ack: Ack<LibraryFavorite[]>) => void;
+
+  // Preparo do mapa (docs/plano-preparo.md §2): lista ordenada de passos por mapa, só GM — nunca
+  // sai no Scene serializado nem no snapshot de jogador. Toda alteração de item relê a linha antes
+  // de reescrever (nunca confia numa lista de items inteira vinda do cliente), pra duas abas do GM
+  // não se atropelarem (§2.1).
+  /** Carregado sob demanda quando a aba "Preparo" abre (como as notas). */
+  "prep:list": (payload: PrepListPayload, ack: Ack<PrepStep[]>) => void;
+  "prep:step-create": (payload: PrepStepCreatePayload, ack: Ack<PrepStep>) => void;
+  "prep:step-update": (payload: PrepStepUpdatePayload, ack: Ack<PrepStep>) => void;
+  /** Soft delete + entrada no desfazer. */
+  "prep:step-delete": (payload: PrepStepDeletePayload, ack: Ack) => void;
+  /** Nova ordem completa dos passos do mapa (permutação exata, mesmo padrão de scene:reorder). */
+  "prep:step-reorder": (payload: PrepStepReorderPayload, ack: Ack<PrepStep[]>) => void;
+  /** Mesmo mapa = duplica (entra logo após o original, título "(cópia)"); outro mapa = copia pro
+   *  fim de lá. A cópia sempre volta a "pendente". `brokenPinRef: true` no ack avisa quando algum
+   *  item `kind: "pin"` foi copiado pra outro mapa (o pino é de um mapa só, então a referência já
+   *  nasce quebrada lá — §2.4). */
+  "prep:step-copy": (payload: PrepStepCopyPayload, ack: Ack<{ step: PrepStep; brokenPinRefs: boolean }>) => void;
+  /** O servidor resolve o nome atual da referência pra `PrepItem.label` — nunca confia num label
+   *  vindo do cliente. */
+  "prep:item-add": (payload: PrepItemAddPayload, ack: Ack<PrepStep>) => void;
+  "prep:item-update": (payload: PrepItemUpdatePayload, ack: Ack<PrepStep>) => void;
+  /** Entra no desfazer (restaura o item na mesma posição). */
+  "prep:item-remove": (payload: PrepItemRemovePayload, ack: Ack<PrepStep>) => void;
+  /** Reordenar dentro do passo ou mover pra outro passo do mesmo mapa. Ack devolve os DOIS passos
+   *  afetados (origem e destino podem ser o mesmo). */
+  "prep:item-move": (payload: PrepItemMovePayload, ack: Ack<PrepStep[]>) => void;
+  /** Zera `used` de todos os passos/itens do mapa. Entra no desfazer (é barato guardar os flags de
+   *  antes e evita um clique errado perder o andamento da sessão, §2.3). */
+  "prep:reset": (payload: PrepResetPayload, ack: Ack<PrepStep[]>) => void;
+
+  // Sons (docs/plano-preparo.md §3): uma trilha por vez (repetir) + efeitos avulsos por cima, sem
+  // cortar a trilha. Estado em memória por SALA (mesmo padrão do blackout do Cast), GM only.
+  /** Troca a trilha e começa do 0. */
+  "audio:play": (payload: AudioPlayPayload, ack: Ack<AudioState>) => void;
+  "audio:pause": (payload: Record<string, never>, ack: Ack<AudioState>) => void;
+  "audio:resume": (payload: Record<string, never>, ack: Ack<AudioState>) => void;
+  "audio:stop": (payload: Record<string, never>, ack: Ack<AudioState>) => void;
+  /** Disponível pro player, não é obrigatório na UI. */
+  "audio:seek": (payload: AudioSeekPayload, ack: Ack<AudioState>) => void;
+  /** Fogo-e-esquece: toca uma vez por cima da trilha, nunca entra no estado nem no snapshot — quem
+   *  entra depois não ouve efeito que já passou. */
+  "audio:effect": (payload: AudioEffectPayload, ack: Ack) => void;
+
   // Desfazer/refazer (docs/plano-desfazer.md): pilha por sala, só do GM, em memória no servidor.
   /** Desfaz o topo da pilha da sala. `null` no ack = pilha vazia (nada pra desfazer). */
   "history:undo": (payload: Record<string, never>, ack: Ack<HistoryActionResult | null>) => void;
@@ -649,6 +730,23 @@ export interface ServerToClientEvents {
   "macro:updated": (macro: Macro) => void;
   "macro:removed": (p: { id: string }) => void;
   "macro:reordered": (p: { order: { id: string; order: number }[] }) => void;
+
+  // Acervo da sala (§1). Biblioteca (created/updated/deleted) e favoritos só vão pro GM (rooms.gm).
+  "asset:created": (asset: Asset) => void;
+  "asset:updated": (asset: Asset) => void;
+  "asset:deleted": (p: { id: string }) => void;
+  "library:favoritesChanged": (p: { favorites: LibraryFavorite[] }) => void;
+
+  // Preparo do mapa (§2). Só pro GM (rooms.gm) — nunca chega a jogador.
+  "prep:stepUpserted": (p: { sceneId: string; step: PrepStep }) => void;
+  "prep:stepRemoved": (p: { sceneId: string; stepId: string }) => void;
+  "prep:reordered": (p: { sceneId: string; order: { stepId: string; order: number }[] }) => void;
+
+  // Sons (§3). Pra TODOS (rooms.all), inclusive as telas do Cast — o servidor já resolveu
+  // assetId -> url (jogador nunca recebe assetId nem nome, §3.4).
+  "audio:state": (p: { state: AudioState; serverNow: number }) => void;
+  /** Fogo-e-esquece: não faz upsert de estado nenhum no cliente. */
+  "audio:effect": (p: { url: string }) => void;
 
   /** Erros não relacionados a um ack específico. */
   "server:error": (p: { message: string }) => void;
