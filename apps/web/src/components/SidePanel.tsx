@@ -5,6 +5,7 @@ import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
 import { CharactersTab } from './CharactersTab';
 import { PartyView } from './PartyView';
 import { PrepPanel, type PrepPanelProps } from './PrepPanel';
+import { TabErrorBoundary } from './TabErrorBoundary';
 import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, MacroAction, Participant, PartyEntry, SystemDefinition, Token } from '@tormenta-vtt/shared';
 
 export type SidePanelTab = 'chat' | 'initiative' | 'characters' | 'prep';
@@ -212,53 +213,62 @@ export const SidePanel: React.FC<SidePanelProps> = ({
         ))}
       </div>
 
-      {/* Tab Content Container */}
+      {/* Tab Content Container. Cada aba tem o próprio TabErrorBoundary (não um só ao redor do
+          bloco inteiro): um erro de render numa aba não pode derrubar as outras nem a sala toda. */}
       <div className="flex-1 overflow-hidden relative">
         {activeTab === 'chat' ? (
-          <ChatTab
-            messages={messages}
-            participants={participants}
-            me={me}
-            characters={characters}
-            tokens={tokens}
-            onSendMessage={onSendMessage}
-            onRollCharacter={onRollCharacter}
-            onSaveMacro={onSaveMacro}
-          />
+          <TabErrorBoundary label="Chat">
+            <ChatTab
+              messages={messages}
+              participants={participants}
+              me={me}
+              characters={characters}
+              tokens={tokens}
+              onSendMessage={onSendMessage}
+              onRollCharacter={onRollCharacter}
+              onSaveMacro={onSaveMacro}
+            />
+          </TabErrorBoundary>
         ) : activeTab === 'characters' ? (
-          <CharactersTab
-            characters={characters}
-            participants={participants}
-            me={me}
-            onOpen={onOpenCharacter}
-            onCreate={onCreateCharacter}
-            onDelete={onDeleteCharacter}
-          />
+          <TabErrorBoundary label="Fichas">
+            <CharactersTab
+              characters={characters}
+              participants={participants}
+              me={me}
+              onOpen={onOpenCharacter}
+              onCreate={onCreateCharacter}
+              onDelete={onDeleteCharacter}
+            />
+          </TabErrorBoundary>
         ) : activeTab === 'prep' && prepPanel ? (
-          <PrepPanel {...prepPanel} />
+          <TabErrorBoundary label="Preparo">
+            <PrepPanel {...prepPanel} />
+          </TabErrorBoundary>
         ) : (
-          <CombatPanel
-            combat={combat}
-            viewer={isGm ? 'gm' : 'player'}
-            meId={me.id}
-            sceneId={activeSceneId}
-            tokens={tokens}
-            conditions={conditions}
-            movementLimitEnabled={movementLimitEnabled}
-            autoRollNpcInitiativeEnabled={autoRollNpcInitiativeEnabled}
-            selectedTokenIds={selectedIds}
-            onSelectToken={onSelectToken}
-            selectedTokenId={selectedTokenId}
-            centerOnActiveTurn={centerOnActiveTurn}
-            onToggleCenterOnActiveTurn={onToggleCenterOnActiveTurn}
-            myTargetTokenIds={myTargetTokenIds}
-            othersTargetTokenIds={othersTargetTokenIds}
-            showOtherTargets={showOtherTargets}
-            onToggleShowOtherTargets={onToggleShowOtherTargets}
-            clearTargetsOnTurnEnd={clearTargetsOnTurnEnd}
-            onToggleClearTargetsOnTurnEnd={onToggleClearTargetsOnTurnEnd}
-            {...combatCallbacks}
-          />
+          <TabErrorBoundary label="Iniciativa">
+            <CombatPanel
+              combat={combat}
+              viewer={isGm ? 'gm' : 'player'}
+              meId={me.id}
+              sceneId={activeSceneId}
+              tokens={tokens}
+              conditions={conditions}
+              movementLimitEnabled={movementLimitEnabled}
+              autoRollNpcInitiativeEnabled={autoRollNpcInitiativeEnabled}
+              selectedTokenIds={selectedIds}
+              onSelectToken={onSelectToken}
+              selectedTokenId={selectedTokenId}
+              centerOnActiveTurn={centerOnActiveTurn}
+              onToggleCenterOnActiveTurn={onToggleCenterOnActiveTurn}
+              myTargetTokenIds={myTargetTokenIds}
+              othersTargetTokenIds={othersTargetTokenIds}
+              showOtherTargets={showOtherTargets}
+              onToggleShowOtherTargets={onToggleShowOtherTargets}
+              clearTargetsOnTurnEnd={clearTargetsOnTurnEnd}
+              onToggleClearTargetsOnTurnEnd={onToggleClearTargetsOnTurnEnd}
+              {...combatCallbacks}
+            />
+          </TabErrorBoundary>
         )}
       </div>
     </aside>

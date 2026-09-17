@@ -54,6 +54,14 @@ function pinLabel(pin: Pin): string {
   return pin.kind === "note" ? pin.title : pin.name;
 }
 
+/** Referência estável pro fallback "nenhum passo carregado ainda" (ver `steps` abaixo): um `?? []`
+ *  dentro do próprio seletor do Zustand cria um array NOVO a cada chamada — como o hook usa
+ *  `useSyncExternalStore` por baixo, uma referência diferente a cada render convence o React de
+ *  que a store "mudou" de novo, disparando outro render, que cria outro array novo, ad infinitum
+ *  ("Maximum update depth exceeded"). Reaproveitando esta constante o `Object.is` do React vê a
+ *  MESMA referência quando não há passos, e o loop não acontece. */
+const EMPTY_STEPS: PrepStep[] = [];
+
 const KIND_ICON: Record<PrepRef["kind"], React.ComponentType<{ className?: string }>> = {
   asset: MapIcon,
   handout: FileText,
@@ -117,7 +125,7 @@ export interface PrepPanelProps {
  * store que o botão manual já chamaria (mesmo espírito das macros, §9.20).
  */
 export const PrepPanel: React.FC<PrepPanelProps> = ({ sceneId, sceneName, scenes, getViewportCenter, onOpenMapNotes, onOpenNotePin }) => {
-  const steps = usePrep((s) => s.stepsByScene[sceneId] ?? []);
+  const steps = usePrep((s) => s.stepsByScene[sceneId] ?? EMPTY_STEPS);
   const status = usePrep((s) => s.statusByScene[sceneId] ?? "idle");
   const loadSteps = usePrep((s) => s.loadSteps);
 
