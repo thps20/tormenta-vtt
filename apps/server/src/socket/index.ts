@@ -20,6 +20,7 @@ import { registerTargetHandlers } from "./targets.js";
 import { registerEncounterHandlers } from "./encounter.js";
 import { registerPartyHandlers } from "./party.js";
 import { registerMacroHandlers } from "./macros.js";
+import { registerLibraryHandlers } from "./library.js";
 import type { TypedServer } from "./types.js";
 
 /** Ponto único que liga todos os handlers de socket. */
@@ -68,6 +69,7 @@ export function registerSocketHandlers(io: TypedServer, log: FastifyBaseLogger):
     registerEncounterHandlers(io, socket);
     registerPartyHandlers(io, socket);
     registerMacroHandlers(io, socket);
+    registerLibraryHandlers(io, socket);
 
     socket.on("disconnect", (reason) => {
       log.info({ socketId: socket.id, reason }, "socket desconectado");

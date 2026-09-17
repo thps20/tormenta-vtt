@@ -44,6 +44,8 @@ model Room {
   roomCompendiumEntries RoomCompendiumEntry[]
   compendiumFavorites   CompendiumFavorite[]
   macros                Macro[]
+  assets                Asset[]
+  libraryFavorites      LibraryFavorite[]
 }
 
 model Participant {
@@ -494,4 +496,41 @@ model Macro {
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
   @@index([roomId, participantId])
+}
+
+/// Arquivo do acervo (docs/plano-preparo.md §1.1): o que o GM subiu e ainda não tinha tabela
+/// própria. Handouts/encontros/criaturas/macros NÃO vêm pra cá — o acervo só os referencia
+/// (rules/library.ts#buildLibraryItems).
+model Asset {
+  id         String    @id @default(cuid())
+  roomId     String
+  /// "map" | "token" | "audio". Imagem: o GM escolhe no upload (sugestão pelo tamanho) e pode trocar.
+  kind       String
+  name       String
+  url        String // "/uploads/<hex>.<ext>", mesmo formato de Scene.mapUrl
+  width      Int? // imagens
+  height     Int?
+  durationMs Int? // áudio: lido pelo navegador ao subir (metadata do <audio>), só informativo
+  tags       String[]  @default([])
+  /// Soft delete (mesmo padrão de Handout.deletedAt). null = existe.
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+}
+
+/// Estrela do acervo (docs/plano-preparo.md §1.1). Tabela à parte (não uma coluna em cada tabela
+/// referenciada) pra favoritar funcionar igual em Asset, Handout, SavedEncounter, criatura e macro
+/// sem migrar quatro tabelas. É do GM da sala (não por participante, diferente de CompendiumFavorite).
+model LibraryFavorite {
+  roomId    String
+  refKind   String // "asset" | "handout" | "encounter" | "creature" | "macro"
+  refId     String
+  createdAt DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, refKind, refId])
 }

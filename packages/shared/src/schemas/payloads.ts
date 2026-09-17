@@ -30,6 +30,14 @@ export const UploadResultSchema = z.object({
 });
 export type UploadResult = z.infer<typeof UploadResultSchema>;
 
+/** POST /api/upload de um áudio (docs/plano-preparo.md §1.3): mesma rota de imagem, resposta
+ *  diferente (sem dimensão) — `kind` deixa o cliente saber qual dos dois formatos voltou. */
+export const UploadAudioResultSchema = z.object({
+  url: z.string().min(1),
+  kind: z.literal("audio"),
+});
+export type UploadAudioResult = z.infer<typeof UploadAudioResultSchema>;
+
 // --- Sala ------------------------------------------------------------------
 
 /**

@@ -38,6 +38,16 @@ export async function purgeDeletedScenes(now: Date = new Date()): Promise<number
   return result.count;
 }
 
+/**
+ * Apaga de vez itens do acervo marcados como deletedAt há mais de TOKEN_TRASH_RETENTION_DAYS dias
+ * (docs/plano-preparo.md §4). O arquivo em disco continua sem limpeza, mesma limitação de hoje —
+ * só a linha do banco some.
+ */
+export async function purgeDeletedAssets(now: Date = new Date()): Promise<number> {
+  const result = await prisma.asset.deleteMany({ where: { deletedAt: { lt: retentionCutoff(now) } } });
+  return result.count;
+}
+
 /** Roda a limpeza uma vez no boot e depois a cada CLEANUP_INTERVAL_MS. Devolve o timer, pra
  *  encerramento limpo (index.ts já para todo o resto no SIGINT/SIGTERM). */
 export function scheduleTokenTrashCleanup(log: { info: (obj: unknown, msg?: string) => void; error: (obj: unknown, msg?: string) => void }): NodeJS.Timeout {
@@ -52,6 +62,11 @@ export function scheduleTokenTrashCleanup(log: { info: (obj: unknown, msg?: stri
         if (count > 0) log.info({ count }, "limpeza: mapas apagados de vez (retenção expirada)");
       })
       .catch((err) => log.error({ err }, "limpeza de mapas falhou"));
+    purgeDeletedAssets()
+      .then((count) => {
+        if (count > 0) log.info({ count }, "limpeza: itens do acervo apagados de vez (retenção expirada)");
+      })
+      .catch((err) => log.error({ err }, "limpeza do acervo falhou"));
   };
   run();
   return setInterval(run, CLEANUP_INTERVAL_MS);
