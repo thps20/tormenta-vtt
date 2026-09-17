@@ -2,6 +2,7 @@ import { z } from "zod";
 import { IdSchema } from "./common.js";
 import { KeySchema } from "./system.js";
 import { TemplateShapeSchema } from "./template.js";
+import { DEFAULT_TOKEN_COLOR, TokenCellsSchema } from "./token.js";
 import { ModifierTargetSchema } from "../rules/modifierTarget.js";
 
 /**
@@ -306,6 +307,21 @@ export const DamageResponsesSchema = z.object({
 });
 export type DamageResponses = z.infer<typeof DamageResponsesSchema>;
 
+/**
+ * Aparência que esta ficha usa ao virar token no mapa (docs/SPEC.md §9.30). A FICHA é a prateleira
+ * do personagem; o token é só a presença dela num mapa — então imagem, tamanho e cor ficam aqui e
+ * são copiados a cada "Colocar no mapa", em vez de o Mestre remontar o token a cada mapa novo.
+ * Mora dentro de `Character.data` (coluna Json), então não precisou de migration.
+ * `null` = ainda não definida: o servidor preenche sozinho na primeira vez que um token é vinculado
+ * à ficha (`token:link-character`) e no spawn de criatura do compêndio.
+ */
+export const TokenDefaultsSchema = z.object({
+  imageUrl: z.string().nullable().default(null),
+  cells: TokenCellsSchema.default(1),
+  color: z.string().default(DEFAULT_TOKEN_COLOR),
+});
+export type TokenDefaults = z.infer<typeof TokenDefaultsSchema>;
+
 /** Conteúdo da coluna `data` + campos editáveis. */
 export const CharacterDataSchema = z.object({
   imageUrl: z.string().nullable().default(null),
@@ -328,6 +344,8 @@ export const CharacterDataSchema = z.object({
   bio: z.string().max(20000).default(""),
   items: z.array(CharacterItemSchema).default([]),
   damageResponses: DamageResponsesSchema.default({}),
+  /** Aparência desta ficha no mapa; null = ainda não definida (ver TokenDefaultsSchema). */
+  tokenDefaults: TokenDefaultsSchema.nullable().default(null),
 });
 export type CharacterData = z.infer<typeof CharacterDataSchema>;
 

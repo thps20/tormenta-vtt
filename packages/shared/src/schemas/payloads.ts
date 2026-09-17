@@ -279,6 +279,15 @@ export type CharacterRollPayload = z.infer<typeof CharacterRollSchema>;
 export const CharacterUseItemSchema = z.object({ characterId: IdSchema, itemId: IdSchema, enhancements: z.array(EnhancementUseSchema).default([]) });
 export type CharacterUseItemPayload = z.infer<typeof CharacterUseItemSchema>;
 
+/**
+ * "Colocar no mapa" (docs/SPEC.md §9.30): cria um token desta ficha em `x,y` (pixels do mapa, canto
+ * superior esquerdo do token), já vinculado e com a aparência de `tokenDefaults`. Evento próprio, e
+ * não `token:create` + `token:link-character`, porque `token:create` é só do GM — aqui o jogador
+ * também pode, desde que na PRÓPRIA ficha (a mesma `canEditCharacter` de sempre).
+ */
+export const CharacterPlaceTokenSchema = z.object({ characterId: IdSchema, sceneId: IdSchema, x: z.number(), y: z.number() });
+export type CharacterPlaceTokenPayload = z.infer<typeof CharacterPlaceTokenSchema>;
+
 // --- Chat ------------------------------------------------------------------
 
 /**

@@ -25,6 +25,25 @@ export const TokenConditionEntrySchema = z.preprocess(
   TokenConditionSchema,
 );
 
+/**
+ * Lado do token em células (token não quadrado não é suportado): fonte da verdade do tamanho.
+ * Os pixels (`tokenPixelSize`, `rules/placement.ts`) são sempre `cells × cellSize do grid ATUAL`
+ * — nunca gravados, pra não existir "converter tamanho ao trocar de grid" (bug histórico,
+ * docs/plano-mapas.md/docs/plano-grid.md). Inteiro ≥ 1 (20 é só sanidade, colossal em T20 = 6) OU
+ * exatamente 0.5 — meia célula, único tamanho fracionário que o projeto suporta hoje (Minúsculo em
+ * T20, `SizeDefSchema.tokenCells`); token de meia célula pode dividir a célula com outro
+ * (docs/plano-grid.md). Exportado porque a ficha guarda o MESMO tamanho em `tokenDefaults`
+ * (schemas/character.ts): as duas pontas têm que aceitar exatamente os mesmos valores.
+ */
+export const TokenCellsSchema = z
+  .number()
+  .min(0.5)
+  .max(20)
+  .refine((v) => v === 0.5 || Number.isInteger(v), { message: "cells deve ser 0.5 ou um número inteiro" });
+
+/** Cor de token quando ninguém escolheu nenhuma (token novo e `tokenDefaults` da ficha). */
+export const DEFAULT_TOKEN_COLOR = "#e11d48";
+
 export const TokenSchema = z.object({
   id: IdSchema,
   sceneId: IdSchema,
@@ -34,21 +53,7 @@ export const TokenSchema = z.object({
   /** Posição do canto superior esquerdo, em pixels do mapa. */
   x: z.number(),
   y: z.number(),
-  /**
-   * Lado do token em células (token não quadrado não é suportado): fonte da verdade do tamanho.
-   * Os pixels (`tokenPixelSize`, `rules/placement.ts`) são sempre `cells × cellSize do grid ATUAL`
-   * — nunca gravados, pra não existir "converter tamanho ao trocar de grid" (bug histórico,
-   * docs/plano-mapas.md/docs/plano-grid.md). Inteiro ≥ 1 (20 é só sanidade, colossal em T20 = 6) OU
-   * exatamente 0.5 — meia célula, único tamanho fracionário que o projeto suporta hoje (Minúsculo em
-   * T20, `SizeDefSchema.tokenCells`); token de meia célula pode dividir a célula com outro
-   * (docs/plano-grid.md).
-   */
-  cells: z
-    .number()
-    .min(0.5)
-    .max(20)
-    .refine((v) => v === 0.5 || Number.isInteger(v), { message: "cells deve ser 0.5 ou um número inteiro" })
-    .default(1),
+  cells: TokenCellsSchema.default(1),
   rotation: z.number().default(0),
   /** Ordem de desenho: maior = por cima. */
   zIndex: z.number().int().default(0),
@@ -56,7 +61,7 @@ export const TokenSchema = z.object({
   visible: z.boolean().default(true),
   /** Participante que "controla" o token (pode arrastar). null = só o GM. */
   ownerId: IdSchema.nullable(),
-  color: z.string().default("#e11d48"),
+  color: z.string().default(DEFAULT_TOKEN_COLOR),
   /** Ficha vinculada (ver token:link-character). null = sem ficha. */
   characterId: IdSchema.nullable().default(null),
   /**

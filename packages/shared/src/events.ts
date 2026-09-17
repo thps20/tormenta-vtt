@@ -23,6 +23,7 @@ import type {
   CharacterCreatePayload,
   CharacterRollPayload,
   CharacterUpdatePayload,
+  CharacterPlaceTokenPayload,
   CharacterUseItemPayload,
   ChatMessage,
   ChatRevealPayload,
@@ -348,6 +349,13 @@ export interface ClientToServerEvents {
    * insuficiente = ack { ok:false } e nada é publicado.
    */
   "character:use-item": (payload: CharacterUseItemPayload, ack: Ack<ChatMessage>) => void;
+  /**
+   * "Colocar no mapa" (§9.30): cria um token desta ficha no ponto pedido, já vinculado e com a
+   * aparência guardada em `tokenDefaults`; a posição gruda na célula livre mais próxima (mesma
+   * espiral do spawn de criatura). GM em qualquer ficha, jogador só nas dele (e só no mapa ativo).
+   * Ack devolve o token; o broadcast normal (token:created) sai à parte.
+   */
+  "character:place-token": (payload: CharacterPlaceTokenPayload, ack: Ack<Token>) => void;
 
   // Compêndio
   /**
