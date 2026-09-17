@@ -7,7 +7,7 @@ import { useTokens } from "../store/tokens";
 import { toast } from "../store/ui";
 import { clampToMap, effectiveCellSize, snapToGrid } from "./grid";
 import { isTyping } from "./isTyping";
-import { isToolShortcutKey } from "./useToolShortcuts";
+import { KEY_TO_DELTA, isToolShortcutKey, markKeyConsumed } from "./shortcutKeys";
 
 /** `getSystemDefinition` lança se o id não existir; fora de uma sala não há nada pra checar mesmo. */
 function safeSystemDef(systemId: string | undefined): SystemDefinition | null {
@@ -17,26 +17,6 @@ function safeSystemDef(systemId: string | undefined): SystemDefinition | null {
   } catch {
     return null;
   }
-}
-
-/** Tecla → direção (célula). Setas e WASD apontam pro mesmo lugar. */
-const KEY_TO_DELTA: Record<string, { dx: number; dy: number }> = {
-  arrowup: { dx: 0, dy: -1 },
-  arrowdown: { dx: 0, dy: 1 },
-  arrowleft: { dx: -1, dy: 0 },
-  arrowright: { dx: 1, dy: 0 },
-  w: { dx: 0, dy: -1 },
-  s: { dx: 0, dy: 1 },
-  a: { dx: -1, dy: 0 },
-  d: { dx: 1, dy: 0 },
-};
-
-/**
- * Tecla que move token (setas/WASD)? Usado por `useToolShortcuts`: com token selecionado, WASD tem
- * prioridade sobre o atalho de ferramenta da mesma letra (D = Desenho).
- */
-export function isTokenMoveKey(key: string): boolean {
-  return KEY_TO_DELTA[key.toLowerCase()] !== undefined;
 }
 
 /** Depois de tanto tempo sem nova tecla, confirma a rajada — mesmo sem soltar (docs/plano-movimento.md D6). */
@@ -49,6 +29,13 @@ const CONFIRM_DELAY_MS = 250;
  * passo aplica local + emite "ao vivo" (`tokens.moveLive`, já throttled a 33 ms); um patch final
  * (sem `live`) confirma ao soltar a tecla, ou 250 ms depois da última — assim Ctrl+Z desfaz a
  * rajada inteira de uma vez, não um passo por vez. Montado ao lado de `useToolShortcuts` na RoomPage.
+ *
+ * **Consome a tecla** quando de fato move alguém: listener na fase de CAPTURA da janela (roda antes
+ * de qualquer outro, não importa a ordem de montagem dos hooks) + `preventDefault`,
+ * `stopPropagation` e `markKeyConsumed`. É isso que resolve a colisão do **D** (mover para a direita
+ * × ferramenta Desenho): com token selecionado que este usuário pode mover, o atalho de ferramenta
+ * nem chega a rodar. Sem seleção — ou com seleção que ele não pode mover agora — a tecla segue o
+ * caminho normal e o D volta a ser Desenho.
  */
 export function useTokenMoveShortcuts(): void {
   // Refs (não state): o handler de teclado não deve re-renderizar o componente a cada passo.
@@ -118,6 +105,17 @@ export function useTokenMoveShortcuts(): void {
       const delta = KEY_TO_DELTA[e.key.toLowerCase()];
       if (!delta) return;
 
+      // Seta nunca é atalho de outra coisa: segura a rolagem da página mesmo que o movimento não
+      // vá acontecer (sem seleção, fora do turno...).
+      if (e.key.startsWith("Arrow")) e.preventDefault();
+
+      /** Esta tecla é nossa: ninguém mais reage a ela (ver o comentário do hook). */
+      const consume = () => {
+        e.preventDefault();
+        e.stopPropagation();
+        markKeyConsumed(e);
+      };
+
       const { selectedIds, byId: tokensById } = useTokens.getState();
       if (selectedIds.length === 0) {
         // WASD só age com token selecionado. Arrastar já seleciona sozinho (VttCanvas
@@ -138,8 +136,6 @@ export function useTokenMoveShortcuts(): void {
       const scene = selectViewedScene(room);
       if (!me || !scene) return;
 
-      e.preventDefault();
-
       // Início de uma rajada nova: decide AGORA quem se move (não muda tecla a tecla). Filtra por
       // controle (GM ou dono) e pela trava de turno (canMoveNow espelha o servidor, que decide de novo).
       if (!burstTokensRef.current) {
@@ -155,13 +151,21 @@ export function useTokenMoveShortcuts(): void {
           }
           movable.push(t);
         }
-        if (blocked && !warnedRef.current) {
-          toast("Não é o seu turno");
-          warnedRef.current = true;
+        if (blocked) {
+          // Token que este usuário controla, mas não é a vez dele: a tecla ainda era uma tentativa
+          // de mover (não pode virar "trocar de ferramenta" no meio do combate), então consome.
+          consume();
+          if (!warnedRef.current) {
+            toast("Não é o seu turno");
+            warnedRef.current = true;
+          }
         }
         if (movable.length === 0) return;
         burstTokensRef.current = movable;
       }
+      // Daqui pra baixo o movimento VAI acontecer: só agora a tecla é consumida (seleção que este
+      // usuário nem controla segue adiante, e o atalho de ferramenta continua valendo).
+      consume();
 
       const cellSize = effectiveCellSize(scene.grid);
       const step = cellSize * (e.shiftKey ? 5 : 1);
@@ -183,11 +187,11 @@ export function useTokenMoveShortcuts(): void {
     // Se a janela perde o foco com a tecla apertada, o keyup nunca chega.
     const onBlur = () => confirmBurst();
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, { capture: true });
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keydown", onKeyDown, { capture: true });
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
       clearTimer();

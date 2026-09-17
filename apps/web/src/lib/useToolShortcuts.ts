@@ -4,17 +4,8 @@ import { useTemplateHistory } from "../store/templateHistory";
 import { useDrawingHistory } from "../store/drawingHistory";
 import { selectIsGm, useRoom } from "../store/room";
 import { useTools, type ToolMode } from "../store/tools";
-import { useTokens } from "../store/tokens";
 import { isTyping } from "./isTyping";
-import { isTokenMoveKey } from "./useTokenMoveShortcuts";
-
-/** Tecla → modo. Letras em minúsculo; comparamos com e.key.toLowerCase(). */
-const KEY_TO_MODE: Record<string, ToolMode> = { v: "select", h: "pan", r: "ruler", f: "fog", t: "template", p: "pin", d: "draw" };
-
-/** Letra solta que troca de ferramenta? (ver `useTokenMoveShortcuts`, que não avisa nessas letras). */
-export function isToolShortcutKey(key: string): boolean {
-  return KEY_TO_MODE[key.toLowerCase()] !== undefined;
-}
+import { KEY_TO_MODE, wasKeyConsumed } from "./shortcutKeys";
 
 /** Modos que só o GM pode ativar. */
 const GM_ONLY_MODES = new Set<ToolMode>(["fog", "pin"]);
@@ -31,8 +22,9 @@ const GM_ONLY_MODES = new Set<ToolMode>(["fog", "pin"]);
  * último traço; qualquer outro modo desfaz o último gabarito) — só Ctrl+Z, sem refazer, mesmo
  * motivo da Névoa não ter. Um único listener na janela (montado pela página da mesa).
  *
- * Com token selecionado, letra que também move token (WASD — hoje só o D, Desenho) move o token e
- * NÃO troca de ferramenta (`useTokenMoveShortcuts`); sem seleção, D volta a ser Desenho.
+ * Com token selecionado que este usuário pode mover, a letra que também move token (WASD — hoje só
+ * o D, Desenho) é consumida por `useTokenMoveShortcuts` e não chega aqui; sem seleção (ou sem poder
+ * mover agora, ex.: não é o seu turno), D volta a ser Desenho.
  *
  * Shift+letra nunca troca de modo (só letra solta) — deixa a combinação livre pra outros atalhos,
  * como o Shift+F do modo imersivo (docs/SPEC.md §9.22, `useImmersiveModeShortcut`).
@@ -42,7 +34,11 @@ export function useToolShortcuts(): void {
     const { setMode, setSpaceHeld, cancel } = useTools.getState();
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isTyping(e.target)) return;
+      // Tecla já gasta por um atalho mais específico — hoje, mover token com setas/WASD (ver
+      // `useTokenMoveShortcuts`, que roda na captura): D com token selecionado move e não troca de
+      // ferramenta. O `stopPropagation` de lá já impede este listener de rodar; esta checagem é a
+      // rede de segurança se um dia a ordem/fase dos listeners mudar.
+      if (wasKeyConsumed(e) || isTyping(e.target)) return;
       const isGm = selectIsGm(useRoom.getState());
       const key = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && !e.altKey && (key === "z" || key === "y")) {
@@ -83,7 +79,6 @@ export function useToolShortcuts(): void {
       }
       // Shift+letra fica de fora do mapeamento tecla→modo (Shift+F é o atalho do modo imersivo,
       // docs/SPEC.md §9.22 — sem isso, também cairia em "Névoa" aqui).
-      if (isTokenMoveKey(e.key) && useTokens.getState().selectedIds.length > 0) return;
       const mode = e.shiftKey ? undefined : KEY_TO_MODE[e.key.toLowerCase()];
       if (mode && (isGm || !GM_ONLY_MODES.has(mode))) setMode(mode);
     };

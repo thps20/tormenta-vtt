@@ -53,7 +53,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
   - **Névoa (F, só GM)**: fog of war manual, descrita em §9.3. Desenho: botão reservado (desabilitado), fora do MVP.
   - **Pino (P, só GM)**: clique no mapa abre o formulário de um pino de nota (título, texto, ícone/cor, visibilidade) — ver §9.16. Fixar um pino de handout é feito arrastando um card da biblioteca (§9.10), não por esta ferramenta.
   - Esc cancela o gesto em andamento e volta para Selecionar. Scroll = zoom em todos os modos.
-  - **Desenho (D)** só troca a ferramenta **sem token selecionado**; com seleção, D é "mover para a direita" (WASD tem prioridade, §3.3) e a ferramenta não muda.
+  - **Desenho (D)** só troca a ferramenta quando a tecla não foi usada para mover token: `useTokenMoveShortcuts` escuta na fase de **captura** da janela e, quando vai mover (ou quando o token é seu mas não é a sua vez), chama `preventDefault`+`stopPropagation` e marca o evento (`lib/shortcutKeys.ts#markKeyConsumed`) — o atalho de ferramenta nem roda. Sem seleção, ou com token que este usuário não controla, D volta a ser Desenho. As duas tabelas de teclas e a marca de "consumida" vivem em `lib/shortcutKeys.ts` (módulo à parte: os dois hooks precisam da tabela do outro, e um importar o outro criava ciclo).
   - Teclado na barra (`role="toolbar"`): com o foco num botão, ↑/↓ andam entre os botões habilitados (dando a volta) e Home/End vão às pontas; a seta não chega ao atalho de mover token.
   - **Desfazer/refazer (Ctrl+Z / Ctrl+Shift+Z ou Ctrl+Y, só GM)**: com a ferramenta Névoa ativa, Ctrl+Z desfaz a última forma pintada (§9.3, sem refazer); fora dela é o desfazer geral descrito em §9.6. Fora de campo de texto (`isTyping`), igual aos outros atalhos.
 - Sem mapa (`mapUrl = null`) o canvas desenha um retângulo escuro de `mapWidth × mapHeight` (padrão 1600×1100) só para o grid e os tokens terem onde ficar.
@@ -62,7 +62,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 ### 3.3 Tokens
 - Criar: GM clica "Novo token" → aparece no centro da viewport com `cells: 1`. Opcional: imagem via `/api/upload`.
 - Arrastar: durante o drag o cliente emite `token:update {id, x, y}` com throttle (~30/s). Ao soltar, se `grid.snap`, alinha à célula mais próxima e emite a posição final.
-- **Setas/WASD** movem o(s) token(s) selecionados (Shift = 5 células), com o mesmo snap do arraste; com combate ativo, a trava de turno vale pro teclado igual ao arraste (§9.11). Com seleção, WASD tem prioridade sobre o atalho de ferramenta da mesma letra (D = Desenho, §3.2).
+- **Setas/WASD** movem o(s) token(s) selecionados (Shift = 5 células), com o mesmo snap do arraste; com combate ativo, a trava de turno vale pro teclado igual ao arraste (§9.11). WASD tem prioridade sobre o atalho de ferramenta da mesma letra: a tecla é **consumida** pelo movimento (D = Desenho só sem token selecionado, §3.2).
 - Redimensionar: handles nos cantos (Konva Transformer), sempre em célula inteira — a alça "pula" de célula em célula durante o arrasto (`docs/plano-grid.md`). Emite `token:update {id, cells}`.
 - Permissão: servidor rejeita `token:update`/`token:delete` de jogador que não é `ownerId` do token (ack `{ ok: false }`).
 - Todo `token:*` aceito é persistido e reenviado a todos na sala (inclusive quem enviou, para manter uma única fonte de verdade).
@@ -1890,8 +1890,12 @@ feature nova (setembro/2026).
   O selo da aba Iniciativa mostra a rodada só com combate em andamento (antes mostrava "R0" sempre).
 - **Rascunho do chat na store** (`useChat.draft`): o texto digitado sobrevive à troca de aba (a aba
   desmonta).
-- **Tecla D**: ver §3.2/§3.3 (WASD tem prioridade com token selecionado; sem seleção, D = Desenho e
-  não aparece o aviso "Selecione um token").
+- **Tecla D**: ver §3.2/§3.3. O movimento por teclado escuta na captura e consome a tecla
+  (`preventDefault` + `stopPropagation` + `markKeyConsumed`), então o atalho de ferramenta não roda —
+  a correção não depende da ordem em que os hooks são montados. Sem seleção, D = Desenho e não
+  aparece o aviso "Selecione um token" (a letra é atalho de ferramenta). `lib/useIdle.ts` passou a
+  escutar na captura pelo mesmo motivo: mover token com o teclado ainda conta como atividade e traz
+  de volta as barras do modo imersivo.
 - **Atalhos M/J/B em hook da página** (`lib/useGmPanelShortcuts.ts`): o aberto/fechado de
   `MapSelector`/`HandoutSelector`/`LibrarySelector` mora na `RoomPage` (componentes controlados),
   então a tecla continua valendo se o botão sair da barra nos próximos passos.

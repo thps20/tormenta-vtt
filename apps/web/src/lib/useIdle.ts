@@ -25,12 +25,14 @@ export function useIdle(active: boolean, ms = 2000): boolean {
     reset();
     window.addEventListener("mousemove", reset);
     window.addEventListener("pointerdown", reset);
-    window.addEventListener("keydown", reset);
+    // Captura: mover token com setas/WASD "gasta" a tecla (`useTokenMoveShortcuts` chama
+    // stopPropagation), e mesmo assim isso é atividade — as barras do modo imersivo devem voltar.
+    window.addEventListener("keydown", reset, { capture: true });
     return () => {
       if (timer !== null) window.clearTimeout(timer);
       window.removeEventListener("mousemove", reset);
       window.removeEventListener("pointerdown", reset);
-      window.removeEventListener("keydown", reset);
+      window.removeEventListener("keydown", reset, { capture: true });
     };
   }, [active, ms]);
 
