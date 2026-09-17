@@ -130,6 +130,17 @@ export function roll(formula: string, rng: Rng = Math.random): RollOutcome {
 }
 
 /**
+ * Agrupa os grupos de uma rolagem por número de lados, somando as contagens (uma fórmula tipo
+ * "1d6 + 1d6" gera dois `DiceGroupResult` com `sides: 6` separados — o cartão do chat mostra um
+ * ícone só, "2× d6"). Ordem: primeira aparição de cada `sides` na fórmula.
+ */
+export function summarizeDiceTypes(groups: DiceGroupResult[]): { sides: number; count: number }[] {
+  const bySides = new Map<number, number>();
+  for (const g of groups) bySides.set(g.sides, (bySides.get(g.sides) ?? 0) + g.count);
+  return [...bySides.entries()].map(([sides, count]) => ({ sides, count }));
+}
+
+/**
  * Avalia uma expressão SEM dados (ex.: "10 + floor(5/2)"). Usada para stats
  * derivados da ficha (Defesa, CD...). Lança DiceParseError se houver dado.
  */

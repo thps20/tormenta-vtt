@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DiceParseError, multiplyFormulaDice, parseFormula } from "./parser.js";
-import { evaluateConstant, roll, rollParsedMany } from "./roller.js";
+import { addDieToFormula, DiceParseError, multiplyFormulaDice, parseFormula } from "./parser.js";
+import { evaluateConstant, roll, rollParsedMany, summarizeDiceTypes } from "./roller.js";
 
 /** RNG que devolve valores fixos em sequência (repete o último). */
 function seq(values: number[]) {
@@ -84,6 +84,51 @@ describe("multiplyFormulaDice", () => {
   it("preserva kh/kl e respeita o limite de dados", () => {
     expect(multiplyFormulaDice("2d20kh1", 2)).toBe("4d20kh1");
     expect(multiplyFormulaDice("60d6", 2)).toBe("100d6"); // clampa em DICE_LIMITS.maxCount
+  });
+});
+
+// Botões d4..d100 da faixa "ROLAR:" do chat (docs/SPEC.md): acumular em vez de rolar no clique.
+describe("addDieToFormula", () => {
+  it("fórmula vazia vira 1 dado", () => {
+    expect(addDieToFormula("", 6)).toBe("1d6");
+    expect(addDieToFormula("   ", 20)).toBe("1d20");
+  });
+
+  it("acumula no grupo existente do mesmo lado", () => {
+    expect(addDieToFormula("1d6", 6)).toBe("2d6");
+    expect(addDieToFormula("2d6 + 3", 6)).toBe("3d6 + 3");
+  });
+
+  it("lado diferente vira um grupo novo, modificador fixo intacto", () => {
+    expect(addDieToFormula("1d20 + 5", 6)).toBe("1d20 + 5 + 1d6");
+  });
+
+  it("não incrementa um grupo subtraído ou negado — soma um grupo novo", () => {
+    expect(addDieToFormula("1d20 - 1d4", 4)).toBe("1d20 - 1d4 + 1d4");
+    expect(addDieToFormula("-1d6", 6)).toBe("-1d6 + 1d6");
+  });
+
+  it("preserva kh/kl (não mistura com um grupo simples do mesmo lado)", () => {
+    expect(addDieToFormula("2d20kh1", 20)).toBe("2d20kh1 + 1d20");
+  });
+
+  it("respeita o limite de dados (clampa em DICE_LIMITS.maxCount)", () => {
+    expect(addDieToFormula("100d6", 6)).toBe("100d6");
+  });
+});
+
+describe("summarizeDiceTypes", () => {
+  it("agrupa por lados, somando contagens de grupos separados", () => {
+    const r = roll("1d6 + 1d6 + 1d20", seq([0.5, 0.5, 0.5]));
+    expect(summarizeDiceTypes(r.groups)).toEqual([
+      { sides: 6, count: 2 },
+      { sides: 20, count: 1 },
+    ]);
+  });
+
+  it("um grupo só", () => {
+    const r = roll("3d6", seq([0.5]));
+    expect(summarizeDiceTypes(r.groups)).toEqual([{ sides: 6, count: 3 }]);
   });
 });
 

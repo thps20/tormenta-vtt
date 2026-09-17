@@ -373,3 +373,53 @@ export function multiplyFormulaDice(formula: string, times: number): string {
   const parsed = parseFormula(formula, { requireDice: false });
   return serialize(scaleDice(parsed.root, times));
 }
+
+/**
+ * Acha um grupo `NdSides` (sem kh/kl) já SOMADO (não subtraído/negado) na cadeia de soma do
+ * topo e incrementa o count; devolve `added: false` se não achou (o chamador decide o que fazer).
+ */
+function addDieToNode(node: FormulaNode, sides: number, sign: 1 | -1): { node: FormulaNode; added: boolean } {
+  switch (node.kind) {
+    case "dice":
+      if (sign === 1 && node.sides === sides && !node.keep) {
+        return { node: { ...node, count: Math.min(node.count + 1, DICE_LIMITS.maxCount) }, added: true };
+      }
+      return { node, added: false };
+    case "neg": {
+      const inner = addDieToNode(node.arg, sides, (sign * -1) as 1 | -1);
+      return inner.added ? { node: { ...node, arg: inner.node }, added: true } : { node, added: false };
+    }
+    case "binary": {
+      if (node.op !== "+" && node.op !== "-") return { node, added: false };
+      // `right` é sempre um único termo (term()); `left` carrega o resto da cadeia com seus
+      // próprios sinais já embutidos — por isso os dois recebem o MESMO `sign` de entrada, só o
+      // `right` combina com o operador deste nó.
+      const rightSign = (sign * (node.op === "+" ? 1 : -1)) as 1 | -1;
+      const right = addDieToNode(node.right, sides, rightSign);
+      if (right.added) return { node: { ...node, right: right.node }, added: true };
+      const left = addDieToNode(node.left, sides, sign);
+      if (left.added) return { node: { ...node, left: left.node }, added: true };
+      return { node, added: false };
+    }
+    case "number":
+    case "call":
+      return { node, added: false };
+  }
+}
+
+/**
+ * Acrescenta 1 dado de `sides` lados à fórmula (botões `d4..d100` da faixa "ROLAR:" do chat,
+ * docs/SPEC.md): se já existe um grupo do mesmo lado somado no topo, incrementa o count (2× "d6"
+ * vira "2d6", nunca "1d6 + 1d6"); senão anexa "+ 1d{sides}". Fórmula vazia (ou só espaços) vira
+ * só "1d{sides}". Grupos subtraídos/negados do mesmo lado NUNCA são incrementados (evitaria
+ * mudar sem querer o peso de um termo que o autor subtraiu de propósito) — nesse caso também
+ * anexa um novo "+ 1d{sides}".
+ */
+export function addDieToFormula(formula: string, sides: number): string {
+  const trimmed = formula.trim();
+  if (trimmed.length === 0) return `1d${sides}`;
+  const parsed = parseFormula(trimmed, { requireDice: false });
+  const result = addDieToNode(parsed.root, sides, 1);
+  if (result.added) return serialize(result.node);
+  return `${serialize(parsed.root)} + 1d${sides}`;
+}
