@@ -55,6 +55,7 @@ import { MapSelector } from "./MapSelector";
 import { HandoutSelector } from "./HandoutSelector";
 import { HandoutOverlay } from "./HandoutOverlay";
 import { HandoutDragGhost } from "./HandoutDragGhost";
+import { DiceOverlay3D } from "./DiceOverlay3D";
 import { NotePinCard } from "./NotePinCard";
 import { PinCreatePopover } from "./PinCreatePopover";
 import { DrawToolbar } from "./DrawToolbar";
@@ -1127,6 +1128,8 @@ function Table() {
               <EncounterDragGhost />
             </>
           )}
+
+          <DiceOverlay3D />
         </main>
 
         <SidePanel

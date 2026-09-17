@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@3d-dice/dice-box-threejs": "0.0.12",
     "@tormenta-vtt/shared": "workspace:*",
     "konva": "^9.3.0",
     "lucide-react": "^1.41.0",

@@ -69,6 +69,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@3d-dice/dice-box-threejs':
+        specifier: 0.0.12
+        version: 0.0.12
       '@tormenta-vtt/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -139,6 +142,9 @@ importers:
         version: 2.1.9(@types/node@22.20.1)(lightningcss@1.32.0)
 
 packages:
+
+  '@3d-dice/dice-box-threejs@0.0.12':
+    resolution: {integrity: sha512-Bau5UizUunZS9+A6zgGeZecEJotSLEI6YvmYTosvvdhRxv92xo89aIvKYQb6xqdx/AqjHdGENJmqBOadlFL9kA==}
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -1154,6 +1160,9 @@ packages:
   caniuse-lite@1.0.30001810:
     resolution: {integrity: sha512-TITQPUkaz+aVk5GL6NhOdwk1aEaNTSDPsGFWrTuhKGtjTF70jL/Oht2W4c6rXUe5fu7Ie19VIahAXHIIiWWNeg==}
 
+  cannon-es@0.20.0:
+    resolution: {integrity: sha512-eZhWTZIkFOnMAJOgfXJa9+b3kVlvG+FX4mdkpePev/w/rP5V8NRquGyEozcjPfEoXUlb+p7d9SUcmDSn14prOA==}
+
   chai@5.3.3:
     resolution: {integrity: sha512-4zNhdJD/iOjSH0A05ea+Ke6MU5mmpQcbQsSOkgdaUMJ9zTlDTD/GYlwohmIE2u0gaxHYiVHEn1Fw9mZ/ktJWgw==}
     engines: {node: '>=18'}
@@ -1780,6 +1789,9 @@ packages:
     resolution: {integrity: sha512-e2zZ96wSChazBsbENf/Pcm/4swHt2cEKQ92rhUjkL9GCKiTDJIaTBenjE/m9DXi0QBmTMDkFDdOomUy20A1tDQ==}
     engines: {node: '>=20'}
 
+  three@0.143.0:
+    resolution: {integrity: sha512-oKcAGYHhJ46TGEuHjodo2n6TY2R6lbvrkp+feKZxqsUL/WkH7GKKaeu6RHeyb2Xjfk2dPLRKLsOP0KM2VgT8Zg==}
+
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
 
@@ -1989,6 +2001,11 @@ packages:
         optional: true
 
 snapshots:
+
+  '@3d-dice/dice-box-threejs@0.0.12':
+    dependencies:
+      cannon-es: 0.20.0
+      three: 0.143.0
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -2763,6 +2780,8 @@ snapshots:
 
   caniuse-lite@1.0.30001810: {}
 
+  cannon-es@0.20.0: {}
+
   chai@5.3.3:
     dependencies:
       assertion-error: 2.0.1
@@ -3434,6 +3453,8 @@ snapshots:
   thread-stream@4.2.0:
     dependencies:
       real-require: 1.0.0
+
+  three@0.143.0: {}
 
   tinybench@2.9.0: {}
 

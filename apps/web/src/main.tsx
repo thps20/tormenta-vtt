@@ -24,7 +24,8 @@ if (import.meta.env.DEV) {
     import("./store/sceneList"),
     import("./store/encounters"),
     import("./store/ui"),
-  ]).then(([c, r, t, ch, cb, ca, tl, co, h, sl, en, ui]) => {
+    import("./store/diceOverlay3d"),
+  ]).then(([c, r, t, ch, cb, ca, tl, co, h, sl, en, ui, d3d]) => {
     Object.assign(window, {
       __vtt: {
         useConnection: c.useConnection,
@@ -39,6 +40,7 @@ if (import.meta.env.DEV) {
         useSceneList: sl.useSceneList,
         useEncounters: en.useEncounters,
         useUi: ui.useUi,
+        useDiceOverlay3D: d3d.useDiceOverlay3D,
       },
     });
   });
