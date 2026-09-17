@@ -18,9 +18,12 @@ interface HandoutsState {
    * Overlay aberto agora (null = fechado). `messageId` é `null` quando veio de um clique num pino
    * do mapa (sem mensagem de chat associada) — nesse caso não existe "Fechar para todos" (é só uma
    * visualização local, como abrir a ficha de um token). Guardado pra `handout:closed` saber se é
-   * ESTA mensagem que deve fechar.
+   * ESTA mensagem que deve fechar. `whisperTo` (null = "para todos") distingue se este overlay é o
+   * mesmo que está na tela de exibição — só então o Mestre sincroniza zoom/pan com ela
+   * (`HandoutOverlay`/`display:handout-view`, docs/revisao-cast.md); um pino não tem mensagem, então
+   * sempre entra como `null` aqui mas nunca sincroniza (falta `messageId`).
    */
-  open: { messageId: string | null; card: HandoutCard } | null;
+  open: { messageId: string | null; card: HandoutCard; whisperTo: string | null } | null;
 
   /** Arrasto em andamento (pointer events, mesmo mecanismo de `store/compendium.ts`). */
   drag: { handoutId: string; point: DropPoint; targetId: string | null } | null;
@@ -129,9 +132,9 @@ export const useHandouts = create<HandoutsState>((set, get) => ({
   closeIfOpen: (messageId) => set((s) => (s.open?.messageId === messageId ? { open: null } : {})),
 
   openFromLiveMessage: (msg) => {
-    if (msg.kind === "handout" && msg.handout) set({ open: { messageId: msg.id, card: msg.handout } });
+    if (msg.kind === "handout" && msg.handout) set({ open: { messageId: msg.id, card: msg.handout, whisperTo: msg.whisperTo } });
   },
-  openLocal: (messageId, card) => set({ open: { messageId, card } }),
+  openLocal: (messageId, card) => set({ open: { messageId, card, whisperTo: null } }),
   closeLocal: () => set({ open: null }),
 
   startDrag: (handoutId, point) => set({ drag: { handoutId, point, targetId: null } }),

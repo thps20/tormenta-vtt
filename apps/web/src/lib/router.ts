@@ -6,7 +6,11 @@ import { setSessionToken, type SessionRole } from "./session";
  * ("/" e "/room/:inviteCode?gm=<segredo>"), então não vale uma dependência.
  * `navigate` usa pushState para não recarregar a página.
  */
-export type Route = { name: "lobby" } | { name: "room"; inviteCode: string; gmSecret: string | null };
+export type Route =
+  | { name: "lobby" }
+  | { name: "room"; inviteCode: string; gmSecret: string | null }
+  /** Cast — tela de exibição (docs/plano-cast.md): `/room/<código>?display=<token>`. */
+  | { name: "display"; inviteCode: string; displayToken: string };
 
 const ROOM_RE = /^\/room\/([A-Za-z0-9]+)\/?$/;
 
@@ -34,8 +38,15 @@ function consumeSessionParam(pathname: string, search: string): void {
 }
 
 export function parseRoute(pathname: string, search: string): Route {
-  consumeSessionParam(pathname, search);
   const m = ROOM_RE.exec(pathname);
+  // Cast (docs/plano-cast.md §3.1): ?display=<token> é a rota da tela de exibição — nunca passa
+  // por `consumeSessionParam` (a tela não é um Participant, não tem sessão de participante pra
+  // guardar) nem aceita `?gm=` junto (o link de Cast já É a credencial).
+  const displayToken = m && m[1] ? new URLSearchParams(search).get("display") : null;
+  if (m && m[1] && displayToken) {
+    return { name: "display", inviteCode: m[1].toUpperCase(), displayToken };
+  }
+  consumeSessionParam(pathname, search);
   if (m && m[1]) {
     return { name: "room", inviteCode: m[1].toUpperCase(), gmSecret: new URLSearchParams(search).get("gm") };
   }

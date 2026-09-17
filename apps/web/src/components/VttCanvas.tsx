@@ -289,6 +289,24 @@ interface VttCanvasProps {
   /** Barras flutuantes (Toolbar e o HUD abaixo) totalmente escondidas por ociosidade no modo
    *  imersivo — ver lib/useIdle, calculado por quem monta o canvas (RoomPage). */
   immersiveBarsHidden: boolean;
+
+  /**
+   * Cast — tela de exibição (docs/plano-cast.md §3.2). `true` = nenhuma interação: sem escuta de
+   * ponteiro no Stage (`listening={false}`, corta clique/drag/wheel/pan de uma vez só), sem HUD
+   * inferior, sem dica de ferramenta, sem `saveView` (o enquadramento vem de fora, ver
+   * `controlledView`), sem os atalhos de teclado que este componente escuta. Omitido/`false` =
+   * comportamento de sempre.
+   */
+  readOnly?: boolean;
+  /**
+   * Enquadramento imposto de fora (Cast, modo "seguir"/"automático"/mesa física) — em pixels do
+   * MAPA. Só tem efeito com `readOnly`; sem isso o componente nunca calcularia sozinho pra onde
+   * apontar. `null`/omitido com `readOnly` = a tela fica parada onde estava (ex.: aguardando o
+   * primeiro `display:view`).
+   */
+  controlledView?: { center: { x: number; y: number }; zoom: number } | null;
+  /** Multiplicador do tamanho de nome/PV do token (Cast, "conforto de mesa" — docs/plano-cast.md §4.2). Padrão 1. */
+  labelScale?: number;
 }
 
 /** Forma + tamanho (metros) escolhidos na TemplateToolbar, e a sobrescrita de ângulo/largura de um preset. */
@@ -470,6 +488,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   immersiveBgColor,
   onImmersiveBgColorChange,
   immersiveBarsHidden,
+  readOnly = false,
+  controlledView = null,
+  labelScale = 1,
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -717,7 +738,13 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
    * e "centralizar no token da vez" (focusRequest, abaixo) também não chama — é um overlay
    * temporário, não uma mudança de enquadramento que o usuário quis guardar (SPEC §9.7).
    */
-  const saveView = (view: { x: number; y: number; scale: number }) => setSavedView(roomId, scene.id, view);
+  const saveView = (view: { x: number; y: number; scale: number }) => {
+    // Cast (docs/plano-cast.md §3.2): a tela nunca tem enquadramento próprio pra lembrar — o dela
+    // vem de fora (controlledView). Sem essa guarda, nada mais chamaria isto de qualquer forma
+    // (readOnly já tira todo gesto que levaria aqui), mas o guard deixa a garantia explícita.
+    if (readOnly) return;
+    setSavedView(roomId, scene.id, view);
+  };
 
   // Enquadra/restaura só quando é preciso de verdade: a primeira medição válida do container (abrir
   // a sala — inclusive F5, ver getSavedView abaixo), trocar de MAPA (scene.id — scene:enter,
@@ -727,6 +754,10 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   // posição pro mapa não sumir totalmente da vista (bug relatado: recolher o painel devolvia o mapa
   // ao enquadramento padrão).
   useEffect(() => {
+    // Cast (docs/plano-cast.md §3.2): o enquadramento é imposto de fora (controlledView, efeito
+    // abaixo) — este auto-fit/restaurar é da experiência interativa normal (GM/jogador), que a
+    // tela não tem.
+    if (readOnly) return;
     if (dimensions.width <= 0 || dimensions.height <= 0) return;
     const prevSceneId = prevSceneIdRef.current;
     const isNewScene = prevSceneId === null || prevSceneId !== scene.id;
@@ -751,6 +782,20 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     fitToScreen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id, dimensions.width, dimensions.height, mapWidth, mapHeight, roomId]);
+
+  /**
+   * Cast (docs/plano-cast.md §3.2/§4.1): traduz `controlledView` (centro + zoom em pixels do
+   * mapa, calculado por quem monta o canvas — `lib/castCamera.ts`) pro par `stagePos`/`stageScale`
+   * que todo o resto do arquivo já usa — nada mais precisa saber que o enquadramento é de fora. Quem
+   * chama (`DisplayPage`) já entrega o valor SUAVIZADO quadro a quadro quando quer uma transição
+   * (a troca aqui é instantânea: um `setState` novo a cada frame já parece suave aos olhos).
+   */
+  useEffect(() => {
+    if (!readOnly || !controlledView || dimensions.width <= 0 || dimensions.height <= 0) return;
+    const { center, zoom } = controlledView;
+    setStageScale(zoom);
+    setStagePos({ x: dimensions.width / 2 - center.x * zoom, y: dimensions.height / 2 - center.y * zoom });
+  }, [readOnly, controlledView, dimensions.width, dimensions.height]);
 
   // Tamanho do mapa sempre acessível por uma ref (não muda de identidade a cada render): o
   // publicador do retângulo abaixo é criado uma vez só (useRef), então só pode ler valores que
@@ -980,6 +1025,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   // abre menu do navegador ou move a janela ao soltar). Só na ferramenta Selecionar, fora de campo
   // de texto; sem token sob o ponteiro, não faz nada (não limpa — Alt no vazio já cobre "limpar").
   useEffect(() => {
+    if (readOnly) return; // Cast: nenhum atalho de teclado (docs/plano-cast.md §3.2).
     const onKeyDown = (e: KeyboardEvent) => {
       if (mode !== "select" || isTyping(e.target) || e.key.toLowerCase() !== "y") return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -989,7 +1035,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, tokens]);
+  }, [mode, tokens, readOnly]);
 
   // Backspace no modo Régua remove o último vértice travado (docs/SPEC.md §3.2); com o caminho
   // ainda "cru" (2 pontos, nenhum vértice travado com Ctrl) limpa a régua inteira — não há mais o
@@ -997,6 +1043,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   // token/gabarito/pino/traço selecionado), mas nada fica selecionado enquanto se mede: os dois
   // listeners nunca competem pelo mesmo Backspace.
   useEffect(() => {
+    if (readOnly) return; // Cast: nenhum atalho de teclado (docs/plano-cast.md §3.2).
     const onKeyDown = (e: KeyboardEvent) => {
       if (mode !== "ruler" || isTyping(e.target) || e.key !== "Backspace" || !ruler) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -1011,7 +1058,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, ruler]);
+  }, [mode, ruler, readOnly]);
 
   /**
    * Alça de redimensionar (`Konva.Transformer`) sob o ponteiro, por GEOMETRIA — mesmo motivo de
@@ -2148,6 +2195,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       isActiveTurn={token.id === activeTurnTokenId}
       isTargetedByMe={myTargetIds.includes(token.id)}
       targetedByOthers={targetersByToken[token.id] ?? []}
+      labelScale={labelScale}
       onSelect={(additive) => selectByClick(token.id, additive)}
       onCursor={setCursor}
       onDragStart={(node, additive) => handleTokenDragStart(token, node, additive)}
@@ -2194,7 +2242,11 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         scaleY={stageScale}
         x={stagePos.x}
         y={stagePos.y}
-        draggable={mode === "pan"}
+        draggable={!readOnly && mode === "pan"}
+        // Cast (docs/plano-cast.md §3.2): `listening={false}` corta hit-test/eventos do Stage
+        // inteiro de uma vez — nenhum onClick/onWheel/onDragStart abaixo chega a disparar, sem
+        // precisar desligar cada um individualmente.
+        listening={!readOnly}
         onWheel={handleWheel}
         onDragStart={(e) => {
           if (e.target === stageRef.current) setCursor("grabbing");
@@ -2358,7 +2410,9 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       {/* HUD inferior esquerdo: zoom, snap, grid. Translúcido sobre o mapa (preferência do usuário,
        *  ver lib/useBarTranslucency) — opacidade some no CSS, nunca no layout (senão o
        *  ResizeObserver do hook perderia o elemento). No modo imersivo, `immersiveBarsHidden` some
-       *  de vez (e desliga pointer-events) por cima da translucidez normal. */}
+       *  de vez (e desliga pointer-events) por cima da translucidez normal. Cast (docs/plano-cast.md
+       *  §3.2): a tela não tem HUD nenhum — não há o que ajustar sem interação. */}
+      {!readOnly && (
       <div
         ref={hudBarRef}
         id="vtt-hud-bottom"
@@ -2415,6 +2469,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           </>
         )}
       </div>
+      )}
 
       {/* Botão discreto de saída (docs/SPEC.md §9.22): canto oposto ao HUD, sempre presente (não
        *  some de vez com `immersiveBarsHidden`, só fica bem apagado) — Esc faz o mesmo. */}
@@ -2497,7 +2552,8 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
         );
       })()}
 
-      {!selectedToken && (
+      {/* Cast (docs/plano-cast.md §3.2): sem dica de ferramenta — não há ferramenta nenhuma na tela. */}
+      {!readOnly && !selectedToken && (
       <div
         style={{ opacity: immersiveBarsHidden ? 0 : 1 }}
         className={`absolute top-4 right-4 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 pointer-events-none transition-opacity duration-150 ease-out ${FLOAT_SURFACE} bg-surface-1/90 text-12`}
@@ -2576,9 +2632,11 @@ interface TokenNodeProps {
    *  só com a opção "Mostrar alvos dos outros" ligada — já filtrado pelo chamador. */
   isTargetedByMe: boolean;
   targetedByOthers: string[];
+  /** Cast, "conforto de mesa" (docs/plano-cast.md §4.2): multiplica nome e PV. Padrão 1. */
+  labelScale?: number;
 }
 
-const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, combatRound, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu, stageScale, isTargetedByMe, targetedByOthers }) => {
+const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, combatRound, draggable, selectable, isSelected, isActiveTurn, onSelect, onCursor, onDragStart, onDragMove, onDragEnd, onTransformEnd, onContextMenu, stageScale, isTargetedByMe, targetedByOthers, labelScale = 1 }) => {
   const image = useImage(assetUrl(token.imageUrl));
   const radius = tokenRadius(token);
   const cx = token.width / 2;
@@ -2713,7 +2771,7 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, comba
             width={barWidth}
             text={`${bar.current}/${bar.max}${bar.temp > 0 ? ` +${bar.temp}` : ""}`}
             align="center"
-            fontSize={8.5}
+            fontSize={8.5 * labelScale}
             fontFamily="monospace"
             fontStyle="bold"
             fill="#a1a1aa"
@@ -2721,10 +2779,11 @@ const TokenNode: React.FC<TokenNodeProps> = ({ token, bar, conditionByKey, comba
         </Group>
       )}
 
-      {/* Nome abaixo do token. O Rect é a única shape com hit aqui (também serve para arrastar). */}
+      {/* Nome abaixo do token. O Rect é a única shape com hit aqui (também serve para arrastar).
+       *  A caixa cresce junto com o texto (labelScale, Cast §4.2) pra não cortar em zoom de mesa. */}
       <Group y={token.height + 4}>
-        <Rect x={cx - 42} y={0} width={84} height={15} fill="#0c0c0c" stroke="#2d2417" strokeWidth={1} cornerRadius={2} opacity={0.94} />
-        <Text x={cx - 42} y={2} width={84} text={token.name} align="center" fontSize={9} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" ellipsis wrap="none" listening={false} />
+        <Rect x={cx - 42 * labelScale} y={0} width={84 * labelScale} height={15 * labelScale} fill="#0c0c0c" stroke="#2d2417" strokeWidth={1} cornerRadius={2} opacity={0.94} />
+        <Text x={cx - 42 * labelScale} y={2} width={84 * labelScale} text={token.name} align="center" fontSize={9 * labelScale} fontFamily="sans-serif" fontStyle="bold" fill="#e0e0e0" ellipsis wrap="none" listening={false} />
       </Group>
 
       {/*

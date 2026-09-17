@@ -1212,6 +1212,10 @@ function Table() {
           card={openHandout.card}
           onClose={closeHandoutLocal}
           onCloseForAll={isGm && openHandout.messageId ? () => void closeHandoutForAll(openHandout.messageId!) : undefined}
+          // Sincroniza zoom/pan com a tela de exibição (docs/revisao-cast.md) só quando este é o
+          // MESMO handout que está lá: "para todos" (`whisperTo === null`) e veio de uma mensagem
+          // de verdade (`messageId`, nunca um pino aberto localmente).
+          syncToDisplay={isGm && !!openHandout.messageId && openHandout.whisperTo === null}
         />
       )}
       {isGm && <HandoutDragGhost />}

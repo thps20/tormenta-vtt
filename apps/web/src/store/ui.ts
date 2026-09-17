@@ -33,9 +33,23 @@ interface UiState {
 
 let nextId = 1;
 
+/**
+ * Cast — tela de exibição (docs/plano-cast.md §3.1): "erros só no console, sem toast" — a tela não
+ * renderiza `<Toasts/>`, então empilhar toasts que nunca aparecem só vazaria memória com o tempo.
+ * `DisplayPage` liga isto ao montar; nenhum outro componente chama.
+ */
+let displayMode = false;
+export function setDisplayMode(on: boolean): void {
+  displayMode = on;
+}
+
 export const useUi = create<UiState>((set) => ({
   toasts: [],
   push: (message, kind = "error") => {
+    if (displayMode) {
+      console.warn(`[cast] ${message}`);
+      return;
+    }
     const id = nextId++;
     set((s) => ({ toasts: [...s.toasts, { id, message, kind }] }));
     setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 4000);
