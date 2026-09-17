@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { BookOpen, Eye, EyeOff, Heart, ImagePlus, NotebookText, Sparkles, Trash2, User, X } from "lucide-react";
+import { BookOpen, Eye, EyeOff, Heart, ImagePlus, NotebookText, Save, Sparkles, Trash2, User, X } from "lucide-react";
 import type { Character, ConditionDef, Participant, TokenPatch } from "@tormenta-vtt/shared";
 import { uploadImage } from "../lib/api";
 import type { SizedToken } from "../lib/grid";
@@ -20,6 +20,9 @@ interface TokenInspectorProps {
   linkableCharacters: Character[];
   onLinkCharacter: (characterId: string | null) => void;
   onOpenCharacter: (characterId: string) => void;
+  /** "Salvar aparência na ficha" (SPEC §9.30): copia imagem, tamanho e cor deste token pra
+   *  `tokenDefaults` da ficha vinculada. Só aparece com ficha vinculada que o usuário pode editar. */
+  onSaveAppearanceToCharacter: (characterId: string) => void;
   /** conditions[] do sistema da sala (ver SystemDefinitionSchema); vazio se o sistema ainda não carregou. */
   conditions: ConditionDef[];
   /** Abre o ConditionMenu (VttCanvas decide a posição a partir do clique). */
@@ -42,6 +45,7 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({
   linkableCharacters,
   onLinkCharacter,
   onOpenCharacter,
+  onSaveAppearanceToCharacter,
   conditions,
   onOpenConditions,
   onOpenNotes,
@@ -185,6 +189,23 @@ export const TokenInspector: React.FC<TokenInspectorProps> = ({
             )}
           </div>
         </Row>
+
+        {/* §9.30: a ficha é a prateleira — guardar a aparência aqui faz o próximo "Colocar no mapa"
+            (noutro mapa, semana que vem) já nascer com esta cara. Único caminho que sobrescreve
+            uma aparência já escolhida, por isso é um botão explícito. */}
+        {token.characterId && !linkedHidden && (
+          <Row label="Aparência">
+            <button
+              id="btn-save-token-appearance"
+              onClick={() => onSaveAppearanceToCharacter(token.characterId!)}
+              title="Copia imagem, tamanho e cor deste token para a ficha; a próxima vez que ela for colocada no mapa já vem assim"
+              className="flex items-center gap-1 px-2 py-0.5 rounded border border-[#3d3d3d] hover:border-[#d4af37] text-[10px] text-zinc-300 hover:text-[#d4af37] cursor-pointer"
+            >
+              <Save className="w-3 h-3" />
+              Salvar na ficha
+            </button>
+          </Row>
+        )}
 
         {canLink && conditions.length > 0 && (
           <Row label="Condições" icon={<Sparkles className="w-3.5 h-3.5 text-[#d4af37]" />}>

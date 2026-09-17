@@ -1,4 +1,4 @@
-import type { Token } from "@tormenta-vtt/shared";
+import type { Character, Token } from "@tormenta-vtt/shared";
 
 /**
  * "Colocar no mapa" (SPEC §9.30). A ficha é a prateleira do personagem; o token é a presença dela
@@ -10,6 +10,8 @@ import type { Token } from "@tormenta-vtt/shared";
 export interface PlaceOnMapController {
   /** false = não há mapa aberto: nada a colocar (botões desabilitados). */
   enabled: boolean;
+  /** Permissão, a mesma do servidor: GM em qualquer ficha, jogador só nas dele. */
+  canPlace: (character: Character) => boolean;
   /** Token desta ficha no mapa que este cliente vê agora (o primeiro, se houver mais de um). */
   tokenOf: (characterId: string) => Token | null;
   /** Cria o token. `point` em pixels do mapa (arrastar); sem ele, no centro da área visível. */

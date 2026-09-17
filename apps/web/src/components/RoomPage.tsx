@@ -490,6 +490,7 @@ function Table() {
    */
   const placeOnMap: PlaceOnMapController = {
     enabled: scene !== null,
+    canPlace: (character) => me !== null && canEditCharacter(me, character),
     tokenOf: (characterId) => tokens.find((t) => t.characterId === characterId) ?? null,
     place: (characterId, point) => {
       if (!scene) return;

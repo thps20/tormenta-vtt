@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Anchor, Check, FileText, Heart, Info, NotebookText, Plus, Shield, SlidersHorizontal, Sparkles, Swords, Trash2, X, Zap } from "lucide-react";
-import { formatArea, type Character, type CharacterItem, type ComputedCharacter, type ConditionDef, type SystemDefinition, type Token, type TokenCondition } from "@tormenta-vtt/shared";
+import { Anchor, Check, FileText, Heart, ImagePlus, Info, NotebookText, Plus, Shield, SlidersHorizontal, Sparkles, Swords, Trash2, X, Zap } from "lucide-react";
+import { formatArea, type Character, type CharacterItem, type ComputedCharacter, type ConditionDef, type SystemDefinition, type Token, type TokenCondition, type TokenDefaults } from "@tormenta-vtt/shared";
 import { DamageTypeBadge } from "./DamageTypeBadge";
+import { TokenAppearance } from "./character/TokenAppearance";
 
 /**
  * Contrato completo em docs/tipos-ficha-rapida.md. `onOpenTokenInspector` e `onDelete` são
@@ -21,6 +22,8 @@ export interface NpcQuickCardProps {
   onRoll: (ref: { itemId: string; actionId: string }) => void;
   onUseItem: (itemId: string) => void;
   onToggleCondition: (key: string) => void;
+  /** Aparência da FICHA no mapa (SPEC §9.30): o que "Colocar no mapa" repete no próximo mapa. */
+  onTokenDefaultsChange: (next: TokenDefaults) => void;
   onOpenFullSheet: () => void;
   onOpenTokenInspector: () => void;
   /** Notas do Mestre sobre este token (docs/plano-narracao.md), só GM. */
@@ -86,6 +89,7 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
   onRoll,
   onUseItem,
   onToggleCondition,
+  onTokenDefaultsChange,
   onOpenFullSheet,
   onOpenTokenInspector,
   onOpenNotes,
@@ -662,6 +666,16 @@ export const NpcQuickCard: React.FC<NpcQuickCardProps> = ({
           ) : (
             <div className="text-[10px] text-zinc-500 italic py-0.5">Nenhuma condição ativa.</div>
           )}
+        </section>
+
+        {/* ----------------- APARÊNCIA NO MAPA (§9.30) ----------------- */}
+        <section id="npc-section-appearance" className="space-y-1.5 pt-1 border-t border-[#25201a]">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-300">
+            <ImagePlus className="w-3.5 h-3.5 text-amber-400" />
+            <span className="font-serif tracking-wide">No mapa</span>
+            <span className="text-[10px] font-normal text-zinc-500">— guardado na ficha</span>
+          </div>
+          <TokenAppearance def={def} defaults={character.tokenDefaults} name={character.name} isEditMode onChange={onTokenDefaultsChange} />
         </section>
       </div>
     </div>

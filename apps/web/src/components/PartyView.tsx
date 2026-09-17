@@ -1,7 +1,8 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronUp, Eye, EyeOff, MoreVertical, Plus, Users, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, EyeOff, MapPin, MoreVertical, Plus, Users, X } from "lucide-react";
 import { computeCharacter, type Character, type ConditionDef, type PartyEntry, type SystemDefinition, type Token } from "@tormenta-vtt/shared";
+import type { PlaceOnMapController } from "../lib/placeOnMap";
 
 const MENU_WIDTH = 176;
 
@@ -29,6 +30,8 @@ interface PartyViewProps {
   onRemove: (characterId: string) => void;
   onSetHidden: (characterId: string, hidden: boolean) => void;
   onReorder: (characterIds: string[]) => void;
+  /** "Colocar no mapa" (SPEC §9.30) pro chip de quem ainda não está no mapa visto. */
+  placeOnMap?: PlaceOnMapController;
 }
 
 /**
@@ -57,6 +60,7 @@ export const PartyView: React.FC<PartyViewProps> = ({
   onRemove,
   onSetHidden,
   onReorder,
+  placeOnMap,
 }) => {
   const characterById = useMemo(() => new Map(characters.map((c) => [c.id, c])), [characters]);
   const conditionByKey = useMemo(() => new Map(def.conditions.map((c) => [c.key, c])), [def.conditions]);
@@ -137,6 +141,7 @@ export const PartyView: React.FC<PartyViewProps> = ({
                   setDraggedId(null);
                   setDragOverId(null);
                 }}
+                placeOnMap={placeOnMap}
                 onHide={() => onSetHidden(character.id, true)}
                 onShow={() => onSetHidden(character.id, false)}
                 onRemove={() => onRemove(character.id)}
@@ -167,7 +172,8 @@ const PartyChip: React.FC<{
   onHide: () => void;
   onShow: () => void;
   onRemove: () => void;
-}> = ({ isGm, entry, character, token, def, conditionByKey, isActiveTurn, isDragTarget, onOpen, onDragStart, onDragOver, onDrop, onDragEnd, onHide, onShow, onRemove }) => {
+  placeOnMap?: PlaceOnMapController;
+}> = ({ isGm, entry, character, token, def, conditionByKey, isActiveTurn, isDragTarget, onOpen, onDragStart, onDragOver, onDrop, onDragEnd, onHide, onShow, onRemove, placeOnMap }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const computed = useMemo(() => computeCharacter(def, character), [def, character]);
   const ringColor = token?.color ?? "#3a3a38"; // --border (docs/design/DESIGN.md)
@@ -246,6 +252,24 @@ const PartyChip: React.FC<{
           />
         )}
       </div>
+
+      {/* §9.30: ficha do grupo que ainda não tem token neste mapa — o que falta aqui é colocá-la
+          na mesa, então o chip oferece isso na cara em vez de só abrir a ficha. */}
+      {!token && placeOnMap?.enabled && placeOnMap.canPlace(character) && (
+        <button
+          type="button"
+          id={`btn-party-place-${character.id}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            placeOnMap.place(character.id);
+          }}
+          title={`Colocar ${character.name} no mapa`}
+          className="focus-ring w-full flex items-center justify-center gap-1 px-1 py-0.5 rounded-ui border border-dashed border-border text-12 text-text-muted hover:text-accent hover:border-accent cursor-pointer"
+        >
+          <MapPin className="w-3 h-3 shrink-0" />
+          No mapa
+        </button>
+      )}
 
       {mainBar && <ResourceBar {...mainBar} />}
       {otherBars.map(({ resourceKey, values }) => (

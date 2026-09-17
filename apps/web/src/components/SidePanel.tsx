@@ -195,6 +195,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
           recolher o painel inteiro (some junto por estar dentro deste <aside>). */}
       {systemDef && (
         <PartyView
+          placeOnMap={placeOnMap}
           isGm={isGm}
           entries={party}
           characters={characters}

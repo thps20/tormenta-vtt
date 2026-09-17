@@ -19,6 +19,7 @@ import {
   smoothPenPoints,
   tokensInTemplate,
   withMapScale,
+  tokenDefaultsFromToken,
   type Character,
   type CharacterPatch,
   type CharacterRollRequest,
@@ -2551,6 +2552,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
             const next = has ? selectedToken.conditions.filter((c) => c.key !== key) : [...selectedToken.conditions, { key }];
             onTokenPatch({ id: selectedToken.id, conditions: next });
           }}
+          onTokenDefaultsChange={(tokenDefaults) => onCharacterPatch(selectedCharacter.id, { tokenDefaults })}
           onOpenFullSheet={() => onOpenCharacter(selectedCharacter.id)}
           onOpenTokenInspector={() => setForceInspector(true)}
           onOpenNotes={() => onOpenTokenNotes(selectedToken)}
@@ -2569,6 +2571,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
           linkableCharacters={linkableCharacters}
           onLinkCharacter={(characterId) => onLinkCharacter(selectedToken.id, characterId)}
           onOpenCharacter={onOpenCharacter}
+          onSaveAppearanceToCharacter={(characterId) => onCharacterPatch(characterId, { tokenDefaults: tokenDefaultsFromToken(selectedToken) })}
           conditions={systemDef?.conditions ?? []}
           onOpenConditions={() => openConditionMenuAt(selectedToken)}
           onOpenNotes={() => onOpenTokenNotes(selectedToken)}
