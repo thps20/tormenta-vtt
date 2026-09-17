@@ -12,7 +12,7 @@ export type GridLineStyle = "lines" | "dashed" | "crosses";
 export interface GridAppearanceOverride {
   style: GridLineStyle;
   /** "#rrggbb", sem alfa — a opacidade é campo separado (mesma convenção da "Cor do Grid" do Mestre
-   *  em `MapConfigModal`, onde cor e opacidade também são dois controles distintos). */
+   *  em `MapGridInline` (Bastidores), onde cor e opacidade também são dois controles distintos). */
   color: string;
   opacity: number; // 0..1
   /** Espessura em pixels de TELA (não de pixel do mapa) — constante com o zoom, ver `GridLayer`. */

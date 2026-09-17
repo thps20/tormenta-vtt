@@ -1,128 +1,53 @@
-import React, { useEffect, useRef } from "react";
-import { ArrowLeft, ChevronDown, MapPin } from "lucide-react";
+import React from "react";
+import { ChevronRight, MapPin } from "lucide-react";
 import type { Scene } from "@tormenta-vtt/shared";
-import { MapsPanel, type MapsPanelProps } from "./MapsPanel";
-import { FLOAT_MENU, MOTION } from "./MapBar";
+import { MOTION } from "./MapBar";
 
 interface MapSelectorProps {
   /** Mapa que ESTE GM está vendo. */
   viewingScene: Scene | null;
   /** Mapa ativo da mesa (o que os jogadores veem). */
   activeScene: Scene | null;
-  /** Repassadas direto pro MapsPanel dentro do dropdown. */
-  maps: MapsPanelProps;
-  /** Dropdown aberto: controlado pela RoomPage, que também é dona do atalho M (`useGmPanelShortcuts`). */
-  open: boolean;
-  /** Abrir (true) ou fechar (false). Quem abre também dispara `scene:list` sob demanda. */
-  onOpenChange: (open: boolean) => void;
+  /** Abre os Bastidores na seção Mapas (a lista deixou de ser um dropdown daqui, §9.29). */
+  onOpenMaps: () => void;
 }
 
 /**
- * Botão-seletor de mapa da TopBar (só GM): substitui a antiga aba "Mapas" do SidePanel e a faixa
- * `ViewingSceneBanner` (docs/revisao-mapas.md). Clique ou a tecla M (fora de campo de texto) abrem
- * um dropdown largo com o mesmo conteúdo de antes (`MapsPanel`); Esc ou clique fora fecham. Quando
- * o GM está vendo um mapa diferente do ativo da mesa, o botão fica em destaque e o topo do dropdown
- * ganha "Ir para o ativo"/"Ativar este" — o aviso que antes era a faixa acima do canvas.
- * A tecla M é da página (`lib/useGmPanelShortcuts.ts`); o estado aberto/fechado vem por prop.
+ * Botão de ESTADO do mapa na barra superior (só GM): diz qual mapa este GM está vendo e avisa, em
+ * dourado, quando ele não é o ativo da mesa. Clique (ou a tecla M) abre os Bastidores na seção
+ * Mapas — onde a lista, a configuração de grid e a calibração passaram a viver (§9.29). Até o passo
+ * 2 este botão abria um dropdown de 420 px com o `MapsPanel` dentro: eram duas portas para a mesma
+ * coisa, e o dropdown cobria justamente o mapa que o GM estava configurando.
  */
-export const MapSelector: React.FC<MapSelectorProps> = ({ viewingScene, activeScene, maps, open, onOpenChange }) => {
-  const setOpen = onOpenChange;
-  const ref = useRef<HTMLDivElement>(null);
+export const MapSelector: React.FC<MapSelectorProps> = ({ viewingScene, activeScene, onOpenMaps }) => {
   const diverging = viewingScene !== null && activeScene !== null && viewingScene.id !== activeScene.id;
 
-  // Fecha ao clicar fora.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open, setOpen]);
-
-  // Esc fecha (a tecla M que abre/fecha é da página, ver `useGmPanelShortcuts`).
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, setOpen]);
-
   return (
-    <div ref={ref} className="relative">
-      <button
-        id="btn-map-selector"
-        onClick={() => setOpen(!open)}
-        title="Mapas da sala (M)"
-        aria-expanded={open}
-        // Vendo um mapa que não é o ativo da mesa: o único aviso disso na tela, então é o único
-        // ponto dourado da barra superior.
-        className={`focus-ring flex items-center gap-1.5 h-7 px-2 rounded-ui border text-13 cursor-pointer max-w-[320px] ${MOTION} ${
-          diverging ? "bg-surface-2 border-accent/60 text-accent" : "border-transparent text-text hover:bg-surface-2"
-        }`}
-      >
-        <MapPin className={`w-3.5 h-3.5 shrink-0 ${diverging ? "" : "text-text-muted"}`} />
-        {diverging ? (
-          <span className="truncate">
-            Vendo <span className="font-title font-semibold uppercase tracking-[0.06em]">{viewingScene?.name}</span> · ativo:{" "}
-            <span className="font-title font-semibold uppercase tracking-[0.06em]">{activeScene?.name}</span>
-          </span>
-        ) : (
-          <span className="truncate">
-            <span className="text-text-muted">Mapa </span>
-            <span className="font-title font-semibold uppercase tracking-[0.06em]">{viewingScene?.name ?? "Sem mapa"}</span>
-          </span>
-        )}
-        <ChevronDown className={`w-3.5 h-3.5 shrink-0 text-text-muted transition-transform duration-150 ease-out ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && (
-        <div
-          id="map-selector-dropdown"
-          className={`absolute left-0 top-full mt-1 w-[420px] max-h-[70vh] flex flex-col z-50 overflow-hidden ${FLOAT_MENU}`}
-        >
-          {diverging && activeScene && viewingScene && (
-            <div className="flex items-center gap-2 p-2 border-b border-border shrink-0">
-              <button
-                id="btn-map-selector-go-active"
-                onClick={() => {
-                  maps.onEnter(activeScene.id);
-                  setOpen(false);
-                }}
-                className={`focus-ring flex-1 flex items-center justify-center gap-1.5 h-8 px-2.5 rounded-ui border border-border hover:bg-surface-2 text-13 font-medium text-text cursor-pointer ${MOTION}`}
-              >
-                <ArrowLeft className="w-3.5 h-3.5 text-text-muted" />
-                Ir para o ativo
-              </button>
-              <button
-                id="btn-map-selector-activate-this"
-                onClick={() => {
-                  maps.onActivateRequest(viewingScene.id);
-                  setOpen(false);
-                }}
-                className={`focus-ring flex-1 h-8 px-2.5 rounded-ui border border-border hover:bg-surface-2 text-13 font-medium text-text cursor-pointer ${MOTION}`}
-              >
-                Ativar este
-              </button>
-            </div>
-          )}
-
-          <MapsPanel
-            {...maps}
-            onEnter={(sceneId) => {
-              maps.onEnter(sceneId);
-              setOpen(false);
-            }}
-            onSetArrivalMode={(sceneId) => {
-              // O próximo clique precisa acontecer no canvas: o dropdown não pode ficar no caminho.
-              maps.onSetArrivalMode(sceneId);
-              setOpen(false);
-            }}
-          />
-        </div>
+    <button
+      id="btn-map-selector"
+      type="button"
+      onClick={onOpenMaps}
+      title="Mapas da sala (M)"
+      aria-keyshortcuts="M"
+      // Vendo um mapa que não é o ativo da mesa: o único aviso disso na tela, então é o único ponto
+      // dourado da barra superior.
+      className={`focus-ring flex items-center gap-1.5 h-7 px-2 rounded-ui border text-13 cursor-pointer max-w-[320px] ${MOTION} ${
+        diverging ? "bg-surface-2 border-accent/60 text-accent" : "border-transparent text-text hover:bg-surface-2"
+      }`}
+    >
+      <MapPin className={`w-3.5 h-3.5 shrink-0 ${diverging ? "" : "text-text-muted"}`} />
+      {diverging ? (
+        <span className="truncate">
+          Vendo <span className="font-title font-semibold uppercase tracking-[0.06em]">{viewingScene?.name}</span> · ativo:{" "}
+          <span className="font-title font-semibold uppercase tracking-[0.06em]">{activeScene?.name}</span>
+        </span>
+      ) : (
+        <span className="truncate">
+          <span className="text-text-muted">Mapa </span>
+          <span className="font-title font-semibold uppercase tracking-[0.06em]">{viewingScene?.name ?? "Sem mapa"}</span>
+        </span>
       )}
-    </div>
+      <ChevronRight className="w-3.5 h-3.5 shrink-0 text-text-muted" aria-hidden />
+    </button>
   );
 };

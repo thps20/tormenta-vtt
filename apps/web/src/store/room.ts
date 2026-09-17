@@ -454,7 +454,7 @@ export const selectActiveScene = (s: RoomState): Scene | null =>
 
 /**
  * Mapa que ESTE cliente está VENDO (docs/plano-mapas.md §4): substitui `selectActiveScene` em
- * quase todo lugar (canvas, névoa, régua, combate, seletor de alvos, MapConfigModal, spawn de
+ * quase todo lugar (canvas, névoa, régua, combate, seletor de alvos, Bastidores, spawn de
  * criatura). Jogador: sempre o ativo. GM: `viewingSceneId`, com o ativo como reserva enquanto o
  * primeiro `scene:enter` ainda não voltou.
  */

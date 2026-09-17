@@ -24,6 +24,7 @@ import { deleteSelectedTokens, useDeleteSelectionShortcut } from "../lib/useDele
 import { useTokenMoveShortcuts } from "../lib/useTokenMoveShortcuts";
 import { useMapPaletteShortcut } from "../lib/useMapPaletteShortcut";
 import { useSidePanelShortcut } from "../lib/useSidePanelShortcut";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import { useImmersiveModeShortcut } from "../lib/useImmersiveModeShortcut";
 import { useGmPanelShortcuts } from "../lib/useGmPanelShortcuts";
 import { useCombatTurnShortcut } from "../lib/useCombatTurnShortcut";
@@ -71,11 +72,12 @@ import { FogToolbar } from "./FogToolbar";
 import { TemplateToolbar } from "./TemplateToolbar";
 import { VttCanvas, type TokenBar, type VttCanvasHandle } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
-import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
 import { ClipboardList, Image as ImageIcon, Library, LogOut } from "lucide-react";
 import { SidePanel, type SidePanelTab } from "./SidePanel";
-import { PrepDrawer } from "./PrepDrawer";
-import type { PrepPanelProps } from "./PrepPanel";
+import { PrepPanel, type PrepPanelProps } from "./PrepPanel";
+import { BastidoresDrawer, type BastidoresSection } from "./bastidores/BastidoresDrawer";
+import { MapsSection } from "./bastidores/MapsSection";
+import { TabErrorBoundary } from "./TabErrorBoundary";
 import { PrepNextStepCard } from "./PrepNextStepCard";
 import { TopBarOverflowMenu, type OverflowAction } from "./TopBarOverflowMenu";
 import { CharacterMenu } from "./CharacterMenu";
@@ -111,6 +113,11 @@ const TRANSLUCENT_BARS_OVER_MAP_KEY = "tvtt:translucentBarsOverMap";
 // (`null` = padrão quase preto, ver lib/immersiveMode.ts) — o modo em si (entrar/sair) é uma ação de
 // cada sessão, como tela cheia, não algo que volta sozinho ao recarregar a página.
 const IMMERSIVE_BG_COLOR_KEY = "tvtt:immersiveBgColor";
+/** Bastidores (§9.29): aberto/fechado e seção ativa, por usuário (mesmo padrão dos outros acima). */
+const BASTIDORES_OPEN_KEY = "tvtt:bastidoresOpen";
+const BASTIDORES_SECTION_KEY = "tvtt:bastidoresSection";
+/** Abaixo disto, gaveta e painel lateral não cabem juntos: abrir um recolhe o outro (§9.29). */
+const NARROW_LAYOUT_QUERY = "(max-width: 1099px)";
 
 /** Patch de um traço já existente (SPEC §9.17) — mesmo shape do payload do servidor. */
 type DrawingPatch = DrawingPatchPayload["patch"];
@@ -179,7 +186,6 @@ function Table() {
   const deleteScene = useRoom((s) => s.deleteScene);
   const reorderScenesAction = useRoom((s) => s.reorderScenes);
   const setSceneArrival = useRoom((s) => s.setSceneArrival);
-  const [isMapConfigOpen, setMapConfigOpen] = useState(false);
   const [sidePanelTab, setSidePanelTab] = useState<SidePanelTab>("chat");
   // Painel lateral recolhido (\ ou Ctrl+B, ícone na borda): preferência por usuário (localStorage,
   // mesmo padrão de centerOnActiveTurn abaixo) — cada navegador/aba é "um usuário" neste app sem login.
@@ -199,6 +205,74 @@ function Table() {
   }, [sidePanelCollapsed]);
   useSidePanelShortcut(() => setSidePanelCollapsed((v) => !v));
 
+  // Bastidores (§9.29): coluna à esquerda com Mapas e Preparo, uma seção por vez. Aberto/fechado e
+  // seção ativa ficam no localStorage (por usuário), mesmo padrão do painel lateral recolhido.
+  const [bastidoresOpen, setBastidoresOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(BASTIDORES_OPEN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [bastidoresSection, setBastidoresSection] = useState<BastidoresSection>(() => {
+    try {
+      return localStorage.getItem(BASTIDORES_SECTION_KEY) === "preparo" ? "preparo" : "mapas";
+    } catch {
+      return "mapas";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(BASTIDORES_OPEN_KEY, bastidoresOpen ? "1" : "0");
+      localStorage.setItem(BASTIDORES_SECTION_KEY, bastidoresSection);
+    } catch {
+      /* ignora (aba anônima etc.) */
+    }
+  }, [bastidoresOpen, bastidoresSection]);
+  // Refs com o estado atual: deixam o toggle abaixo ter dependência vazia (identidade estável, que
+  // os atalhos precisam) sem ler `bastidoresOpen`/`bastidoresSection` de um closure velho.
+  const sectionRef = useRef(bastidoresSection);
+  sectionRef.current = bastidoresSection;
+  const bastidoresOpenRef = useRef(bastidoresOpen);
+  bastidoresOpenRef.current = bastidoresOpen;
+  /**
+   * Abre numa seção (ou fecha, se já estava aberta NELA) — é o que as teclas M/Shift+P fazem.
+   * Decide FORA do updater de estado: um updater precisa ser puro, e o React pode reexecutá-lo num
+   * render seguinte. Quando isso acontecia com a decisão lá dentro, a segunda execução já via a
+   * seção nova e lia "mesma seção" — então Shift+P com os Mapas abertos fechava a gaveta em vez de
+   * trocar para o Preparo.
+   */
+  const toggleBastidoresSection = useCallback((section: BastidoresSection) => {
+    if (bastidoresOpenRef.current && sectionRef.current === section) {
+      setBastidoresOpen(false);
+      return;
+    }
+    setBastidoresSection(section);
+    setBastidoresOpen(true);
+  }, []);
+
+  /**
+   * Abaixo de 1100 px a gaveta (340) e o painel lateral (320/384) não cabem junto com um mapa
+   * utilizável: abrir um lado recolhe o outro (§9.29). A regra é só de layout — não escreve a
+   * preferência do usuário no localStorage (mesmo cuidado do modo imersivo): `narrowHidesSidePanel`
+   * é um véu por cima dela, e volta a valer sozinho quando a janela cresce ou a gaveta fecha.
+   */
+  const narrowLayout = useMediaQuery(NARROW_LAYOUT_QUERY);
+  // Mantém a gaveta montada durante a animação de saída (150 ms) e a desmonta depois — assim o
+  // MapsPanel/PrepPanel não ficam carregando em segundo plano com a gaveta fechada.
+  const [bastidoresRendered, setBastidoresRendered] = useState(bastidoresOpen);
+  useEffect(() => {
+    if (bastidoresOpen) {
+      setBastidoresRendered(true);
+      return;
+    }
+    const id = setTimeout(() => setBastidoresRendered(false), 160);
+    return () => clearTimeout(id);
+  }, [bastidoresOpen]);
+
+  /** Véu de layout: numa janela estreita com os Bastidores abertos, a Mesa fica recolhida. */
+  const narrowHidesSidePanel = narrowLayout && bastidoresOpen && me?.role === "gm";
+
   // --- Modo imersivo do mapa (docs/SPEC.md §9.22) -------------------------------------------------
   // `immersiveMode` não é persistido (ver comentário de IMMERSIVE_BG_COLOR_KEY no topo do arquivo).
   // O painel lateral recolhido AO ENTRAR usa um flag à parte de `sidePanelCollapsed`
@@ -208,8 +282,25 @@ function Table() {
   // componente (painel, badge de não lidas) deve enxergar.
   const [immersiveMode, setImmersiveMode] = useState(false);
   const [immersiveSidePanelCollapsed, setImmersiveSidePanelCollapsed] = useState(true);
-  const effectiveSidePanelCollapsed = immersiveMode ? immersiveSidePanelCollapsed : sidePanelCollapsed;
-  const toggleSidePanelCollapsed = () => (immersiveMode ? setImmersiveSidePanelCollapsed((v) => !v) : setSidePanelCollapsed((v) => !v));
+  const effectiveSidePanelCollapsed = immersiveMode ? immersiveSidePanelCollapsed : sidePanelCollapsed || narrowHidesSidePanel;
+  /**
+   * Alça/atalho do painel lateral. Numa janela estreita com os Bastidores abertos, quem esconde a
+   * Mesa é o VÉU, não a preferência: aí o botão significa sempre "me devolve a Mesa" — fecha os
+   * Bastidores e deixa a preferência expandida, em vez de inverter um valor que já estava expandido
+   * (o que recolhia a Mesa de verdade e fazia o botão parecer quebrado).
+   */
+  const toggleSidePanelCollapsed = () => {
+    if (immersiveMode) {
+      setImmersiveSidePanelCollapsed((v) => !v);
+      return;
+    }
+    if (narrowHidesSidePanel) {
+      setBastidoresOpen(false);
+      setSidePanelCollapsed(false);
+      return;
+    }
+    setSidePanelCollapsed((v) => !v);
+  };
   const enterImmersiveMode = () => {
     setImmersiveSidePanelCollapsed(true);
     setImmersiveMode(true);
@@ -651,21 +742,16 @@ function Table() {
   const compendiumContext = useCompendium((s) => s.context);
   const closeCompendium = useCompendium((s) => s.close);
   const mapPaletteOpen = compendiumOpen && compendiumContext === "map";
-  useMapPaletteShortcut((openCharacterId !== null || emptySheetOpen) || isMapConfigOpen, me?.role === "gm" ? CREATURE_FILTER : null);
+  useMapPaletteShortcut(openCharacterId !== null || emptySheetOpen, me?.role === "gm" ? CREATURE_FILTER : null);
 
   // Seletores de Mapas (M), Handouts (J) e Acervo (B) do GM: aberto/fechado mora aqui, não dentro
   // de cada botão, pra tecla continuar valendo mesmo se o botão sair da barra (lib/useGmPanelShortcuts).
   // Abrir sempre dispara o carregamento sob demanda da lista (só a store conhece o evento).
-  const [mapSelectorOpen, setMapSelectorOpen] = useState(false);
   const [handoutSelectorOpen, setHandoutSelectorOpen] = useState(false);
   const [librarySelectorOpen, setLibrarySelectorOpen] = useState(false);
-  // useCallback: identidade estável. O MapSelector registra o Esc num efeito que depende disto; se
+  // useCallback: identidade estável. Os seletores registram o Esc num efeito que depende disto; se
   // a função mudasse a cada render, o Esc (que também troca a ferramenta e re-renderiza a página no
   // meio do evento) removeria o listener antes de ele rodar.
-  const setMapSelectorOpenAndLoad = useCallback((open: boolean) => {
-    if (open) void useSceneList.getState().load();
-    setMapSelectorOpen(open);
-  }, []);
   const setHandoutSelectorOpenAndLoad = useCallback((open: boolean) => {
     if (open) void useHandouts.getState().loadLibrary();
     setHandoutSelectorOpen(open);
@@ -677,14 +763,16 @@ function Table() {
     }
     setLibrarySelectorOpen(open);
   }, []);
-  // Gaveta de Preparo (§9.28): coluna à esquerda do mapa, atalho Shift+P (P sozinho é a ferramenta
-  // Pino). No passo 3 ela vira a seção "Preparo" dos Bastidores.
-  const [prepDrawerOpen, setPrepDrawerOpen] = useState(false);
+
   useGmPanelShortcuts(me?.role === "gm", {
-    onToggleMaps: () => setMapSelectorOpenAndLoad(!mapSelectorOpen),
+    // M e Shift+P abrem a gaveta já na seção certa (§9.29); o seletor da barra virou só o estado.
+    onToggleMaps: () => {
+      void useSceneList.getState().load();
+      toggleBastidoresSection("mapas");
+    },
     onToggleHandouts: () => setHandoutSelectorOpenAndLoad(!handoutSelectorOpen),
     onToggleLibrary: () => setLibrarySelectorOpenAndLoad(!librarySelectorOpen),
-    onTogglePrep: () => setPrepDrawerOpen((v) => !v),
+    onTogglePrep: () => toggleBastidoresSection("preparo"),
   });
 
   // Réguas dos outros só valem na cena que estou vendo.
@@ -786,14 +874,6 @@ function Table() {
       visible: drawVisible,
     });
     setPendingDrawingTextPoint(null);
-  };
-
-  // Salvar do modal: só emite o que mudou (mapa e/ou grid).
-  const handleSaveMapConfig = async ({ map, grid }: MapConfigResult) => {
-    if (!scene) return;
-    const mapChanged = map.mapUrl !== scene.mapUrl || map.mapWidth !== scene.mapWidth || map.mapHeight !== scene.mapHeight;
-    if (mapChanged) await setMap(map);
-    await updateGrid(grid);
   };
 
   // --- Mapas: painel, ativar com "Levar para o mapa", ponto de chegada (docs/plano-mapas.md) -----
@@ -966,7 +1046,7 @@ function Table() {
             onClick: () => setHandoutSelectorOpenAndLoad(true),
           },
           { id: "library", label: "Acervo", Icon: Library, shortcut: "B", onClick: () => setLibrarySelectorOpenAndLoad(true) },
-          { id: "prep", label: "Preparo", Icon: ClipboardList, shortcut: "Shift+P", onClick: () => setPrepDrawerOpen((v) => !v) },
+          { id: "prep", label: "Preparo", Icon: ClipboardList, shortcut: "Shift+P", onClick: () => toggleBastidoresSection("preparo") },
         ]
       : []),
     {
@@ -1001,7 +1081,7 @@ function Table() {
   // --- Acervo (docs/plano-preparo.md §1.5) — arrastar um Asset até o mapa --------------------
   /** Token: mesma criação "em branco" de `onTokenCreate`, só com a arte/nome do asset arrastado.
    *  Mapa: pergunta antes de trocar o fundo (mesma conta de `window.confirm` usada em outros lugares
-   *  do projeto, ex. apagar mapa) e chama o MESMO `scene:setMap` do `MapConfigModal`. */
+   *  do projeto, ex. apagar mapa) e chama o MESMO `scene:setMap` dos Bastidores. */
   const handleAssetDrop = (asset: Asset, point: { x: number; y: number }) => {
     if (!scene) return;
     if (asset.kind === "token") {
@@ -1052,7 +1132,7 @@ function Table() {
           scene={scene}
           participants={participants}
           me={me}
-          onOpenMapConfig={isGm ? () => setMapConfigOpen(true) : undefined}
+          onOpenMapConfig={isGm ? () => toggleBastidoresSection("mapas") : undefined}
           onOpenMapNotes={isGm && scene ? () => setNotesTarget({ kind: "scene", id: scene.id, name: scene.name }) : undefined}
           characterMenu={
             <CharacterMenu
@@ -1065,7 +1145,16 @@ function Table() {
             />
           }
           mapSelector={
-            isGm ? <MapSelector viewingScene={scene} activeScene={activeScene} maps={mapsProps} open={mapSelectorOpen} onOpenChange={setMapSelectorOpenAndLoad} /> : undefined
+            isGm ? (
+              <MapSelector
+                viewingScene={scene}
+                activeScene={activeScene}
+                onOpenMaps={() => {
+                  void useSceneList.getState().load();
+                  toggleBastidoresSection("mapas");
+                }}
+              />
+            ) : undefined
           }
           overflowMenu={<TopBarOverflowMenu actions={overflowActions} />}
           hiddenSelectors={
@@ -1097,9 +1186,30 @@ function Table() {
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Bastidores (hoje só Preparo): coluna à ESQUERDA, empurrando o mapa — a barra de
-            ferramentas do canvas continua visível. */}
-        {isGm && prepDrawerOpen && <PrepDrawer panel={prepPanelProps} onClose={() => setPrepDrawerOpen(false)} />}
+        {/* Bastidores: coluna à ESQUERDA, empurrando o mapa — a barra de ferramentas do canvas é
+            ancorada à área do mapa, então continua visível e clicável. */}
+        {isGm && bastidoresRendered && (
+          <BastidoresDrawer open={bastidoresOpen} section={bastidoresSection} onSectionChange={setBastidoresSection} onClose={() => setBastidoresOpen(false)}>
+            {bastidoresSection === "mapas" ? (
+              <TabErrorBoundary label="Mapas">
+                <MapsSection
+                  maps={mapsProps}
+                  viewingScene={scene}
+                  activeScene={activeScene}
+                  systemDef={systemDef}
+                  onSetMap={(map) => void setMap(map)}
+                  onUpdateGrid={(patch) => void updateGrid(patch)}
+                />
+              </TabErrorBoundary>
+            ) : prepPanelProps ? (
+              <TabErrorBoundary label="Preparo">
+                <PrepPanel {...prepPanelProps} />
+              </TabErrorBoundary>
+            ) : (
+              <p className="p-3 text-12 text-text-muted">Sem mapa aberto — o preparo é por mapa.</p>
+            )}
+          </BastidoresDrawer>
+        )}
         <main className="flex-1 h-full relative overflow-hidden">
           <CombatBanner
             combat={combat}
@@ -1360,7 +1470,10 @@ function Table() {
                 sceneId={scene.id}
                 getViewportCenter={() => vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 }}
                 onOpenNotePin={(pin) => setOpenNotePin(pin)}
-                onOpenPrep={() => setPrepDrawerOpen(true)}
+                onOpenPrep={() => {
+                  setBastidoresSection("preparo");
+                  setBastidoresOpen(true);
+                }}
               />
             ) : undefined
           }
@@ -1381,10 +1494,6 @@ function Table() {
           onCreateMine={() => void createCharacter({ name: me.nickname, kind: "pc", ownerId: me.id }).then((c) => c && openCharacter(c.id))}
           onClose={() => openCharacter(null)}
         />
-      )}
-
-      {isGm && scene && (
-        <MapConfigModal isOpen={isMapConfigOpen} scene={scene} systemDef={systemDef} onSave={(r) => void handleSaveMapConfig(r)} onClose={() => setMapConfigOpen(false)} />
       )}
 
       {carryDestScene && (

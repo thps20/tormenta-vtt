@@ -43,8 +43,8 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - `POST /api/upload` (multipart, PNG/JPG/WebP, máx. 20 MB) → salva em `apps/server/uploads/` e devolve `{ url, width, height }`.
 - GM emite `scene:setMap` com a URL e dimensões. Servidor persiste e faz broadcast de `scene:updated`.
 - Painel de grid: tipo (`square`/`none`), `cellSize` (px), `offsetX/Y`, cor, snap. Emite `scene:updateGrid`.
-- **Escala do mapa** (`grid.unitsPerCell`/`grid.unit`, ambos opcionais — `GridConfigSchema`): quanto vale 1 célula NESTE mapa na unidade do jogo. Sem eles, cai no padrão do sistema (`SystemDefinition.grid.cellSize`/`unit`, T20 = 1,5 m); `withMapScale` (`packages/shared/src/rules/scale.ts`) resolve o valor efetivo por cima do sistema — nunca a regra de diagonais, que continua sempre a do sistema. Campo "Escala" no modal "Configurar mapa": 4 presets (1,5 m — batalha; 15 m; 100 m; 1 km — região) + campo livre (valor + rótulo, até 8 caracteres); só aparece quando o sistema declara `grid`. Como `cellSize`/offsets, "Salvar" sempre grava um valor concreto (nunca fica "em branco" depois de aberto uma vez). Tudo que converte célula → distância (régua, gabaritos, orçamento de deslocamento) usa essa escala, nunca hardcoda a do sistema.
-- **Calibrar pela imagem** (docs/plano-grid.md, `GridCalibrator.tsx`): botão no modal "Configurar mapa", desabilitado sem imagem. Arrasta-se um retângulo SEMPRE quadrado sobre uma célula do desenho (zoom livre com a roda, pan com Espaço+arrasto ou botão do meio); `cellSize = lado do retângulo / N` e `offsetX/Y = canto do retângulo módulo cellSize`, onde N ("Cobre N células", padrão 1) deixa arrastar sobre várias células pra ganhar precisão. Prévia do grid ao vivo sobre a imagem; ajuste fino por teclado (setas ±1px, Shift ±0,1px na posição; +/− no tamanho da célula) ou pelos campos numéricos. "Aplicar" só preenche `cellSize`/`offsetX`/`offsetY` nos campos do modal — quem persiste de verdade continua sendo "Salvar" do modal (`scene:updateGrid`); "Cancelar" descarta tudo. `cellSize`/`offsetX`/`offsetY` aceitam decimal (`GridConfigSchema`, sem `.int()`) porque uma calibração real quase nunca cai num valor redondo. Só calibração manual — não detecta grid já desenhado na imagem. Como `Token.cells` é a fonte da verdade do tamanho (docs/plano-grid.md), recalibrar NUNCA muda o tamanho relativo dos tokens — só reencaixa a posição deles (mesmo caminho de `scene:updateGrid` normal, §9.7).
+- **Escala do mapa** (`grid.unitsPerCell`/`grid.unit`, ambos opcionais — `GridConfigSchema`): quanto vale 1 célula NESTE mapa na unidade do jogo. Sem eles, cai no padrão do sistema (`SystemDefinition.grid.cellSize`/`unit`, T20 = 1,5 m); `withMapScale` (`packages/shared/src/rules/scale.ts`) resolve o valor efetivo por cima do sistema — nunca a regra de diagonais, que continua sempre a do sistema. Bloco "Escala" na seção **Mapas** dos Bastidores (§9.29 — era o modal "Configurar mapa"): 4 presets (1,5 m; 15 m; 100 m; 1 km) + campo livre (valor + rótulo, até 8 caracteres); só aparece quando o sistema declara `grid`. Cada controle aplica na hora (`scene:updateGrid`), sem "Salvar". Tudo que converte célula → distância (régua, gabaritos, orçamento de deslocamento) usa essa escala, nunca hardcoda a do sistema.
+- **Calibrar pela imagem** (docs/plano-grid.md, `GridCalibrator.tsx`): botão na seção **Mapas** dos Bastidores (§9.29), desabilitado sem imagem. Arrasta-se um retângulo SEMPRE quadrado sobre uma célula do desenho (zoom livre com a roda, pan com Espaço+arrasto ou botão do meio); `cellSize = lado do retângulo / N` e `offsetX/Y = canto do retângulo módulo cellSize`, onde N ("Cobre N células", padrão 1) deixa arrastar sobre várias células pra ganhar precisão. Prévia do grid ao vivo sobre a imagem; ajuste fino por teclado (setas ±1px, Shift ±0,1px na posição; +/− no tamanho da célula) ou pelos campos numéricos. "Aplicar" grava `cellSize`/`offsetX`/`offsetY` direto (`scene:updateGrid`) e fecha o calibrador; "Cancelar" descarta. (Até setembro/2026 o resultado só preenchia os campos de um modal, que tinha o próprio "Salvar".) `cellSize`/`offsetX`/`offsetY` aceitam decimal (`GridConfigSchema`, sem `.int()`) porque uma calibração real quase nunca cai num valor redondo. Só calibração manual — não detecta grid já desenhado na imagem. Como `Token.cells` é a fonte da verdade do tamanho (docs/plano-grid.md), recalibrar NUNCA muda o tamanho relativo dos tokens — só reencaixa a posição deles (mesmo caminho de `scene:updateGrid` normal, §9.7).
 - O canvas (react-konva) desenha: imagem do mapa → linhas do grid → tokens → réguas/caixa de seleção. Pan no modo "Mover mapa" (ou espaço segurado); zoom com scroll e botões +/−/ajustar.
 - **Barra de ferramentas** (coluna à esquerda do canvas, um modo por vez, estado em `store/tools.ts`, atalhos em `lib/useToolShortcuts.ts`):
   - **Selecionar (V)**: clicar num token só seleciona (mantém o TokenInspector aberto, não abre ficha); duplo clique abre a ficha vinculada, se houver e o usuário puder vê-la (token sem ficha: duplo clique não faz nada além de selecionar); botão direito sempre abre o menu de condições (§3.3), mesmo em token com ficha — padrão Foundry. Arrastar no mapa vazio desenha uma caixa que seleciona os tokens com o centro dentro dela; shift+clique entra/sai da seleção; arrastar um token selecionado move todos os selecionados que o usuário controla. Arrastar um token que NÃO está selecionado já o seleciona no ato — padrão Foundry, `docs/fix-movimento-turno.md` — trocando a seleção por só ele (shift+arrastar entra na seleção atual em vez de trocar, mesma regra do shift+clique); o arraste em si sempre move só o token agarrado, os outros da seleção entram no próximo arraste. O Stage não faz pan. Duplo clique é detectado por geometria (dois `mousedown` no mesmo token dentro de ~300 ms), não pelo `dblclick` nativo do Konva — mesmo motivo do hit de token/badge de condição (`docs/debug-condicoes.md`): o canvas de hit do Konva é embaralhado por proteção anti-fingerprinting.
@@ -382,8 +382,9 @@ apps/web/src/
                 ícone com tooltip/badge quando o header fica estreito demais pro rótulo; recolhível,
                 §9.8), ChatTab,
                 InitiativeTab (modo de combate), CombatBanner (faixa "rolar iniciativa"/"seu
-                turno"), CharactersTab, MapsPanel (conteúdo do dropdown do MapSelector, §9.7),
-                CarryTokensDialog ("Levar para o mapa" ao ativar, §9.7), MapConfigModal,
+                turno"), CharactersTab, MapsPanel (seção Mapas dos Bastidores, §9.29),
+                CarryTokensDialog ("Levar para o mapa" ao ativar, §9.7), MapGridInline (grid/escala/
+                calibração na mesma seção),
                 NicknamePrompt, Toasts, CharacterSheetDrawer (gaveta da ficha),
                 TemplateToolbar (painel da ferramenta Área), TemplateLayer (desenho dos
                 gabaritos no canvas, §9.9), HandoutSelector (botão da TopBar, atalho J, §9.10),
@@ -661,7 +662,7 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   "visitado" independente do ativo (estado do cliente, persistido em `sessionStorage` por sala —
   dois GMs, ou duas abas, podem olhar mapas diferentes ao mesmo tempo). `selectViewedScene`
   substitui `selectActiveScene` em quase todo lugar do web (canvas, névoa, régua, combate, spawn de
-  criatura, `MapConfigModal`); `selectActiveScene` continua valendo pro `MapSelector`. Quando os
+  criatura, seção Mapas dos Bastidores); `selectActiveScene` continua valendo pro `MapSelector`. Quando os
   dois divergem, o botão-seletor da TopBar troca para "Vendo X · ativo: Y" com destaque dourado — o
   aviso que evita o erro mais provável da feature: editar um mapa achando que a mesa está vendo.
 - **Enquadramento (zoom/pan) por mapa e por usuário** (`VttCanvas`, `lib/session.ts#getSavedView`/
@@ -726,17 +727,18 @@ mapa (setembro/2026). Plano e decisões em `docs/plano-mapas.md`; revisão pós-
   reencaixado sai num `token:updated` (mesma visibilidade de sempre); se algum foi, a troca inteira
   (grid + tokens) entra na pilha de desfazer como UMA entrada — reencaixar não é trivial de desfazer
   à mão, diferente de só mudar cor/snap.
-- **Seletor de mapa** (`MapSelector`, na TopBar, só GM): botão "Mapa: <nome visitado> ▾" (ou "Vendo
-  X · ativo: Y" em destaque dourado quando diverge, ver acima). Clique ou a tecla **M** (fora de campo
-  de texto; listener da página, `lib/useGmPanelShortcuts.ts`, não do botão) abrem um dropdown de ~420 px ancorado abaixo do botão; Esc ou clique fora fecham. Quando
-  divergente, o topo do dropdown ganha "← Ir para o ativo" e "Ativar este". O corpo é o `MapsPanel`:
-  card por mapa com miniatura (gerada no cliente, cacheada em `localStorage` — `lib/thumbnails.ts`),
-  contagem de tokens e status de combate (`scene:list`, buscado ao abrir o dropdown — dados que o
-  cliente não carregou de mapas que não visitou), badges Ativo/Vendo, renomear inline, duplicar,
-  apagar, arrastar para reordenar (`scene:reorder`, mesmo contrato de `combat:reorder`), e no
-  rodapé "+ Novo mapa"/"Novo por upload". Selecionar um mapa ou iniciar "Definir ponto de chegada"
-  fecha o dropdown (o segundo precisa que o clique seguinte chegue ao canvas); as demais ações
-  deixam o dropdown aberto. Jogador só vê o texto "Mapa: <nome do ativo>", sem botão nem dropdown.
+- **Seletor de mapa** (`MapSelector`, na TopBar, só GM): botão de ESTADO — "Mapa: <nome visitado>"
+  (ou "Vendo X · ativo: Y" em destaque dourado quando diverge). Clique ou a tecla **M** abrem os
+  **Bastidores na seção Mapas** (§9.29); até setembro/2026 abriam um dropdown de 420 px com o
+  `MapsPanel` dentro — duas portas pra mesma coisa, e o dropdown cobria o mapa que estava sendo
+  configurado. Jogador só vê o texto "Mapa: <nome do ativo>", sem botão.
+- **`MapsPanel`** (hoje dentro da seção Mapas dos Bastidores): card por mapa com miniatura (gerada
+  no cliente, cacheada em `localStorage` — `lib/thumbnails.ts`), contagem de tokens e status de
+  combate (`scene:list`, buscado ao abrir a seção — dados que o cliente não carregou de mapas que
+  não visitou), badges Ativo/Vendo, renomear inline, duplicar, apagar, arrastar para reordenar
+  (`scene:reorder`, mesmo contrato de `combat:reorder`), e no rodapé "+ Novo mapa"/"Novo por
+  upload". Quando o GM está vendo um mapa diferente do ativo, "← Ir para o ativo" e "Ativar este"
+  ficam no topo da seção.
   O menu ⋯ de cada card (Renomear/Duplicar/ponto de chegada/Apagar) abre num portal em
   `document.body` (posição `fixed`, calculada a partir do botão), nunca preso ao
   `overflow-y-auto` da lista — com muitos mapas o card fica escondido por trás da rolagem sem
@@ -1645,7 +1647,7 @@ todos. Fica inteiramente no cliente: não é regra de sistema nem config de sala
   `override` (`null` = seguir o padrão do mapa). Um override tem `style` (`lines` = linhas cheias,
   `dashed` = pontilhado, `crosses` = só uma marca em cada cruzamento — mais leve visualmente em
   mapas grandes), `color` (`#rrggbb`, sem alfa — a opacidade é campo separado, mesma convenção da
-  "Cor do Grid" do Mestre em `MapConfigModal`), `opacity` (0..1) e `thickness` (1 a 3 px de **tela**,
+  "Cor do Grid" do Mestre em `MapGridInline`), `opacity` (0..1) e `thickness` (1 a 3 px de **tela**,
   constante com o zoom, não px do mapa — por isso não fica mais grosso/fino ao dar zoom). Sem
   override, o padrão é `style: "lines"` na cor que o Mestre escolheu (`Scene.grid.color`), opacidade
   cheia e 1px de tela.
@@ -1945,3 +1947,35 @@ nova: só muda onde as coisas moram.
   ignorando Shift.
 - **1366×768**: com 4 participantes e trilha tocando, os dois lados da barra não se sobrepõem (era
   o aperto relatado na crítica, ~16 px sobrando antes).
+
+### 9.29 Bastidores: gaveta de preparar à esquerda do mapa
+
+Passo 3 do caminho C (`docs/critique-arquitetura-mesa.md`), setembro/2026. A geografia da Mesa passa
+a ser fixa: **esquerda = bastidores (editar/montar), direita = mesa (conduzir)**, sem "modo" nenhum.
+
+- **Gaveta** (`components/bastidores/BastidoresDrawer.tsx`, 340 px / 360 px acima de 1280): coluna à
+  esquerda que **empurra** o mapa em vez de cobrir — é o que mantém a barra de ferramentas do canvas
+  visível e clicável (ela é ancorada à área do mapa, não à janela). Cabeçalho "Bastidores" + lista de
+  seções (uma visível por vez, `role=tablist`, ←/→ trocam). Fecha no X ou **Esc**. Só GM.
+- **Seções nesta etapa**: **Mapas** (`MapsSection`) e **Preparo** (a gaveta do passo 2 virou uma
+  seção). Acervo, Criaturas & Homebrew, Handouts e Sons entram no passo 4.
+- **Mapas**: o `MapsPanel` que era o dropdown do `MapSelector` (miniaturas, criar, renomear,
+  duplicar, apagar, reordenar, ativar, ponto de chegada, notas) e, abaixo, **imagem + grid + escala +
+  calibração inline** do mapa visto (`MapGridInline`) — o `MapConfigModal` deixou de existir. Sem
+  preview próprio nem "Salvar": **o mapa atrás é o preview**, e cada controle aplica na hora
+  (`scene:setMap`/`scene:updateGrid`). Controles contínuos (tamanho da célula, deslocamentos,
+  opacidade) só emitem ao soltar — arrastando, o valor fica num rascunho local, senão sairia um
+  evento por pixel.
+- **Atalhos**: **M** abre a gaveta na seção Mapas e **Shift+P** na seção Preparo; a mesma tecla na
+  mesma seção fecha. A engrenagem ao lado do nome do mapa (§9.28) e o ⋯ levam aos mesmos lugares.
+- **Estado por usuário** (`localStorage`): `tvtt:bastidoresOpen` e `tvtt:bastidoresSection` — reabrir
+  a sala devolve a gaveta como estava, mesmo padrão do painel lateral recolhido (§9.8).
+- **Os dois lados convivem**: abrir os Bastidores NÃO recolhe a coluna da Mesa — o chat continua
+  visível enquanto o Mestre mexe no mapa. **Abaixo de 1100 px** (`NARROW_LAYOUT_QUERY`) não cabem os
+  dois: com a gaveta aberta, a Mesa fica recolhida (um véu de layout, que NÃO sobrescreve a
+  preferência do usuário — mesmo cuidado do modo imersivo, §9.22), e expandir a Mesa fecha a gaveta.
+  Voltando a uma janela larga, a Mesa reaparece como o usuário a tinha deixado.
+- **Animação**: a gaveta anima só a largura (150 ms, `transition-[width]`), com o conteúdo em largura
+  fixa pra não reorganizar texto a cada quadro; a página segura o desmonte por esse tempo, então
+  `MapsPanel`/`PrepPanel` não ficam montados com a gaveta fechada.
+- **Jogador não tem Bastidores** (nem a tecla: `useGmPanelShortcuts` só liga para GM).
