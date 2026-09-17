@@ -18,6 +18,9 @@ export interface EncounterCartItem {
 export interface EncounterSpawnOptions {
   startCombat: boolean;
   rollNpcInitiative: boolean;
+  /** Solta o encontro inteiro invisível (docs/plano-preparo.md §2.2, usado pelo Preparo) — só
+   *  ESCONDE, nunca revela uma linha salva como `visibleOnSpawn:false`. */
+  forceHidden?: boolean;
 }
 
 interface EncountersState {
@@ -142,7 +145,7 @@ export const useEncounters = create<EncountersState>((set, get) => ({
   },
 
   spawn: async (id, sceneId, point, opts) => {
-    const res = await emitAck("encounter:spawn", { id, sceneId, x: point.x, y: point.y });
+    const res = await emitAck("encounter:spawn", { id, sceneId, x: point.x, y: point.y, forceHidden: opts.forceHidden });
     if (!res.ok) {
       toast(res.error);
       return false;

@@ -19,6 +19,7 @@ import { useEncounters } from "./encounters";
 import { useMacros } from "./macros";
 import { useCast } from "./cast";
 import { useLibrary } from "./library";
+import { usePrep } from "./prep";
 import { toast } from "./ui";
 
 /**
@@ -106,6 +107,11 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("asset:updated", (a) => useLibrary.getState().upsertAsset(a));
   socket.on("asset:deleted", ({ id }) => useLibrary.getState().removeAssetLocal(id));
   socket.on("library:favoritesChanged", ({ favorites }) => useLibrary.getState().setFavorites(favorites));
+
+  // Preparo do mapa (docs/plano-preparo.md §2): só chega pro GM (rooms.gm).
+  socket.on("prep:stepUpserted", ({ step }) => usePrep.getState().upsertStep(step));
+  socket.on("prep:stepRemoved", ({ sceneId, stepId }) => usePrep.getState().removeStepLocal(sceneId, stepId));
+  socket.on("prep:reordered", ({ sceneId, order }) => usePrep.getState().applyReorder(sceneId, order));
 
   // Pinos no mapa (docs/plano-narracao.md): mesma regra de broadcast de mapa de sempre.
   socket.on("pin:created", ({ sceneId, pin }) => usePins.getState().upsertPin(sceneId, pin));

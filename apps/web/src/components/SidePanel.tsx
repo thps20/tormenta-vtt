@@ -1,12 +1,13 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, MessageSquare, Swords, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ClipboardList, MessageSquare, Swords, Users } from 'lucide-react';
 import { ChatTab } from './ChatTab';
 import { CombatPanel, type CombatPanelCallbacks } from './CombatPanel';
 import { CharactersTab } from './CharactersTab';
 import { PartyView } from './PartyView';
+import { PrepPanel, type PrepPanelProps } from './PrepPanel';
 import type { Character, CharacterCreatePayload, CharacterRollRequest, ChatMessage, Combat, ConditionDef, MacroAction, Participant, PartyEntry, SystemDefinition, Token } from '@tormenta-vtt/shared';
 
-export type SidePanelTab = 'chat' | 'initiative' | 'characters';
+export type SidePanelTab = 'chat' | 'initiative' | 'characters' | 'prep';
 
 interface SidePanelProps {
   /** Aba ativa (controlada pela página, para outros botões poderem abrir uma aba). */
@@ -69,6 +70,9 @@ interface SidePanelProps {
   unreadMessages: number;
   /** Badge "é seu turno" na alça recolhida. */
   isMyTurn: boolean;
+  /** Aba "Preparo" (docs/plano-preparo.md §2) — só existe (e só é oferecida na lista de abas)
+   *  quando o mapa visto está carregado E o viewer é GM; jogador nem sabe que ela existe. */
+  prepPanel: PrepPanelProps | null;
 }
 
 /** Uma aba, com o rótulo e a contagem já formatados em texto pra virar tooltip/rodapé do ícone. */
@@ -125,6 +129,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   onToggleCollapsed,
   unreadMessages,
   isMyTurn,
+  prepPanel,
 }) => {
   const setActiveTab = onTabChange;
 
@@ -132,6 +137,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
     { id: 'chat', label: 'Chat', Icon: MessageSquare, badge: String(messages.length) },
     { id: 'initiative', label: 'Iniciativa', Icon: Swords, badge: `R${combat?.round ?? 0}` },
     { id: 'characters', label: 'Fichas', Icon: Users, badge: String(characters.length) },
+    ...(prepPanel ? [{ id: 'prep' as const, label: 'Preparo', Icon: ClipboardList, badge: '' }] : []),
   ];
 
   // Recolhido: o canvas ocupa a largura toda e sobra só esta alça fina, com os badges que
@@ -228,6 +234,8 @@ export const SidePanel: React.FC<SidePanelProps> = ({
             onCreate={onCreateCharacter}
             onDelete={onDeleteCharacter}
           />
+        ) : activeTab === 'prep' && prepPanel ? (
+          <PrepPanel {...prepPanel} />
         ) : (
           <CombatPanel
             combat={combat}
@@ -267,26 +275,30 @@ const TabButton: React.FC<{ id: string; tab: TabDef; active: boolean; onClick: (
   <button
     id={id}
     onClick={onClick}
-    title={`${label} (${badge})`}
+    title={badge ? `${label} (${badge})` : label}
     className={`focus-ring relative flex-1 min-w-0 flex items-center justify-center gap-2 px-1 text-xs font-title font-bold tracking-widest uppercase transition-all cursor-pointer ${
       active ? 'border-b-2 border-accent bg-surface-2 text-accent' : 'border-b border-border text-text-muted hover:text-text hover:bg-surface-2'
     }`}
   >
     <Icon className="w-3.5 h-3.5 shrink-0" />
     <span className="hidden @[350px]:inline truncate">{label}</span>
-    <span
-      className={`hidden @[350px]:inline-block shrink-0 text-[10px] font-data tabular-nums px-1.5 py-0.2 rounded-ui ${
-        active ? 'bg-bg text-accent border border-accent/40' : 'bg-surface-2 text-text-muted'
-      }`}
-    >
-      {badge}
-    </span>
-    <span
-      className={`flex @[350px]:hidden absolute top-0.5 right-1.5 min-w-[15px] h-[15px] px-0.5 items-center justify-center rounded-full text-[8px] font-data tabular-nums leading-none ${
-        active ? 'bg-accent text-bg' : 'bg-surface-2 text-text'
-      }`}
-    >
-      {badge}
-    </span>
+    {badge && (
+      <span
+        className={`hidden @[350px]:inline-block shrink-0 text-[10px] font-data tabular-nums px-1.5 py-0.2 rounded-ui ${
+          active ? 'bg-bg text-accent border border-accent/40' : 'bg-surface-2 text-text-muted'
+        }`}
+      >
+        {badge}
+      </span>
+    )}
+    {badge && (
+      <span
+        className={`flex @[350px]:hidden absolute top-0.5 right-1.5 min-w-[15px] h-[15px] px-0.5 items-center justify-center rounded-full text-[8px] font-data tabular-nums leading-none ${
+          active ? 'bg-accent text-bg' : 'bg-surface-2 text-text'
+        }`}
+      >
+        {badge}
+      </span>
+    )}
   </button>
 );

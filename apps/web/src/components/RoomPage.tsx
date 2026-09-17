@@ -1271,6 +1271,18 @@ function Table() {
           onToggleCollapsed={toggleSidePanelCollapsed}
           unreadMessages={unreadMessages}
           isMyTurn={myTurn}
+          prepPanel={
+            isGm && scene
+              ? {
+                  sceneId: scene.id,
+                  sceneName: scene.name,
+                  scenes: scenes.map((s) => ({ id: s.id, name: s.name })),
+                  getViewportCenter: () => vttCanvasRef.current?.getViewportCenter() ?? { x: 0, y: 0 },
+                  onOpenMapNotes: () => setNotesTarget({ kind: "scene", id: scene.id, name: scene.name }),
+                  onOpenNotePin: (pin) => setOpenNotePin(pin),
+                }
+              : null
+          }
         />
       </div>
 
