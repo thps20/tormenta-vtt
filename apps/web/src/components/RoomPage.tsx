@@ -17,6 +17,7 @@ import { activeCombatant, isMyTurn, sceneCombat, useCombat } from "../store/comb
 import { canEditCharacter, sortedCharacters, useCharacters } from "../store/characters";
 import { useParty } from "../store/party";
 import { useSystemDef } from "../lib/system";
+import { useEmitGmView } from "../lib/castCamera";
 import { useToolShortcuts } from "../lib/useToolShortcuts";
 import { useMacroShortcuts } from "../lib/useMacroShortcuts";
 import { deleteSelectedTokens, useDeleteSelectionShortcut } from "../lib/useDeleteSelectionShortcut";
@@ -68,6 +69,8 @@ import { TOKEN_COLORS } from "./TokenInspector";
 import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
 import { SidePanel, type SidePanelTab } from "./SidePanel";
 import { CharacterMenu } from "./CharacterMenu";
+import { CastMenu } from "./cast/CastMenu";
+import { useCast } from "../store/cast";
 import { NicknamePrompt } from "./NicknamePrompt";
 import { CompendiumPalette } from "./compendium/CompendiumPalette";
 import { MacroBar, useMacroBarController } from "./MacroBar";
@@ -356,6 +359,9 @@ function Table() {
   const spawnFromCompendium = useTokens((s) => s.spawnFromCompendium);
   const deleteToken = useTokens((s) => s.delete);
   const vttCanvasRef = useRef<VttCanvasHandle>(null);
+  // Cast, "seguir o Mestre" (docs/plano-cast.md §4.1): manda o enquadramento pra tela de exibição,
+  // throttled — só GM, e só quando compensa (useEmitGmView já filtra displayCount/cameraMode).
+  useEmitGmView(() => vttCanvasRef.current?.getView() ?? null, scene?.id ?? null, me?.role === "gm");
   /** Solta na cena ativa (Enter/botão no preview usam o centro da viewport; arrastar no mapa usa o ponto largado). */
   const spawnCreatureAt = async (entryId: string, point: { x: number; y: number }, opts: { count: number; visible: boolean }): Promise<boolean> => {
     if (!scene) return false;
@@ -901,6 +907,20 @@ function Table() {
             isGm ? <HandoutSelector gallery={handoutGalleryProps} onOpen={() => void loadHandoutLibrary()} /> : undefined
           }
           onOpenMacros={() => macroBarController.setCreating(true)}
+          castMenu={
+            isGm ? (
+              <CastMenu
+                onCenterHere={
+                  scene
+                    ? () => {
+                        const v = vttCanvasRef.current?.getView();
+                        if (v) useCast.getState().centerHere({ sceneId: scene.id, ...v });
+                      }
+                    : undefined
+                }
+              />
+            ) : undefined
+          }
         />
       </div>
 

@@ -28,6 +28,7 @@ import { useDrawings } from "./drawings";
 import { useEncounters } from "./encounters";
 import { useMacros } from "./macros";
 import { useSceneList } from "./sceneList";
+import { useCast } from "./cast";
 import { toast } from "./ui";
 
 export type JoinStatus =
@@ -41,6 +42,12 @@ interface JoinParams {
   inviteCode: string;
   gmSecret: string | null;
   nickname?: string;
+}
+
+/** Cast — tela de exibição (docs/plano-cast.md): parâmetros de `display:join`. */
+interface DisplayJoinParams {
+  inviteCode: string;
+  displayToken: string;
 }
 
 interface RoomState {
@@ -57,6 +64,9 @@ interface RoomState {
   viewingSceneId: string | null;
   /** Últimos parâmetros de join, para reconectar automaticamente. */
   lastJoin: JoinParams | null;
+  /** Cast (docs/plano-cast.md): últimos parâmetros de `display:join`, mutuamente exclusivo com
+   *  `lastJoin` (uma aba é OU um participante OU uma tela) — reconecta sozinho do mesmo jeito. */
+  lastJoinDisplay: DisplayJoinParams | null;
   /** Trava de orçamento de deslocamento da SALA (docs/plano-movimento.md §4.3): true = vale o
    *  orçamento; GM pode desligar ("ignorar limite") em `combat:set-movement-limit`. */
   movementLimitEnabled: boolean;
@@ -68,6 +78,9 @@ interface RoomState {
   playerDrawingEnabled: boolean;
 
   join: (params: JoinParams) => Promise<void>;
+  /** Cast (docs/plano-cast.md): entra como tela de exibição — reaproveita `applySnapshot` (mesmo
+   *  formato, ver `DisplaySnapshot`), então todas as stores de domínio hidratam sem código novo. */
+  joinDisplay: (params: DisplayJoinParams) => Promise<{ ok: true } | { ok: false; error: string }>;
   leave: () => void;
   applySnapshot: (snap: RoomSnapshot) => void;
 
@@ -118,6 +131,7 @@ export const useRoom = create<RoomState>((set, get) => ({
   scenes: [],
   viewingSceneId: null,
   lastJoin: null,
+  lastJoinDisplay: null,
   movementLimitEnabled: true,
   autoRollNpcInitiativeEnabled: true,
   playerDrawingEnabled: true,
@@ -160,6 +174,23 @@ export const useRoom = create<RoomState>((set, get) => ({
     set({ status: { kind: "joined" } });
   },
 
+  joinDisplay: async (params) => {
+    const socket = getSocket();
+    set({ status: { kind: "joining" }, lastJoinDisplay: params });
+    const res = await new Promise<AckOf<"display:join">>((resolve) => socket.emit("display:join", params, resolve));
+    if (!res.ok) {
+      set({ status: { kind: "error", message: res.error } });
+      return res;
+    }
+    // Sem sessionToken pra guardar (a tela nunca é um Participant — o link É a credencial dela,
+    // docs/plano-cast.md §3.1). `applySnapshot` reaproveita o mesmo formato pra hidratar as
+    // stores de domínio (tokens, combate, pinos...); `cameraMode`/`blackout` vão à parte (useCast).
+    get().applySnapshot(res.data);
+    useCast.getState().hydrateForDisplay({ cameraMode: res.data.cameraMode, blackout: res.data.blackout });
+    set({ status: { kind: "joined" } });
+    return { ok: true };
+  },
+
   leave: () => {
     set({
       status: { kind: "idle" },
@@ -169,10 +200,12 @@ export const useRoom = create<RoomState>((set, get) => ({
       scenes: [],
       viewingSceneId: null,
       lastJoin: null,
+      lastJoinDisplay: null,
       movementLimitEnabled: true,
       autoRollNpcInitiativeEnabled: true,
       playerDrawingEnabled: true,
     });
+    useCast.getState().reset();
     useTokens.getState().setAll([]);
     useChat.getState().setAll([]);
     useCombat.getState().setSnapshot(null, null);
@@ -214,6 +247,8 @@ export const useRoom = create<RoomState>((set, get) => ({
     useParty.getState().setAll(snap.party);
     useCompendium.getState().setFavorites(snap.favoriteEntryIds);
     useMacros.getState().setAll(snap.macros);
+    // Cast (docs/plano-cast.md): só o GM recebe `cast` — jogador e tela de exibição não tocam nisto.
+    if (snap.cast) useCast.getState().hydrateFromCastState(snap.cast);
 
     // Jogador sempre vê o ativo (derivado, sem sessionStorage). GM: restaura o mapa que estava
     // visitando (F5 no meio da preparação); se o id salvo não existe mais (mapa apagado) ou é o

@@ -17,6 +17,7 @@ import { usePins } from "./pins";
 import { useDrawings } from "./drawings";
 import { useEncounters } from "./encounters";
 import { useMacros } from "./macros";
+import { useCast } from "./cast";
 import { toast } from "./ui";
 
 /**
@@ -29,8 +30,12 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("connect", () => {
     // Na primeira conexão o join inicial já está na fila do socket; só reentramos se a
     // conexão caiu depois de já termos entrado.
-    const { lastJoin, status } = useRoom.getState();
-    if (lastJoin && status.kind === "joined") void useRoom.getState().join(lastJoin);
+    const { lastJoin, lastJoinDisplay, status } = useRoom.getState();
+    if (status.kind !== "joined") return;
+    if (lastJoin) void useRoom.getState().join(lastJoin);
+    // Cast (docs/plano-cast.md): tela de exibição reconecta com o mesmo token, sozinha — se ele
+    // foi revogado nesse meio, o ack vem com erro e ela mostra o aviso (ver DisplayPage).
+    else if (lastJoinDisplay) void useRoom.getState().joinDisplay(lastJoinDisplay);
   });
 
   socket.on("room:participantJoined", (p) => useRoom.getState().upsertParticipant(p));
@@ -122,4 +127,17 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("macro:reordered", ({ order }) => useMacros.getState().applyReorder(order));
 
   socket.on("server:error", ({ message }) => toast(message));
+
+  // Cast — tela de exibição (docs/plano-cast.md). `display:presence`/`display:tokenChanged`/
+  // chegam só ao GM (rooms.gm); `display:view`/
+  // `display:handout` só à tela (rooms.display); `cameraModeChanged`/`blackoutChanged` chegam aos
+  // dois — a mesma store serve ambos (ver store/cast.ts).
+  socket.on("display:presence", ({ count }) => useCast.getState().setPresenceCount(count));
+  socket.on("display:tokenChanged", ({ displayToken }) => useCast.getState().setTokenChanged(displayToken));
+  socket.on("display:cameraModeChanged", ({ mode }) => useCast.getState().setCameraModeChanged(mode));
+  socket.on("display:blackoutChanged", ({ blackout }) => useCast.getState().setBlackoutChanged(blackout));
+  socket.on("display:view", (view) => useCast.getState().setView(view));
+  socket.on("display:handout", ({ handout }) => useCast.getState().setDisplayHandout(handout));
+  socket.on("display:handout-view", (view) => useCast.getState().setHandoutView(view));
+  socket.on("display:revoked", () => useCast.getState().setRevoked());
 }

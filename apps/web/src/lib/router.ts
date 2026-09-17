@@ -46,6 +46,11 @@ export function roomPath(inviteCode: string, gmSecret?: string | null): string {
   return `/room/${inviteCode}${gmSecret ? `?gm=${encodeURIComponent(gmSecret)}` : ""}`;
 }
 
+/** Cast (docs/plano-cast.md): caminho da tela de exibição — link que o GM copia/abre em nova janela. */
+export function displayPath(inviteCode: string, displayToken: string): string {
+  return `/room/${inviteCode}?display=${encodeURIComponent(displayToken)}`;
+}
+
 const listeners = new Set<() => void>();
 
 export function navigate(path: string): void {

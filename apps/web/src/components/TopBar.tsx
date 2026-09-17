@@ -22,6 +22,8 @@ interface TopBarProps {
   handoutSelector?: React.ReactNode;
   /** Abre o criador de macro (docs/SPEC.md §9.20) — GM e jogador, é preferência pessoal. */
   onOpenMacros?: () => void;
+  /** Botão "Cast" (`CastMenu`, docs/plano-cast.md §5), montado pela página — só GM. */
+  castMenu?: React.ReactNode;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -36,6 +38,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   mapSelector,
   handoutSelector,
   onOpenMacros,
+  castMenu,
 }) => {
   const [copied, setCopied] = useState(false);
   const isGM = me.role === "gm";
@@ -146,6 +149,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <div className="flex items-center gap-2 ml-1">
           {characterMenu}
+          {castMenu}
           {onOpenMacros && (
             <button
               id="btn-topbar-macros"

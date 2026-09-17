@@ -94,6 +94,10 @@ export const DEFAULT_MAP = DEFAULT_MAP_SIZE;
 export interface VttCanvasHandle {
   /** Ponto do mapa (pixels) no centro da viewport agora — mesmo cálculo do botão "novo token". */
   getViewportCenter: () => { x: number; y: number };
+  /** Nó do Stage do Konva, pra `stage.toDataURL(...)` — Cast, miniatura da tela pro GM (docs/plano-cast.md §5). */
+  getStage: () => Konva.Stage | null;
+  /** Enquadramento atual (pixels do mapa) — Cast, botão "Centralizar aqui" (docs/plano-cast.md §4.1). */
+  getView: () => { center: { x: number; y: number }; viewWidth: number; viewHeight: number };
 }
 
 interface VttCanvasProps {
@@ -830,7 +834,11 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     x: (dimensions.width / 2 - stagePos.x) / stageScale,
     y: (dimensions.height / 2 - stagePos.y) / stageScale,
   });
-  useImperativeHandle(ref, () => ({ getViewportCenter: viewportCenter }));
+  useImperativeHandle(ref, () => ({
+    getViewportCenter: viewportCenter,
+    getStage: () => stageRef.current,
+    getView: () => ({ center: viewportCenter(), viewWidth: dimensions.width / stageScale, viewHeight: dimensions.height / stageScale }),
+  }));
 
   const handleCreateToken = () => {
     const size = effectiveCellSize(scene.grid);
