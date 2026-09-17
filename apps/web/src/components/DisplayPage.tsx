@@ -31,6 +31,10 @@ interface DisplayPageProps {
 
 const noop = () => {};
 
+/** Quantos ms a miniatura da tela é mandada pro GM (docs/plano-cast.md §5). */
+const PREVIEW_FRAME_INTERVAL_MS = 2000;
+const PREVIEW_FRAME_WIDTH = 320;
+
 /**
  * Cast — tela de exibição (docs/plano-cast.md): segunda tela só de leitura, projetada sobre a mesa
  * física ou numa TV, do ponto de vista de um jogador sem tokens (`displayViewer`, servidor). Não é
@@ -113,6 +117,7 @@ export const DisplayPage: React.FC<DisplayPageProps> = ({ inviteCode, displayTok
   const displayHandout = useCast((s) => s.displayHandout);
   const handoutView = useCast((s) => s.handoutView);
   const revoked = useCast((s) => s.revoked);
+  const previewDemand = useCast((s) => s.previewDemand);
 
   // Calibração de mesa física (docs/plano-cast.md §3.3): 100% local a esta tela.
   const [tabletop, setTabletop] = useState(() => loadTabletopPrefs());
@@ -131,6 +136,25 @@ export const DisplayPage: React.FC<DisplayPageProps> = ({ inviteCode, displayTok
   const { view, rotatedSize } = useCastCamera({ scene, tokens, combat, templates, cameraMode, lastView, tabletop, screenSize });
 
   const canvasRef = useRef<VttCanvasHandle>(null);
+
+  // Miniatura sob demanda (docs/plano-cast.md §5): só enquanto algum GM pediu.
+  useEffect(() => {
+    if (!previewDemand) return;
+    const id = setInterval(() => {
+      const stage = canvasRef.current?.getStage();
+      if (!stage) return;
+      try {
+        const pixelRatio = Math.min(1, PREVIEW_FRAME_WIDTH / stage.width());
+        const dataUrl = stage.toDataURL({ mimeType: "image/jpeg", quality: 0.6, pixelRatio });
+        void emitAck("display:frame", { dataUrl });
+      } catch {
+        // Mapa de origem externa sem CORS "contamina" o canvas (stage.toDataURL lança) — sem
+        // miniatura desta vez, não é um erro pra insistir (console, nunca toast: setDisplayMode).
+        console.warn("[cast] miniatura indisponível (mapa de origem externa sem CORS?)");
+      }
+    }, PREVIEW_FRAME_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [previewDemand]);
 
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
   const [calibrationOpen, setCalibrationOpen] = useState(false);

@@ -7,8 +7,8 @@ import { toast } from "./ui";
  * Cast — tela de exibição (docs/plano-cast.md). Uma store só serve os DOIS lados, porque os dois
  * compartilham o mesmo `cameraMode`/`blackout` (broadcast pros dois) e é a mesma sala de qualquer
  * jeito — evita duas stores que precisariam ficar sincronizadas entre si:
- *  - GM: `displayToken`/`displayCount` (de `RoomSnapshot.cast`, GM only) + as ações (criar/revogar
- *    link, mudar modo, blackout, centralizar).
+ *  - GM: `displayToken`/`displayCount` (de `RoomSnapshot.cast`, GM only) + `previewFrame`
+ *    (miniatura que a tela manda) + as ações (criar/revogar link, mudar modo, blackout, centralizar).
  *  - Tela: `cameraMode`/`blackout` (de `DisplaySnapshot`) + `lastView` (o `display:view` mais
  *    recente do Mestre, cru — `DisplayPage`/`lib/castCamera.ts` decidem o que fazer com ele) +
  *    `displayHandout` (overlay "para todos", docs/plano-cast.md §10).
@@ -18,6 +18,13 @@ interface CastStoreState {
   displayCount: number;
   cameraMode: DisplayCameraMode;
   blackout: boolean;
+
+  /** Miniatura mais recente da tela (GM, popover Cast) — data URL JPEG, ou null sem preview ativo. */
+  previewFrame: string | null;
+  /** Este cliente (GM) está pedindo miniatura agora (liga/desliga `display:preview`). */
+  previewWanted: boolean;
+  /** Algum GM está pedindo miniatura agora (tela: só manda `display:frame` enquanto isto é true). */
+  previewDemand: boolean;
 
   /** Último enquadramento do Mestre repassado pelo servidor (tela). Cru: câmera decide o resto. */
   lastView: DisplayViewPayload | null;
@@ -37,6 +44,8 @@ interface CastStoreState {
   setTokenChanged: (token: string | null) => void;
   setCameraModeChanged: (mode: DisplayCameraMode) => void;
   setBlackoutChanged: (blackout: boolean) => void;
+  setPreviewFrame: (dataUrl: string) => void;
+  setPreviewDemandChanged: (on: boolean) => void;
   setView: (view: DisplayViewPayload) => void;
   setDisplayHandout: (handout: HandoutCard | null) => void;
   setHandoutView: (view: DisplayHandoutViewPayload) => void;
@@ -46,6 +55,8 @@ interface CastStoreState {
   revokeLink: () => Promise<boolean>;
   setCameraMode: (mode: DisplayCameraMode) => Promise<void>;
   setBlackout: (on: boolean) => Promise<void>;
+  /** Liga/desliga o pedido de miniatura (GM abriu/fechou o popover Cast). */
+  setPreviewWanted: (on: boolean) => void;
   /** "Centralizar aqui": manda o enquadramento atual do Mestre, em qualquer modo de câmera. */
   centerHere: (view: Omit<DisplayViewPayload, "reason">) => void;
 }
@@ -55,6 +66,9 @@ export const useCast = create<CastStoreState>((set, get) => ({
   displayCount: 0,
   cameraMode: "follow",
   blackout: false,
+  previewFrame: null,
+  previewWanted: false,
+  previewDemand: false,
   lastView: null,
   displayHandout: null,
   handoutView: null,
@@ -68,6 +82,9 @@ export const useCast = create<CastStoreState>((set, get) => ({
       displayCount: 0,
       cameraMode: "follow",
       blackout: false,
+      previewFrame: null,
+      previewWanted: false,
+      previewDemand: false,
       lastView: null,
       displayHandout: null,
       handoutView: null,
@@ -81,6 +98,8 @@ export const useCast = create<CastStoreState>((set, get) => ({
   // ENQUADRAMENTO sincronizado não deveria sobreviver escondido: religar sem blackout reabre o
   // handout centralizado, esperando o Mestre mexer de novo (docs/revisao-cast.md).
   setBlackoutChanged: (blackout) => set({ blackout, handoutView: blackout ? null : get().handoutView }),
+  setPreviewFrame: (previewFrame) => set({ previewFrame }),
+  setPreviewDemandChanged: (previewDemand) => set({ previewDemand }),
   setView: (lastView) => set({ lastView }),
   // Fechar ou trocar o handout limpa o enquadramento sincronizado — o próximo aberto começa
   // centralizado até o Mestre mexer de novo, nunca herda o zoom/pan de um handout anterior.
@@ -125,6 +144,10 @@ export const useCast = create<CastStoreState>((set, get) => ({
       set({ blackout: prev });
       toast(res.error);
     }
+  },
+  setPreviewWanted: (on) => {
+    set({ previewWanted: on, previewFrame: on ? get().previewFrame : null });
+    void emitAck("display:preview", { on });
   },
   centerHere: (view) => {
     void getSocket().emit("display:view", { ...view, reason: "center" }, () => undefined);

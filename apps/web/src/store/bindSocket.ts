@@ -129,7 +129,7 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("server:error", ({ message }) => toast(message));
 
   // Cast — tela de exibição (docs/plano-cast.md). `display:presence`/`display:tokenChanged`/
-  // chegam só ao GM (rooms.gm); `display:view`/
+  // `display:frame` só chegam ao GM (rooms.gm); `display:view`/`display:previewDemand`/
   // `display:handout` só à tela (rooms.display); `cameraModeChanged`/`blackoutChanged` chegam aos
   // dois — a mesma store serve ambos (ver store/cast.ts).
   socket.on("display:presence", ({ count }) => useCast.getState().setPresenceCount(count));
@@ -137,6 +137,8 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("display:cameraModeChanged", ({ mode }) => useCast.getState().setCameraModeChanged(mode));
   socket.on("display:blackoutChanged", ({ blackout }) => useCast.getState().setBlackoutChanged(blackout));
   socket.on("display:view", (view) => useCast.getState().setView(view));
+  socket.on("display:previewDemand", ({ on }) => useCast.getState().setPreviewDemandChanged(on));
+  socket.on("display:frame", ({ dataUrl }) => useCast.getState().setPreviewFrame(dataUrl));
   socket.on("display:handout", ({ handout }) => useCast.getState().setDisplayHandout(handout));
   socket.on("display:handout-view", (view) => useCast.getState().setHandoutView(view));
   socket.on("display:revoked", () => useCast.getState().setRevoked());

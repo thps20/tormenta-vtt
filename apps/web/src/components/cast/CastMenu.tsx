@@ -23,8 +23,8 @@ interface CastMenuProps {
 
 /**
  * Botão "Cast" da TopBar (só GM, docs/plano-cast.md §5): cria/copia o link da tela de exibição,
- * modo de câmera, blackout e "Centralizar aqui". Estado
- * de token/modo/blackout vem de `store/cast.ts` (broadcast já sincroniza entre abas do
+ * modo de câmera, blackout, "Centralizar aqui" e a miniatura do que a tela está mostrando. Estado
+ * de token/modo/blackout/miniatura vem de `store/cast.ts` (broadcast já sincroniza entre abas do
  * GM) — só `onCenterHere` precisa vir de fora (RoomPage é quem tem o enquadramento do `VttCanvas`).
  */
 export const CastMenu: React.FC<CastMenuProps> = ({ onCenterHere }) => {
@@ -33,10 +33,12 @@ export const CastMenu: React.FC<CastMenuProps> = ({ onCenterHere }) => {
   const displayCount = useCast((s) => s.displayCount);
   const cameraMode = useCast((s) => s.cameraMode);
   const blackout = useCast((s) => s.blackout);
+  const previewFrame = useCast((s) => s.previewFrame);
   const createLink = useCast((s) => s.createLink);
   const revokeLink = useCast((s) => s.revokeLink);
   const setCameraMode = useCast((s) => s.setCameraMode);
   const setBlackout = useCast((s) => s.setBlackout);
+  const setPreviewWanted = useCast((s) => s.setPreviewWanted);
 
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -46,6 +48,7 @@ export const CastMenu: React.FC<CastMenuProps> = ({ onCenterHere }) => {
 
   useEffect(() => {
     if (!open) return;
+    setPreviewWanted(true);
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
       if (rootRef.current?.contains(t) || menuRef.current?.contains(t)) return;
@@ -57,6 +60,7 @@ export const CastMenu: React.FC<CastMenuProps> = ({ onCenterHere }) => {
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => {
+      setPreviewWanted(false);
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
@@ -137,6 +141,10 @@ export const CastMenu: React.FC<CastMenuProps> = ({ onCenterHere }) => {
                   </button>
                 </div>
                 <p className="text-11 text-text-muted">{displayCount > 0 ? `${displayCount} tela${displayCount > 1 ? "s" : ""} conectada${displayCount > 1 ? "s" : ""}` : "Nenhuma tela conectada ainda"}</p>
+
+                {previewFrame && (
+                  <img src={previewFrame} alt="Miniatura da tela de exibição" className="w-full rounded-ui border border-border object-contain bg-black" />
+                )}
 
                 <div className="pt-2 border-t border-border space-y-1.5">
                   <span className="text-11 font-ui font-semibold text-text-muted uppercase tracking-wide">Modo de câmera</span>
