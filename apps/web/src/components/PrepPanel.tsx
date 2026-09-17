@@ -125,6 +125,21 @@ export const PrepPanel: React.FC<PrepPanelProps> = ({ sceneId, sceneName, scenes
     void loadSteps(sceneId);
   }, [sceneId, loadSteps]);
 
+  // Resolver referência (§2.6) depende de 4 bibliotecas carregadas SOB DEMANDA em outro lugar
+  // (Acervo/Handouts/Encontros salvos/Compêndio — cada uma só carrega quando o próprio diálogo
+  // abre, mesmo padrão de sempre no projeto). A aba Preparo é uma consumidora NOVA dessas listas
+  // que não passa por nenhum desses diálogos, então precisa garantir o carregamento sozinha —
+  // senão um GM que abre "Preparo" antes de "Acervo" (ex: entrou de novo na sala, ou só usa o
+  // preparo) veria toda referência de asset/handout/encontro/criatura homebrew como "quebrada" por
+  // engano (a lista local está vazia, não porque a coisa foi apagada). Roda uma vez só; cada
+  // store já se protege sozinha contra recarregar em cima de "loading"/dado igual.
+  useEffect(() => {
+    if (useLibrary.getState().assetsStatus === "idle") void useLibrary.getState().loadAssets();
+    if (useHandouts.getState().libraryStatus === "idle") void useHandouts.getState().loadLibrary();
+    if (useEncounters.getState().status === "idle") void useEncounters.getState().load();
+    if (useCompendium.getState().status === "idle") void useCompendium.getState().load();
+  }, []);
+
   // --- Dados de resolução (§2.6): pools de ids existentes + as listas em si pra nome/ação --------
   const assets = useLibrary((s) => s.assets);
   const handouts = useHandouts((s) => s.library);

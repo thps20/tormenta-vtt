@@ -171,11 +171,14 @@ Room 1───* Macro *───1 Participant
 | **ChatMessage** | `id, roomId, participantId, nickname, kind, text?, roll?(JSON), item?(JSON), initiativeBatch?(JSON), handout?(JSON), visibility, tokenId?, whisperTo?` | `roll` segue `DiceRollSchema` (dano da ficha traz `damage[]`, uma parcela rolada por tipo; `applied[]` acumula o que já foi aplicado em tokens, §3.3; `natural`/`targets[]` são o sistema de alvos, §9.12 — ataque OU dano com alvo marcado, congelados na hora da rolagem, ataque com acerto/erro calculado e dano só com o nome; `criticalConfirmed` é o crítico confirmado de "Rolar dano junto com o ataque", §9.13); `item` segue `ItemCardSchema` (kind `item`); `initiativeBatch` segue `InitiativeBatchSchema` (kind `initiative-batch`: `{ round, entries: [{ combatantId, tokenId, name, formula?, result? }] }`, `combat:roll` rolando mais de um combatente, §3.5); `handout` segue `HandoutCardSchema` (kind `handout`, §9.10: cópia denormalizada do handout mostrado); `visibility` = `all \| gm \| self` (§3.4, sempre `all` num handout — quem recebe é decidido por `whisperTo`); `tokenId?` liga a rolagem a um token (combate/ficha), filtrado à parte de `visibility` (§3.4/§3.5) — um `initiative-batch` não usa este campo (várias linhas, vários tokens): o gate é por linha, dentro de `initiativeBatch.entries`; `whisperTo?` (§9.10) é um sussurro visual por PESSOA (`participantId`): setado, só o GM e ele recebem a mensagem, nem card nem placeholder pros demais — mesmo mecanismo de exclusão de `tokenId`, só que por pessoa |
 | **Handout** | `id, roomId, name, kind, imageUrl?, width?, height?, text?, tags[], deletedAt?` | Biblioteca por sala (§9.10), só o GM vê (`handout:list` é `gmOnly`). `kind` = `image \| text`; imagem reaproveita `POST /api/upload` (mesmo limite de 20 MB do mapa), texto vai até 20 000 caracteres, sem parser de markdown (texto puro). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Token.deletedAt`): soft delete de `handout:delete`, que também soft-deleta os `Pin` deste handout em qualquer mapa (§9.10) |
 | **Pin** | `id, sceneId, kind, handoutId?, x, y, visible, name?, imageUrl?, width?, height?, text?, icon?, color?, deletedAt?` | Pino no mapa (§9.10/§9.16, docs/plano-narracao.md — unifica o antigo `HandoutPin` com pino de nota). Geometria em pixels do mapa, como `Token`/`Template`. `kind` = `image \| text` (handout — `handoutId` setado, campos de conteúdo são uma CÓPIA denormalizada do `Handout` no momento de `pin:create`, mesmo padrão de `Combatant.name/color`: editar o handout original depois não atualiza pinos já fixados) \| `note` (`handoutId` null; `name` faz o papel de título, `text` o corpo, `icon`/`color` a aparência — conteúdo é o próprio dado, editável no lugar por `pin:update`). `visible` = GM controla se o pino aparece pros jogadores (mesma regra de `Token.visible`, sem névoa). `deletedAt`: soft delete de `pin:remove` (e da cascata de `handout:delete`), entra no desfazer do GM (§9.6) |
+| **PrepStep** | `id, sceneId, order, title, notes, items(JSON), used, deletedAt?, createdAt, updatedAt` | Passo do preparo de um mapa (§9.25, docs/plano-preparo.md), só o GM vê — NUNCA sai no `Scene` serializado nem em snapshot de jogador/Cast. `items` = `PrepItem[]` (`PrepItemSchema`: `id, ref: PrepRef, label, used, auto, options`), lista pequena sempre reescrita inteira (mesmo raciocínio de `Room.party`) — toda alteração relê a linha numa transação antes de reescrever (dois GMs não se atropelam). `PrepRef` é uma união discriminada (`asset \| handout \| encounter \| creature \| macro \| pin \| npc \| note`) que aponta pra algo que já existe, nunca duplica dado. `deletedAt`: soft delete de `prep:step-delete`, entra no desfazer do GM; limpeza definitiva depois de 30 dias |
 | **Drawing** | `id, sceneId, kind, ownerId, color, strokeWidth, filled, visible, points(Float[]), x1?, y1?, x2?, y2?, x?, y?, width?, height?, cx?, cy?, rx?, ry?, text?, deletedAt?` | Traço de desenho livre no mapa (§9.17): uma linha por traço — diferente da névoa (blob JSON cumulativo em `Scene.fog`) e dos gabaritos (efêmeros, nunca no banco) — sobrevive a F5 e a um restart. `kind` = `pen \| line \| rect \| ellipse \| arrow \| text`; só os campos do `kind` atual são preenchidos (mesmo padrão de `Pin`); `points` (só `pen`) é um array nativo do Postgres, polilinha achatada já decimada/suavizada pelo cliente. `ownerId` sempre travado no servidor (nunca confiado do payload, mesmo princípio de `Template.ownerId`): jogador move/apaga só os seus, GM todos. `visible` = GM decide "todos" (padrão) ou "só GM" (jogador sempre cria `true`, nunca muda depois). `deletedAt`: soft delete de `drawing:remove`/`clear-mine`/`clear-all`, entra no desfazer do GM (§9.6) |
 | **SavedEncounter** | `id, roomId, name, tags[], notes, entries(JSON), deletedAt?` | Encontro salvo (§9.14): grupo de criaturas do compêndio que o GM monta uma vez e solta de uma vez. `entries` = `{ entryId, count, visibleOnSpawn, nameOverride? }[]` (`SavedEncounterEntrySchema`) — só a "receita", nunca cópia de ficha; resolvida contra o compêndio ATUAL na hora de soltar (`encounter:spawn`). `deletedAt` (coluna só do banco, nunca serializada, mesmo padrão de `Handout.deletedAt`): soft delete de `encounter:delete` |
 | **RoomCompendiumEntry** | `roomId, entryId, type, kind?, name, tags[], description, page?, data(JSON), deletedAt?` | Homebrew da sala (§9.18): entrada de compêndio própria, prioridade sobre a do sistema quando `entryId` bate. Chave primária **composta** `(roomId, entryId)` — `entryId` é o slug que vira `CompendiumEntry.id`, fixo desde a criação (gerado do nome, `slugify`). `type`/`kind`/`name`/`tags`/`description`/`page` são colunas de índice/exibição; `data` guarda o resto do corpo mecânico (`CompendiumItemBody` ou `{ sheet: CreatureSheet }`), confirmado por `validateCompendiumEntry` antes de gravar. `deletedAt`: soft delete de `compendium:room-delete`, entra no desfazer do GM (§9.6) |
 | **CompendiumFavorite** | `id, roomId, participantId, entryId` | Favorito por participante (§9.19), `@@unique([participantId, entryId])`. `entryId` sem FK (é o id de um `CompendiumEntry`, sistema ou sala; favoritar não valida se ainda existe). 100% pessoal: nunca serializado num tipo compartilhado — só sai em `RoomSnapshot.favoriteEntryIds`, já filtrado pro próprio `me` |
 | **Macro** | `id, roomId, participantId, order, label, icon, color, action(JSON)` | Botão da barra de macros por participante (§9.20). `action` segue `MacroActionSchema` (`roll \| characterAction \| useItem \| chatText`). Estritamente pessoal (nem o GM edita a de outro participante) — só sai em `RoomSnapshot.macros`, já filtrado pro próprio `me` e ordenado por `order` |
+| **Asset** | `id, roomId, kind, name, url, width?, height?, durationMs?, tags[], deletedAt?, createdAt` | Acervo da sala (§9.24, docs/plano-preparo.md): arquivo que ainda não tinha tabela própria. `kind` = `map \| token \| audio`; `width`/`height` só imagem, `durationMs` só áudio (lido pelo navegador ao subir, só informativo — nunca conferido no servidor). `url` sempre `/uploads/...` (mesmo formato de `Scene.mapUrl`). Backfill na migration: imagens já em uso em `Scene.mapUrl`/`Token.imageUrl` viraram `Asset` automaticamente. `deletedAt`: soft delete de `asset:delete`, entra no desfazer do GM; limpeza definitiva depois de 30 dias (arquivo em disco não é limpo) |
+| **LibraryFavorite** | `roomId, refKind, refId, createdAt` (PK composta `roomId+refKind+refId`) | Estrela do acervo (§9.24): funciona igual sobre `Asset`/`Handout`/`SavedEncounter`/criatura/`Macro` sem migrar quatro tabelas. `refKind` = `asset \| handout \| encounter \| creature \| macro`; `refId` sem FK (favoritar não valida se ainda existe). Do GM da sala (diferente de `CompendiumFavorite`, que é por participante) |
 | **Combat** | `id, roomId, sceneId (único: um combate por cena), round, status, activeCombatantId?` | `status` = `rolling \| active \| ended` (§3.5). Persistido (ao contrário da iniciativa manual anterior, que vivia em memória) |
 | **Combatant** | `id, combatId, tokenId, characterId? (cópia informativa, não normativa), initiative?, lastRollVisibility?, lastRollMessageId?, bonus, delayed, surprised, order, addedRound, movementBudget?, movementUsed, movementDiagonals, movementAnchorX?, movementAnchorY?, movementPath?(JSON)` | `initiative = null` = ainda não rolou. `lastRollVisibility`/`lastRollMessageId`: modo e mensagem da rolagem que gravou o valor atual (colunas só do banco): decidem quem vê o número na lista e deixam o `chat:reveal` liberá-lo (§3.5). `combat:remove` apaga o combatente (e ajusta `activeCombatantId`/`round` se o removido era o ativo, `stateAfterRemoval`, §3.5). `token:delete`/`token:delete-many` **não** apagam mais a linha do combatente (o token agora é soft delete, §9.6): só param de listá-lo (o combate ignora combatente cujo token tem `deletedAt`) e fazem o mesmo ajuste de turno/`order`; a linha volta se o GM desfizer. Os seis últimos campos são o orçamento de deslocamento do turno (§9.11): `movementAnchorX/Y` (de onde o próximo movimento é medido) e `movementPath` (o caminho desenhado) são colunas só do banco, nunca serializadas no `Combatant` do shared — o cliente só recebe `movementBudget/Used/Diagonals` e `movementPath` via `Combat` (§5) |
 | **SystemDefinition** | `id, name, attributes[], skills[], resources[] (com `color?`, §9.15), derived[], level, sizes[], damageTypeGroups[], damageTypes[] (com `color?`/`group?`/`healing?`), currencies[], traitFields[], equipStats[], itemKinds[], activation, conditions[] (`key, label, icon, color, description, modifiers[], defaultDuration?`), pinIcons[] (§9.16), skillTotal, rolls{} (inclui `attackHit?`/`attackAutoHit?`/`attackAutoMiss?`, §9.12, e `critical?`, §9.13), combat{} (§3.5), damageAttribute, tokenBar, grid?, race? (§9.11), movement? (§9.11), trainedBonus[]` | Arquivo JSON (`schemaVersion: 2`), **não** está no banco. Registrado em `packages/shared/src/systems.ts` e lido por server e web. `conditions[].icon` é um SVG simples embutido (sem arte externa); `description` vazia por ora (o JSON vai pro bundle do web, então o padrão de `descriptions.local.json` do compêndio — só servidor — não se aplica aqui); `modifiers[]` tem o mesmo formato do Modificador da ficha (§3.6) mas ainda não é lido por nenhum código. `pinIcons[]` (`key, label, icon, color`, docs/plano-narracao.md): ícones extras pra pino de nota — mesmo formato de `conditions[]`, mas NÃO é regra de sistema (é mobília de UI); vazio (padrão) = o cliente usa uma paleta embutida no código. `race?` aponta o `itemKinds[]` que alimenta o placeholder `{race.<campo>}` nas fórmulas (§9.11); `movement?` declara o orçamento de deslocamento por turno (ausente = sistema sem a regra); `rolls.attackHit?`/`attackAutoHit?`/`attackAutoMiss?` são a regra de acerto do sistema de alvos (§9.12, ausentes = sistema sem a regra); `rolls.critical?` confirma um crítico ameaçado ao rolar dano junto com o ataque (§9.13, mesma gramática de `attackAutoHit`, só `{natural}`; ausente = sistema não confirma sozinho) |
@@ -230,7 +233,7 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `encounter:create-from-tokens` | `{ tokenIds[], name, tags?, notes? }` | GM | `encounter:created` (só GM); ack `{ encounter, ignoredTokens }` — tokens sem `Character.compendiumEntryId` são ignorados e contados (§9.14) |
 | `encounter:update` | `{ id, patch: { name?, tags?, notes?, entries? } }` | GM | `encounter:updated` (só GM) |
 | `encounter:delete` | `{ id }` | GM | ack; `encounter:deleted` (só GM, soft delete) |
-| `encounter:spawn` | `{ id, sceneId, x, y }` (pixels do mapa) | GM | `character:created`/`token:created` por cópia, como `compendium:spawn-creature`; ack `{ tokens: Token[], skippedEntryIds: string[] }` — entradas cuja criatura sumiu do compêndio são puladas e avisadas, não derrubam a soltura inteira (§9.14) |
+| `encounter:spawn` | `{ id, sceneId, x, y, forceHidden? }` (pixels do mapa; `forceHidden` §9.25/9.2: soltar o encontro inteiro invisível pelo preparo — só ESCONDE, nunca revela uma linha salva `visibleOnSpawn: true`) | GM | `character:created`/`token:created` por cópia, como `compendium:spawn-creature`; ack `{ tokens: Token[], skippedEntryIds: string[] }` — entradas cuja criatura sumiu do compêndio são puladas e avisadas, não derrubam a soltura inteira (§9.14) |
 | `chat:send` | `{ text, visibility? }` (`visibility` = modo de rolagem do autor; `/gmr` e `/pr` no texto forçam) | todos | `chat:message` a todos (texto sempre público); rolagem fora de "Pública" vai a todos, mas quem `visibility` não permite recebe sem `roll` (placeholder, §3.4); ack sem `roll` quando o autor não pode ver (às cegas) |
 | `chat:reveal` | `{ messageId }` | GM | `chat:message` da mesma mensagem com `visibility: "all"` para todos (cliente faz upsert) |
 | `combat:start` | `{ sceneId, tokenIds[], visibility? }` | GM | `combat:updated`; substitui um combate anterior do mapa, se houver; com a opção da sala ligada (padrão), rola sozinho os NPCs recém-entrados (`visibility` = modo de quem chamou) — publica `chat:message{kind:"initiative-batch"}` junto, igual a `combat:roll` |
@@ -285,6 +288,15 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `display:preview` | `{ on }` | GM | liga/desliga o pedido de miniatura; `display:previewDemand` pras telas quando a demanda muda de "ninguém pede" pra "alguém pede" (ou volta) |
 | `display:frame` | `{ dataUrl }` (JPEG, tela → servidor) | tela de exibição | repassa `display:frame` ao GM (`rooms.gm`) |
 | `display:set-tabletop-hint` | `{ tabletop: boolean }` | tela de exibição | sem broadcast — só ajusta o PADRÃO do modo de câmera (§9.23) enquanto o GM não escolheu um |
+| `asset:create` / `asset:update` / `asset:delete` / `asset:list` | `AssetCreatePayload` / `{ id, patch }` / `{ id }` / `{}` (§9.24) | GM | ack `Asset` / `Asset` / — / `Asset[]`; `asset:created`/`asset:updated`/`asset:deleted` só pra `rooms.gm`; apagar entra no desfazer do GM |
+| `library:favorites` / `library:favorite-set` | `{}` / `{ refKind, refId, favorite }` (§9.24) | GM | ack `LibraryFavorite[]` / `LibraryFavorite[]`; `library:favoritesChanged` só pra `rooms.gm` |
+| `prep:list` | `{ sceneId }` (§9.25) | GM | ack `PrepStep[]` (não apagados, ordenados); sem broadcast — carregado sob demanda, como as notas |
+| `prep:step-create` / `prep:step-update` / `prep:step-delete` | `{ sceneId, title, afterStepId? }` / `{ stepId, patch }` / `{ stepId }` | GM | ack `PrepStep` / `PrepStep` / —; `prep:stepUpserted`/`prep:stepRemoved` só pra `rooms.gm`; apagar entra no desfazer |
+| `prep:step-reorder` | `{ sceneId, stepIds }` (permutação exata) | GM | ack; `prep:reordered` só pra `rooms.gm` |
+| `prep:step-copy` | `{ stepId, targetSceneId }` (mesmo mapa duplica, outro mapa copia pro fim) | GM | ack `{ step, brokenPinRefs }` — pino copiado pra outro mapa fica quebrado de propósito, avisado no ack; `prep:stepUpserted` só pra `rooms.gm` |
+| `prep:item-add` / `prep:item-update` / `prep:item-remove` / `prep:item-move` | `{ stepId, ref, index? }` / `{ stepId, itemId, patch }` / `{ stepId, itemId }` / `{ stepId, itemId, toStepId, index }` | GM | ack `PrepStep`; `prep:stepUpserted` só pra `rooms.gm`; remover entra no desfazer (restaura na mesma posição) |
+| `prep:reset` | `{ sceneId }` (zera `used` de todos os passos/itens do mapa) | GM | ack; `prep:stepUpserted` de cada passo só pra `rooms.gm`; entra no desfazer |
+| `audio:play` / `audio:pause` / `audio:resume` / `audio:stop` / `audio:seek` / `audio:effect` | `{ assetId, loop }` / `{}` / `{}` / `{}` / `{ positionMs }` / `{ assetId }` (§9.26; servidor resolve `assetId → url`, cliente nunca manda url) | GM | ack; `audio:state { state, serverNow }` a `rooms.gm` (com `assetId`) e `rooms.players` (sem `assetId`, §3.4); `audio:effect { url }` fogo-e-esquece, não entra no estado |
 
 ### Servidor → Cliente
 
@@ -330,6 +342,14 @@ Salas do Socket.io: cada socket entra em `room:<roomId>`. Broadcasts vão para e
 | `display:frame` | `{ dataUrl }` (§9.23; miniatura da tela, repassada ao GM) |
 | `display:handout` | `{ handout: HandoutCard \| null }` (§9.10/§9.23; handout mostrado/fechado "para todos" — só às telas, sussurro nunca chega) |
 | `display:handout-view` | `{ handoutId, zoom, x, y }` (§9.10/§9.23; zoom/pan do handout aberto, só às telas — fechar/trocar o handout ou ligar o blackout limpa o estado sincronizado no cliente) |
+| `asset:created` / `asset:updated` | `Asset` (§9.24; só pra `rooms.gm`, cliente faz upsert por id) |
+| `asset:deleted` | `{ id }` (só pra `rooms.gm`) |
+| `library:favoritesChanged` | `LibraryFavorite[]` (§9.24; lista completa, só pra `rooms.gm`) |
+| `prep:stepUpserted` | `PrepStep` (§9.25; passo criado/editado/item alterado — só pra `rooms.gm`, cliente faz upsert por id) |
+| `prep:stepRemoved` | `{ sceneId, stepId }` (só pra `rooms.gm`) |
+| `prep:reordered` | `{ sceneId, order: [{ stepId, order }] }` (só pra `rooms.gm`) |
+| `audio:state` | `{ state: AudioState, serverNow }` (§9.26; GM recebe com `assetId`, jogador e tela do Cast recebem sem `assetId`/nome — `toPublicAudioState`) |
+| `audio:effect` | `{ url }` (§9.26; fogo-e-esquece — quem entra depois não ouve efeito que já passou) |
 | `display:revoked` | `{}` (§9.23; enviado à tela antes de derrubá-la — link revogado ou trocado) |
 
 ### HTTP (fora do socket)
@@ -455,6 +475,7 @@ Todos os itens do MVP acima estão implementados (setembro/2026), incluindo a fi
 - Sistema de alvos (§9.12): alvos são efêmeros (memória, como a régua/gabaritos) — se perdem num restart do servidor, não num F5. Sem checagem de alcance ou linha de visão (marcar um alvo do outro lado do mapa funciona igual); sem acerto automático em crítico (20/1 natural) a menos que o sistema declare `attackAutoHit`/`attackAutoMiss` (T20 declara). O selo de "quem mais mira" (`showOtherTargets`) mostra só iniciais/contagem, sem tooltip com os nomes. Ver `docs/revisao-alvos.md` para as bordas testadas.
 - Desenho livre no mapa (§9.17): `pen`/`text` não redimensionam por arrasto (só move/apaga); `rect`/`ellipse` não giram; sem seleção múltipla de traços; sem cascata de soft delete ao apagar o mapa (a linha fica órfã até a limpeza de 30 dias do mapa, mesma situação de `Pin` hoje — sem job de limpeza dedicado pra traço/pino individual). Fica abaixo da névoa (ela continua cobrindo o que está por baixo, ao contrário de régua/gabarito, que ficam numa camada acima, sempre visíveis).
 - Cast (§9.23): câmera automática e mesa física brigam se o GM insistir num modo que não seja Livre — qualquer pan desloca o mapa por baixo de miniaturas físicas já colocadas (o snap por célula ameniza, não resolve; documentado como recomendação de uso, não bug). Sem Presentation API; um link de exibição por sala; sem régua/alvos/pings do PRÓPRIO jogador na tela (só a do Mestre chega, por já estar na sala de broadcast). Miniatura do Mestre falha silenciosamente (console) em mapas de origem externa sem CORS. Modo de câmera, blackout e a dica de mesa física (que decide o padrão do modo) são estado em memória — não sobrevivem a um restart do servidor.
+- Acervo/Preparo/Sons (§9.24-9.26, docs/plano-preparo.md/docs/revisao-preparo.md): sem pastas (só tags); sem playlist, fade ou mixagem — uma trilha por vez, volume é só o de cada um, não "da mesa"; sem ponto fixo de soltura por item do preparo (sempre centro da tela); "mostrar handout para X" (sussurro) não está disponível pelo preparo, só "para todos"; apagar um arquivo do acervo não limpa o arquivo em disco (mesma limitação de sempre, acima); criaturas do sistema (só as homebrew da sala) não entram na grade do acervo, mas são buscáveis no "+ Item" do preparo; markdown leve não foi aplicado retroativamente às notas do Mestre existentes (`Scene.gmNotes`/`Token.notes`, texto puro); estado de áudio (trilha tocando, posição) não sobrevive a um restart do servidor (mesmo padrão de blackout/modo de câmera do Cast); sem comando de servidor pra só alternar `loop` sem reiniciar a trilha do zero — o botão de repetir do player reinicia. Teste manual em navegador cobriu os casos de borda pedidos (asset apagado usado em vários passos, copiar passo com pino pra outro mapa, trocar de mapa com trilha tocando, duas abas de GM editando o mesmo passo, autoplay bloqueado na tela do Cast) — ver `docs/revisao-preparo.md`; não cobriu a reprodução de áudio audível de verdade (ambiente de teste headless, sem dispositivo de som e sem decodificador de mídia funcional).
 
 ## 9. Fase 2 (pós-MVP)
 
@@ -1742,3 +1763,113 @@ olham enquanto o Mestre opera no notebook dele (docs/plano-cast.md, setembro/202
   chat na tela de exibição, interação por toque, modo de câmera diferente por tela.
 
 Ver `docs/revisao-cast.md` para as bordas testadas e os casos de borda de entrega.
+
+### 9.24 Acervo
+
+Biblioteca única da sala (docs/plano-preparo.md §1, setembro/2026): arquivos que ainda não tinham
+tabela própria (imagem de mapa, arte de token, áudio) mais o que já existia — handouts, encontros
+salvos, criaturas homebrew da sala e macros — tudo numa vista só, sem duplicar dado.
+
+- **Tabela `Asset`** (`kind`: "map"/"token"/"audio") + `LibraryFavorite` (estrela sobre asset/
+  handout/encontro/criatura/macro, por sala). Handout/encontro/criatura/macro continuam nas
+  próprias tabelas/telas — `rules/library.ts#buildLibraryItems` (shared, função pura testada) só
+  combina `Asset[]` + as listas dessas quatro stores numa lista única de exibição (nome/tipo/tags/
+  favorito/data). Criatura do compêndio: só homebrew da sala entra na lista (criaturas do sistema
+  são centenas; entram no preparo pelo seletor de busca, não pela grade do acervo).
+- **Backfill na migration**: imagens já usadas em `Scene.mapUrl`/`Token.imageUrl` viraram `Asset`
+  automaticamente (uma linha por URL distinta por sala), sem tocar em nenhum arquivo.
+- **Upload**: `POST /api/upload` aceita agora também MP3/OGG (mesmo limite de 20 MB da imagem),
+  conferido pelos BYTES iniciais (ID3/frame MPEG ou "OggS"), não pelo mimetype que o navegador
+  declara. `LibraryDialog` (TopBar, atalho **B**) aceita subir vários arquivos arrastando do
+  sistema operacional, com fila de progresso e sugestão automática de tipo (imagem: lado maior ≥
+  1000 px → mapa, senão token), editável antes de confirmar.
+- **Sem pastas, só tags** (busca + chips de tipo/tag + "só favoritos" resolvem achar; pasta forçaria
+  escolher "onde fica" cada coisa, e a mesma imagem pode ser "sessão 3" e "subterrâneo" ao mesmo
+  tempo).
+- **Arrastar pro mapa** (`lib/useLibraryDrag.ts`, generaliza o mecanismo de `useHandoutDrag`):
+  `Asset{kind:"token"}` solto no mapa → `token:create`; `Asset{kind:"map"}` → confirma e troca o
+  fundo (`scene:setMap`); handout/encontro/criatura arrastados da grade continuam reconhecidos
+  pelos MESMOS alvos que o `VttCanvas` já tinha (o item carrega o registro original). Arrastar
+  áudio pro mapa não tem alvo (áudio não tem "lugar" — ele entra pelo preparo, §9.25); macro também
+  não é arrastável pro mapa.
+- Todos os eventos `asset:*`/`library:*` são **gmOnly**, broadcast só pra `rooms.gm` — jogador nunca
+  recebe nome, tag nem lista do acervo (nem os eventos chegam até ele).
+- Apagar um `Asset` é soft delete com **desfazer**; a limpeza de 30 dias (`services/cleanup.ts`)
+  leva a linha do banco (o arquivo em disco não é limpo, mesma limitação de sempre — §8).
+
+### 9.25 Preparo
+
+Lista ordenada de passos por mapa, só o GM vê (docs/plano-preparo.md §2): cada passo tem nota (em
+markdown leve) e itens que **apontam** pro acervo/handout/encontro/criatura/macro/pino/NPC, ou um
+lembrete solto sem referência (`note`) — nunca reimplementa a ação em si.
+
+- **Aba "Preparo"** no painel lateral, só GM (jogador não vê a aba). Mostra o preparo do mapa que o
+  GM está vendo agora; trocar de mapa troca a lista. Ao montar, garante o carregamento das quatro
+  bibliotecas de que depende pra resolver referência (acervo, handouts, encontros salvos, compêndio
+  homebrew) — elas são carregadas sob demanda em outro lugar (o próprio diálogo de cada uma), e a
+  aba Preparo é uma consumidora nova que não pode presumir que o GM já abriu esses diálogos antes.
+- **Ação principal por tipo, um clique**, sempre reaproveitando a MESMA ação de store que o botão
+  manual chamaria: mapa → `scene:setMap`; token → `token:create`; áudio → `audio:play` (§9.26);
+  handout → mostrar para todos; encontro → soltar (visível ou invisível, `encounter:spawn.
+  forceHidden` — só esconde, nunca revela uma linha salva visível); criatura → soltar N cópias;
+  macro → rolar; pino → abrir (centraliza + cartão); NPC → abrir ficha. "Centro da tela" é o mesmo
+  ponto de soltar sem arrastar.
+- **Usado/pendente**: item marca sozinho ao dar certo (ação que falha não marca); passo marca ao
+  terminar "Iniciar este passo" (mesmo rodando com alguma falha — o GM decide se segue) ou à mão.
+  Progresso "X/Y itens usados" no card.
+- **"Iniciar este passo"**: diálogo de confirmação lista os itens com `auto:true`, executa em
+  SEQUÊNCIA (espera cada ack), continua mesmo se um item falhar (referência quebrada conta como
+  falha direto, sem tentar). Ao terminar, abre um **diálogo modal de resumo** — não um toast —
+  listando ✅/❌ por item com o motivo da falha, e um botão **"Tentar de novo os que falharam"** que
+  reexecuta só esses.
+- **Reordenar** passo/item por arrasto (HTML5 drag nativo, mesmo padrão de `MacroBar`). **Duplicar/
+  copiar**: mesmo mapa duplica logo depois do original; outro mapa copia pro fim de lá, sempre
+  voltando a "pendente". Referências viram referências (nada duplicado no acervo); um item de PINO
+  copiado pra outro mapa fica quebrado de propósito (o pino é daquele mapa) — a UI avisa com um
+  toast na hora da cópia. **Duplicar um mapa** (`scene:duplicate`) copia o preparo junto, tudo
+  pendente; apagar um mapa não mexe nos passos dele (seguem presos ao mapa apagado).
+- **Referência quebrada** (§2.6): borda vermelha, ícone de corrente partida, último nome conhecido
+  (`item.label`, copiado no momento de adicionar — nunca usado pra executar), ação desabilitada,
+  botão "Remover do passo". Desfazer o apagar no acervo conserta a referência sozinho.
+- **Concorrência entre abas/GMs**: toda alteração de itens relê a linha do banco dentro de uma
+  transação antes de reescrever — duas abas do GM editando o mesmo passo convergem pro mesmo estado
+  final via broadcast, sem uma sobrescrever a outra (testado ao vivo, ver `docs/revisao-preparo.md`).
+- Nota em **markdown leve** (`**negrito**`, `*itálico*`, `# título`, listas, `> citação` —
+  `rules/lightMarkdown.ts`, shared, função pura testada): o React só monta elementos a partir da
+  árvore devolvida, nunca `dangerouslySetInnerHTML`.
+- Todos os eventos `prep:*` são gmOnly, broadcast só pra `rooms.gm`. `PrepStep`/`PrepItem` NUNCA
+  saem no `Scene` serializado nem em nenhum snapshot de jogador/Cast.
+
+### 9.26 Sons
+
+Trilha em loop + efeitos de uma vez, tocando pra todo mundo ao mesmo tempo (docs/plano-preparo.md
+§3): estado em memória no servidor, por SALA — não sobrevive a um restart.
+
+- **Uma trilha por vez** + efeitos por cima sem cortar a trilha (fogo-e-esquece, nunca entra no
+  estado nem no snapshot). Comandos do GM (`audio:play{assetId,loop}`/`pause`/`resume`/`stop`/
+  `seek`/`effect`) resolvem `assetId → url` no SERVIDOR (confere sala e `deletedAt`) — o cliente
+  nunca manda URL.
+- **Posição sem timer no servidor**: `positionMs` + `(agora do servidor − at)`, em loop módulo a
+  duração (que só o navegador conhece) — `rules/audio.ts#trackPositionMs`, função pura testada.
+  Pausar grava a posição calculada; quem entra depois (reload, jogador novo, GM reconectando)
+  recebe esse cálculo no snapshot e entra NO MEIO da trilha, não do zero — confirmado ao vivo
+  (`docs/revisao-preparo.md`).
+- **Relógio**: `RoomSnapshot.audio`/broadcasts levam `serverNow`; o cliente guarda só a diferença
+  pro próprio relógio (skew), sem precisar ser perfeito.
+- **Trocar de mapa não afeta o áudio** (é da SALA, não do mapa) — confirmado ao vivo.
+- **Vazamento**: jogador e a tela do Cast recebem uma versão do estado SEM `assetId` nem nome do
+  arquivo — só `url`/`playing`/`loop`/posição (`toPublicAudioState`, shared). Só o GM vê qual asset
+  está tocando (o player dele resolve o nome pelo acervo já carregado).
+- **`store/audio.ts`** sincroniza o estado; **`AudioEngine.tsx`** (dois `<audio>` fora do React,
+  mesmo espírito do `DiceOverlay3D`) monta em `RoomPage` (todo mundo) e `DisplayPage` (Cast).
+  **Autoplay bloqueado** (`NotAllowedError`, comum principalmente na tela do Cast, que ninguém
+  "clica"): aviso "🔇 Toque a tela para ativar o som"; o primeiro clique/tecla em qualquer lugar da
+  página destrava e recalcula a posição certa — confirmado ao vivo.
+- **Volume/silenciar** por USUÁRIO/navegador (`localStorage`, `tvtt:audio`, validado com Zod), não
+  por sala — não existe volume "pra mesa"/mixagem. **Player do GM** (TopBar): nome da trilha, ▶/⏸,
+  ⏹, repetir, volume (reaproveita o mesmo controle de todo mundo). Sem comando de servidor pra só
+  trocar `loop` sem reiniciar a trilha — o botão de repetir reinicia do zero (limitação conhecida,
+  §8).
+- Todos os comandos `audio:*` (exceto o snapshot/broadcast de leitura) são gmOnly.
+
+Ver `docs/revisao-preparo.md` para as bordas testadas e os casos de borda de entrega.
