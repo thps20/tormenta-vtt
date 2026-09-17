@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ClipboardList, Map as MapIcon, PanelLeftClose } from "lucide-react";
 import { MOTION } from "../MapBar";
 
@@ -43,14 +43,20 @@ export const BastidoresDrawer: React.FC<BastidoresDrawerProps> = ({ open, sectio
     return () => cancelAnimationFrame(id);
   }, [open]);
 
-  // Esc fecha (mesma convenção dos diálogos e da gaveta de ficha).
+  // Esc fecha (mesma convenção dos diálogos e da gaveta de ficha). `onClose` num ref pelo mesmo
+  // motivo do `MapConfigModal`: o Esc re-renderiza a página (ele também cancela o gesto da
+  // ferramenta), e um listener registrado durante o disparo do evento não chega a rodar.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      // Um modal por cima (Configurar Mapa, calibrador) tem o próprio Esc: não fecha a gaveta junto.
+      if (e.key !== "Escape" || document.querySelector("#map-config-modal-backdrop, #grid-calibrator-backdrop")) return;
+      onCloseRef.current();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  }, []);
 
   return (
     <aside

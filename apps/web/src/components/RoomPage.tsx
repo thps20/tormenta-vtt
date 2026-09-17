@@ -74,6 +74,7 @@ import { VttCanvas, type TokenBar, type VttCanvasHandle } from "./VttCanvas";
 import { TOKEN_COLORS } from "./TokenInspector";
 import { ClipboardList, Image as ImageIcon, Library, LogOut } from "lucide-react";
 import { SidePanel, type SidePanelTab } from "./SidePanel";
+import { MapConfigModal, type MapConfigResult } from "./MapConfigModal";
 import { PrepPanel, type PrepPanelProps } from "./PrepPanel";
 import { BastidoresDrawer, type BastidoresSection } from "./bastidores/BastidoresDrawer";
 import { MapsSection } from "./bastidores/MapsSection";
@@ -186,6 +187,7 @@ function Table() {
   const deleteScene = useRoom((s) => s.deleteScene);
   const reorderScenesAction = useRoom((s) => s.reorderScenes);
   const setSceneArrival = useRoom((s) => s.setSceneArrival);
+  const [isMapConfigOpen, setMapConfigOpen] = useState(false);
   const [sidePanelTab, setSidePanelTab] = useState<SidePanelTab>("chat");
   // Painel lateral recolhido (\ ou Ctrl+B, ícone na borda): preferência por usuário (localStorage,
   // mesmo padrão de centerOnActiveTurn abaixo) — cada navegador/aba é "um usuário" neste app sem login.
@@ -742,7 +744,7 @@ function Table() {
   const compendiumContext = useCompendium((s) => s.context);
   const closeCompendium = useCompendium((s) => s.close);
   const mapPaletteOpen = compendiumOpen && compendiumContext === "map";
-  useMapPaletteShortcut(openCharacterId !== null || emptySheetOpen, me?.role === "gm" ? CREATURE_FILTER : null);
+  useMapPaletteShortcut((openCharacterId !== null || emptySheetOpen) || isMapConfigOpen, me?.role === "gm" ? CREATURE_FILTER : null);
 
   // Seletores de Mapas (M), Handouts (J) e Acervo (B) do GM: aberto/fechado mora aqui, não dentro
   // de cada botão, pra tecla continuar valendo mesmo se o botão sair da barra (lib/useGmPanelShortcuts).
@@ -874,6 +876,14 @@ function Table() {
       visible: drawVisible,
     });
     setPendingDrawingTextPoint(null);
+  };
+
+  // Salvar do modal: só emite o que mudou (mapa e/ou grid).
+  const handleSaveMapConfig = async ({ map, grid }: MapConfigResult) => {
+    if (!scene) return;
+    const mapChanged = map.mapUrl !== scene.mapUrl || map.mapWidth !== scene.mapWidth || map.mapHeight !== scene.mapHeight;
+    if (mapChanged) await setMap(map);
+    await updateGrid(grid);
   };
 
   // --- Mapas: painel, ativar com "Levar para o mapa", ponto de chegada (docs/plano-mapas.md) -----
@@ -1081,7 +1091,7 @@ function Table() {
   // --- Acervo (docs/plano-preparo.md §1.5) — arrastar um Asset até o mapa --------------------
   /** Token: mesma criação "em branco" de `onTokenCreate`, só com a arte/nome do asset arrastado.
    *  Mapa: pergunta antes de trocar o fundo (mesma conta de `window.confirm` usada em outros lugares
-   *  do projeto, ex. apagar mapa) e chama o MESMO `scene:setMap` dos Bastidores. */
+   *  do projeto, ex. apagar mapa) e chama o MESMO `scene:setMap` do `MapConfigModal`. */
   const handleAssetDrop = (asset: Asset, point: { x: number; y: number }) => {
     if (!scene) return;
     if (asset.kind === "token") {
@@ -1132,7 +1142,7 @@ function Table() {
           scene={scene}
           participants={participants}
           me={me}
-          onOpenMapConfig={isGm ? () => toggleBastidoresSection("mapas") : undefined}
+          onOpenMapConfig={isGm ? () => setMapConfigOpen(true) : undefined}
           onOpenMapNotes={isGm && scene ? () => setNotesTarget({ kind: "scene", id: scene.id, name: scene.name }) : undefined}
           characterMenu={
             <CharacterMenu
@@ -1192,14 +1202,7 @@ function Table() {
           <BastidoresDrawer open={bastidoresOpen} section={bastidoresSection} onSectionChange={setBastidoresSection} onClose={() => setBastidoresOpen(false)}>
             {bastidoresSection === "mapas" ? (
               <TabErrorBoundary label="Mapas">
-                <MapsSection
-                  maps={mapsProps}
-                  viewingScene={scene}
-                  activeScene={activeScene}
-                  systemDef={systemDef}
-                  onSetMap={(map) => void setMap(map)}
-                  onUpdateGrid={(patch) => void updateGrid(patch)}
-                />
+                <MapsSection maps={mapsProps} viewingScene={scene} activeScene={activeScene} />
               </TabErrorBoundary>
             ) : prepPanelProps ? (
               <TabErrorBoundary label="Preparo">
@@ -1494,6 +1497,10 @@ function Table() {
           onCreateMine={() => void createCharacter({ name: me.nickname, kind: "pc", ownerId: me.id }).then((c) => c && openCharacter(c.id))}
           onClose={() => openCharacter(null)}
         />
+      )}
+
+      {isGm && scene && (
+        <MapConfigModal isOpen={isMapConfigOpen} scene={scene} systemDef={systemDef} onSave={(r) => void handleSaveMapConfig(r)} onClose={() => setMapConfigOpen(false)} />
       )}
 
       {carryDestScene && (

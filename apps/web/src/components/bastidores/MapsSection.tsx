@@ -1,29 +1,27 @@
 import React from "react";
-import { ArrowLeft, Sliders } from "lucide-react";
-import type { GridConfig, Scene, SystemDefinition } from "@tormenta-vtt/shared";
+import { ArrowLeft } from "lucide-react";
+import type { Scene } from "@tormenta-vtt/shared";
 import { MapsPanel, type MapsPanelProps } from "../MapsPanel";
 import { MOTION } from "../MapBar";
-import { MapGridInline } from "./MapGridInline";
 
 interface MapsSectionProps {
   maps: MapsPanelProps;
-  /** Mapa que este GM está vendo (o que a parte de grid/calibração configura). */
+  /** Mapa que este GM está vendo — pro aviso de divergência. */
   viewingScene: Scene | null;
-  /** Mapa ativo da mesa (o que os jogadores veem) — pro aviso de divergência. */
+  /** Mapa ativo da mesa (o que os jogadores veem). */
   activeScene: Scene | null;
-  systemDef: SystemDefinition | null;
-  onSetMap: (map: { mapUrl: string | null; mapWidth: number | null; mapHeight: number | null }) => void;
-  onUpdateGrid: (patch: Partial<GridConfig>) => void;
 }
 
 /**
  * Seção "Mapas" dos Bastidores (docs/SPEC.md §9.29): a lista que era o dropdown do `MapSelector`
- * (`MapsPanel`: miniaturas, criar, renomear, duplicar, apagar, reordenar, ativar, ponto de chegada)
- * e, abaixo, imagem/grid/escala/calibração do mapa VISTO — antes um modal (`MapConfigModal`).
+ * (`MapsPanel`: miniaturas, criar, renomear, duplicar, apagar, reordenar, ativar, ponto de chegada).
  * Quando o GM está vendo um mapa diferente do ativo, as duas ações do aviso ("Ir para o ativo",
  * "Ativar este") ficam no topo, onde estavam no dropdown.
+ *
+ * Imagem, grid e calibração continuam no modal "Configurar Mapa" (`MapConfigModal`), aberto pela
+ * engrenagem ao lado do nome do mapa (§9.28) — não migraram para cá.
  */
-export const MapsSection: React.FC<MapsSectionProps> = ({ maps, viewingScene, activeScene, systemDef, onSetMap, onUpdateGrid }) => {
+export const MapsSection: React.FC<MapsSectionProps> = ({ maps, viewingScene, activeScene }) => {
   const diverging = viewingScene !== null && activeScene !== null && viewingScene.id !== activeScene.id;
 
   return (
@@ -50,21 +48,7 @@ export const MapsSection: React.FC<MapsSectionProps> = ({ maps, viewingScene, ac
         </div>
       )}
 
-      {/* Lista de mapas: mantém a própria rolagem e o rodapé de criar/enviar. */}
-      <div className="flex-1 min-h-0">
-        <MapsPanel {...maps} />
-      </div>
-
-      {/* Configuração do mapa visto: rolagem própria, até ~metade da altura da gaveta. */}
-      {viewingScene && (
-        <section className="shrink-0 max-h-[52%] overflow-y-auto scrollbar-thin border-t border-border">
-          <h3 className="sticky top-0 z-10 flex items-center gap-1.5 bg-surface-1 px-2.5 py-2 font-title text-13 font-bold uppercase tracking-widest text-text">
-            <Sliders className="w-3.5 h-3.5 text-text-muted" aria-hidden />
-            <span className="truncate">Configurar “{viewingScene.name}”</span>
-          </h3>
-          <MapGridInline scene={viewingScene} systemDef={systemDef} onSetMap={onSetMap} onUpdateGrid={onUpdateGrid} />
-        </section>
-      )}
+      <MapsPanel {...maps} />
     </div>
   );
 };
