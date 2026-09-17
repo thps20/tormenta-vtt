@@ -15,6 +15,7 @@ import {
 import { CompendiumItemBodySchema, CreatureSheetSchema, type CompendiumCreatureEntry, type CompendiumEntry, type CompendiumItemBody, type CompendiumSource, type CreatureSheet } from "../schemas/compendium.js";
 import type { ItemFieldDef, SystemDefinition } from "../schemas/system.js";
 import { saveSkills } from "./activation.js";
+import { normalizeTokenCells } from "./placement.js";
 import { emptyFieldValue } from "./progression.js";
 
 const baseSkill = (key: string) => key.split(":")[0] ?? "";
@@ -223,6 +224,10 @@ export function entryToItem(def: SystemDefinition, body: CompendiumItemBody, new
  * virando CharacterItem (entryToItem), sem imagem e sem biografia (como qualquer cópia do
  * compêndio). `opts.name` sobrescreve o nome (soltura em lote numerada: "Goblin 1", "Goblin 2"...);
  * sem ele, usa `entry.name`. `ownerId`/vínculo ao token ficam por conta de quem chama.
+ *
+ * A cópia já nasce com `tokenDefaults` (§9.30) — tamanho pelo porte, cor pelo tipo da criatura, as
+ * MESMAS contas que quem solta no mapa usa pro token. Assim a ficha da criatura serve de prateleira
+ * desde a primeira soltura: colocá-la de novo, noutro mapa, não exige remontar o token.
  */
 export function entryToCharacter(
   def: SystemDefinition,
@@ -235,6 +240,11 @@ export function entryToCharacter(
     imageUrl: null,
     bio: "",
     items: entry.sheet.items.map((body) => entryToItem(def, body, newId)),
+    tokenDefaults: {
+      imageUrl: null,
+      cells: normalizeTokenCells(def.sizes.find((s) => s.key === entry.sheet.size)?.tokenCells ?? 1),
+      color: creatureColor(def, entry),
+    },
   });
   return { name: opts.name ?? entry.name, kind: "npc", data };
 }

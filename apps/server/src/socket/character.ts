@@ -2,6 +2,7 @@ import {
   CharacterCreateSchema,
   CharacterDataSchema,
   CharacterDeleteSchema,
+  CharacterPlaceTokenSchema,
   CharacterRollSchema,
   CharacterUpdateSchema,
   CharacterUseItemSchema,
@@ -13,6 +14,7 @@ import {
   computeCharacter,
   createDefaultCharacterData,
   removeFromParty,
+  resolveTokenDefaults,
   validateCharacterItems,
   type SystemDefinition,
 } from "@tormenta-vtt/shared";
@@ -29,11 +31,16 @@ import {
 } from "../services/characters.js";
 import { emitChatMessage } from "../services/chatVisibility.js";
 import { sceneGeometry } from "../services/grid.js";
+import { describePlaceToken, pushEntry } from "../services/history.js";
+import { freeSpotNear } from "../services/placement.js";
 import { partyOf, pruneFromParty, saveAndBroadcastParty } from "../services/party.js";
 import { createRollMessage, type RollTargetInput } from "../services/rolls.js";
 import { toChatMessage, toScene, toToken } from "../services/serialize.js";
 import { filterTargetTokensByScene, getTargets } from "../services/targets.js";
+import { isActiveScene } from "../services/visibility.js";
 import { guarded, HandlerError } from "./ack.js";
+import { emitHistoryUpdated } from "./history.js";
+import { buildMultiSpawnHistoryEntry } from "./spawnHistory.js";
 import { broadcastToken } from "./token.js";
 import { rooms, type TypedServer, type TypedSocket } from "./types.js";
 
@@ -141,6 +148,59 @@ export function registerCharacterHandlers(io: TypedServer, socket: TypedSocket):
       for (const t of linked) broadcastToken(io, ctx.roomId, toToken({ ...t, characterId: null }), "token:updated", sceneGeometry(toScene(t.scene)));
       // Visão de grupo (SPEC §9.15): ficha apagada some do grupo também.
       await pruneFromParty(io, ctx.roomId, characterId);
+    }),
+  );
+
+  /**
+   * "Colocar no mapa" (docs/SPEC.md §9.30): a ficha é a prateleira do personagem, o token é só a
+   * presença dela neste mapa — então aqui NÃO se cria ficha nenhuma, só um token já vinculado com a
+   * aparência guardada em `tokenDefaults`. Não é `token:create` + `token:link-character` porque
+   * `token:create` é gmOnly: o jogador precisa poder colocar o PRÓPRIO personagem no mapa.
+   */
+  socket.on(
+    "character:place-token",
+    guarded(socket, CharacterPlaceTokenSchema, async ({ characterId, sceneId, x, y }, ctx) => {
+      const character = toCharacter(await requireCharacter(characterId, ctx.roomId));
+      if (!canEditCharacter(ctx, character)) throw new HandlerError("Você não controla esta ficha");
+      const sceneRow = await prisma.scene.findUnique({ where: { id: sceneId } });
+      if (!sceneRow || sceneRow.roomId !== ctx.roomId || sceneRow.deletedAt !== null) throw new HandlerError("Mapa não encontrado");
+      // Mesma defesa em profundidade de token:update (docs/plano-mapas.md §11): jogador só mexe no
+      // mapa ATIVO da sala; o GM coloca em qualquer mapa que esteja vendo.
+      if (ctx.role !== "gm" && !(await isActiveScene(ctx.roomId, sceneId))) throw new HandlerError("Este mapa não está aberto na mesa");
+
+      const scene = toScene(sceneRow);
+      const appearance = resolveTokenDefaults(character.tokenDefaults);
+      const point = await freeSpotNear(scene, { x, y }, appearance.cells);
+      const zIndex = await prisma.token.count({ where: { sceneId, deletedAt: null } });
+      const token = toToken(
+        await prisma.token.create({
+          data: {
+            sceneId,
+            // O nome do token é mais curto que o da ficha (64 vs. 80, TokenSchema).
+            name: character.name.slice(0, 64),
+            imageUrl: appearance.imageUrl,
+            x: point.x,
+            y: point.y,
+            cells: appearance.cells,
+            zIndex: zIndex + 1,
+            // NPC nasce oculto (só o GM vê), como o padrão de soltar criatura do compêndio: colocar
+            // um NPC no mapa pra preparar a cena não pode entregar a surpresa. PC nasce visível.
+            visible: character.kind === "pc",
+            ownerId: character.ownerId,
+            color: appearance.color,
+            characterId: character.id,
+          },
+        }),
+      );
+      broadcastToken(io, ctx.roomId, token, "token:created", sceneGeometry(scene));
+
+      if (ctx.role === "gm") {
+        const def = await requireSystem(ctx.roomId);
+        // `character: null` = desfazer apaga só o token; a ficha continua na prateleira.
+        pushEntry(ctx.roomId, buildMultiSpawnHistoryEntry(io, ctx.roomId, sceneId, def, describePlaceToken(token.name), [{ character: null, token }]));
+        emitHistoryUpdated(io, ctx.roomId);
+      }
+      return token;
     }),
   );
 

@@ -1977,3 +1977,39 @@ a ser fixa: **esquerda = bastidores (editar/montar), direita = mesa (conduzir)**
   fixa pra não reorganizar texto a cada quadro; a página segura o desmonte por esse tempo, então
   `MapsPanel`/`PrepPanel` não ficam montados com a gaveta fechada.
 - **Jogador não tem Bastidores** (nem a tecla: `useGmPanelShortcuts` só liga para GM).
+
+### 9.30 A ficha como prateleira do personagem (aparência de token e "Colocar no mapa")
+
+Setembro/2026. Antes, cada mapa novo exigia recriar o token **e** a ficha do personagem: o vínculo
+morria com o mapa. Agora a divisão é explícita — **a ficha é a prateleira do personagem; o token é
+só a presença dela num mapa**. Nenhum conceito novo: nada de "ator", "prefab" ou biblioteca à parte.
+
+- **`Character.tokenDefaults`** (`{ imageUrl, cells, color } | null`, dentro de `Character.data`,
+  sem migration): a aparência que esta ficha usa ao virar token. `null` = ainda não definida.
+  - **Preenchida sozinha** na primeira vez que a ficha ganha um token — `token:link-character` copia
+    a aparência do token vinculado quando `tokenDefaults` ainda é `null` (uma aparência já escolhida
+    nunca é sobrescrita por acaso) — e no spawn de criatura do compêndio, onde `entryToCharacter`
+    (`rules/compendium.ts`) já nasce com tamanho pelo porte e cor pelo tipo, as mesmas contas do
+    token solto (§9.5).
+  - **Editável** no cabeçalho da ficha (miniatura, trocar/remover imagem, tamanho em células, cor) e
+    na ficha rápida do NPC. É um `character:update` comum — logo, GM em qualquer ficha, jogador só
+    nas dele.
+- **`character:place-token { characterId, sceneId, x, y }`** → ack com o `Token` criado: cria **só o
+  token** (a ficha já existe), já vinculado, com a aparência de `tokenDefaults` e grudado na célula
+  livre mais próxima do ponto (`services/placement.ts#freeSpotNear` — a mesma espiral de
+  `findFreeCells` do spawn, então nunca empilha em cima de outro token). Evento próprio, e não
+  `token:create` + `token:link-character`, porque `token:create` é só do GM e aqui o **jogador
+  precisa poder colocar o próprio personagem no mapa**. `ownerId` vem do dono da ficha; PC nasce
+  visível e **NPC nasce oculto** (só o GM), pelo mesmo motivo do padrão "invisível ao soltar" do
+  compêndio. Jogador só no mapa ATIVO (mesma defesa em profundidade de `token:update`).
+  - **Desfazer** (GM): reusa `buildMultiSpawnHistoryEntry` com `character: null` — desfazer apaga só
+    o token; a ficha, que é a prateleira, nunca entra no undo de uma colocação no mapa.
+- **Onde se coloca no mapa**: botão em cada linha da aba Fichas e no cabeçalho da ficha aberta (cria
+  no centro da área visível), arrastando a linha da ficha até o mapa (cria no ponto solto), e no chip
+  de um PC da visão de grupo que não está no mapa atual.
+  - Ficha que **já tem token neste mapa** troca o botão por **"Ir para o token"** (centraliza e
+    seleciona) em vez de duplicar; duplicar continua possível, mas só pelo item de menu "Colocar
+    outro".
+- **"Salvar aparência na ficha"** no menu do token (só com ficha vinculada): copia imagem, tamanho e
+  cor do token para `tokenDefaults` — um `character:update` explícito, o único caminho que
+  sobrescreve uma aparência já escolhida.

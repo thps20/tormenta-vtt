@@ -128,6 +128,11 @@ export function describeSpawn(count: number, creatureName: string): string {
   return count === 1 ? `soltar ${creatureName}` : `soltar ${count} cópias de ${creatureName}`;
 }
 
+/** "colocar <nome> no mapa" (character:place-token, §9.30 — só o token nasce, a ficha já existia). */
+export function describePlaceToken(characterName: string): string {
+  return `colocar ${characterName} no mapa`;
+}
+
 /** "soltar encontro <nome>" (encounter:spawn — várias criaturas, uma entrada de histórico só). */
 export function describeEncounterSpawn(encounterName: string): string {
   return `soltar encontro ${encounterName}`;

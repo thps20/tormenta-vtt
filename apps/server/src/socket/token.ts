@@ -12,6 +12,7 @@ import {
   TokenUpdateManySchema,
   applyResourceDelta,
   computeCharacter,
+  tokenDefaultsFromToken,
   type AppliedDamage,
   type SystemDefinition,
   type Token,
@@ -375,13 +376,21 @@ export function registerTokenHandlers(io: TypedServer, socket: TypedSocket): voi
       const row = await requireToken(tokenId, ctx.roomId);
       if (!canEditToken(ctx, row)) throw new HandlerError("Você não controla este token");
       await requirePlayerTokenOnActiveScene(ctx, row.sceneId);
-      if (characterId) {
-        // Jogador só vincula uma ficha que também é dele.
-        const character = toCharacter(await requireCharacter(characterId, ctx.roomId));
-        if (!canEditCharacter(ctx, character)) throw new HandlerError("Você não controla esta ficha");
-      }
+      // Jogador só vincula uma ficha que também é dele.
+      const character = characterId ? toCharacter(await requireCharacter(characterId, ctx.roomId)) : null;
+      if (character && !canEditCharacter(ctx, character)) throw new HandlerError("Você não controla esta ficha");
       const token = toToken(await prisma.token.update({ where: { id: tokenId }, data: { characterId } }));
       broadcastToken(io, ctx.roomId, token, "token:updated", sceneGeometry(toScene(row.scene)));
+
+      // §9.30: a PRIMEIRA vez que uma ficha ganha token é o momento em que ela aprende com que
+      // cara vai pro mapa — daí em diante "Colocar no mapa" repete essa aparência sozinho. Só
+      // preenche se ainda estiver vazia: uma aparência já escolhida nunca é sobrescrita por acaso
+      // (pra isso existe "Salvar aparência na ficha", um character:update explícito).
+      if (character && character.tokenDefaults === null) {
+        const data = CharacterDataSchema.parse({ ...characterDataOf(character), tokenDefaults: tokenDefaultsFromToken(token) });
+        const updated = toCharacter(await prisma.character.update({ where: { id: character.id }, data: { data: toJson(data) } }));
+        broadcastCharacter(io, ctx.roomId, updated, "character:updated");
+      }
       return token;
     }),
   );

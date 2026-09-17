@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CompendiumCreatureEntrySchema, CompendiumEntrySchema, CompendiumItemEntrySchema, type CompendiumCreatureEntry, type CompendiumItemEntry } from "../schemas/compendium.js";
 import { getSystemDefinition } from "../systems.js";
+import { normalizeTokenCells } from "./placement.js";
 import { characterItemToCompendiumBody, creatureColor, creatureSheetFromCharacterData, entryToCharacter, entryToItem, mergeCompendium, slugify, validateCompendiumEntry } from "./compendium.js";
 
 const def = getSystemDefinition("tormenta20");
@@ -213,6 +214,15 @@ describe("entryToCharacter", () => {
     expect(item?.id).toBe("id1");
     expect(item?.name).toBe("Adaga");
     expect(item?.actions.map((a) => a.id)).toEqual(["id2", "id3"]);
+  });
+
+  it("já nasce com tokenDefaults: tamanho pelo porte e cor pelo tipo da criatura (§9.30)", () => {
+    const result = entryToCharacter(def, creature(), () => "x");
+    expect(result.data.tokenDefaults).toEqual({
+      imageUrl: null,
+      cells: normalizeTokenCells(def.sizes.find((s) => s.key === "pequeno")?.tokenCells ?? 1),
+      color: creatureColor(def, creature()),
+    });
   });
 
   it("opts.name sobrescreve o nome (soltura em lote numerada); sem ele, usa o nome da entrada", () => {

@@ -14,6 +14,10 @@ import { rooms, type TypedServer } from "./types.js";
  * recria as MESMAS linhas (mesmos ids) a partir do snapshot capturado na hora do spawn. Usada tanto
  * por `compendium:spawn-creature` (uma criatura, N cópias) quanto por `encounter:spawn` (várias
  * criaturas do encontro, uma entrada de undo só) — só o `summary` e a origem de `results` mudam.
+ *
+ * `character: null` = só o token nasceu nesta ação, a ficha já existia antes ("Colocar no mapa",
+ * §9.30): aí desfazer apaga só o token e refazer recria só o token — a ficha, que é a prateleira do
+ * personagem, nunca entra no undo de uma colocação no mapa.
  */
 export function buildMultiSpawnHistoryEntry(
   io: TypedServer,
@@ -21,7 +25,7 @@ export function buildMultiSpawnHistoryEntry(
   sceneId: string,
   def: SystemDefinition,
   summary: string,
-  results: { character: Character; token: Token }[],
+  results: { character: Character | null; token: Token }[],
 ): HistoryEntry {
   return {
     summary,
@@ -35,14 +39,14 @@ export function buildMultiSpawnHistoryEntry(
         if (await adjustCombatForTokenRemoval(def, token.sceneId, token.id)) combatAffected = true;
       }
       const tokenIds = results.map((r) => r.token.id);
-      const characterIds = results.map((r) => r.character.id);
+      const characterIds = results.map((r) => r.character?.id).filter((id): id is string => id !== undefined);
       await prisma.token.deleteMany({ where: { id: { in: tokenIds } } });
-      await prisma.character.deleteMany({ where: { id: { in: characterIds } } });
+      if (characterIds.length > 0) await prisma.character.deleteMany({ where: { id: { in: characterIds } } });
       for (const { token, character } of results) {
         io.to(rooms.all(roomId)).emit("token:deleted", { tokenId: token.id });
         // Mesmo padrão de character:delete (socket/character.ts): broadcast geral, sem vazar nada
         // (é só o id) — jogador nunca teve o NPC no cache, então o remove() dele é um no-op.
-        io.to(rooms.all(roomId)).emit("character:deleted", { characterId: character.id });
+        if (character) io.to(rooms.all(roomId)).emit("character:deleted", { characterId: character.id });
       }
       if (combatAffected) await emitCombat(io, roomId, sceneId, { role: "gm", participantId: "" });
     },
@@ -50,16 +54,19 @@ export function buildMultiSpawnHistoryEntry(
       const scene = await prisma.scene.findUniqueOrThrow({ where: { id: sceneId } });
       const geom = sceneGeometry(toScene(scene));
       for (const { character, token } of results) {
-        const characterRow = await prisma.character.create({
-          data: {
-            id: character.id,
-            roomId: character.roomId,
-            ownerId: character.ownerId,
-            name: character.name,
-            kind: character.kind,
-            data: toJson(characterDataOf(character)),
-          },
-        });
+        if (character) {
+          const characterRow = await prisma.character.create({
+            data: {
+              id: character.id,
+              roomId: character.roomId,
+              ownerId: character.ownerId,
+              name: character.name,
+              kind: character.kind,
+              data: toJson(characterDataOf(character)),
+            },
+          });
+          broadcastCharacter(io, roomId, toCharacter(characterRow), "character:created");
+        }
         const tokenRow = await prisma.token.create({
           data: {
             id: token.id,
@@ -79,7 +86,6 @@ export function buildMultiSpawnHistoryEntry(
             conditions: token.conditions,
           },
         });
-        broadcastCharacter(io, roomId, toCharacter(characterRow), "character:created");
         broadcastToken(io, roomId, toToken(tokenRow), "token:created", geom);
       }
     },
