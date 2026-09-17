@@ -41,3 +41,16 @@ export type AudioSeekPayload = z.infer<typeof AudioSeekSchema>;
 /** Toca uma vez, por cima da trilha, sem entrar no estado (fogo-e-esquece). */
 export const AudioEffectSchema = z.object({ assetId: IdSchema });
 export type AudioEffectPayload = z.infer<typeof AudioEffectSchema>;
+
+// --- Preferência local de volume (§3.3) -----------------------------------------------------------
+
+/**
+ * Volume/silenciar do PRÓPRIO usuário, guardado no navegador (`localStorage`, chave `tvtt:audio`,
+ * mesmo padrão de `TabletopPrefsSchema`/`lib/tabletopPrefs.ts`) — nunca por sala nem sincronizado
+ * pelo servidor: cada um ouve no volume que quiser, sem mixagem nem "volume pra mesa" (§3.3).
+ */
+export const AudioUiPrefsSchema = z.object({
+  volume: z.number().min(0).max(1).default(1),
+  muted: z.boolean().default(false),
+});
+export type AudioUiPrefs = z.infer<typeof AudioUiPrefsSchema>;

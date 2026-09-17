@@ -26,6 +26,11 @@ interface TopBarProps {
   onOpenMacros?: () => void;
   /** Botão "Cast" (`CastMenu`, docs/plano-cast.md §5), montado pela página — só GM. */
   castMenu?: React.ReactNode;
+  /** Player da trilha tocando agora (`AudioPlayer`, docs/plano-preparo.md §3.3) — só GM, só
+   *  quando há trilha (a página decide `undefined` quando não há nada tocando). */
+  audioPlayer?: React.ReactNode;
+  /** Botão de volume (`VolumeControl`, docs/plano-preparo.md §3.3) — todo mundo, sempre montado. */
+  volumeControl?: React.ReactNode;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -42,6 +47,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   librarySelector,
   onOpenMacros,
   castMenu,
+  audioPlayer,
+  volumeControl,
 }) => {
   const [copied, setCopied] = useState(false);
   const isGM = me.role === "gm";
@@ -154,6 +161,8 @@ export const TopBar: React.FC<TopBarProps> = ({
         <div className="flex items-center gap-2 ml-1">
           {characterMenu}
           {castMenu}
+          {audioPlayer}
+          {volumeControl}
           {onOpenMacros && (
             <button
               id="btn-topbar-macros"

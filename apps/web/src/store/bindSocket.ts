@@ -20,6 +20,7 @@ import { useMacros } from "./macros";
 import { useCast } from "./cast";
 import { useLibrary } from "./library";
 import { usePrep } from "./prep";
+import { useAudio } from "./audio";
 import { toast } from "./ui";
 
 /**
@@ -112,6 +113,11 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("prep:stepUpserted", ({ step }) => usePrep.getState().upsertStep(step));
   socket.on("prep:stepRemoved", ({ sceneId, stepId }) => usePrep.getState().removeStepLocal(sceneId, stepId));
   socket.on("prep:reordered", ({ sceneId, order }) => usePrep.getState().applyReorder(sceneId, order));
+
+  // Sons (docs/plano-preparo.md §3): `audio:state` chega pro autor também (GM sempre está em
+  // rooms.gm) — nunca aplicamos otimista no `store/audio.ts#play/pause/...`, só reagimos aqui.
+  socket.on("audio:state", ({ state, serverNow }) => useAudio.getState().applyState(state, serverNow));
+  socket.on("audio:effect", ({ url }) => useAudio.getState().applyEffect(url));
 
   // Pinos no mapa (docs/plano-narracao.md): mesma regra de broadcast de mapa de sempre.
   socket.on("pin:created", ({ sceneId, pin }) => usePins.getState().upsertPin(sceneId, pin));

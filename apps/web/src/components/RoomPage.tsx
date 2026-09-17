@@ -85,6 +85,10 @@ import { useLibrary } from "../store/library";
 import { LibrarySelector } from "./LibrarySelector";
 import { LibraryDragGhost } from "./LibraryDragGhost";
 import { CREATURE_FILTER } from "../lib/compendium";
+import { useAudio } from "../store/audio";
+import { AudioEngine } from "./AudioEngine";
+import { AudioPlayer } from "./AudioPlayer";
+import { VolumeControl } from "./VolumeControl";
 
 const CENTER_ON_TURN_KEY = "tvtt:centerOnActiveTurn";
 const SIDE_PANEL_COLLAPSED_KEY = "tvtt:sidePanelCollapsed";
@@ -672,6 +676,7 @@ function Table() {
   const sheetOpen = openChar !== null || emptySheetOpen;
   const linkableCharacters = characters.filter((c) => canEditCharacter(me, c));
   const isGm = me.role === "gm";
+  const hasAudioTrack = useAudio((s) => s.track !== null);
 
   // --- Gabaritos de área de efeito: Ctrl+Z local do jogador (docs/plano-gabaritos.md §4) ---------
   // O GM já tem tudo isso pela pilha geral do servidor (socket/templates.ts empilha sozinho); aqui
@@ -1014,6 +1019,8 @@ function Table() {
               />
             ) : undefined
           }
+          audioPlayer={isGm && hasAudioTrack ? <AudioPlayer /> : undefined}
+          volumeControl={<VolumeControl />}
         />
       </div>
 
@@ -1223,6 +1230,7 @@ function Table() {
           )}
 
           <DiceOverlay3D />
+          <AudioEngine />
         </main>
 
         <SidePanel

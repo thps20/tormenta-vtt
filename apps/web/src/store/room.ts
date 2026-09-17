@@ -29,6 +29,7 @@ import { useEncounters } from "./encounters";
 import { useMacros } from "./macros";
 import { useLibrary } from "./library";
 import { usePrep } from "./prep";
+import { useAudio } from "./audio";
 import { useSceneList } from "./sceneList";
 import { useCast } from "./cast";
 import { toast } from "./ui";
@@ -223,6 +224,7 @@ export const useRoom = create<RoomState>((set, get) => ({
     useMacros.getState().reset();
     useLibrary.getState().reset();
     usePrep.getState().reset();
+    useAudio.getState().reset();
     useSceneList.getState().reset();
     // Desconectar e reconectar é o jeito simples de sair das salas do Socket.io.
     const socket = getSocket();
@@ -253,6 +255,9 @@ export const useRoom = create<RoomState>((set, get) => ({
     useMacros.getState().setAll(snap.macros);
     // Cast (docs/plano-cast.md): só o GM recebe `cast` — jogador e tela de exibição não tocam nisto.
     if (snap.cast) useCast.getState().hydrateFromCastState(snap.cast);
+    // Sons (docs/plano-preparo.md §3): `snap.audio` é pra TODO MUNDO (GM, jogador e, via
+    // `DisplaySnapshot`, a tela do Cast) — diferente de `cast` acima, não é gmOnly.
+    useAudio.getState().hydrateFromSnapshot(snap.audio);
 
     // Jogador sempre vê o ativo (derivado, sem sessionStorage). GM: restaura o mapa que estava
     // visitando (F5 no meio da preparação); se o id salvo não existe mais (mapa apagado) ou é o

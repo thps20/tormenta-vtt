@@ -37,7 +37,7 @@ import { useCharacters } from "../store/characters";
 import { useTokens } from "../store/tokens";
 import { useRoom } from "../store/room";
 import { usePrep } from "../store/prep";
-import { emitAck } from "../store/connection";
+import { useAudio } from "../store/audio";
 import { toast } from "../store/ui";
 import { LightMarkdownView } from "./LightMarkdownView";
 import { PrepAddItemDialog } from "./PrepAddItemDialog";
@@ -211,9 +211,9 @@ export const PrepPanel: React.FC<PrepPanelProps> = ({ sceneId, sceneName, scenes
             if (created) useTokens.getState().select(created.id);
             return created ? { ok: true } : { ok: false, error: "Falha ao criar o token" };
           }
-          // Áudio: dispara audio:play direto (etapa 6 troca por uma ação de store dedicada).
-          const res = await emitAck("audio:play", { assetId: asset.id, loop: item.options.audioMode !== "once" });
-          return res.ok ? { ok: true } : { ok: false, error: res.error };
+          // Áudio (etapa 6, store/audio.ts): toca via useAudio, mesmo contrato {ok, error?}.
+          const ok = await useAudio.getState().play(asset.id, item.options.audioMode !== "once");
+          return ok ? { ok: true } : { ok: false, error: "Falha ao tocar o áudio" };
         }
         case "handout": {
           const ok = await useHandouts.getState().show(ref.handoutId, "all");

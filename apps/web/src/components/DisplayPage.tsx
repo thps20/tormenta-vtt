@@ -11,6 +11,8 @@ import { sceneTemplates, useTemplates } from "../store/templates";
 import { useCharacters } from "../store/characters";
 import { useTools, type RemoteRuler } from "../store/tools";
 import { useCast } from "../store/cast";
+import { useAudio } from "../store/audio";
+import { AudioEngine } from "./AudioEngine";
 import { emitAck } from "../store/connection";
 import { setDisplayMode } from "../store/ui";
 import { useSystemDef } from "../lib/system";
@@ -81,6 +83,10 @@ export const DisplayPage: React.FC<DisplayPageProps> = ({ inviteCode, displayTok
   const templates = useMemo(() => sceneTemplates(templatesByScene, scene?.id), [templatesByScene, scene?.id]);
 
   const pinIcons = useMemo(() => resolvePinIcons(systemDef), [systemDef]);
+
+  // Sons (docs/plano-preparo.md §3.3): a tela toca a mesma trilha de todo mundo (`AudioEngine`
+  // abaixo); só falta o aviso de autoplay bloqueado, mais comum aqui — ninguém "clica" numa TV.
+  const audioBlocked = useAudio((s) => s.blocked);
 
   // Régua do Mestre (docs/plano-cast.md §9 decisão 3): já chega por `rooms.players` — só falta ler
   // (mesma store que RoomPage usa pro jogador ver a régua de outro participante).
@@ -308,6 +314,16 @@ export const DisplayPage: React.FC<DisplayPageProps> = ({ inviteCode, displayTok
           F: tela cheia · C: calibrar
         </div>
       )}
+
+      {/* Autoplay bloqueado (§3.3): mais comum aqui do que em RoomPage — ninguém "clica" numa TV.
+       *  Qualquer toque/tecla na tela (AudioEngine.tsx tem o listener global) destrava sozinho. */}
+      {audioBlocked && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-ui bg-black/70 text-zinc-300 text-xs font-ui pointer-events-none">
+          🔇 Toque a tela para ativar o som
+        </div>
+      )}
+
+      <AudioEngine />
 
       {/* Canto discreto que abre a calibração (docs/plano-cast.md §3.3) — invisível, só a tecla C
        *  costuma ser usada; a área existe pra telas sem teclado por perto. */}
