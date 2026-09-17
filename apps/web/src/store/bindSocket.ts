@@ -18,6 +18,7 @@ import { useDrawings } from "./drawings";
 import { useEncounters } from "./encounters";
 import { useMacros } from "./macros";
 import { useCast } from "./cast";
+import { useLibrary } from "./library";
 import { toast } from "./ui";
 
 /**
@@ -99,6 +100,12 @@ export function bindSocket(socket: Socket<ServerToClientEvents, ClientToServerEv
   socket.on("handout:updated", (h) => useHandouts.getState().upsertLibrary(h));
   socket.on("handout:deleted", ({ id }) => useHandouts.getState().removeFromLibrary(id));
   socket.on("handout:closed", ({ messageId }) => useHandouts.getState().closeIfOpen(messageId));
+
+  // Acervo (docs/plano-preparo.md §1): Asset e favoritos só chegam pro GM (rooms.gm).
+  socket.on("asset:created", (a) => useLibrary.getState().upsertAsset(a));
+  socket.on("asset:updated", (a) => useLibrary.getState().upsertAsset(a));
+  socket.on("asset:deleted", ({ id }) => useLibrary.getState().removeAssetLocal(id));
+  socket.on("library:favoritesChanged", ({ favorites }) => useLibrary.getState().setFavorites(favorites));
 
   // Pinos no mapa (docs/plano-narracao.md): mesma regra de broadcast de mapa de sempre.
   socket.on("pin:created", ({ sceneId, pin }) => usePins.getState().upsertPin(sceneId, pin));

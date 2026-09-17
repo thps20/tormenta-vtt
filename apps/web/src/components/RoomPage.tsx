@@ -32,12 +32,14 @@ import { useHistory } from "../store/history";
 import { useSceneList } from "../store/sceneList";
 import { selectEffectiveMode, useTools } from "../store/tools";
 import {
+  buildLibraryItems,
   computeCharacter,
   isPointRevealed,
   pickTokensToCarry,
   targetsFromTemplate,
   tokenCenter,
   withMapScale,
+  type Asset,
   type Drawing,
   type DrawingPatchPayload,
   type Handout,
@@ -78,6 +80,10 @@ import { MacroBar, useMacroBarController } from "./MacroBar";
 import { DragGhost, EncounterDragGhost } from "./compendium/DragGhost";
 import { useCompendium } from "../store/compendium";
 import { useEncounters } from "../store/encounters";
+import { useMacros } from "../store/macros";
+import { useLibrary } from "../store/library";
+import { LibrarySelector } from "./LibrarySelector";
+import { LibraryDragGhost } from "./LibraryDragGhost";
 import { CREATURE_FILTER } from "../lib/compendium";
 
 const CENTER_ON_TURN_KEY = "tvtt:centerOnActiveTurn";
@@ -842,6 +848,52 @@ function Table() {
     },
   };
 
+  // --- Acervo (docs/plano-preparo.md §1) ------------------------------------------------------
+  const libraryAssets = useLibrary((s) => s.assets);
+  const libraryFavorites = useLibrary((s) => s.favorites);
+  const libraryUploads = useLibrary((s) => s.uploads);
+  const loadLibraryAssets = useLibrary((s) => s.loadAssets);
+  const loadLibraryFavorites = useLibrary((s) => s.loadFavorites);
+  const updateAsset = useLibrary((s) => s.updateAsset);
+  const removeAsset = useLibrary((s) => s.removeAsset);
+  const toggleLibraryFavorite = useLibrary((s) => s.toggleFavorite);
+  const uploadAndCreateAsset = useLibrary((s) => s.uploadAndCreateAsset);
+  const encounterLibraryItems = useEncounters((s) => s.items);
+  const updateEncounterAction = useEncounters((s) => s.update);
+  const compendiumEntries = useCompendium((s) => s.entries);
+  const compendiumRoomIds = useCompendium((s) => s.roomIds);
+  const roomMacros = useMacros((s) => s.macros);
+
+  /** Combina Asset + handout/encontro/criatura(homebrew)/macro numa vista única (`rules/library.ts`,
+   *  §1.1 do plano) — cada lista já vem pré-filtrada por quem a possui, esta função só junta. */
+  const libraryItems = useMemo(
+    () =>
+      buildLibraryItems({
+        assets: libraryAssets,
+        handouts: handoutLibrary,
+        encounters: encounterLibraryItems,
+        creatures: compendiumEntries.filter((e) => compendiumRoomIds.includes(e.id)),
+        macros: roomMacros,
+        favorites: libraryFavorites,
+      }),
+    [libraryAssets, handoutLibrary, encounterLibraryItems, compendiumEntries, compendiumRoomIds, roomMacros, libraryFavorites],
+  );
+
+  const libraryDialogProps = {
+    items: libraryItems,
+    uploads: libraryUploads,
+    onUploadAsset: (file: File, override: Parameters<typeof uploadAndCreateAsset>[1]) => void uploadAndCreateAsset(file, override),
+    onToggleFavorite: (refKind: Parameters<typeof toggleLibraryFavorite>[0], refId: string, favorite: boolean) => void toggleLibraryFavorite(refKind, refId, favorite),
+    onEditAsset: (id: string, patch: Parameters<typeof updateAsset>[1]) => void updateAsset(id, patch),
+    onDeleteAsset: (id: string) => void removeAsset(id),
+    onEditHandout: (id: string, patch: Parameters<typeof updateHandout>[1]) => void updateHandout(id, patch),
+    onEditEncounter: (id: string, patch: Parameters<typeof updateEncounterAction>[1]) => void updateEncounterAction(id, patch),
+    /** O acervo não reimplementa o editor de homebrew — só abre a paleta do compêndio, já filtrável
+     *  em "Sala" por lá (§1.2 do plano: "botão Editar abre a tela deles"). */
+    onOpenCreature: () => useCompendium.getState().open("map", null),
+    onOpenMacro: (macroId: string) => macroBarController.setEditingId(macroId),
+  };
+
   // --- Pinos (docs/plano-narracao.md — unifica handout:pin com pino de nota) ----------------
   /** Card denormalizado a partir de um pino de handout (mesmos campos de HandoutCard, o pino só tem 3 a mais: id/sceneId/visible). */
   const pinToCard = (pin: Pin & { kind: "image" | "text" }): HandoutCard =>
@@ -856,6 +908,35 @@ function Table() {
   const handleHandoutDrop = (handout: Handout, point: { x: number; y: number }) => {
     if (!scene) return;
     void createPin({ kind: "handout", sceneId: scene.id, x: point.x, y: point.y, visible: true, handoutId: handout.id });
+  };
+
+  // --- Acervo (docs/plano-preparo.md §1.5) — arrastar um Asset até o mapa --------------------
+  /** Token: mesma criação "em branco" de `onTokenCreate`, só com a arte/nome do asset arrastado.
+   *  Mapa: pergunta antes de trocar o fundo (mesma conta de `window.confirm` usada em outros lugares
+   *  do projeto, ex. apagar mapa) e chama o MESMO `scene:setMap` do `MapConfigModal`. */
+  const handleAssetDrop = (asset: Asset, point: { x: number; y: number }) => {
+    if (!scene) return;
+    if (asset.kind === "token") {
+      const n = tokens.length + 1;
+      void createToken({
+        sceneId: scene.id,
+        name: asset.name,
+        imageUrl: asset.url,
+        x: point.x,
+        y: point.y,
+        cells: 1,
+        rotation: 0,
+        zIndex: n,
+        visible: true,
+        ownerId: null,
+        hp: null,
+        conditions: [],
+        color: TOKEN_COLORS[(n - 1) % TOKEN_COLORS.length] ?? "#e11d48",
+      }).then((created) => created && selectToken(created.id));
+      return;
+    }
+    if (!window.confirm(`Usar "${asset.name}" como fundo deste mapa?`)) return;
+    void setMap({ mapUrl: asset.url, mapWidth: asset.width, mapHeight: asset.height });
   };
 
   /** Ferramenta "Pino" (atalho P): clique no mapa guarda o ponto e abre o formulário de nota. */
@@ -906,6 +987,17 @@ function Table() {
           }
           handoutSelector={
             isGm ? <HandoutSelector gallery={handoutGalleryProps} onOpen={() => void loadHandoutLibrary()} /> : undefined
+          }
+          librarySelector={
+            isGm ? (
+              <LibrarySelector
+                dialog={libraryDialogProps}
+                onOpen={() => {
+                  void loadLibraryAssets();
+                  void loadLibraryFavorites();
+                }}
+              />
+            ) : undefined
           }
           onOpenMacros={() => macroBarController.setCreating(true)}
           castMenu={
@@ -1023,6 +1115,7 @@ function Table() {
                 onOpenPin={handleOpenPin}
                 onMovePin={isGm ? handleMovePin : undefined}
                 onHandoutDrop={isGm ? handleHandoutDrop : undefined}
+                onAssetDrop={isGm ? handleAssetDrop : undefined}
                 onPinToolClick={isGm ? handlePinToolClick : undefined}
                 drawings={drawings}
                 drawTool={isGm || playerDrawingEnabled ? { kind: drawKind, color: drawColor, strokeWidth: drawStrokeWidth, filled: drawFilled, visible: drawVisible } : null}
@@ -1222,6 +1315,7 @@ function Table() {
         />
       )}
       {isGm && <HandoutDragGhost />}
+      {isGm && <LibraryDragGhost />}
 
       {openNotePin && (
         <NotePinCard

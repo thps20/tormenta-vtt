@@ -1,4 +1,4 @@
-import type { CreateRoomBody, RoomPublic, UploadResult } from "@tormenta-vtt/shared";
+import type { CreateRoomBody, RoomPublic, UploadAudioResult, UploadResult } from "@tormenta-vtt/shared";
 import { SERVER_URL } from "../config";
 
 /** Chamadas HTTP (fora do socket). Erros viram exceções com a mensagem do servidor. */
@@ -34,6 +34,18 @@ export async function uploadImage(file: File): Promise<UploadResult> {
   const res = await fetch(`${SERVER_URL}/api/upload`, { method: "POST", body: form });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as UploadResult;
+}
+
+/**
+ * Mesma rota, aceitando também áudio (docs/plano-preparo.md §1.3, acervo) — `uploadImage` continua
+ * existindo à parte pros call sites que só lidam com imagem e não querem checar `kind`.
+ */
+export async function uploadFile(file: File): Promise<UploadResult | UploadAudioResult> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${SERVER_URL}/api/upload`, { method: "POST", body: form });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as UploadResult | UploadAudioResult;
 }
 
 /** O servidor guarda URLs relativas ("/uploads/x.png"); aqui viram absolutas. */

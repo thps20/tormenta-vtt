@@ -20,6 +20,8 @@ interface TopBarProps {
   mapSelector?: React.ReactNode;
   /** Seletor de handouts (`HandoutSelector`, docs/SPEC.md §9.10), ao lado do de mapa — só GM. */
   handoutSelector?: React.ReactNode;
+  /** Seletor do Acervo (`LibrarySelector`, docs/plano-preparo.md §1.5), ao lado do de handouts — só GM. */
+  librarySelector?: React.ReactNode;
   /** Abre o criador de macro (docs/SPEC.md §9.20) — GM e jogador, é preferência pessoal. */
   onOpenMacros?: () => void;
   /** Botão "Cast" (`CastMenu`, docs/plano-cast.md §5), montado pela página — só GM. */
@@ -37,6 +39,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   characterMenu,
   mapSelector,
   handoutSelector,
+  librarySelector,
   onOpenMacros,
   castMenu,
 }) => {
@@ -76,6 +79,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             </span>
           )}
           {handoutSelector}
+          {librarySelector}
           <span className="w-px h-4 bg-border mx-1" aria-hidden />
           <button
             onClick={handleCopyInvite}

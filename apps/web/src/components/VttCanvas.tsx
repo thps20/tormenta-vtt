@@ -22,6 +22,7 @@ import {
   type Character,
   type CharacterPatch,
   type CharacterRollRequest,
+  type Asset,
   type Combat,
   type CompendiumEntry,
   type ConditionDef,
@@ -233,6 +234,13 @@ interface VttCanvasProps {
    * mapa não aceita o drop.
    */
   onHandoutDrop?: (handout: Handout, point: { x: number; y: number }) => void;
+  /**
+   * Arrastar um card do Acervo (docs/plano-preparo.md §1.5) até o mapa — só `Asset{kind:"map"|"token"}`
+   * (áudio ainda não tem alvo no mapa nesta etapa: fica pra quando a aba Preparo existir). Mesmo
+   * alvo "mapa" dos outros arrastos (`lib/dropTargets.ts`, `accepts` distingue pela forma). GM only;
+   * ausente = o mapa não aceita o drop.
+   */
+  onAssetDrop?: (asset: Asset, point: { x: number; y: number }) => void;
   /** Ferramenta "Pino" (atalho P, docs/plano-narracao.md): clique no mapa abre o formulário de nota
    *  no ponto clicado (RoomPage guarda x/y e chama `pin:create` ao confirmar). GM only. */
   onPinToolClick?: (point: { x: number; y: number }) => void;
@@ -463,6 +471,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
   onOpenPin,
   onMovePin,
   onHandoutDrop,
+  onAssetDrop,
   onPinToolClick,
   drawings,
   drawTool,
@@ -929,6 +938,19 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
       onDrop: (handout, point) => onHandoutDrop(handout, mapPointFromClient(point)),
     });
   }, [onHandoutDrop]);
+
+  // Quarto alvo no MESMO id "map" (docs/plano-preparo.md §1.5): arrastar um Asset do Acervo. Só
+  // "map"/"token" têm alvo aqui — "audio" ainda não solta em lugar nenhum do mapa (a aba Preparo,
+  // que dá "lugar" a um áudio, é de uma etapa seguinte). `accepts` distingue pela forma: Asset é o
+  // único arrasto com `kind` igual a "map"/"token"/"audio" (Handout usa "image"/"text").
+  useEffect(() => {
+    if (!onAssetDrop) return;
+    return registerDropTarget<Asset>({
+      id: MAP_DROP_TARGET,
+      accepts: (entry) => typeof entry === "object" && entry !== null && "kind" in entry && (entry.kind === "map" || entry.kind === "token"),
+      onDrop: (asset, point) => onAssetDrop(asset, mapPointFromClient(point)),
+    });
+  }, [onAssetDrop]);
 
   // Terceiro alvo no MESMO id "map" (§9.14): arrastar um encontro salvo solta ele inteiro no ponto.
   // `accepts` distingue pela forma (SavedEncounter tem `entries`, que nem CompendiumEntry nem Handout têm).
@@ -2228,7 +2250,7 @@ export const VttCanvas = forwardRef<VttCanvasHandle, VttCanvasProps>(({
     <div
       ref={containerRef}
       id="vtt-canvas-container"
-      {...(onSpawnCreature || onHandoutDrop || onSpawnEncounter ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
+      {...(onSpawnCreature || onHandoutDrop || onSpawnEncounter || onAssetDrop ? { [DROP_TARGET_ATTR]: MAP_DROP_TARGET } : {})}
       // Modo imersivo (docs/SPEC.md §9.22): fundo fora do mapa vira a cor da preferência (padrão
       // quase preto); fora dele é o fundo da aplicação (token --bg).
       style={immersiveMode ? { backgroundColor: immersiveBgColor ?? DEFAULT_IMMERSIVE_BG_COLOR } : undefined}
