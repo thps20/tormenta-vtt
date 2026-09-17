@@ -1,15 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Dices, Scroll, Eye, Flame, MessageCircle, BookmarkPlus } from 'lucide-react';
+import { Send, Dices, Scroll, Eye, Flame, MessageCircle, Sparkles } from 'lucide-react';
 import {
-  hitRuleTargetLabel,
-  isCombinedAttackRoll,
+  addDieToFormula,
   type Character,
   type CharacterRollRequest,
   type ChatMessage,
-  type DiceRoll,
   type MacroAction,
   type Participant,
-  type RollTarget,
   type Token,
 } from '@tormenta-vtt/shared';
 import { canEditCharacter } from '../store/characters';
@@ -17,39 +14,21 @@ import { useChat } from '../store/chat';
 import { useTargets } from '../store/targets';
 import { useSystemDef } from '../lib/system';
 import { rollModeInfo } from '../lib/rollMode';
-import { loadRollDamageWithAttack, saveRollDamageWithAttack } from '../lib/rollPreferences';
-import { ApplyDamageButton } from './chat/ApplyDamageButton';
+import {
+  loadDiceAnimationMode,
+  loadRollDamageWithAttack,
+  saveDiceAnimationMode,
+  saveRollDamageWithAttack,
+  type DiceAnimationMode,
+} from '../lib/rollPreferences';
 import { HandoutCardMessage } from './chat/HandoutCardMessage';
 import { InitiativeBatchMessage } from './chat/InitiativeBatchMessage';
 import { ItemCardMessage } from './chat/ItemCardMessage';
+import { RollCardMessage } from './chat/RollCardMessage';
 import { RollModeButton } from './chat/RollModeButton';
 import { WhisperTargetButton } from './chat/WhisperTargetButton';
-import { DamageFormula, DamageTypeBadge } from './DamageTypeBadge';
 import { useHandouts } from '../store/handouts';
 import { pressedClass } from './MapBar';
-
-/** Soma dos totais das parcelas de dano — usado no bloco de dano de uma rolagem combinada (§9.13),
- *  onde `roll.total` é o total do ATAQUE, não do dano (que fica só em `roll.damage[]`). */
-function sumDamage(damage: NonNullable<DiceRoll['damage']>): number {
-  return damage.reduce((sum, d) => sum + d.total, 0);
-}
-
-/**
- * Sistema de alvos (docs/plano-alvos.md): uma linha por alvo de um ataque — "Acertou/Errou" (com
- * o número só quando o servidor mandou `targetValue`, ver services/chatVisibility.ts#rollTargetsForViewer
- * no servidor); "(N natural)" quando `attackAutoHit`/`attackAutoMiss` decidiu; sem regra de acerto
- * no sistema (ou alvo sem ficha), só o nome.
- */
-function targetLineText(def: ReturnType<typeof useSystemDef>, roll: DiceRoll, target: RollTarget): { text: string; color: string } {
-  const name = target.name;
-  if (target.reason === 'auto-hit') return { text: `Acertou ${name} (${roll.natural} natural)`, color: 'text-success' };
-  if (target.reason === 'auto-miss') return { text: `Errou ${name} (${roll.natural} natural)`, color: 'text-danger' };
-  if (target.hit === null) return { text: `→ ${name}`, color: 'text-text-muted' };
-  const verb = target.hit ? 'Acertou' : 'Errou';
-  if (target.targetValue === undefined) return { text: `${verb} ${name}`, color: target.hit ? 'text-success' : 'text-danger' };
-  const label = def?.rolls.attackHit ? hitRuleTargetLabel(def, def.rolls.attackHit) : 'alvo';
-  return { text: `${verb} ${name} (${roll.total} vs ${label} ${target.targetValue})`, color: target.hit ? 'text-success' : 'text-danger' };
-}
 
 /**
  * Rótulo do sussurro (docs/plano-narracao.md), quando `msg.whisperTo` está setado — texto e rolagem
@@ -108,6 +87,15 @@ export const ChatTab: React.FC<ChatTabProps> = ({
     saveRollDamageWithAttack(value);
     setRollDamageWithAttackState(value);
   };
+  // Animação de revelação da rolagem (docs/SPEC.md, item 3): "simples" (padrão), "3D" ou
+  // desligada — mesmo padrão de preferência por usuário, lida pelo RollCardMessage do cartão.
+  const [diceAnimationMode, setDiceAnimationModeState] = useState(loadDiceAnimationMode);
+  const cycleDiceAnimationMode = () => {
+    const next: Record<DiceAnimationMode, DiceAnimationMode> = { simple: '3d', '3d': 'off', off: 'simple' };
+    const value = next[diceAnimationMode];
+    saveDiceAnimationMode(value);
+    setDiceAnimationModeState(value);
+  };
   // Sistema de alvos (docs/plano-alvos.md §3.5): "Aplicar" pré-seleciona os alvos do CARD quando
   // ele tiver (roll.targets, ataque com acerto/erro); sem alvo no card, cai nos meus alvos atuais.
   const myTargetIds = useTargets((s) => s.mine);
@@ -118,6 +106,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
   const whispering = whisperTarget !== null;
   const modeInfo = rollModeInfo(rollMode);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -135,8 +124,26 @@ export const ChatTab: React.FC<ChatTabProps> = ({
     setInputText('');
   };
 
+  /**
+   * Botões d4..d100 da faixa "ROLAR:" (docs/SPEC.md): ACUMULAM na fórmula do campo, nunca rolam
+   * no clique — só Enter/enviar rola de verdade. Campo vazio ou sem comando de rolagem vira
+   * "/r 1d{sides}"; já sendo um comando (`/r`, `/gmr`...), soma o dado na fórmula existente
+   * (`addDieToFormula`, packages/shared/src/dice/parser.ts) preservando modificador e `# rótulo`.
+   */
   const handleQuickDice = (sides: number) => {
-    onSendMessage(`/r 1d${sides}`);
+    const match = /^\/(r|roll|gmr|gr|pr)\b\s*/i.exec(inputText);
+    if (!match) {
+      setInputText(`/r 1d${sides}`);
+      chatInputRef.current?.focus();
+      return;
+    }
+    const cmd = match[0].trimEnd();
+    const rest = inputText.slice(match[0].length);
+    const hashIdx = rest.indexOf('#');
+    const formulaPart = hashIdx === -1 ? rest : rest.slice(0, hashIdx);
+    const label = hashIdx === -1 ? '' : ` ${rest.slice(hashIdx)}`;
+    setInputText(`${cmd} ${addDieToFormula(formulaPart, sides)}${label}`);
+    chatInputRef.current?.focus();
   };
 
   /**
@@ -245,6 +252,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
                 msg={msg}
                 time={formatTime(msg.createdAt)}
                 isGm={me.role === 'gm'}
+                animationMode={diceAnimationMode}
                 onReveal={(messageId) => void revealMessage(messageId)}
               />
             );
@@ -295,242 +303,27 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             );
           }
 
-          // 4. DICE ROLL MESSAGE (HIGHLIGHTED) - Elegant Dark
+          // 4. DICE ROLL MESSAGE — cartão extraído pra RollCardMessage.tsx (hospeda o estado
+          // local da animação de revelação, docs/SPEC.md item 3).
           if (msg.kind === 'roll' && msg.roll) {
-            const roll = msg.roll;
-            // Parcelas de dano por tipo (só rolagens de dano da ficha; rolagens antigas não têm).
-            const damage = roll.damage && roll.damage.length > 0 ? roll.damage : null;
-            // Crítico a partir de critThreshold (ataques com margem ampliada); padrão = 20 natural.
-            const critFrom = roll.critThreshold ?? 20;
-            const isCritical =
-              roll.groups.some((g) => g.sides === 20 && g.rolls.some((r) => r >= critFrom));
-            const isFumble =
-              roll.groups.some((g) => g.sides === 20 && g.rolls.includes(1));
-            // "Rolar dano junto com o ataque" (§9.13): ataque em cima (roll.total/groups são DELE) e
-            // dano embaixo, num bloco à parte — não misturado no número do header como o dano avulso.
-            const combined = isCombinedAttackRoll(roll);
-            const rollWhisper = whisperLabel(msg, me, participants);
-            // Acionável (fica cartão) quando tem Aplicar (dano) ou Revelar (segredo, só o GM);
-            // rolagem simples (teste, ataque sem dano, já pública) é só uma linha de log.
-            const hasApply = !!damage || roll.applied.length > 0;
-            const hasReveal = msg.visibility !== 'all' && me.role === 'gm';
-            const actionable = hasApply || hasReveal;
-
             return (
-              <div
+              <RollCardMessage
                 key={msg.id}
-                id={`chat-msg-${msg.id}`}
-                data-whisper-to={msg.whisperTo ?? undefined}
-                className={actionable ? 'p-3 rounded-ui border border-border bg-surface-2' : 'py-1.5 border-b border-border'}
-              >
-                {/* Roll Header */}
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-bold uppercase tracking-tight text-text">{msg.nickname}</span>
-                    {isGm && <span className="text-[9px] px-1.5 py-0.2 rounded-ui bg-bg/40 border border-border text-text-muted font-bold">GM</span>}
-                    {rollWhisper && (
-                      <span className="flex items-center gap-1 text-[9px] px-1 rounded-ui bg-bg/40 border border-border text-text-muted lowercase">
-                        <MessageCircle className="w-2.5 h-2.5" />
-                        {rollWhisper}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {/* Só rolagem SOLTA (sem ficha) vira macro "roll" — a de ficha (atributo/perícia)
-                        já é ao vivo pela própria ficha, sem tipo de macro equivalente (§9.20). */}
-                    {!roll.characterId && (
-                      <button
-                        type="button"
-                        onClick={() => onSaveMacro({ type: 'roll', formula: roll.formula, label: roll.label }, roll.label || 'Rolagem')}
-                        title="Salvar como macro"
-                        className="focus-ring text-text-muted hover:text-text transition-colors cursor-pointer"
-                      >
-                        <BookmarkPlus className="w-3 h-3" />
-                      </button>
-                    )}
-                    <span className="text-[9px] font-data tabular-nums text-text-muted">
-                      {formatTime(msg.createdAt)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Roll Content Layout */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex flex-col flex-1 min-w-0">
-                    <span className="text-[11px] text-text-muted italic mb-1 truncate">
-                      {roll.label ? roll.label : 'Rolagem de dados'}
-                    </span>
-                    <div className="flex items-baseline gap-2">
-                      <span
-                        className={`text-2xl font-data tabular-nums font-bold tracking-tight ${
-                          isCritical ? 'text-accent' : isFumble ? 'text-danger' : 'text-text'
-                        }`}
-                      >
-                        {roll.total}
-                      </span>
-                      {/* Dano por tipo: uma parcela = só o selo; várias = "(7 [Fogo] + 14 [Frio])".
-                          Combinado (§9.13) não mistura aqui: o dano tem bloco próprio, embaixo. */}
-                      {damage && !combined && damage.length === 1 && damage[0] && <DamageTypeBadge def={def} type={damage[0].damageType} />}
-                      {damage && !combined && damage.length > 1 && (
-                        <span className="text-[11px] font-data tabular-nums text-text flex items-center gap-1 flex-wrap" data-damage-breakdown>
-                          (
-                          {damage.map((d, i) => (
-                            <React.Fragment key={i}>
-                              {i > 0 && <span className="text-text-muted">+</span>}
-                              <span className="font-bold text-text">{d.total}</span>
-                              <DamageTypeBadge def={def} type={d.damageType} />
-                            </React.Fragment>
-                          ))}
-                          )
-                        </span>
-                      )}
-                      <span className="text-[11px] font-data tabular-nums text-text-muted">
-                        {roll.groups.map((g) => `[${g.rolls.join(', ')}]`).join(' ')}
-                        {roll.modifier !== 0 && (
-                          <span>
-                            {' '}
-                            {roll.modifier > 0 ? `+ ${roll.modifier}` : `- ${Math.abs(roll.modifier)}`}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    {/* Fórmula do dano com o selo de cada parcela: "6d6 + 1 [Fogo] + 4d6 [Frio]". */}
-                    {damage && !combined && (
-                      <div className="mt-1 text-[10px] font-data text-text-muted" data-damage-formula>
-                        <DamageFormula def={def} components={damage} />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Notação do dado ("1d20"): rótulo simples, sem moldura decorativa. */}
-                  <span className="font-data text-[11px] text-text-muted shrink-0">
-                    {roll.groups[0] ? `${roll.groups[0].count}d${roll.groups[0].sides}` : 'd20'}
-                  </span>
-                </div>
-
-                {/* Sistema de alvos (docs/plano-alvos.md): uma linha por alvo do ataque. */}
-                {roll.targets.length > 0 && (
-                  <div className="mt-2 pt-1.5 border-t border-border space-y-0.5" data-roll-targets>
-                    {roll.targets.map((t) => {
-                      const { text, color } = targetLineText(def, roll, t);
-                      return (
-                        <div key={t.tokenId} className={`text-[11px] font-data ${color}`}>
-                          {text}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Dano combinado com o ataque (§9.13): bloco próprio, com o total/parcelas/fórmula
-                    do dano (roll.total ali em cima é do ATAQUE, não deste dano) e o aviso de
-                    crítico — confirmado (dado já multiplicado) ou só "possível" (o Mestre decide). */}
-                {combined && damage && (
-                  <div className="mt-2 pt-1.5 border-t border-border" data-combined-damage>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-[11px] text-text-muted italic">Dano</span>
-                      <span className="text-xl font-data tabular-nums font-bold text-text">{sumDamage(damage)}</span>
-                      {damage.length === 1 && damage[0] && <DamageTypeBadge def={def} type={damage[0].damageType} />}
-                      {damage.length > 1 && (
-                        <span className="text-[11px] font-data tabular-nums text-text flex items-center gap-1 flex-wrap">
-                          (
-                          {damage.map((d, i) => (
-                            <React.Fragment key={i}>
-                              {i > 0 && <span className="text-text-muted">+</span>}
-                              <span className="font-bold text-text">{d.total}</span>
-                              <DamageTypeBadge def={def} type={d.damageType} />
-                            </React.Fragment>
-                          ))}
-                          )
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 text-[10px] font-data text-text-muted" data-damage-formula>
-                      <DamageFormula def={def} components={damage} />
-                    </div>
-                    {isCritical && (
-                      <div
-                        className={`mt-1 flex items-center gap-1 text-[10px] font-ui ${roll.criticalConfirmed ? 'text-accent' : 'text-text'}`}
-                        data-critical={roll.criticalConfirmed ? 'confirmed' : 'possible'}
-                      >
-                        <Flame className="w-3 h-3" />
-                        {roll.criticalConfirmed ? 'Crítico confirmado! Dano já multiplicado.' : 'Possível crítico — confirme e ajuste o dano à mão.'}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {(damage || roll.applied.length > 0) && (
-                  <div className="mt-2 pt-1.5 border-t border-border flex items-center justify-between gap-2 flex-wrap" data-apply-damage>
-                    <ApplyDamageButton
-                      messageId={msg.id}
-                      roll={roll}
-                      tokens={tokens}
-                      characters={characters}
-                      participants={participants}
-                      def={def}
-                      me={me}
-                      onApply={applyDamage}
-                      preselectTokenIds={
-                        combined
-                          ? roll.targets.filter((t) => t.hit !== false).map((t) => t.tokenId) // sem alvo = [] de propósito (§9.13: "Aplicar" abre vazio)
-                          : roll.targets.length > 0
-                            ? roll.targets.map((t) => t.tokenId)
-                            : myTargetIds
-                      }
-                    />
-                    {roll.applied.length > 0 && (
-                      <span className="text-[10px] font-data tabular-nums text-text-muted" data-applied-log>
-                        Aplicado:{' '}
-                        {roll.applied.map((a, i) => (
-                          <React.Fragment key={i}>
-                            {i > 0 && ', '}
-                            <span
-                              className={a.amount < 0 ? 'text-danger' : 'text-success'}
-                              // Decomposição (§3.3): bruto/ajuste calculados pelo SERVIDOR pela
-                              // resposta a dano do alvo — só num tooltip, pra não inchar a linha
-                              // (cards de antes desta feature têm os dois em 0: sem tooltip).
-                              title={a.adjustment !== 0 ? `Bruto ${a.raw >= 0 ? '+' : ''}${a.raw} · resistência ${a.adjustment >= 0 ? '+' : ''}${a.adjustment} · aplicado ${a.amount >= 0 ? '+' : ''}${a.amount}` : undefined}
-                            >
-                              {a.tokenName} {a.amount >= 0 ? '+' : '−'}
-                              {Math.abs(a.amount)}
-                            </span>
-                            {a.multiplier && a.multiplier !== '1' && ` (${a.multiplier === '0.5' ? '½' : `×${a.multiplier}`})`}
-                          </React.Fragment>
-                        ))}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {msg.visibility !== 'all' && (() => {
-                  const vis = rollModeInfo(msg.visibility);
-                  const VisIcon = vis.icon;
-                  return (
-                    <div
-                      className="mt-2 pt-1.5 border-t border-border flex items-center justify-between gap-2 text-[10px] font-ui"
-                      data-visibility={msg.visibility}
-                    >
-                      <span className="flex items-center gap-1 text-text-muted">
-                        <VisIcon className="w-3 h-3" />
-                        <span>{msg.visibility === 'gm' ? 'Rolagem secreta: só o GM vê' : 'Rolagem própria: só você vê'}</span>
-                      </span>
-                      {me.role === 'gm' && (
-                        <button
-                          type="button"
-                          id={`reveal-${msg.id}`}
-                          onClick={() => void revealMessage(msg.id)}
-                          title="Tornar pública para todos"
-                          className="focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border border-accent text-accent hover:bg-surface-1 transition-colors cursor-pointer"
-                        >
-                          <Eye className="w-3 h-3" />
-                          Revelar
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
+                def={def}
+                msg={msg}
+                isGm={isGm}
+                time={formatTime(msg.createdAt)}
+                whisperLabel={whisperLabel(msg, me, participants)}
+                tokens={tokens}
+                characters={characters}
+                participants={participants}
+                me={me}
+                myTargetIds={myTargetIds}
+                animationMode={diceAnimationMode}
+                onApplyDamage={applyDamage}
+                onReveal={(messageId) => void revealMessage(messageId)}
+                onSaveMacro={onSaveMacro}
+              />
             );
           }
 
@@ -583,6 +376,20 @@ export const ChatTab: React.FC<ChatTabProps> = ({
             <Flame className="w-3 h-3" />
             Dano junto
           </button>
+          <button
+            type="button"
+            id="dice-animation-mode-btn"
+            onClick={cycleDiceAnimationMode}
+            aria-pressed={diceAnimationMode !== 'off'}
+            data-mode={diceAnimationMode}
+            title={`Animação da rolagem: ${
+              diceAnimationMode === 'simple' ? 'Simples' : diceAnimationMode === '3d' ? '3D' : 'Desligada'
+            }. Clique para alternar.`}
+            className={`focus-ring flex items-center gap-1 px-1.5 py-0.5 rounded-ui border font-ui text-[10px] uppercase tracking-wide transition-colors cursor-pointer select-none ${pressedClass(diceAnimationMode !== 'off')}`}
+          >
+            <Sparkles className="w-3 h-3" />
+            {diceAnimationMode === 'simple' ? 'Simples' : diceAnimationMode === '3d' ? '3D' : 'Desligada'}
+          </button>
         </div>
         <div className="flex items-center gap-0.5">
           {[4, 6, 8, 10, 12, 20, 100].map((sides) => (
@@ -603,6 +410,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({
         <div className="relative flex-1">
           <input
             id="chat-input-field"
+            ref={chatInputRef}
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}

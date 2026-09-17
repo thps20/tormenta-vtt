@@ -15,6 +15,17 @@ interface ChatState {
    * querer na mensagem seguinte.
    */
   whisperTarget: string | null;
+  /**
+   * Ids de rolagem (`roll` ou `initiative-batch`) que acabaram de "nascer" — mensagem nova com
+   * resultado, ou placeholder secreto que só agora ganhou `roll` (revelação). O cartão
+   * (`RollCardMessage`/`InitiativeBatchMessage`) lê e consome via `consumeRollAnimation` ao
+   * montar, pra tocar a animação de rolagem (docs/SPEC.md) uma vez só — `setAll` (hidratação de
+   * `room:join`) nunca popula isto, então recarregar a sala não anima o histórico.
+   */
+  pendingRollAnimations: Set<string>;
+  /** true (e some do set) se `id` estava marcado para animar; false se não (já consumido, ou
+   *  nunca foi uma rolagem nova — ex.: upsert de "aplicar dano"). */
+  consumeRollAnimation: (id: string) => boolean;
   setAll: (messages: ChatMessage[]) => void;
   /** Insere ou substitui (mesma mensagem revelada volta com visibility nova). */
   append: (msg: ChatMessage) => void;
@@ -44,21 +55,38 @@ export const useChat = create<ChatState>((set, get) => ({
   messages: [],
   rollMode: loadRollMode(),
   whisperTarget: null,
+  pendingRollAnimations: new Set(),
+  consumeRollAnimation: (id) => {
+    const has = get().pendingRollAnimations.has(id);
+    if (has) {
+      set((s) => {
+        const next = new Set(s.pendingRollAnimations);
+        next.delete(id);
+        return { pendingRollAnimations: next };
+      });
+    }
+    return has;
+  },
   setAll: (messages) => set({ messages }),
   append: (msg) =>
     set((s) => {
       const idx = s.messages.findIndex((m) => m.id === msg.id);
+      const prev = idx >= 0 ? s.messages[idx] : undefined;
+      const hadResult = prev !== undefined && (prev.kind === "initiative-batch" || (prev.kind === "roll" && !!prev.roll));
+      const hasResult = msg.kind === "initiative-batch" || (msg.kind === "roll" && !!msg.roll);
+      const pendingRollAnimations =
+        hasResult && !hadResult ? new Set(s.pendingRollAnimations).add(msg.id) : s.pendingRollAnimations;
       if (idx >= 0) {
         const next = s.messages.slice();
         next[idx] = msg;
-        return { messages: next };
+        return { messages: next, pendingRollAnimations };
       }
       // Mensagem revelada pode ser antiga: entra na posição do createdAt, não no fim.
       const next = s.messages.slice();
       let i = next.length;
       while (i > 0 && (next[i - 1]?.createdAt ?? "") > msg.createdAt) i--;
       next.splice(i, 0, msg);
-      return { messages: next.slice(-MAX_MESSAGES) };
+      return { messages: next.slice(-MAX_MESSAGES), pendingRollAnimations };
     }),
   setRollMode: (mode) => {
     saveRollMode(mode);
