@@ -26,7 +26,7 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 ## 3. Funcionalidades do MVP
 
 ### 3.1 Sala e convite
-- `POST /api/rooms { name, nickname }` → cria sala, cria participante GM, devolve `{ room, gmSecret, sessionToken }`.
+- `POST /api/rooms { name, nickname, ownerKey? }` → cria sala, cria participante GM, devolve `{ room, gmSecret, sessionToken }`. `ownerKey` é opcional (§9.31, "Minhas mesas") — sem ele, a sala não aparece em "Minhas mesas" de ninguém, mas continua acessível pelo link normal.
 - URL do GM: `/room/<inviteCode>?gm=<gmSecret>` — URL do jogador: `/room/<inviteCode>`. Qualquer uma
   aceita também `&session=<sessionToken>` (`lib/router.ts#consumeSessionParam`): grava o token no
   `localStorage` (mesma chave de sempre, por papel — "gm" se `?gm=` também estiver na URL, senão
@@ -36,8 +36,9 @@ Sem login: um `sessionToken` (cuid) é gravado no `localStorage` (chave por `inv
 - Ao abrir a URL, o cliente pede nickname (se não houver `sessionToken` salvo) e emite `room:join`.
 - Servidor responde com `RoomSnapshot` (estado completo, inclui `sessionToken`) e faz broadcast de `room:participantJoined`.
 - Ao desconectar, o servidor faz broadcast de `room:participantLeft { id }`; o participante **continua** na lista com `connected = false` (jogadores online = `connected = true`).
-- O Lobby (`/`) tem só dois cards: criar sala e entrar com código. Não há lista de salas recentes no MVP.
+- O Lobby (`/`) tem os dois cards de sempre (criar sala e entrar com código) mais a seção "Minhas mesas" (§9.31, setembro/2026): as salas deste navegador, com abrir/renomear/encerrar.
 - Ao criar a sala, o servidor cria automaticamente um mapa "Mapa 1" vazio e o define como ativo.
+- `room:join` numa sala encerrada (`Room.deletedAt`, §9.31) devolve o erro "Esta mesa foi encerrada" em vez de deixar entrar — vale tanto pro link do GM quanto pro de jogador.
 
 ### 3.2 Mapa e grid (GM)
 - `POST /api/upload` (multipart, PNG/JPG/WebP, máx. 20 MB) → salva em `apps/server/uploads/` e devolve `{ url, width, height }`.
@@ -165,7 +166,7 @@ Room 1───* Macro *───1 Participant
 
 | Entidade | Campos principais | Notas |
 |---|---|---|
-| **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId, party(JSON), displayToken?` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`). `activeSceneId` sempre aponta pra um mapa não apagado da sala (invariante mantida por `scene:activate`/`scene:delete`, §9.7). `party` = `PartyEntry[]` da Visão de grupo (§9.15, `{ characterId, hidden }[]`), não serializado em `RoomPublic`/`Room` do shared — vai à parte, já filtrado por papel, em `RoomSnapshot.party` (§5). `displayToken` (Cast, §9.23): token do link da tela de exibição, `null` = Cast desligado — nunca vai em `RoomPublic`; só ao GM, dentro de `RoomSnapshot.cast` |
+| **Room** | `id, name, inviteCode, gmSecret, systemId, activeSceneId, party(JSON), displayToken?, ownerKey?, deletedAt?` | `gmSecret` nunca vai ao cliente (ver `RoomPublicSchema`). `activeSceneId` sempre aponta pra um mapa não apagado da sala (invariante mantida por `scene:activate`/`scene:delete`, §9.7). `party` = `PartyEntry[]` da Visão de grupo (§9.15, `{ characterId, hidden }[]`), não serializado em `RoomPublic`/`Room` do shared — vai à parte, já filtrado por papel, em `RoomSnapshot.party` (§5). `displayToken` (Cast, §9.23): token do link da tela de exibição, `null` = Cast desligado — nunca vai em `RoomPublic`; só ao GM, dentro de `RoomSnapshot.cast`. `ownerKey`/`deletedAt` (§9.31, "Minhas mesas"): identidade local do Mestre dona da sala e soft delete de "encerrar mesa" — nenhum dos dois sai em `RoomPublic`/`RoomSnapshot`, só em `MyRoom` (`GET /api/rooms/mine`, gated pelo próprio `ownerKey`) |
 | **Participant** | `id, roomId, nickname, role, sessionToken` | `connected` é estado em memória, não persistido |
 | **Scene** | `id, roomId, name, mapUrl, mapWidth, mapHeight, grid(JSON), fog(JSON), order, arrival(JSON), gmNotes?, deletedAt?` | Múltiplos mapas por sala (§9.7). `grid` e `fog` são JSON para evoluir sem migration; `fog` segue `FogConfigSchema` (§9.3). `order`: posição no painel "Mapas", renumerada 0..n-1 a cada `scene:reorder`. `arrival` = `{x,y} \| null` (pixels do mapa): onde tokens levados de outro mapa aparecem ao ativar. `gmNotes` (docs/plano-narracao.md, §9.16): nota do Mestre sobre o mapa, markdown leve — coluna só do banco, **nunca** sai no `Scene` do shared (só `hasNotes: boolean`, calculado em `toScene`); o texto só sai por `scene:get-notes` (GM only). `deletedAt` (coluna só do banco, nunca serializada no `Scene` do shared, mesmo padrão de `Token.deletedAt`): soft delete de `scene:delete` — todo lugar que lista "mapas da sala agora" filtra `deletedAt: null`; limpeza definitiva depois de 30 dias (`services/cleanup.ts`) |
 | **Token** | `id, sceneId, name, imageUrl, x, y, cells, rotation, zIndex, visible, ownerId, color, characterId?, hp?(JSON), conditions(JSON: TokenCondition[]), notes?, deletedAt?` | Posição (`x, y`) em **pixels do mapa**, não em células (docs/plano-grid.md). `cells` (inteiro ≥ 1, ou exatamente 0.5 — meia célula, hoje só o Minúsculo de T20, `tokenCells` em `sizes[]`; um token de meia célula pode dividir a célula com outro) é a fonte da verdade do TAMANHO — lado do token em células, sempre quadrado; os pixels (`width`/`height` do `Token` do shared, nunca persistidos nem trafegados no socket) são derivados on-the-fly de `cells × cellSize do grid ATUAL da cena` (`tokenPixelSize`, `packages/shared/src/rules/placement.ts`) em quem precisa (canvas, espiral de posicionamento, névoa) — trocar de mapa ou editar o `cellSize` do mapa (`scene:updateGrid`) nunca precisa "converter" tamanho nenhum. `characterId` só muda por `token:link-character`. `hp` = `{ current, max } \| null` (§3.3), ignorado enquanto há `characterId`. `conditions` = `{ key, expiresRound? }[]` — chave de `SystemDefinition.conditions[]`, `expiresRound` comparado a `Combat.round` (§3.5), ausente = permanente; coluna `Json` no banco (não `String[]`, pra caber o objeto). `notes` (docs/plano-narracao.md, §9.16): nota do Mestre sobre o token — coluna só do banco, **nunca** sai no `Token` do shared (só `hasNotes: boolean`); redigido de novo pra jogador mesmo quando `true` (`redactTokenForViewer`, `services/visibility.ts`) — o indicador no token é "só o GM vê" mesmo sendo o dono. Texto só sai por `token:get-notes` (GM only). `deletedAt` (coluna só do banco, nunca serializada no `Token` do shared): soft delete de `token:delete`/`token:delete-many` (§9.6) — todo lugar que lista "tokens da cena agora" filtra `deletedAt: null`; a limpeza definitiva apaga a linha de vez depois de 30 dias (`services/cleanup.ts`). Uma nota sobrevive ao soft delete/desfazer do token normalmente (a coluna não é tocada por `token:delete`), mas `token:get-notes`/`token:set-notes` recusam um token soft-deleted (mesma regra "não encontrado" de qualquer handler normal) |
@@ -2013,3 +2014,46 @@ só a presença dela num mapa**. Nenhum conceito novo: nada de "ator", "prefab" 
 - **"Salvar aparência na ficha"** no menu do token (só com ficha vinculada): copia imagem, tamanho e
   cor do token para `tokenDefaults` — um `character:update` explícito, o único caminho que
   sobrescreve uma aparência já escolhida.
+
+### 9.31 Minhas mesas (identidade local do Mestre)
+
+Setembro/2026. Sem login (§2), não havia como o Lobby saber quais salas são "suas": cada sala só
+existia pra quem guardasse o link. `ownerKey` resolve isso com uma identidade **local ao
+navegador**, sem servidor de conta nenhum.
+
+- **`ownerKey`**: string opaca gerada no navegador (`crypto.randomUUID()`, `lib/ownerKey.ts`) e
+  guardada no `localStorage` numa chave **global** (`tvtt:ownerKey`, ao contrário do `sessionToken`
+  de `lib/session.ts`, que é por sala) — é a mesma para todas as mesas deste navegador. O servidor
+  nunca gera nem valida o formato, só compara com `Room.ownerKey` (`OwnerKeySchema`, string,
+  16–128 chars). É gerada preguiçosamente: só na primeira vez que o navegador cria ou adota uma
+  sala (`getOrCreateOwnerKey`), não em toda visita ao Lobby.
+- **`Room.ownerKey`** (coluna nullable, `@@index`): gravado na criação se `ownerKey` veio no body de
+  `POST /api/rooms`; `null` numa sala criada antes desta feature, ou criada sem essa opção.
+- **Lista "Minhas mesas"** (Lobby, abaixo dos cards de sempre): `GET /api/rooms/mine?ownerKey=&status=active|ended`
+  devolve `MyRoom[]` — nome, código, `gmSecret` (permite "Abrir" entrar direto como GM, sem repetir o
+  link secreto), última atividade (`createdAt` da `ChatMessage` mais recente da sala, ou o
+  `createdAt` da sala se não houve nenhuma), contagem de participantes e de mapas (`Scene` com
+  `deletedAt: null`). Cada rota de mutação (`PATCH /api/rooms/:id`, `POST /api/rooms/:id/end`,
+  `POST /api/rooms/:id/reopen`) confere `ownerKey` contra `Room.ownerKey` antes de agir
+  (`services/rooms.ts`); sala sem dono (`ownerKey: null`) ou dono diferente → 403.
+- **Encerrar mesa**: `POST /api/rooms/:id/end { ownerKey, confirmName }` grava `Room.deletedAt`
+  (mesmo padrão de soft delete de Token/Scene/Handout/Asset — a sala some da lista e do convite, mas
+  fica no banco). `confirmName` precisa bater com o nome atual da sala: a UI já exige digitar o nome
+  pra habilitar o botão, o servidor confere de novo como segunda trava. Não derruba quem já está
+  conectado — só bloqueia `room:join` novo (reconexão inclusive) com "Esta mesa foi encerrada"
+  (§3.1). Aba "Encerradas" no Lobby lista essas salas com um botão **Reabrir**
+  (`POST /api/rooms/:id/reopen`, limpa `deletedAt`). Limpeza definitiva depois de
+  `TOKEN_TRASH_RETENTION_DAYS` (30 dias, `services/cleanup.ts#purgeDeletedRooms`) apaga a linha de
+  vez — tudo que pende dela cai junto por `onDelete: Cascade`.
+- **Adotar sala antiga**: "Adicionar mesa que já tenho" no Lobby manda `POST /api/rooms/adopt
+  { inviteCode, gmSecret, ownerKey }` — a mesma checagem de segredo que `room:join` já faz pra virar
+  GM. Confirmado, grava (sobrescrevendo, se já havia) o `ownerKey` deste navegador na sala, que passa
+  a aparecer em "Minhas mesas". É como uma sala criada antes desta feature (`ownerKey: null`) entra
+  na lista sem perder nada, e também como uma mesma sala pode ser "adotada" de novo por outro
+  navegador de propósito.
+- **Exportar/importar a chave**: "copiar minha chave de Mestre" (gera uma se ainda não existir) e
+  "usar uma chave existente" (cola e substitui a deste navegador) — só `localStorage`, nenhuma rota
+  no servidor. A UI avisa que é uma credencial: quem tiver a chave vê e gerencia as mesmas mesas.
+- **Login futuro**: quando existir conta de verdade, `ownerKey` deixa de ser a identidade em si e
+  vira só o **vínculo inicial** — a conta nova "adota" (ou migra) as salas que já tinham esse
+  `ownerKey`, em vez de o usuário perder o acesso às mesas criadas sem login.
