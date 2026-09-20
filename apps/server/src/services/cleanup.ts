@@ -48,6 +48,16 @@ export async function purgeDeletedAssets(now: Date = new Date()): Promise<number
   return result.count;
 }
 
+/**
+ * Apaga de vez salas encerradas há mais de TOKEN_TRASH_RETENTION_DAYS dias (docs/SPEC.md §3.1,
+ * "Encerrar mesa"). Tudo que pende da sala (participantes, mapas, tokens, chat, fichas...) cai
+ * junto por `onDelete: Cascade` em cada tabela filha — não precisa apagar nada antes.
+ */
+export async function purgeDeletedRooms(now: Date = new Date()): Promise<number> {
+  const result = await prisma.room.deleteMany({ where: { deletedAt: { lt: retentionCutoff(now) } } });
+  return result.count;
+}
+
 /** Roda a limpeza uma vez no boot e depois a cada CLEANUP_INTERVAL_MS. Devolve o timer, pra
  *  encerramento limpo (index.ts já para todo o resto no SIGINT/SIGTERM). */
 export function scheduleTokenTrashCleanup(log: { info: (obj: unknown, msg?: string) => void; error: (obj: unknown, msg?: string) => void }): NodeJS.Timeout {
@@ -67,6 +77,11 @@ export function scheduleTokenTrashCleanup(log: { info: (obj: unknown, msg?: stri
         if (count > 0) log.info({ count }, "limpeza: itens do acervo apagados de vez (retenção expirada)");
       })
       .catch((err) => log.error({ err }, "limpeza do acervo falhou"));
+    purgeDeletedRooms()
+      .then((count) => {
+        if (count > 0) log.info({ count }, "limpeza: salas encerradas apagadas de vez (retenção expirada)");
+      })
+      .catch((err) => log.error({ err }, "limpeza de salas encerradas falhou"));
   };
   run();
   return setInterval(run, CLEANUP_INTERVAL_MS);

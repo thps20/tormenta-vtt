@@ -18,6 +18,9 @@ export function registerRoomHandlers(io: TypedServer, socket: TypedSocket): void
 
       const room = await prisma.room.findUnique({ where: { inviteCode: inviteCode.toUpperCase() } });
       if (!room) throw new HandlerError("Sala não encontrada");
+      // Encerrada (docs/SPEC.md §3.1, soft delete): o link de convite passa a responder isto em vez
+      // de deixar entrar. Não derruba quem já estava conectado — só bloqueia join/reconexão novos.
+      if (room.deletedAt) throw new HandlerError("Esta mesa foi encerrada");
 
       const me = await resolveParticipant(room.id, room.gmSecret, { nickname, gmSecret, sessionToken });
 
