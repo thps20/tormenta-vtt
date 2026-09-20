@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { Swords, Crown, Copy, Check, LogIn, PlusCircle, ArrowRight, Dices, KeyRound } from "lucide-react";
 import { createRoom } from "../lib/api";
+import { getOrCreateOwnerKey } from "../lib/ownerKey";
 import { navigate, roomPath } from "../lib/router";
 import { getLastNickname, setLastNickname, setSessionToken } from "../lib/session";
 import { useRoom } from "../store/room";
+import { MyRooms } from "./MyRooms";
 
 /**
  * Tela inicial: criar sala (vira GM) ou entrar com código (vira jogador).
@@ -35,7 +37,7 @@ export const Lobby: React.FC = () => {
     setCreateError(null);
     setCreating(true);
     try {
-      const res = await createRoom({ name, nickname });
+      const res = await createRoom({ name, nickname, ownerKey: getOrCreateOwnerKey() });
       // Guarda a sessão do GM para o room:join reconectar como o mesmo participante.
       setSessionToken(res.room.inviteCode, "gm", res.sessionToken);
       setLastNickname(nickname);
@@ -283,6 +285,10 @@ export const Lobby: React.FC = () => {
               </div>
             </form>
           </div>
+        </div>
+
+        <div className="flex justify-center">
+          <MyRooms />
         </div>
       </main>
 

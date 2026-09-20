@@ -161,7 +161,9 @@ export const useRoom = create<RoomState>((set, get) => ({
     );
 
     if (!res.ok) {
-      if (res.error === "Sala não encontrada") {
+      // Sala inexistente ou encerrada (docs/SPEC.md §3.1): mensagem final, não adianta pedir
+      // nickname de novo.
+      if (res.error === "Sala não encontrada" || res.error === "Esta mesa foi encerrada") {
         set({ status: { kind: "error", message: res.error } });
         return;
       }

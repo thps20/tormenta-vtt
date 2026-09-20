@@ -1,4 +1,14 @@
-import type { CreateRoomBody, RoomPublic, UploadAudioResult, UploadResult } from "@tormenta-vtt/shared";
+import type {
+  AdoptRoomBody,
+  CreateRoomBody,
+  EndRoomBody,
+  MyRoom,
+  ReopenRoomBody,
+  RenameRoomBody,
+  RoomPublic,
+  UploadAudioResult,
+  UploadResult,
+} from "@tormenta-vtt/shared";
 import { SERVER_URL } from "../config";
 
 /** Chamadas HTTP (fora do socket). Erros viram exceções com a mensagem do servidor. */
@@ -26,6 +36,55 @@ export async function createRoom(body: CreateRoomBody): Promise<CreateRoomRespon
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as CreateRoomResponse;
+}
+
+/** GET /api/rooms/mine — "Minhas mesas" do Lobby (docs/SPEC.md §3.1). */
+export async function listMyRooms(ownerKey: string, status: "active" | "ended"): Promise<MyRoom[]> {
+  const url = `${SERVER_URL}/api/rooms/mine?${new URLSearchParams({ ownerKey, status })}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(await parseError(res));
+  const body = (await res.json()) as { rooms: MyRoom[] };
+  return body.rooms;
+}
+
+export async function renameMyRoom(roomId: string, body: RenameRoomBody): Promise<MyRoom> {
+  const res = await fetch(`${SERVER_URL}/api/rooms/${roomId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return ((await res.json()) as { room: MyRoom }).room;
+}
+
+export async function endMyRoom(roomId: string, body: EndRoomBody): Promise<MyRoom> {
+  const res = await fetch(`${SERVER_URL}/api/rooms/${roomId}/end`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return ((await res.json()) as { room: MyRoom }).room;
+}
+
+export async function reopenMyRoom(roomId: string, body: ReopenRoomBody): Promise<MyRoom> {
+  const res = await fetch(`${SERVER_URL}/api/rooms/${roomId}/reopen`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return ((await res.json()) as { room: MyRoom }).room;
+}
+
+export async function adoptRoom(body: AdoptRoomBody): Promise<MyRoom> {
+  const res = await fetch(`${SERVER_URL}/api/rooms/adopt`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return ((await res.json()) as { room: MyRoom }).room;
 }
 
 export async function uploadImage(file: File): Promise<UploadResult> {
