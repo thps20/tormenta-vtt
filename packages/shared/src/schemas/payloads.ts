@@ -6,6 +6,7 @@ import { CharacterDataSchema, CharacterKindSchema, CharacterRollRequestSchema, E
 import { CompendiumIdSchema } from "./compendium.js";
 import { RollVisibilitySchema } from "./dice.js";
 import { TokenPatchSchema } from "./token.js";
+import { OwnerKeySchema } from "./room.js";
 
 /**
  * Schemas dos payloads que entram no servidor (socket e HTTP).
@@ -20,8 +21,48 @@ const NicknameSchema = z.string().trim().min(1).max(32);
 export const CreateRoomBodySchema = z.object({
   name: z.string().trim().min(1).max(80),
   nickname: NicknameSchema,
+  /** Identidade local de quem está criando (docs/SPEC.md §3.1). Opcional: sem ela, a sala não
+   *  aparece em "Minhas mesas" de ninguém (comportamento de antes desta feature). */
+  ownerKey: OwnerKeySchema.optional(),
 });
 export type CreateRoomBody = z.infer<typeof CreateRoomBodySchema>;
+
+/** GET /api/rooms/mine?ownerKey=&status= (docs/SPEC.md §3.1, "Minhas mesas"). */
+export const MyRoomsQuerySchema = z.object({
+  ownerKey: OwnerKeySchema,
+  status: z.enum(["active", "ended"]).default("active"),
+});
+export type MyRoomsQuery = z.infer<typeof MyRoomsQuerySchema>;
+
+/** PATCH /api/rooms/:id — renomear (só o dono). */
+export const RenameRoomBodySchema = z.object({
+  ownerKey: OwnerKeySchema,
+  name: z.string().trim().min(1).max(80),
+});
+export type RenameRoomBody = z.infer<typeof RenameRoomBodySchema>;
+
+/** POST /api/rooms/:id/end — encerrar (soft delete). `confirmName` é a mesma confirmação que a UI
+ *  já pede digitando o nome da sala; o servidor confere de novo como segunda trava. */
+export const EndRoomBodySchema = z.object({
+  ownerKey: OwnerKeySchema,
+  confirmName: z.string().min(1).max(80),
+});
+export type EndRoomBody = z.infer<typeof EndRoomBodySchema>;
+
+/** POST /api/rooms/:id/reopen — tira do soft delete. */
+export const ReopenRoomBodySchema = z.object({
+  ownerKey: OwnerKeySchema,
+});
+export type ReopenRoomBody = z.infer<typeof ReopenRoomBodySchema>;
+
+/** POST /api/rooms/adopt — "Adicionar mesa que já tenho": código + segredo de GM em troca de gravar
+ *  o `ownerKey` atual na sala (docs/SPEC.md §3.1, adoção de salas antigas). */
+export const AdoptRoomBodySchema = z.object({
+  inviteCode: z.string().trim().min(1).max(32),
+  gmSecret: z.string().min(1),
+  ownerKey: OwnerKeySchema,
+});
+export type AdoptRoomBody = z.infer<typeof AdoptRoomBodySchema>;
 
 export const UploadResultSchema = z.object({
   url: z.string().min(1),

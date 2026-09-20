@@ -33,6 +33,16 @@ model Room {
   /// tela que ainda usasse o antigo. null = Cast desligado (nunca gerado, ou revogado). NUNCA sai
   /// em `toRoomPublic`; só vai ao GM, dentro de `RoomSnapshot.cast` (services/display.ts).
   displayToken  String?  @unique
+  /// Identidade local do Mestre (docs/SPEC.md §3.1, "Minhas mesas" no Lobby): string opaca gerada
+  /// no navegador de quem criou (ou adotou) a sala, guardada no localStorage. null = sala sem dono
+  /// local — salas criadas antes desta feature ficam assim até serem adotadas (POST /api/rooms/adopt).
+  /// NUNCA sai em `toRoomPublic`/`RoomSnapshot`; só é comparado no servidor.
+  ownerKey      String?
+  /// Soft delete de "encerrar mesa" (mesmo padrão de Token.deletedAt): a sala e tudo que pende dela
+  /// continuam no banco (desfazer = reabrir, POST /api/rooms/:id/reopen); a limpeza definitiva de
+  /// 30 dias (services/cleanup.ts) apaga de vez. null = sala ativa. `room:join` recusa entrar numa
+  /// sala encerrada.
+  deletedAt     DateTime?
 
   scenes                Scene[]
   participants          Participant[]
@@ -46,6 +56,8 @@ model Room {
   macros                Macro[]
   assets                Asset[]
   libraryFavorites      LibraryFavorite[]
+
+  @@index([ownerKey])
 }
 
 model Participant {
